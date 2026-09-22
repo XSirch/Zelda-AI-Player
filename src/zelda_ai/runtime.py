@@ -302,6 +302,20 @@ def _best_traversal_probe(game: GameState, direction: str):
     return min(candidates, key=lambda p: (p.delta_y, p.distance))
 
 
+def _best_climb_surface_probe(game: GameState, direction: str):
+    # OoT wall flags: LADDER=0x02, LADDER_TOP=0x04, CLIMBABLE=0x08.
+    candidates = [p for p in game.navigation_probes
+        if p.wall_hit and p.wall_distance is not None and (p.wall_flags & 0x0E)]
+    if direction == "down":
+        tops = [p for p in candidates if p.wall_flags & 0x04]
+        if tops:
+            return min(tops, key=lambda p: (p.wall_distance, p.distance))
+        ladders = [p for p in candidates if p.wall_flags & 0x02]
+        return min(ladders, key=lambda p: (p.wall_distance, p.distance)) if ladders else None
+    climbable = [p for p in candidates if p.wall_flags & (0x02 | 0x08)]
+    return min(climbable, key=lambda p: (p.wall_distance, p.distance)) if climbable else None
+
+
 async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameState,
                           direction: str) -> dict:
     before = bridge.state
@@ -357,6 +371,28 @@ async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameS
             # Hanging at a ledge while descending: A-button "Down" releases to the lower surface.
             if direction == "down" and current.player.hanging_ledge and current.context_action.label == "down":
                 acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=100, settle_s=0.12)
+                continue
+
+            surface_probe = _best_climb_surface_probe(current, direction)
+            if surface_probe is not None and not current.player.climbing_ladder:
+                # Unlike floor deltas, this is direct collision-surface evidence of a ladder/climb wall.
+                # Center behind Link, then move toward the probed surface until OoT latches the climb state.
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=70, settle_s=0.04)
+                stick_x, stick_y = _probe_stick(surface_probe.direction)
+                command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=220)
+                await asyncio.sleep(0.20)
+                bridge.release()
+                await asyncio.sleep(0.08)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                last_probe = surface_probe.direction
+                probe_attempts += 1
+                if sample and sample.player and sample.player.climbing_ladder:
+                    continue
+                # A climbable wall approached from below may require the explicit Climb affordance.
+                if direction == "up" and sample and sample.player and (
+                        sample.player.can_climb or sample.context_action.label == "climb"):
+                    acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=100, settle_s=0.08)
                 continue
 
             # At a LADDER_TOP wall, OoT attaches Link by moving into the wall; A would be the wrong input.
