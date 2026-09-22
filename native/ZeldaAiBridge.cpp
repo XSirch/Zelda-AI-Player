@@ -299,9 +299,58 @@ json ActorJson(Actor* actor, Player* player) {
     };
 }
 
+Actor* ContextActor(Player* player, uint16_t doAction) {
+    if (!player) return nullptr;
+    switch (doAction) {
+        case DO_ACTION_OPEN:
+        case DO_ACTION_ENTER:
+            if (player->doorActor) return player->doorActor;
+            break;
+        case DO_ACTION_GRAB:
+        case DO_ACTION_THROW:
+        case DO_ACTION_DROP:
+            if (player->interactRangeActor) return player->interactRangeActor;
+            if (player->heldActor) return player->heldActor;
+            break;
+        case DO_ACTION_SPEAK:
+        case DO_ACTION_CHECK:
+            if (player->focusActor) return player->focusActor;
+            break;
+        default:
+            break;
+    }
+    if (player->interactRangeActor && player->interactRangeActor != &player->actor) {
+        return player->interactRangeActor;
+    }
+    if (player->focusActor && player->focusActor != &player->actor) {
+        return player->focusActor;
+    }
+    if (player->doorActor && player->doorActor != &player->actor) {
+        return player->doorActor;
+    }
+    return nullptr;
+}
+
+int ActorObservationPriority(Actor* actor, Actor* contextActor) {
+    if (!actor) return 99;
+    if (actor == contextActor || actor->isTargeted) return 0;
+    if (actor->textId != 0 || actor->category == ACTORCAT_NPC || actor->category == ACTORCAT_BOSS ||
+        actor->category == ACTORCAT_DOOR || actor->category == ACTORCAT_CHEST) return 1;
+    if (actor->category == ACTORCAT_ENEMY) return 2;
+    if (actor->category == ACTORCAT_SWITCH || actor->category == ACTORCAT_BG ||
+        actor->category == ACTORCAT_PROP || actor->category == ACTORCAT_ITEMACTION) return 3;
+    return 4;
+}
+
 json DrawnActors(Player* player) {
-    std::vector<std::pair<float, Actor*>> candidates;
+    struct Candidate {
+        int priority;
+        float distance;
+        Actor* actor;
+    };
+    std::vector<Candidate> candidates;
     const int room = gPlayState->roomCtx.curRoom.num;
+    Actor* contextActor = ContextActor(player, Data().doAction);
     for (int category = 0; category < ACTORCAT_MAX; ++category) {
         for (Actor* actor = gPlayState->actorCtx.actorLists[category].head; actor != nullptr; actor = actor->next) {
             if (actor == &player->actor || !actor->isDrawn || (actor->room != -1 && actor->room != room)) continue;
@@ -312,15 +361,17 @@ json DrawnActors(Player* player) {
             const float dz = a.z - p.z;
             const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
             if (std::isfinite(distance) && distance <= MAX_ACTOR_DISTANCE) {
-                candidates.emplace_back(distance, actor);
+                candidates.push_back({ActorObservationPriority(actor, contextActor), distance, actor});
             }
         }
     }
-    std::sort(candidates.begin(), candidates.end(),
-              [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate& lhs, const Candidate& rhs) {
+        if (lhs.priority != rhs.priority) return lhs.priority < rhs.priority;
+        return lhs.distance < rhs.distance;
+    });
     json result = json::array();
     for (size_t i = 0; i < candidates.size() && i < MAX_ACTORS; ++i) {
-        result.push_back(ActorJson(candidates[i].second, player));
+        result.push_back(ActorJson(candidates[i].actor, player));
     }
     return result;
 }
@@ -413,6 +464,7 @@ void Snapshot() {
         {"dialogue", json::object()},
         {"progress", json::object()},
         {"context_action", {{"code", bridge.doAction}, {"label", DoActionName(bridge.doAction)}}},
+        {"context_actor", nullptr},
         {"pause_menu", {{"active", false}, {"ready", false}, {"state", 0}, {"transition_state", 0},
             {"page_index", 0}, {"cursor_special_pos", 0}, {"cursor_point", json::array()},
             {"cursor_item", json::array()}, {"cursor_slot", json::array()},
@@ -517,6 +569,8 @@ void Snapshot() {
             Actor* target = gPlayState->actorCtx.targetCtx.targetedActor;
             if (!target) target = gPlayState->actorCtx.targetCtx.arrowPointedActor;
             if (target) state["target_actor"] = ActorJson(target, player);
+            Actor* contextActor = ContextActor(player, bridge.doAction);
+            if (contextActor) state["context_actor"] = ActorJson(contextActor, player);
             state["nearby_actors"] = DrawnActors(player);
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
