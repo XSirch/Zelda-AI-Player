@@ -27,7 +27,7 @@ Implemented skills:
 - shield_face(target_actor_id or target_position): orient Link then sustain R; useful for directional shield/reflection mechanics, but reflection success is NOT assumed
 - fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
-- explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger
+- explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger; wall recovery backs away before turning
 
 The state contract includes scene + scene_name, room, entrance_index, day_time/is_night, player pose/collision state, camera,
 raw inventory/equipment plus inventory_named entries (name/item_id/ammo when applicable) for items Link owns, pause-menu cursor state,
@@ -57,7 +57,9 @@ not explain how to obtain it. A world_transition event or a changed scene/room i
 Re-observe and replan.
 Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is active, then target_actor
 and nearby_actors to ground interactions. nearby_actors prioritizes contextual/targeted actors, NPCs,
-bosses, doors, chests and enemies before generic effects/props.
+bosses, doors, chests and enemies before generic effects/props. Actor category 10 is a door in OoT's actor
+category enum and category 11 is a chest. In an interior where the objective requires leaving or continuing,
+prefer interact_with_actor on an observed door instead of repeatedly probing the walls with free movement.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
@@ -70,14 +72,20 @@ interact_with_actor over many one-step move calls. Use interact_with_actor rathe
 specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. In an unknown area with no concrete target, use explore_area
 for several seconds; once a transition is discovered its exit/spawn coordinates become a known_world_edge. These are local steering controllers, NOT collision-aware global pathfinding:
 a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
-For free exploration, turn(left/right) plus short move probes remain valid. The runtime may replay a previously
-successful adaptive trajectory before calling you; replay success/failure appears in events. Current skills do
+For free exploration, turn(left/right) plus short move probes remain valid. move(back) is a first-class movement,
+not a last resort: when Link is close to a wall, corner, furniture, door frame or other obstruction, back up long
+enough to create clearance before choosing a new heading. Do not alternate forward/left/right probes while pinned.
+The local navigate/explore controllers also perform reverse-arc recovery automatically when collision/progress
+telemetry indicates they are stuck. The runtime may replay a previously successful adaptive trajectory before
+calling you; replay success/failure appears in events. Current skills do
 not yet solve global collision paths. aim_at provides local ranged alignment but does not infer line-of-sight, puzzle
 semantics or hit confirmation. fight_enemy is suitable for ordinary observed enemies;
 bosses with invulnerability phases or item-specific mechanics still require you to reason about the opening and use
 the appropriate item/interaction rather than repeatedly invoking generic melee.
-If stuck_score rises or a stuck_detected event appears, change strategy: recenter, backtrack, rotate/explore,
-or abandon the current local route instead of repeating the same action.
+If stuck_score rises or a stuck_detected event appears, change strategy. Prefer an explicit short move(back)
+when manual clearance is useful, then rotate/recenter and probe a genuinely different heading; abandon the local
+route if it still fails. An auto_unstick event means the runtime already performed a reverse escape, so reason from
+the new pose instead of immediately repeating the old forward/lateral action.
 
 Use position, yaw, camera vectors and last_result to verify progress. If movement produces little displacement,
 change heading instead of repeating the same action. Health is in native units: 16 units are one heart.
