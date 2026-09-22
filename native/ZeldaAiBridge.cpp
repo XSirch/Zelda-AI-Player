@@ -514,6 +514,8 @@ void Snapshot() {
                         {"slot", slot},
                         {"item_id", item},
                         {"name", SohUtils::GetItemName(item)},
+                        {"ammo", slot < ARRAY_COUNT(gSaveContext.inventory.ammo)
+                            ? json(gSaveContext.inventory.ammo[slot]) : json(nullptr)},
                     });
                 }
             }
