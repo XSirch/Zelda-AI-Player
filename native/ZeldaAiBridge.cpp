@@ -557,6 +557,24 @@ void RegisterZeldaAiBridge() {
             std::to_string(action) + ":" + DoActionName(action));
     });
 
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemReceive>([](GetItemEntry itemEntry) {
+        std::string detail = std::to_string(itemEntry.itemId);
+        if (itemEntry.modIndex == MOD_NONE && itemEntry.itemId < ITEM_LAST_USED) {
+            detail += ":" + SohUtils::GetItemName(itemEntry.itemId);
+        }
+        Event("item_received", detail);
+    });
+
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagSet>(
+        [](int16_t scene, int16_t flagType, int16_t flag) {
+            Event("scene_flag_set", std::to_string(scene) + ":" + std::to_string(flagType) + ":" + std::to_string(flag));
+        });
+
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagUnset>(
+        [](int16_t scene, int16_t flagType, int16_t flag) {
+            Event("scene_flag_unset", std::to_string(scene) + ":" + std::to_string(flagType) + ":" + std::to_string(flag));
+        });
+
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnEnemyDefeat>([](void* rawActor) {
         auto* actor = static_cast<Actor*>(rawActor);
         if (actor) Event("enemy_defeated", std::to_string(actor->id));
