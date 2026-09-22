@@ -29,7 +29,7 @@ function Monitor({ game }: { game: GameState | null }) {
   }
   return <section className="monitor panel"><div className="section-head"><span>01 / MONITOR DO JOGO</span><span className="muted">VÍDEO LOCAL · NÃO ENVIADO À IA</span></div>
     <div className="screen"><video ref={video} muted playsInline className={active ? '' : 'hidden'} />{!active && <div className="screen-empty"><div className="reticle">+</div><h2>{game?.source === 'simulator' ? 'Simulador de protocolo' : 'Seu jogo, nesta tela.'}</h2><p>{game?.source === 'simulator' ? 'Não há Zelda rodando no simulador. Ele testa controles, métricas e comunicação.' : 'Abra o Ship of Harkinian e selecione sua janela. A captura permanece neste navegador.'}</p><button onClick={capture}>Selecionar janela</button></div>}</div>
-    <div className="monitor-foot"><span>{game ? `SCENE ${game.scene} / ROOM ${game.room} / SAMPLE ${game.seq}` : 'AGUARDANDO TELEMETRIA'}</span>{active && <button className="small" onClick={stop}>Desconectar vídeo</button>}</div>{error && <p className="error">{error}</p>}</section>;
+    <div className="monitor-foot"><span>{game ? `${game.scene_name || `SCENE ${game.scene}`} / ROOM ${game.room} / SAMPLE ${game.seq}` : 'AGUARDANDO TELEMETRIA'}</span>{active && <button className="small" onClick={stop}>Desconectar vídeo</button>}</div>{error && <p className="error">{error}</p>}</section>;
 }
 
 function DialoguePanel({ game }: { game: GameState | null }) {
@@ -42,6 +42,16 @@ function DialoguePanel({ game }: { game: GameState | null }) {
       {dialogue.speaker && <p className="muted">SPEAKER ACTOR {dialogue.speaker.actor_id} · CAT {dialogue.speaker.category} · {number(dialogue.speaker.distance)} u</p>}
       {dialogue.choices.length > 0 && <ol className="choice-list">{dialogue.choices.map((choice, index) =>
         <li key={`${dialogue.text_id}-${index}`} className={index === dialogue.choice_index ? 'selected-choice' : ''}>{choice || `Opção ${index + 1}`}</li>)}</ol>}
+    </div>
+  </section>;
+}
+
+function InventoryPanel({ game }: { game: GameState | null }) {
+  if (!game?.inventory_named?.length) return null;
+  return <section className="panel inventory-panel">
+    <div className="section-head"><span>INVENTÁRIO OBSERVADO</span><span className="muted">{game.inventory_named.length} slots ocupados</span></div>
+    <div className="inventory-grid">{game.inventory_named.map(item =>
+      <div className="inventory-item" key={item.slot}><span>SLOT {item.slot} · ID {item.item_id}</span><strong>{item.name}</strong></div>)}
     </div>
   </section>;
 }
@@ -108,7 +118,7 @@ function App() {
       {game?.source === 'simulator' && <div className="notice">MODO SIMULADO — não é gameplay real e não pertence ao benchmark de Zelda.</div>}
       {error && <div role="alert" className="error-banner"><span>{error}</span><button aria-label="Fechar erro" onClick={() => setError('')}>×</button></div>}
       {snap?.reason && <div className="notice">Execução: {snap.reason}</div>}
-      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><DialoguePanel game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div><div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div><div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div><div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div><div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div><div><span>PAUSE</span><strong>{game?.pause_menu?.active ? `Página ${game.pause_menu.page_index} · cursor ${game.pause_menu.cursor_point?.[game.pause_menu.page_index] ?? '—'}` : 'Fechado'}</strong></div><div><span>GAME OVER</span><strong>{game?.game_over_state ? `Estado ${game.game_over_state}` : 'Não'}</strong></div><div><span>OCARINA</span><strong>{game?.ocarina_mode ? `Modo ${game.ocarina_mode} · última ${game.last_played_song}` : 'Inativa'}</strong></div></div>
+      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><DialoguePanel game={game}/><InventoryPanel game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div><div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div><div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div><div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div><div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div><div><span>PAUSE</span><strong>{game?.pause_menu?.active ? `Página ${game.pause_menu.page_index} · ${game.pause_menu.ready ? 'pronto' : `transição ${game.pause_menu.transition_state}`} · cursor ${game.pause_menu.cursor_slot?.[game.pause_menu.page_index] ?? '—'}` : 'Fechado'}</strong></div><div><span>GAME OVER</span><strong>{game?.game_over_state ? `Estado ${game.game_over_state}` : 'Não'}</strong></div><div><span>OCARINA</span><strong>{game?.ocarina_mode ? `Modo ${game.ocarina_mode} · última ${game.last_played_song}` : 'Inativa'}</strong></div></div>
       <section className="panel"><div className="section-head">03 / DECISÃO E RESULTADO</div><div className="decision"><span className="eyebrow">{snap?.last_decision?.skill ?? 'SEM AÇÃO'}</span><h3>{snap?.last_decision?.goal ?? 'Pronto para uma nova execução'}</h3><p>{snap?.last_decision?.summary ?? 'O modelo recebe um estado compacto e devolve uma decisão estruturada.'}</p>{snap?.last_result && <code>{snap.last_result.status} / {snap.last_result.reason}</code>}</div></section></div>
       <section className="panel controls"><div className="section-head">02 / AGENTE</div><form onSubmit={event => { event.preventDefault(); void action(start); }}>
         <label>Provider<select value={config.provider} onChange={e => update('provider', e.target.value)}><option value="codex">Codex · ChatGPT</option><option value="openrouter">OpenRouter · API</option>{providers.some(p => p.id === 'demo') && <option value="demo">Simulador determinístico</option>}</select></label>
