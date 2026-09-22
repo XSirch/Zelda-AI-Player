@@ -1021,7 +1021,8 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                         recovery_attempts = 0
 
             wall_contact = bool(current.player.bg_check_flags & 0x008)
-            if (wall_contact or stagnant >= 3) and recovery_attempts < 3:
+            obstructed = (wall_contact and stagnant >= 1) or stagnant >= 3
+            if obstructed and recovery_attempts < 3:
                 # Unknown rooms need clearance before another probe. Alternate reverse arcs on each retry.
                 recovery = await _backtrack_recovery(bridge, current, recovery_attempts)
                 acknowledged |= recovery["acknowledged"]
@@ -1039,7 +1040,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                     last_seq = sample.seq
                 continue
 
-            if (wall_contact or stagnant >= 3) and recovery_attempts >= 3:
+            if obstructed and recovery_attempts >= 3:
                 turn_ticks = max(turn_ticks, 6)
                 stagnant = 0
                 turn_side *= -1
@@ -1792,11 +1793,13 @@ class Runtime:
         recovery = await _backtrack_recovery(self.bridge, game, attempt)
         moved = recovery["distance"]
         turned = abs(recovery["yaw_delta"])
-        if recovery["world_changed"] or moved >= 8.0 or turned >= 1200:
+        recovered = recovery["world_changed"] or moved >= 8.0 or turned >= 1200
+        if recovered:
             self.stuck_score = max(2, self.stuck_score - 2)
-        self.last_result = {"status": "completed" if recovery["acknowledged"] else "failed",
-            "reason": "auto_unstick_reverse_escape", "distance": moved,
-            "yaw_delta": recovery["yaw_delta"], "recovery_attempt": attempt + 1,
+        self.last_result = {"status": "completed" if recovered else "failed",
+            "reason": "auto_unstick_reverse_escape" if recovered else "auto_unstick_no_progress",
+            "distance": moved, "yaw_delta": recovery["yaw_delta"],
+            "world_changed": recovery["world_changed"], "recovery_attempt": attempt + 1,
             "acknowledged": recovery["acknowledged"]}
         self.log("auto_unstick", self.last_result)
         return True
