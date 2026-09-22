@@ -229,6 +229,49 @@ def _is_door_actor(actor) -> bool:
     return actor is not None and (actor.category == 10 or actor.category_name == "door")
 
 
+def _door_intent_actor(game: GameState, decision: Decision):
+    doors = [actor for actor in game.room_actors if _is_door_actor(actor)]
+    if not doors:
+        return None
+
+    if decision.args.target_actor_id is not None:
+        target = _matching_actor(game, decision.args.target_actor_id, decision.args.target_actor_params)
+        if _is_door_actor(target):
+            return target
+
+    text = f"{decision.goal} {decision.summary}".lower()
+    exit_intent = any(token in text for token in (
+        "door", "exit", "leave", "outside", "entrance", "enter",
+        "porta", "sair", "saída", "saida", "entrada"))
+    if not exit_intent:
+        return None
+
+    if decision.skill == "navigate_to" and decision.args.target_position is not None:
+        px, py, pz = decision.args.target_position
+        near = [door for door in doors if math.dist(door.position, (px, py, pz)) <= 180.0]
+        return min(near, key=lambda actor: actor.distance) if near else None
+
+    if decision.skill in {"move", "turn", "camera_center", "explore_area"} and len(doors) == 1:
+        return doors[0]
+    return None
+
+
+def _as_door_interaction(decision: Decision, door) -> Decision:
+    args = decision.args.model_copy(update={
+        "target_actor_id": door.actor_id,
+        "target_actor_params": door.params,
+        "target_position": None,
+        "stop_distance": None,
+        "duration_ms": max(5000, decision.args.duration_ms),
+    })
+    return Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "interact_with_actor",
+        "summary": f"Use dedicated door controller: {decision.summary}"[:280],
+        "args": args.model_dump(),
+    })
+
+
 async def _wait_interaction_evidence(bridge: Bridge, observation: GameState, before_event_ids: set[str],
                                      timeout_s: float = 1.5) -> tuple[str | None, dict]:
     deadline = time.monotonic() + timeout_s
@@ -1546,6 +1589,16 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return {"status": "stale", "reason": "world_changed_during_inference", "skill": decision.skill}
     if not before.in_game:
         return {"status": "stale", "reason": "game_not_ready", "skill": decision.skill}
+
+    door = _door_intent_actor(before, decision)
+    if door is not None and decision.skill != "interact_with_actor":
+        requested_skill = decision.skill
+        promoted = _as_door_interaction(decision, door)
+        result = await _interact_with_door(bridge, promoted, observation)
+        result["requested_skill"] = requested_skill
+        result["door_intent_promoted"] = True
+        return result
+
     if decision.skill == "equip_item":
         return await _equip_item(bridge, decision, observation)
     if decision.skill == "equip_gear":
