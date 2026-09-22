@@ -1682,7 +1682,8 @@ class Runtime:
                     "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
                     "last_decision": self.last_decision, "last_result": self.last_result,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
-                    "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene)],
+                    "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
+                    "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
                     "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
                     "stuck_score": self.stuck_score,
                     "human_hints": list(self.hints)}
