@@ -18,10 +18,27 @@ from .providers.openrouter import reserve_cost
 from .store import Store
 
 CONTRACT_VERSION = "state-v2/skills-v1/trajectory-v1/prompt-v4"
-BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "R": 0x0010,
-    "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
+BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "START": 0x1000, "R": 0x0010,
+    "C_UP": 0x0008, "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
+MENU_SKILLS = {"pause_toggle", "menu_move", "menu_confirm", "menu_cancel", "menu_assign", "continue_gameover"}
 NAVIGATION_SKILLS = {"move", "turn", "interact", "wait", "camera_center", "roll", "backflip", "sidestep"}
+SONG_IDS = {"minuet": 0, "bolero": 1, "serenade": 2, "requiem": 3, "nocturne": 4, "prelude": 5,
+    "sarias": 6, "eponas": 7, "lullaby": 8, "suns": 9, "time": 10, "storms": 11}
+SONG_NOTES = {
+    "minuet": ["A", "C_UP", "C_LEFT", "C_RIGHT", "C_LEFT", "C_RIGHT"],
+    "bolero": ["C_DOWN", "A", "C_DOWN", "A", "C_RIGHT", "C_DOWN", "C_RIGHT", "C_DOWN"],
+    "serenade": ["A", "C_DOWN", "C_RIGHT", "C_RIGHT", "C_LEFT"],
+    "requiem": ["A", "C_DOWN", "A", "C_RIGHT", "C_DOWN", "A"],
+    "nocturne": ["C_LEFT", "C_RIGHT", "C_RIGHT", "A", "C_LEFT", "C_RIGHT", "C_DOWN"],
+    "prelude": ["C_UP", "C_RIGHT", "C_UP", "C_RIGHT", "C_LEFT", "C_UP"],
+    "sarias": ["C_DOWN", "C_RIGHT", "C_LEFT", "C_DOWN", "C_RIGHT", "C_LEFT"],
+    "eponas": ["C_UP", "C_LEFT", "C_RIGHT", "C_UP", "C_LEFT", "C_RIGHT"],
+    "lullaby": ["C_LEFT", "C_UP", "C_RIGHT", "C_LEFT", "C_UP", "C_RIGHT"],
+    "suns": ["C_RIGHT", "C_DOWN", "C_UP", "C_RIGHT", "C_DOWN", "C_UP"],
+    "time": ["C_RIGHT", "A", "C_DOWN", "C_RIGHT", "A", "C_DOWN"],
+    "storms": ["A", "C_DOWN", "C_UP", "A", "C_DOWN", "C_UP"],
+}
 SKILL_CATALOG = [
     {"id": "move", "name": "Translação curta", "status": "implemented", "version": "1.0"},
     {"id": "turn", "name": "Giro local com feedback de yaw", "status": "implemented", "version": "1.0"},
@@ -38,12 +55,18 @@ SKILL_CATALOG = [
     {"id": "target", "name": "Z-target", "status": "implemented", "version": "1.0"},
     {"id": "use_item", "name": "Usar item já equipado em C", "status": "implemented", "version": "1.0"},
     {"id": "wait", "name": "Esperar com controle neutro", "status": "implemented", "version": "1.0"},
+    {"id": "pause_toggle", "name": "Abrir/fechar pause menu", "status": "implemented", "version": "1.0"},
+    {"id": "menu_move", "name": "Mover cursor do pause menu", "status": "implemented", "version": "1.0"},
+    {"id": "menu_confirm", "name": "Confirmar seleção no menu", "status": "implemented", "version": "1.0"},
+    {"id": "menu_cancel", "name": "Cancelar/voltar no menu", "status": "implemented", "version": "1.0"},
+    {"id": "menu_assign", "name": "Atribuir item selecionado a C", "status": "implemented", "version": "1.0"},
+    {"id": "continue_gameover", "name": "Confirmar continue após game over", "status": "implemented", "version": "1.0"},
+    {"id": "play_song", "name": "Tocar música conhecida na ocarina", "status": "implemented", "version": "1.0"},
     {"id": "navigate", "name": "Navegação espacial até ator/saída/posição", "status": "planned", "version": None},
     {"id": "talk_to", "name": "Aproximar e conversar com ator", "status": "planned", "version": None},
-    {"id": "equip_item", "name": "Controle do pause menu e equipamento", "status": "planned", "version": None},
+    {"id": "equip_item", "name": "Equipar item por ID usando o pause menu", "status": "planned", "version": None},
     {"id": "aim_at", "name": "Mira calibrada para arco/estilingue/Hookshot", "status": "planned", "version": None},
     {"id": "fight_enemy", "name": "Combate composto com feedback", "status": "planned", "version": None},
-    {"id": "play_song", "name": "Execução de música na ocarina", "status": "planned", "version": None},
     {"id": "manipulate_object", "name": "Empurrar/puxar/carregar/lançar objetos", "status": "planned", "version": None},
     {"id": "explore_area", "name": "Exploração e grafo de saídas", "status": "planned", "version": None},
     {"id": "death_recovery", "name": "Game over e recuperação autônoma", "status": "planned", "version": None},
@@ -68,6 +91,8 @@ def controller_input(decision: Decision) -> tuple[int, int, int]:
         return BUTTONS["A"], 0, max(45, amount)
     if skill == "jump_attack":
         return BUTTONS["Z"] | BUTTONS["A"], 0, 0
+    if skill == "menu_move":
+        return 0, {"left": -60, "right": 60}.get(args.direction, 0), {"up": 60, "down": -60}.get(args.direction, 0)
     button = {
         "interact": BUTTONS["A"],
         "advance_dialogue": BUTTONS["A"],
@@ -77,8 +102,14 @@ def controller_input(decision: Decision) -> tuple[int, int, int]:
         "camera_center": BUTTONS["Z"],
         "wait": 0,
         "choose_dialogue": 0,
+        "pause_toggle": BUTTONS["START"],
+        "menu_confirm": BUTTONS["A"],
+        "menu_cancel": BUTTONS["B"],
+        "continue_gameover": BUTTONS["A"],
+        "play_song": 0,
+        "menu_move": 0,
     }.get(skill)
-    if skill == "use_item":
+    if skill in {"use_item", "menu_assign"}:
         button = BUTTONS[f"C_{args.slot.upper()}"]
     return button or 0, 0, 0
 
@@ -133,20 +164,67 @@ async def _choose_dialogue(bridge: Bridge, decision: Decision, observation: Game
         "choice_index": target, "acknowledged": acknowledged, "skill": decision.skill}
 
 
+async def _play_song(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    current = bridge.state
+    song = decision.args.song
+    if not current or not bridge.connected:
+        raise RuntimeError("bridge_disconnected")
+    if song not in SONG_NOTES:
+        return {"status": "failed", "reason": "unknown_song", "skill": decision.skill}
+    if current.ocarina_mode == 0:
+        return {"status": "failed", "reason": "ocarina_not_active", "skill": decision.skill}
+    before_event_ids = {event.id for event in current.events}
+    acknowledged = False
+    first_command = None
+    for note in SONG_NOTES[song]:
+        current = bridge.state
+        if not current or (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+            return {"status": "interrupted", "reason": "world_changed", "skill": decision.skill}
+        if current.ocarina_mode == 0:
+            return {"status": "interrupted", "reason": "ocarina_closed", "skill": decision.skill}
+        command_id = bridge.send(buttons=BUTTONS[note], lease_ms=90)
+        if first_command is None:
+            first_command = command_id
+        await asyncio.sleep(0.11)
+        bridge.release()
+        await asyncio.sleep(0.07)
+        sample = bridge.state
+        if sample and first_command is not None:
+            acknowledged |= sample.last_command_seq >= first_command
+    await asyncio.sleep(0.35)
+    after = bridge.state
+    if after and first_command is not None:
+        acknowledged |= after.last_command_seq >= first_command
+    expected = SONG_IDS[song]
+    confirmed = bool(after and any(
+        event.id not in before_event_ids and event.kind == "ocarina_song_action" and event.detail == str(expected)
+        for event in after.events))
+    return {"status": "completed" if acknowledged else "failed",
+        "reason": "song_confirmed" if confirmed else ("notes_sent" if acknowledged else "input_not_acknowledged"),
+        "song": song, "song_id": expected, "confirmed": confirmed,
+        "acknowledged": acknowledged, "skill": decision.skill}
+
+
 async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     before = bridge.state
     if not before or not bridge.connected:
         raise RuntimeError("bridge_disconnected")
     if (before.instance_id, before.scene_epoch) != (observation.instance_id, observation.scene_epoch):
         return {"status": "stale", "reason": "world_changed_during_inference", "skill": decision.skill}
-    if before.paused or not before.in_game:
+    if not before.in_game:
         return {"status": "stale", "reason": "game_not_ready", "skill": decision.skill}
+    if before.paused and decision.skill not in MENU_SKILLS:
+        return {"status": "stale", "reason": "pause_menu_active", "skill": decision.skill}
+    if not before.paused and decision.skill in {"menu_move", "menu_confirm", "menu_cancel", "menu_assign"}:
+        return {"status": "stale", "reason": "pause_menu_not_active", "skill": decision.skill}
     if before.dialogue.active and decision.skill not in DIALOGUE_SKILLS and decision.skill != "wait":
         return {"status": "stale", "reason": "dialogue_requires_handling", "skill": decision.skill}
-    if before.cutscene_active and not before.dialogue.active and decision.skill != "wait":
+    if before.cutscene_active and not before.dialogue.active and decision.skill not in {"wait", "continue_gameover"}:
         return {"status": "stale", "reason": "cutscene_active", "skill": decision.skill}
     if decision.skill == "choose_dialogue":
         return await _choose_dialogue(bridge, decision, observation)
+    if decision.skill == "play_song":
+        return await _play_song(bridge, decision, observation)
 
     buttons, x, y = controller_input(decision)
     start_yaw = before.player.yaw if before.player else None
@@ -165,8 +243,14 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
             if (current.instance_id, current.scene_epoch) != (before.instance_id, before.scene_epoch):
                 status, reason = "interrupted", "world_changed"
                 break
-            if current.paused or not current.in_game:
+            if not current.in_game:
                 status, reason = "interrupted", "game_not_ready"
+                break
+            if current.paused and decision.skill not in MENU_SKILLS:
+                status, reason = "interrupted", "pause_menu_opened"
+                break
+            if not current.paused and decision.skill in {"menu_move", "menu_confirm", "menu_cancel", "menu_assign"}:
+                status, reason = "interrupted", "pause_menu_closed"
                 break
             if (not before.dialogue.active and current.dialogue.active and
                     decision.skill not in DIALOGUE_SKILLS):
@@ -238,6 +322,8 @@ class Runtime:
         self.trajectory_tainted = False
         self.replaying_trajectory = False
         self.replay_attempts: set[tuple[str, int]] = set()
+        self.stuck_score = 0
+        self.stuck_notified_at = 0
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -253,6 +339,27 @@ class Runtime:
         if self.run_id:
             self.store.event(self.run_id, kind, data)
         self.publish(True)
+
+    def _update_stuck(self, decision: Decision, result: dict):
+        status = result.get("status")
+        reason = result.get("reason")
+        if status == "interrupted" and reason in {"world_changed", "dialogue_opened", "cutscene_started",
+                                                  "pause_menu_opened", "pause_menu_closed"}:
+            self.stuck_score = 0
+        elif status in {"failed", "stale"}:
+            self.stuck_score = min(20, self.stuck_score + 2)
+        elif decision.skill == "move" and (result.get("distance") or 0) >= 20:
+            self.stuck_score = max(0, self.stuck_score - 3)
+        elif decision.skill == "turn" and abs(result.get("yaw_delta") or 0) >= 1800:
+            self.stuck_score = max(0, self.stuck_score - 2)
+        else:
+            self.stuck_score = max(0, self.stuck_score - 1)
+        if self.stuck_score >= 6 and self.stuck_score - self.stuck_notified_at >= 2:
+            self.stuck_notified_at = self.stuck_score
+            self.replay_attempts.clear()
+            self.trajectory_tainted = True
+            self.log("stuck_detected", {"score": self.stuck_score, "last_skill": decision.skill,
+                "instruction": "Replan; do not repeat the same failed local action."})
 
     def _reset_trajectory_trace(self, state: GameState | None = None, *, tainted: bool = False):
         self.trajectory_trace.clear()
@@ -557,7 +664,7 @@ class Runtime:
                     raise ProviderFailure("bridge_disconnected")
                 if game.instance_id != self.game_instance:
                     raise ProviderFailure("game_instance_changed; start a new run")
-                if game.paused or not game.in_game:
+                if not game.in_game:
                     if time.monotonic() - self.started >= self.config.max_runtime_s:
                         raise ProviderFailure("runtime_budget_reached")
                     await asyncio.sleep(0.25)
@@ -580,6 +687,7 @@ class Runtime:
                     "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
                     "last_result": self.last_result, "events": list(self.recent)[-5:],
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene)],
+                    "stuck_score": self.stuck_score,
                     "human_hints": list(self.hints)}
                 prompt = json.dumps(observation, separators=(",", ":"), ensure_ascii=False)
                 self.budget_check(prompt)
@@ -625,6 +733,7 @@ class Runtime:
                     "stale": "skill_stale",
                 }.get(self.last_result["status"], "skill_result")
                 self.log(event_kind, self.last_result)
+                self._update_stuck(decision, self.last_result)
                 await asyncio.sleep(0.1)
         except asyncio.CancelledError:
             raise
