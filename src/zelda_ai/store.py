@@ -329,6 +329,7 @@ class Store:
             "known_cost_usd": round(cost, 8), "cost_usd": None if codex_calls or unknown_cost else round(cost, 8),
             "mean_latency_ms": sum(latencies) / len(latencies) if latencies else None,
             "deaths": kinds["player_died"], "boss_events": len(bosses),
+            "game_completions": kinds["game_completed"],
             "interventions": kinds["human_hint"] + kinds["take_control"],
             "skill_failures": kinds["skill_failed"], "vision_calls": 0,
             "trajectories_learned": kinds["trajectory_learned"],
