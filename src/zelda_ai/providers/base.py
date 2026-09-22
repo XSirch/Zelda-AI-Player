@@ -17,6 +17,7 @@ Implemented skills:
 - play_song(song) after an ocarina has already been activated; the executor sends the complete learned note sequence
 - navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate; use 4000-8000 ms for room-scale travel
 - approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
+- follow_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a moving observed actor for a bounded window; useful for races/guides
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
 - interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
