@@ -283,6 +283,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     best_distance = float("inf")
     stagnant_samples = 0
     recentered = False
+    detour_attempts = 0
     last_actor = None
     last_progress_seq = -1
 
@@ -366,6 +367,13 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 else:
                     stagnant_samples += 1
 
+            if (current.player.bg_check_flags & 0x008) and stagnant_samples >= 4 and detour_attempts < 2:
+                # Local collision recovery only: sidestep around the contact, then resume target steering.
+                side = 60 if detour_attempts == 0 else -60
+                acknowledged |= await _pulse(bridge, stick_x=side, stick_y=20, hold_ms=260, settle_s=0.06)
+                detour_attempts += 1
+                stagnant_samples = 0
+                continue
             if stagnant_samples >= 5 and not recentered:
                 bridge.release()
                 acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=80, settle_s=0.15)
