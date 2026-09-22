@@ -70,7 +70,7 @@ SKILL_CATALOG = [
     {"id": "interact_with_actor", "name": "Aproximar/interagir com ator e verificar efeito", "status": "implemented", "version": "2.0"},
     {"id": "equip_item", "name": "Equipar item possuído em C via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "equip_gear", "name": "Equipar espada/escudo/túnica/botas via pause menu", "status": "implemented", "version": "2.0"},
-    {"id": "aim_at", "name": "Mira calibrada para arco/estilingue/Hookshot", "status": "planned", "version": None},
+    {"id": "aim_at", "name": "Mira fechada e disparo com item C equipado", "status": "implemented", "version": "2.0"},
     {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
     {"id": "manipulate_object", "name": "Empurrar/puxar/carregar/lançar objetos", "status": "planned", "version": None},
     {"id": "explore_area", "name": "Exploração e grafo de saídas", "status": "planned", "version": None},
@@ -393,6 +393,145 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
         "target_distance": (last_actor.distance if last_actor else None),
         "distance": math.dist(start_position, after.player.position) if after and after.player else None,
         "acknowledged": acknowledged, "skill": decision.skill}
+
+
+def _aim_error(game: GameState, target: tuple[float, float, float]) -> tuple[float, float] | None:
+    if game.camera_eye is None or game.camera_at is None:
+        return None
+    eye = game.camera_eye
+    at = game.camera_at
+    current = (at[0] - eye[0], at[1] - eye[1], at[2] - eye[2])
+    desired = (target[0] - eye[0], target[1] - eye[1], target[2] - eye[2])
+    cur_h = math.hypot(current[0], current[2])
+    dst_h = math.hypot(desired[0], desired[2])
+    if cur_h < 1e-4 or dst_h < 1e-4:
+        return None
+    current_yaw = math.atan2(current[0], current[2])
+    desired_yaw = math.atan2(desired[0], desired[2])
+    yaw_error = (desired_yaw - current_yaw + math.pi) % (2 * math.pi) - math.pi
+    current_pitch = math.atan2(current[1], cur_h)
+    desired_pitch = math.atan2(desired[1], dst_h)
+    return yaw_error, desired_pitch - current_pitch
+
+
+def _aim_stick(error: float, sign: int) -> int:
+    degrees = math.degrees(error)
+    if abs(degrees) < 1.2:
+        return 0
+    magnitude = max(12, min(55, round(abs(degrees) * 2.2)))
+    return magnitude * (1 if degrees > 0 else -1) * sign
+
+
+async def _aim_at(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    current = bridge.state
+    if not current or not current.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+        return {"status": "stale", "reason": "gameplay_state_blocks_aim", "skill": decision.skill}
+
+    slot = decision.args.slot
+    if slot is None:
+        return {"status": "failed", "reason": "aim_slot_missing", "skill": decision.skill}
+    button_index = {"left": 1, "down": 2, "right": 3}[slot]
+    if len(current.equipped) <= button_index or current.equipped[button_index] in {0xFE, 0xFF}:
+        return {"status": "failed", "reason": "aim_slot_empty", "slot": slot, "skill": decision.skill}
+    item_id = current.equipped[button_index]
+    button = BUTTONS[f"C_{slot.upper()}"]
+
+    deadline = time.monotonic() + min(8.0, max(0.6, decision.args.duration_ms / 1000))
+    first_command = None
+    acknowledged = False
+    sign_x = sign_y = 1
+    flipped_x = flipped_y = False
+    previous_abs = None
+    previous_stick = (0, 0)
+    stable = 0
+    last_seq = -1
+    before_events = {event.id for event in current.events}
+
+    # Give the equipped aiming item a short moment to enter first-person/aim state.
+    first_command = bridge.send(buttons=button, lease_ms=300)
+    await asyncio.sleep(0.22)
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "interrupted", "reason": "world_changed", "skill": decision.skill}
+            if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+                return {"status": "interrupted", "reason": "gameplay_state_changed", "skill": decision.skill}
+
+            if current.last_command_seq >= first_command:
+                acknowledged = True
+            if current.seq == last_seq:
+                await asyncio.sleep(0.04)
+                continue
+            last_seq = current.seq
+
+            actor = None
+            if decision.args.target_actor_id is not None:
+                actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+                if actor is None:
+                    return {"status": "failed", "reason": "aim_target_actor_not_observed",
+                        "item_id": item_id, "skill": decision.skill}
+                target = actor.focus_position or actor.position
+            else:
+                target = decision.args.target_position
+            error = _aim_error(current, target)
+            if error is None:
+                return {"status": "failed", "reason": "camera_state_unavailable",
+                    "item_id": item_id, "skill": decision.skill}
+            yaw_error, pitch_error = error
+            abs_error = (abs(yaw_error), abs(pitch_error))
+
+            if previous_abs is not None:
+                if previous_stick[0] != 0 and abs_error[0] > previous_abs[0] + math.radians(0.5) and not flipped_x:
+                    sign_x *= -1
+                    flipped_x = True
+                if previous_stick[1] != 0 and abs_error[1] > previous_abs[1] + math.radians(0.5) and not flipped_y:
+                    sign_y *= -1
+                    flipped_y = True
+
+            if abs_error[0] <= math.radians(2.2) and abs_error[1] <= math.radians(2.2):
+                stable += 1
+                if stable >= 2:
+                    bridge.release()  # Releasing the held C-button fires bow/slingshot/hookshot-style items.
+                    await asyncio.sleep(0.35)
+                    after = bridge.state
+                    defeated = None
+                    if after:
+                        acknowledged |= after.last_command_seq >= first_command
+                        defeated = next((event for event in after.events
+                            if event.id not in before_events and event.kind in {"enemy_defeated", "boss_defeated"}
+                            and (decision.args.target_actor_id is None or
+                                 event.detail == str(decision.args.target_actor_id))), None)
+                    return {"status": "completed",
+                        "reason": defeated.kind if defeated else "aligned_shot_released",
+                        "item_id": item_id, "slot": slot,
+                        "yaw_error_deg": round(math.degrees(yaw_error), 2),
+                        "pitch_error_deg": round(math.degrees(pitch_error), 2),
+                        "target_defeated": defeated is not None,
+                        "acknowledged": acknowledged, "skill": decision.skill}
+            else:
+                stable = 0
+
+            stick_x = _aim_stick(yaw_error, sign_x)
+            stick_y = _aim_stick(pitch_error, sign_y)
+            previous_abs = abs_error
+            previous_stick = (stick_x, stick_y)
+            command_id = bridge.send(buttons=button, stick_x=stick_x, stick_y=stick_y, lease_ms=260)
+            if first_command is None:
+                first_command = command_id
+            await asyncio.sleep(0.10)
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "failed", "reason": "aim_timeout", "item_id": item_id, "slot": slot,
+        "acknowledged": bool(after and after.last_command_seq >= first_command) or acknowledged,
+        "skill": decision.skill}
 
 
 async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
@@ -817,6 +956,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
     if decision.skill == "interact_with_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True, interact=True)
+    if decision.skill == "aim_at":
+        return await _aim_at(bridge, decision, observation)
     if decision.skill == "fight_enemy":
         return await _fight_enemy(bridge, decision, observation)
     if before.paused and decision.skill not in MENU_SKILLS:
