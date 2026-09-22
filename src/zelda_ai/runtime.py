@@ -73,7 +73,7 @@ SKILL_CATALOG = [
     {"id": "aim_at", "name": "Mira fechada e disparo com item C equipado", "status": "implemented", "version": "2.0"},
     {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
     {"id": "manipulate_object", "name": "Empurrar/puxar/carregar/lançar objetos", "status": "planned", "version": None},
-    {"id": "explore_area", "name": "Exploração e grafo de saídas", "status": "planned", "version": None},
+    {"id": "explore_area", "name": "Exploração local com colisão e descoberta", "status": "implemented", "version": "2.0"},
     {"id": "death_recovery", "name": "Game over e recuperação autônoma", "status": "planned", "version": None},
     {"id": "vision_fallback", "name": "Visão sob demanda após falhas estruturadas", "status": "planned", "version": None},
 ]
@@ -630,6 +630,99 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
         "acknowledged": acknowledged, "skill": decision.skill}
 
 
+async def _explore_area(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    if before.paused or before.dialogue.active or before.cutscene_active or before.game_over_state != 0:
+        return {"status": "stale", "reason": "gameplay_state_blocks_exploration", "skill": decision.skill}
+
+    baseline_actors = {(actor.actor_id, actor.params) for actor in before.nearby_actors}
+    baseline_context = before.context_action.label
+    start_health = before.player.health
+    start_position = before.player.position
+    deadline = time.monotonic() + min(12.0, max(1.0, decision.args.duration_ms / 1000))
+    last_position = start_position
+    last_seq = before.seq
+    stagnant = 0
+    turn_ticks = 0
+    turn_side = 1
+    first_command = None
+    acknowledged = False
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "completed", "reason": "transition_discovered",
+                    "from": [observation.scene, observation.room],
+                    "to": [current.scene, current.room],
+                    "distance": math.dist(start_position, current.player.position) if current.player else None,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+                return {"status": "completed", "reason": "interactive_state_discovered",
+                    "dialogue": current.dialogue.active, "cutscene": current.cutscene_active,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            if first_command is not None:
+                acknowledged |= current.last_command_seq >= first_command
+            new_actors = [actor for actor in current.nearby_actors
+                if (actor.actor_id, actor.params) not in baseline_actors]
+            if new_actors:
+                actor = min(new_actors, key=lambda row: row.distance)
+                return {"status": "completed", "reason": "actor_discovered",
+                    "actor": actor.model_dump(), "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if current.context_action.label != "none" and current.context_action.label != baseline_context:
+                return {"status": "completed", "reason": "context_action_discovered",
+                    "context_action": current.context_action.model_dump(),
+                    "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if start_health - current.player.health >= 16:
+                return {"status": "failed", "reason": "danger_detected",
+                    "health_lost": start_health - current.player.health,
+                    "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            if current.seq != last_seq:
+                moved = math.dist(last_position, current.player.position)
+                last_position = current.player.position
+                last_seq = current.seq
+                if moved < 1.2:
+                    stagnant += 1
+                else:
+                    stagnant = max(0, stagnant - 1)
+
+            if (current.player.bg_check_flags & 0x008) or stagnant >= 3:
+                turn_ticks = max(turn_ticks, 5)
+                stagnant = 0
+                turn_side *= -1
+
+            if turn_ticks > 0:
+                buttons, stick_x, stick_y = 0, 58 * turn_side, 10
+                turn_ticks -= 1
+            else:
+                buttons, stick_x, stick_y = 0, 0, 58
+
+            command_id = bridge.send(buttons=buttons, stick_x=stick_x, stick_y=stick_y, lease_ms=240)
+            if first_command is None:
+                first_command = command_id
+            await asyncio.sleep(0.10)
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "completed", "reason": "exploration_window_complete",
+        "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "acknowledged": bool(after and first_command is not None and
+            after.last_command_seq >= first_command) or acknowledged,
+        "skill": decision.skill}
+
+
 def _inventory_slot(game: GameState, item_id: int) -> int | None:
     for item in game.inventory_named:
         if item.item_id == item_id:
@@ -968,6 +1061,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _aim_at(bridge, decision, observation)
     if decision.skill == "fight_enemy":
         return await _fight_enemy(bridge, decision, observation)
+    if decision.skill == "explore_area":
+        return await _explore_area(bridge, decision, observation)
     if before.paused and decision.skill not in MENU_SKILLS:
         return {"status": "stale", "reason": "pause_menu_active", "skill": decision.skill}
     if not before.paused and decision.skill in {"menu_move", "menu_confirm", "menu_cancel", "menu_assign"}:
