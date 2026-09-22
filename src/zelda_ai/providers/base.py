@@ -43,7 +43,8 @@ dungeon requirement became available. progress is not a hidden quest-flag oracle
 not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
 Re-observe and replan.
 Use context_action (speak/open/grab/climb/etc.), target_actor and nearby_actors to ground interactions.
-Actors expose engine IDs/params and positions, not guaranteed semantic names. Never invent a name from an ID.
+Observed actors expose engine IDs/params/positions and, when SoH ActorDB has metadata, name/description.
+Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
 known_world_edges contains only transitions previously traversed by this same adaptive namespace. Use an edge's
 from_position as an observed exit coordinate when returning to a known destination; do not assume an unobserved
