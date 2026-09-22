@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 ProviderId = Literal["codex", "openrouter", "demo"]
 Effort = str  # Actual accepted values are validated against the provider catalog.
-Skill = Literal["move", "interact", "attack", "defend", "target", "use_item", "wait"]
+Skill = Literal["move", "turn", "interact", "attack", "defend", "target", "use_item", "wait"]
 
 
 class StrictModel(BaseModel):
