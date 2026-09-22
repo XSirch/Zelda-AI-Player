@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import _equipment_point, _inventory_slot, _menu_grid_directions, _steer_to, controller_input
+from zelda_ai.runtime import _aim_error, _aim_stick, _equipment_point, _inventory_slot, _menu_grid_directions, _steer_to, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -115,3 +115,21 @@ def test_equipment_grid_mapping_matches_vanilla_layout():
     assert _equipment_point(0x45) == 14  # Iron Boots
     assert _equipment_point(0x46) == 15  # Hover Boots
     assert _equipment_point(7) is None
+
+
+def test_aim_error_zero_when_camera_points_at_target(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, 0.0),
+        "camera_at": (0.0, 0.0, 10.0)})
+    yaw, pitch = _aim_error(game, (0.0, 0.0, 100.0))
+    assert abs(yaw) < 1e-6
+    assert abs(pitch) < 1e-6
+
+
+def test_aim_error_and_stick_point_toward_right_and_up(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, 0.0),
+        "camera_at": (0.0, 0.0, 10.0)})
+    yaw, pitch = _aim_error(game, (10.0, 10.0, 100.0))
+    assert yaw > 0 and pitch > 0
+    assert _aim_stick(yaw, 1) > 0
+    assert _aim_stick(pitch, 1) > 0
+    assert _aim_stick(yaw, -1) < 0
