@@ -95,3 +95,5 @@ def test_native_traversal_state_and_terrain_probes_are_exposed():
     assert "json NavigationProbes(Player* player)" in source
     assert 'state["navigation_probes"] = NavigationProbes(player);' in source
     assert "70.0f, 140.0f" in source
+    assert "BgCheck_EntityLineTest1" in source
+    assert '{"wall_flags", wallFlags}' in source
