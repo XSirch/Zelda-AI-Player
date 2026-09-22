@@ -141,7 +141,7 @@ class GameState(StrictModel):
 class SkillArgs(StrictModel):
     # Required nullable keys keep the schema compatible with strict JSON outputs.
     direction: Literal["forward", "back", "left", "right", "up", "down"] | None
-    duration_ms: int = Field(ge=50, le=2000)
+    duration_ms: int = Field(ge=50, le=12000)
     strength: float = Field(ge=0, le=1)
     slot: Literal["left", "down", "right"] | None
     choice_index: int | None = Field(ge=0, le=2)
@@ -184,6 +184,8 @@ class Decision(StrictModel):
             raise ValueError("choose_dialogue requires choice_index")
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
+        if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "equip_item"} and self.args.duration_ms > 2000:
+            raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
         if self.skill == "navigate_to" and self.args.target_position is None:
