@@ -13,7 +13,7 @@ Skill = Literal[
     "advance_dialogue", "choose_dialogue", "camera_center", "roll", "backflip",
     "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
-    "navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
+    "navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
     "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area", "manipulate_object",
 ]
 
@@ -219,7 +219,7 @@ class Decision(StrictModel):
             raise ValueError("choose_dialogue requires choice_index")
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
-        if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
+        if self.skill not in {"navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
                               "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area",
                               "manipulate_object"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
@@ -227,7 +227,7 @@ class Decision(StrictModel):
             raise ValueError("play_song requires song")
         if self.skill == "navigate_to" and self.args.target_position is None:
             raise ValueError("navigate_to requires target_position")
-        if self.skill in {"approach_actor", "talk_to_actor", "interact_with_actor", "fight_enemy",
+        if self.skill in {"approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor", "fight_enemy",
                            "manipulate_object"} and self.args.target_actor_id is None:
             raise ValueError(f"{self.skill} requires target_actor_id")
         if self.skill == "equip_item" and (self.args.item_id is None or self.args.slot is None):
