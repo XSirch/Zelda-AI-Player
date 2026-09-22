@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zelda-ai-player"
+version = "0.1.0"
+description = "Local, state-driven agent laboratory for Ship of Harkinian"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.128.2,<1", "uvicorn>=0.34,<1", "pydantic>=2.12,<3",
+  "pydantic-settings>=2.10,<3", "httpx>=0.28,<1", "sqlalchemy>=2.0.40,<3",
+  "websockets>=15,<17",
+]
+
+[project.scripts]
+zelda-ai = "zelda_ai.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "ruff>=0.12,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zelda_ai"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

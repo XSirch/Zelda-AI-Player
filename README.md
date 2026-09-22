@@ -1,7 +1,115 @@
 # Zelda AI Player
 
-Laboratório local de agentes para The Legend of Zelda: Ocarina of Time via Ship of Harkinian.
+Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**, com estado estruturado, Codex/ChatGPT, OpenRouter e painel administrativo.
 
-Implementação inicial em andamento: bridge nativo, runtime Python, adaptadores Codex/OpenRouter e painel administrativo.
+**Estado: milestone 0.1 — fundação executável, não um agente capaz de zerar o jogo.** Backend e protocolo foram testados com simulador explícito. A integração nativa completa ainda precisa ser compilada e validada no SoH/Windows; os providers precisam do seu login para um teste real. Não há ROM, assets de Zelda ou credenciais no repositório.
 
-Nenhuma ROM, asset do jogo ou credencial faz parte deste repositório.
+## O que existe nesta versão
+
+- FastAPI/Python, persistência local SQLite/SQLAlchemy, telemetria WebSocket e histórico de runs/segmentos/chamadas/eventos.
+- Painel React/TypeScript: monitor local, provider/modelo/effort, limites, iniciar/pausar/retomar/encerrar, assumir controle, instruções humanas, memória, skills e comparação de registros.
+- Codex app-server por JSON-RPC/stdio, login oficial ChatGPT em perfil isolado, catálogo dinâmico e contabilização dos tokens informados pela CLI. Não usa OAuth como API key.
+- OpenRouter por API, catálogo dinâmico, JSON estruturado, reasoning effort quando anunciado e custo efetivamente retornado. Sem retry pago automático.
+- Bridge C++ para SoH: telemetria a 5 Hz por UDP autenticado em localhost, input analógico/botões por leases de até 500 ms, proteção contra replay e comandos de outra cena.
+- Skills básicas: movimento relativo à câmera, A, B, Z, Z+R, C-buttons já equipados e espera. O resultado reporta deslocamento/ACK/dano observado, não inventa acerto de flecha ou vitória.
+- Memória persistente de notas/hipóteses; isolamento por run ou experiência por modelo + effort + versão do contrato. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
+
+## Testar o painel e o ciclo sem jogo ou créditos
+
+Requisitos: Python 3.12+, `uv`, Node 22.16+ e npm. Execute na raiz do clone:
+
+```powershell
+git clone https://github.com/XSirch/Zelda-AI-Player.git
+cd Zelda-AI-Player
+uv sync
+cd web
+npm install
+npm run build
+cd ..
+uv run zelda-ai serve --demo
+```
+
+Abra **http://127.0.0.1:8787**. Em **AO VIVO**, selecione **Simulador determinístico** e inicie. O banner SIMULADO é permanente; não é gameplay nem um modelo de IA. O contador de tokens/custo do simulador é zero porque não chama provider algum.
+
+Para desenvolvimento do frontend, mantenha `uv run zelda-ai serve --demo` em um terminal e execute `npm run dev` em `web/` em outro. Acesse **http://127.0.0.1:5173**. O Vite faz proxy de API e WebSocket para o backend.
+
+> A instalação npm não foi concluída no ambiente de autoria por indisponibilidade de DNS. A sintaxe TS/TSX foi verificada, mas o typecheck completo, build Vite e inspeção visual do painel **não foram executados**. Não há lockfile inventado. Gere e versione os lockfiles após resolver dependências no ambiente local.
+
+## Conectar o SoH real
+
+O executável oficial sem modificações não publica este protocolo. É necessário compilar uma cópia separada do Shipwright com o adaptador incluído. Use uma extração de jogo obtida legitimamente; este projeto não fornece nem baixa ROMs.
+
+```powershell
+# Exemplo: clone separado, fora de Zelda-AI-Player
+git clone --recursive https://github.com/HarbourMasters/Shipwright.git D:\Projetos\Shipwright-AI
+git -C D:\Projetos\Shipwright-AI checkout d30fc192f2eb01ceea45bd1e12de61636cafbf86
+git -C D:\Projetos\Shipwright-AI submodule update --init --recursive
+
+# Na raiz de Zelda-AI-Player
+uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI
+```
+
+O instalador confere o commit e o blob de `padmgr.c`, copia apenas nossos três arquivos C++ e aplica um ponto de input antes do cálculo nativo de press/release. É idempotente; não dá `reset --hard`, não deleta assets e não reescreve o upstream arbitrariamente.
+
+Siga as instruções de build do [Shipwright na revisão fixada](https://github.com/HarbourMasters/Shipwright/tree/d30fc192f2eb01ceea45bd1e12de61636cafbf86). Reconfigure o CMake depois de instalar o bridge, pois novos arquivos foram adicionados. **O build completo do SoH não foi executado aqui.**
+
+Depois de compilar, abra dois terminais na raiz deste projeto:
+
+```powershell
+# Terminal 1: backend real, sem --demo
+uv run zelda-ai serve
+
+# Terminal 2: substitua pelo caminho real do executável compilado
+uv run zelda-ai launch-soh "D:\Projetos\Shipwright-AI\build\CAMINHO_REAL\soh.exe"
+```
+
+`launch-soh` injeta o token local e a porta no ambiente do processo. Abra/carregue um save manualmente. O painel precisa mostrar **BRIDGE Conectado** e um estado jogável antes de autorizar uma run. A IA não controla a seleção de saves nesta versão.
+
+## Autenticação e modelos
+
+### Codex / ChatGPT
+
+Instale a CLI oficial do Codex e deixe o executável `codex` no PATH. Em **CONEXÕES → Conectar ChatGPT**, conclua o login na página oficial e clique em **Verificar conexões**. O código de dispositivo é uma alternativa quando suportado pela CLI.
+
+A autenticação fica em `.local/codex`, sob gerenciamento da CLI. Por isolamento, o projeto **não copia** as credenciais do seu perfil global; será necessário autenticar esse perfil uma vez. Alternativa no PowerShell:
+
+```powershell
+$env:CODEX_HOME = Join-Path (Get-Location) ".local\codex"
+codex login
+```
+
+O subprocesso trabalha num diretório vazio, sem carregar os projetos/MCPs pessoais, com ferramentas de shell e pesquisa desabilitadas e sandbox de leitura. O modelo de gameplay deve somente devolver o JSON da decisão. Não há bloqueios de worktree impostos ao agente que desenvolve o projeto.
+
+Os modelos e efforts vêm de `model/list`, não de nomes inventados. O consumo usa os limites/créditos da sua conta Codex, e **não é representado como custo zero ou como fatura estimada da API OpenAI**. A disponibilidade e a quota dependem da sua conta. O limite de saída configurado no painel aplica-se ao OpenRouter; o adaptador Codex não oferece um teto de saída por chamada.
+
+### OpenRouter
+
+Informe a chave mascarada em **CONEXÕES** (memória do processo) ou copie `.env.example` para `.env` e preencha `OPENROUTER_API_KEY` no seu computador. Nesta versão só são selecionáveis modelos que anunciam `structured_outputs`.
+
+Não presumimos que todos aceitam os mesmos efforts. O seletor utiliza o metadado `reasoning.supported_efforts`. Custo desconhecido ou tokens ausentes ficam explicitamente pendentes e impedem novas inferências na run. Falhas, cancelamentos ou respostas truncadas podem ter sido cobrados; não repetimos automaticamente a chamada.
+
+## Vídeo não consome tokens
+
+Em **Selecionar janela**, escolha a janela do SoH no diálogo do navegador. O vídeo é apenas um `MediaStream` local, exibido em `<video>`, sem upload ao backend ou ao modelo. O modelo recebe somente texto/estado. Fechar a captura não encerra a run; pausar a IA não pausa o jogo.
+
+## Custos e comparação
+
+- Totais = tokens de entrada + saída. Cache e reasoning são subconjuntos, nunca somados novamente.
+- Há limites de chamadas, tokens, duração e uma reserva conservadora antes de cada chamada OpenRouter. Uma chamada em andamento pode ultrapassar um orçamento de tokens; a reserva de USD não é garantia contratual do provider. Para teto de cobrança, configure também limite na chave do provider.
+- Trocas de modelo/effort são aplicadas **entre decisões** e criam segmentos. A run passa a ser mista.
+- Dicas e controle humano marcam a run como assistida. Partidas simuladas nunca são rotuladas como SoH.
+- O fingerprint atual identifica revisão e estado inicial observado, **não** um save state/RNG certificado. Não produzimos um percentual de conclusão ou ranking de quem zerou.
+- O núcleo, contrato de decisão e skills são compartilhados. Codex e OpenRouter usam transportes e envelopes diferentes; não alegamos equivalência perfeita dos harnesses internos.
+- A tela de inspeção/exportação contém as últimas 200 entradas por tipo. O banco local guarda o histórico integral.
+
+## Testes
+
+```powershell
+uv run pytest -q
+cd web
+npm run build
+```
+
+26 testes passaram no ambiente de autoria: contratos, métricas, isolamento, limites, segurança HTTP, protocolo Codex com subprocesso de teste, API OpenRouter com transporte simulado, UDP e ciclo completo demo. O teste C++ compila e executa `InputLease.hpp` com `g++`/`clang++` quando disponível; isso **não substitui** compilar o adaptador dentro do SoH.
+
+Veja [docs/STATUS.md](docs/STATUS.md) para fronteiras do milestone e próximo trabalho, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para os contratos e [AGENTS.md](AGENTS.md) para desenvolvimento.
