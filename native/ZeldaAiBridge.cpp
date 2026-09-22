@@ -175,6 +175,71 @@ void Event(const char* kind, const std::string& detail) {
     PushEventLocked(bridge, kind, detail);
 }
 
+json ProgressJson() {
+    json questItems = json::array();
+    for (int quest = QUEST_MEDALLION_FOREST; quest <= QUEST_SKULL_TOKEN; ++quest) {
+        if (CHECK_QUEST_ITEM(quest)) {
+            questItems.push_back(SohUtils::GetQuestItemName(quest));
+        }
+    }
+
+    json ownedEquipment = json::array();
+    const std::pair<uint16_t, int> equipmentItems[] = {
+        {EQUIP_FLAG_SWORD_KOKIRI, ITEM_SWORD_KOKIRI},
+        {EQUIP_FLAG_SWORD_MASTER, ITEM_SWORD_MASTER},
+        {EQUIP_FLAG_SWORD_BGS, ITEM_SWORD_BGS},
+        {EQUIP_FLAG_SHIELD_DEKU, ITEM_SHIELD_DEKU},
+        {EQUIP_FLAG_SHIELD_HYLIAN, ITEM_SHIELD_HYLIAN},
+        {EQUIP_FLAG_SHIELD_MIRROR, ITEM_SHIELD_MIRROR},
+        {EQUIP_FLAG_TUNIC_KOKIRI, ITEM_TUNIC_KOKIRI},
+        {EQUIP_FLAG_TUNIC_GORON, ITEM_TUNIC_GORON},
+        {EQUIP_FLAG_TUNIC_ZORA, ITEM_TUNIC_ZORA},
+        {EQUIP_FLAG_BOOTS_KOKIRI, ITEM_BOOTS_KOKIRI},
+        {EQUIP_FLAG_BOOTS_IRON, ITEM_BOOTS_IRON},
+        {EQUIP_FLAG_BOOTS_HOVER, ITEM_BOOTS_HOVER},
+    };
+    for (const auto& [flag, item] : equipmentItems) {
+        if (gSaveContext.inventory.equipment & flag) {
+            ownedEquipment.push_back(SohUtils::GetItemName(item));
+        }
+    }
+
+    json dungeonItems = json::array();
+    const int mapIndex = gSaveContext.mapIndex;
+    int smallKeys = 0;
+    if (mapIndex >= 0 && mapIndex < static_cast<int>(ARRAY_COUNT(gSaveContext.inventory.dungeonItems))) {
+        if (CHECK_DUNGEON_ITEM(DUNGEON_KEY_BOSS, mapIndex)) dungeonItems.push_back("Boss Key");
+        if (CHECK_DUNGEON_ITEM(DUNGEON_COMPASS, mapIndex)) dungeonItems.push_back("Compass");
+        if (CHECK_DUNGEON_ITEM(DUNGEON_MAP, mapIndex)) dungeonItems.push_back("Dungeon Map");
+    }
+    if (mapIndex >= 0 && mapIndex < static_cast<int>(ARRAY_COUNT(gSaveContext.inventory.dungeonKeys))) {
+        smallKeys = std::max<int>(gSaveContext.inventory.dungeonKeys[mapIndex], 0);
+    }
+
+    return {
+        {"quest_items", questItems},
+        {"owned_equipment", ownedEquipment},
+        {"upgrade_levels", {
+            {"quiver", CUR_UPG_VALUE(UPG_QUIVER)},
+            {"bomb_bag", CUR_UPG_VALUE(UPG_BOMB_BAG)},
+            {"strength", CUR_UPG_VALUE(UPG_STRENGTH)},
+            {"scale", CUR_UPG_VALUE(UPG_SCALE)},
+            {"wallet", CUR_UPG_VALUE(UPG_WALLET)},
+            {"bullet_bag", CUR_UPG_VALUE(UPG_BULLET_BAG)},
+            {"sticks", CUR_UPG_VALUE(UPG_STICKS)},
+            {"nuts", CUR_UPG_VALUE(UPG_NUTS)},
+        }},
+        {"heart_pieces", static_cast<int>((gSaveContext.inventory.questItems >> 28) & 0xF)},
+        {"skull_tokens", std::max<int>(gSaveContext.inventory.gsTokens, 0)},
+        {"magic_acquired", gSaveContext.isMagicAcquired != 0},
+        {"double_magic", gSaveContext.isDoubleMagicAcquired != 0},
+        {"double_defense", gSaveContext.isDoubleDefenseAcquired != 0},
+        {"map_index", mapIndex},
+        {"dungeon_items", dungeonItems},
+        {"small_keys", smallKeys},
+    };
+}
+
 json ActorJson(Actor* actor, Player* player) {
     if (!actor || !player) return nullptr;
     const auto& a = actor->world.pos;
@@ -305,6 +370,7 @@ void Snapshot() {
         {"player", nullptr},
         {"inventory_named", json::array()},
         {"dialogue", json::object()},
+        {"progress", json::object()},
         {"context_action", {{"code", bridge.doAction}, {"label", DoActionName(bridge.doAction)}}},
         {"pause_menu", {{"active", false}, {"ready", false}, {"state", 0}, {"transition_state", 0},
             {"page_index", 0}, {"cursor_special_pos", 0}, {"cursor_point", json::array()},
@@ -382,6 +448,7 @@ void Snapshot() {
             state["cutscene_active"] =
                 (gPlayState->csCtx.state != CS_STATE_IDLE) || (Player_InCsMode(gPlayState) != 0);
             state["dialogue"] = DialogueJson(player);
+            state["progress"] = ProgressJson();
             state["message_id"] =
                 state["dialogue"]["active"].get<bool>() ? state["dialogue"]["text_id"] : json(nullptr);
             state["player"] = {
