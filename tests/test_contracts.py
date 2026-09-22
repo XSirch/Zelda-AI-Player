@@ -141,3 +141,16 @@ def test_game_state_accepts_semantic_scene_inventory_and_pause_ready(state):
     assert enriched.scene_name == "Kokiri Forest"
     assert enriched.inventory_named[0].name == "Fairy Ocarina"
     assert enriched.pause_menu.ready
+
+
+def test_game_state_accepts_pause_visible_progress(state):
+    enriched = type(state).model_validate({**state.model_dump(), "progress": {
+        "quest_items": ["Kokiri's Emerald", "Saria's Song"],
+        "owned_equipment": ["Kokiri Sword", "Deku Shield"],
+        "upgrade_levels": {"bullet_bag": 1, "wallet": 1},
+        "heart_pieces": 2, "skull_tokens": 4, "magic_acquired": False,
+        "double_magic": False, "double_defense": False, "map_index": 0,
+        "dungeon_items": ["Dungeon Map"], "small_keys": 1}})
+    assert "Kokiri's Emerald" in enriched.progress.quest_items
+    assert "Deku Shield" in enriched.progress.owned_equipment
+    assert enriched.progress.small_keys == 1
