@@ -23,6 +23,8 @@ Implemented skills:
 - equip_gear(item_id): equips an owned sword/shield/tunic/boots on the Equipment page and verifies progress.equipment[].equipped
 - aim_at(C slot, target_actor_id or target_position): holds an equipped ranged item, feedback-aligns camera yaw/pitch and releases a shot; alignment is success, a hit is NOT assumed
 - fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
+- manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
+- explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger
 
 The state contract includes scene + scene_name, room, entrance_index, player pose, camera,
 raw inventory/equipment plus inventory_named entries for items Link owns, pause-menu cursor state,
@@ -52,11 +54,14 @@ Use context_action (speak/open/grab/climb/etc.), target_actor and nearby_actors 
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
-known_world_edges contains only transitions previously traversed by this same adaptive namespace. Use an edge's
+Game-over save/continue/respawn is handled automatically without a model call. The runtime also ends the run
+as completed when the final Ganon actor defeat emits game_completed. known_world_edges contains only transitions
+previously traversed by this same adaptive namespace. Use an edge's
 from_position as an observed exit coordinate when returning to a known destination; do not assume an unobserved
 edge exists. When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor/
 interact_with_actor over many one-step move calls. Use interact_with_actor rather than a blind interact when a
-specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. These are local steering controllers, NOT collision-aware global pathfinding:
+specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. In an unknown area with no concrete target, use explore_area
+for several seconds; once a transition is discovered its exit/spawn coordinates become a known_world_edge. These are local steering controllers, NOT collision-aware global pathfinding:
 a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
 For free exploration, turn(left/right) plus short move probes remain valid. The runtime may replay a previously
 successful adaptive trajectory before calling you; replay success/failure appears in events. Current skills do
