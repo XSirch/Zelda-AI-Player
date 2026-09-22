@@ -73,7 +73,17 @@ uv run zelda-ai launch-soh "D:\Projetos\Shipwright-AI\build\CAMINHO_REAL\soh.exe
 
 ### Codex / ChatGPT
 
-Instale a CLI oficial do Codex e deixe o executável `codex` no PATH. Em **CONEXÕES → Conectar ChatGPT**, conclua o login na página oficial e clique em **Verificar conexões**. O código de dispositivo é uma alternativa quando suportado pela CLI.
+Instale a CLI oficial do Codex e deixe o executável `codex` no PATH. Para Windows, o instalador oficial resolve a versão estável mais recente:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
+codex --version
+where.exe codex
+```
+
+GPT-6 Astra requer Codex CLI 0.153.0 ou mais recente. O painel mostra a versão do app-server detectada e marca a compatibilidade com Astra. Quando `gpt-6-astra` estiver presente no `model/list` da sua conta, ele é a preferência inicial do provider Codex; se não estiver disponível, o seletor recua para outro modelo realmente anunciado pelo catálogo, sem inventar acesso.
+
+Em **CONEXÕES → Conectar ChatGPT**, conclua o login na página oficial e clique em **Verificar conexões**. O código de dispositivo é uma alternativa quando suportado pela CLI.
 
 A autenticação fica em `.local/codex`, sob gerenciamento da CLI. Por isolamento, o projeto **não copia** as credenciais do seu perfil global; será necessário autenticar esse perfil uma vez. Alternativa no PowerShell:
 
