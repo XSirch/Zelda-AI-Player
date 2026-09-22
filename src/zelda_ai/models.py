@@ -154,6 +154,7 @@ class GameState(StrictModel):
     dialogue: DialogueState = Field(default_factory=DialogueState)
     progress: ProgressState = Field(default_factory=ProgressState)
     context_action: ContextAction = Field(default_factory=ContextAction)
+    context_actor: ActorObservation | None = None
     pause_menu: PauseMenuState = Field(default_factory=PauseMenuState)
     game_over_state: int = Field(default=0, ge=0, le=65535)
     ocarina_mode: int = Field(default=0, ge=0, le=65535)
