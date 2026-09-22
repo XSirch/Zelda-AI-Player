@@ -390,6 +390,8 @@ void Snapshot() {
         {"scene_name", ""},
         {"room", -1},
         {"entrance_index", -1},
+        {"day_time", 0},
+        {"is_night", false},
         {"in_game", bridge.playable},
         {"player", nullptr},
         {"inventory_named", json::array()},
@@ -447,6 +449,8 @@ void Snapshot() {
             state["scene_name"] = SohUtils::GetSceneName(scene);
             state["room"] = room;
             state["entrance_index"] = gSaveContext.entranceIndex;
+            state["day_time"] = gSaveContext.dayTime;
+            state["is_night"] = gSaveContext.nightFlag != 0;
             state["paused"] = gPlayState->pauseCtx.state != 0;
             state["pause_menu"] = {
                 {"active", gPlayState->pauseCtx.state != 0},
