@@ -176,6 +176,21 @@ void Event(const char* kind, const std::string& detail) {
     PushEventLocked(bridge, kind, detail);
 }
 
+bool ItemUsesAmmo(int item) {
+    switch (item) {
+        case ITEM_STICK:
+        case ITEM_NUT:
+        case ITEM_BOMB:
+        case ITEM_BOW:
+        case ITEM_SLINGSHOT:
+        case ITEM_BOMBCHU:
+        case ITEM_BEAN:
+            return true;
+        default:
+            return false;
+    }
+}
+
 json ProgressJson() {
     json questItems = json::array();
     for (int quest = QUEST_MEDALLION_FOREST; quest <= QUEST_SKULL_TOKEN; ++quest) {
@@ -514,8 +529,8 @@ void Snapshot() {
                         {"slot", slot},
                         {"item_id", item},
                         {"name", SohUtils::GetItemName(item)},
-                        {"ammo", slot < ARRAY_COUNT(gSaveContext.inventory.ammo)
-                            ? json(gSaveContext.inventory.ammo[slot]) : json(nullptr)},
+                        {"ammo", ItemUsesAmmo(item) && slot < ARRAY_COUNT(gSaveContext.inventory.ammo)
+                            ? json(std::max<int>(gSaveContext.inventory.ammo[slot], 0)) : json(nullptr)},
                     });
                 }
             }
