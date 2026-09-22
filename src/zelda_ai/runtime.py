@@ -1683,6 +1683,36 @@ class Runtime:
             await asyncio.sleep(0.15)
         return True
 
+    async def _defensive_guard(self):
+        try:
+            while self.state == "running":
+                game = self.bridge.state
+                if (not game or not game.in_game or not game.player or game.paused or
+                        game.dialogue.active or game.cutscene_active or game.game_over_state != 0):
+                    self.bridge.release()
+                    await asyncio.sleep(0.10)
+                    continue
+                threat = next((actor for actor in game.nearby_actors
+                    if actor.category in {5, 9} and actor.distance <= 180), None)
+                if threat is None:
+                    self.bridge.release()
+                    await asyncio.sleep(0.10)
+                    continue
+                self.bridge.send(buttons=BUTTONS["Z"] | BUTTONS["R"], lease_ms=250)
+                await asyncio.sleep(0.18)
+        finally:
+            self.bridge.release()
+
+    async def _decide_with_guard(self, config: RunConfig, prompt: str):
+        guard = asyncio.create_task(self._defensive_guard())
+        try:
+            return await self.providers[config.provider].decide(config, prompt)
+        finally:
+            guard.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await guard
+            self.bridge.release()
+
     async def validate_model(self, config: RunConfig) -> ModelInfo:
         if config.provider not in self.providers:
             raise ValueError("Provider not available")
@@ -1881,7 +1911,7 @@ class Runtime:
                 started = time.monotonic()
                 result = None
                 try:
-                    result = await self.providers[self.config.provider].decide(self.config, prompt)
+                    result = await self._decide_with_guard(self.config, prompt)
                     decision = Decision.model_validate_json(result.text)
                     self.store.finish_call(call_id, status="completed", decision=decision.model_dump(),
                         usage=result.usage.model_dump(), latency_ms=(time.monotonic() - started) * 1000)
