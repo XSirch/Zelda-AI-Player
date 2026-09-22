@@ -5,11 +5,26 @@ import asyncio
 import contextlib
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
 from ..models import Decision, ModelInfo, RunConfig, Usage
 from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
+
+
+ASTRA_MIN_CODEX_VERSION = (0, 153, 0)
+_VERSION_RE = re.compile(r"(?<!\\d)(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+][0-9A-Za-z.-]+)?")
+
+
+def parse_codex_version(value: str | None) -> tuple[str | None, tuple[int, int, int] | None]:
+    if not value:
+        return None, None
+    match = _VERSION_RE.search(value)
+    if not match:
+        return None, None
+    normalized = ".".join(match.groups())
+    return normalized, tuple(int(part) for part in match.groups())
 
 
 def parse_usage(params: dict, model: str) -> Usage:
@@ -43,6 +58,7 @@ class JsonRpcProcess:
         self.pending: dict[int, asyncio.Future] = {}
         self.notifications: asyncio.Queue = asyncio.Queue(maxsize=4096)
         self.next_id = 0
+        self.server_version: str | None = None
         self.start_lock = asyncio.Lock()
         self.write_lock = asyncio.Lock()
 
@@ -67,8 +83,11 @@ class JsonRpcProcess:
                     stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
                     cwd=str(workspace), env=environment, limit=4 * 1024 * 1024)
                 self.reader = asyncio.create_task(self._read())
-                await self.request("initialize", {"clientInfo": {"name": "zelda_ai_player", "version": "0.1.0"},
+                initialized = await self.request("initialize", {"clientInfo": {"name": "zelda_ai_player", "version": "0.1.0"},
                     "capabilities": {"experimentalApi": False}}, timeout=20)
+                server_info = initialized.get("serverInfo") or {}
+                raw_version = server_info.get("version") or initialized.get("userAgent")
+                self.server_version, _ = parse_codex_version(raw_version)
                 await self.write({"method": "initialized", "params": {}})
             except (OSError, asyncio.TimeoutError, ProviderFailure):
                 await self.close()
@@ -136,6 +155,7 @@ class JsonRpcProcess:
             with contextlib.suppress(asyncio.CancelledError):
                 await self.reader
         self.process = None
+        self.server_version = None
 
 
 class CodexProvider:
@@ -147,6 +167,8 @@ class CodexProvider:
     async def status(self) -> dict:
         try:
             await self.rpc.start()
+            version_text, version = parse_codex_version(self.rpc.server_version)
+            astra_cli_ready = version is not None and version >= ASTRA_MIN_CODEX_VERSION
             result = await self.rpc.request("account/read", {"refreshToken": False})
             account = result.get("account") or {}
             connected = account.get("type") == "chatgpt"
@@ -154,11 +176,22 @@ class CodexProvider:
             if connected:
                 with contextlib.suppress(ProviderFailure, asyncio.TimeoutError):
                     limits = await self.rpc.request("account/rateLimits/read")
+            if connected:
+                message = "ChatGPT autenticado."
+                if version_text:
+                    message += f" Codex CLI {version_text}."
+                if version is not None and not astra_cli_ready:
+                    message += " Astra requer Codex CLI 0.153.0 ou mais recente."
+            else:
+                message = "Conecte a conta ChatGPT pelo painel."
             return {"connected": connected, "auth_type": account.get("type"),
-                "plan": account.get("planType"), "limits": limits,
-                "message": "ChatGPT autenticado." if connected else "Conecte a conta ChatGPT pelo painel."}
+                "plan": account.get("planType"), "limits": limits, "cli_version": version_text,
+                "astra_cli_ready": astra_cli_ready, "message": message}
         except (ProviderFailure, asyncio.TimeoutError) as exc:
-            return {"connected": False, "message": str(exc) or "Codex timed out."}
+            version_text, version = parse_codex_version(self.rpc.server_version)
+            return {"connected": False, "cli_version": version_text,
+                "astra_cli_ready": version is not None and version >= ASTRA_MIN_CODEX_VERSION,
+                "message": str(exc) or "Codex timed out."}
 
     async def login(self, device: bool = False) -> dict:
         await self.rpc.start()
