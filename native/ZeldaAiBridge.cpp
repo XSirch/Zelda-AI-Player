@@ -569,7 +569,7 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemReceive>([](GetItemEntry itemEntry) {
         std::string detail = std::to_string(itemEntry.itemId);
-        if (itemEntry.modIndex == MOD_NONE && itemEntry.itemId < ITEM_LAST_USED) {
+        if (itemEntry.modIndex == MOD_NONE && itemEntry.itemId <= ITEM_ROCS_FEATHER) {
             detail += ":" + SohUtils::GetItemName(itemEntry.itemId);
         }
         Event("item_received", detail);
