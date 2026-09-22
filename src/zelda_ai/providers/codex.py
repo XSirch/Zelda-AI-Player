@@ -14,7 +14,7 @@ from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
 
 
 ASTRA_MIN_CODEX_VERSION = (0, 153, 0)
-_VERSION_RE = re.compile(r"(?<!\\d)(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+][0-9A-Za-z.-]+)?")
+_VERSION_RE = re.compile(r"(?<!\d)(\d+)\.(\d+)\.(\d+)(?:[-+][0-9A-Za-z.-]+)?")
 
 
 def parse_codex_version(value: str | None) -> tuple[str | None, tuple[int, int, int] | None]:
