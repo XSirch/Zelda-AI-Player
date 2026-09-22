@@ -17,12 +17,14 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v2/skills-v1/trajectory-v1/prompt-v4"
+CONTRACT_VERSION = "state-v2/skills-v2/trajectory-v1/prompt-v5"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "START": 0x1000, "R": 0x0010,
     "C_UP": 0x0008, "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
-MENU_SKILLS = {"pause_toggle", "menu_move", "menu_confirm", "menu_cancel", "menu_assign", "continue_gameover"}
-NAVIGATION_SKILLS = {"move", "turn", "interact", "wait", "camera_center", "roll", "backflip", "sidestep"}
+MENU_SKILLS = {"pause_toggle", "menu_move", "menu_confirm", "menu_cancel", "menu_assign",
+    "continue_gameover", "equip_item"}
+NAVIGATION_SKILLS = {"move", "turn", "interact", "wait", "camera_center", "roll", "backflip", "sidestep",
+    "navigate_to", "approach_actor"}
 SONG_IDS = {"minuet": 0, "bolero": 1, "serenade": 2, "requiem": 3, "nocturne": 4, "prelude": 5,
     "sarias": 6, "eponas": 7, "lullaby": 8, "suns": 9, "time": 10, "storms": 11}
 SONG_NOTES = {
@@ -62,9 +64,10 @@ SKILL_CATALOG = [
     {"id": "menu_assign", "name": "Atribuir item selecionado a C", "status": "implemented", "version": "1.0"},
     {"id": "continue_gameover", "name": "Confirmar continue após game over", "status": "implemented", "version": "1.0"},
     {"id": "play_song", "name": "Tocar música conhecida na ocarina", "status": "implemented", "version": "1.0"},
-    {"id": "navigate", "name": "Navegação espacial até ator/saída/posição", "status": "planned", "version": None},
-    {"id": "talk_to", "name": "Aproximar e conversar com ator", "status": "planned", "version": None},
-    {"id": "equip_item", "name": "Equipar item por ID usando o pause menu", "status": "planned", "version": None},
+    {"id": "navigate_to", "name": "Servo local até posição observada", "status": "implemented", "version": "2.0"},
+    {"id": "approach_actor", "name": "Aproximar-se de ator desenhado", "status": "implemented", "version": "2.0"},
+    {"id": "talk_to_actor", "name": "Aproximar e iniciar conversa com ator", "status": "implemented", "version": "2.0"},
+    {"id": "equip_item", "name": "Equipar item possuído em C via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "aim_at", "name": "Mira calibrada para arco/estilingue/Hookshot", "status": "planned", "version": None},
     {"id": "fight_enemy", "name": "Combate composto com feedback", "status": "planned", "version": None},
     {"id": "manipulate_object", "name": "Empurrar/puxar/carregar/lançar objetos", "status": "planned", "version": None},
@@ -205,6 +208,336 @@ async def _play_song(bridge: Bridge, decision: Decision, observation: GameState)
         "acknowledged": acknowledged, "skill": decision.skill}
 
 
+
+def _matching_actor(game: GameState, actor_id: int, params: int | None):
+    candidates = list(game.nearby_actors)
+    if game.target_actor is not None:
+        candidates.append(game.target_actor)
+    matches = [actor for actor in candidates
+        if actor.actor_id == actor_id and (params is None or actor.params == params)]
+    return min(matches, key=lambda actor: actor.distance) if matches else None
+
+
+def _steer_to(game: GameState, target: tuple[float, float, float], strength: float) -> tuple[int, int, float]:
+    if not game.player:
+        return 0, 0, float("inf")
+    px, _, pz = game.player.position
+    dx, dz = target[0] - px, target[2] - pz
+    distance = math.hypot(dx, dz)
+    if distance < 1e-6:
+        return 0, 0, 0.0
+
+    if game.camera_eye is not None and game.camera_at is not None:
+        fx = game.camera_at[0] - game.camera_eye[0]
+        fz = game.camera_at[2] - game.camera_eye[2]
+        flen = math.hypot(fx, fz)
+    else:
+        flen = 0.0
+    if flen < 1e-4:
+        angle = game.player.yaw * math.pi / 32768.0
+        fx, fz = math.sin(angle), math.cos(angle)
+    else:
+        fx, fz = fx / flen, fz / flen
+
+    # Camera-relative right vector. N64 stick X is right, Y is forward.
+    rx, rz = fz, -fx
+    ux, uz = dx / distance, dz / distance
+    local_x = ux * rx + uz * rz
+    local_y = ux * fx + uz * fz
+    scale = max(28, min(80, round(80 * max(0.35, strength))))
+    return (
+        max(-80, min(80, round(local_x * scale))),
+        max(-80, min(80, round(local_y * scale))),
+        distance,
+    )
+
+
+async def _pulse(bridge: Bridge, *, buttons: int = 0, stick_x: int = 0, stick_y: int = 0,
+                 hold_ms: int = 100, settle_s: float = 0.12) -> bool:
+    command_id = bridge.send(buttons=buttons, stick_x=stick_x, stick_y=stick_y,
+        lease_ms=max(50, min(300, hold_ms)))
+    await asyncio.sleep(max(0.05, hold_ms / 1000))
+    bridge.release()
+    await asyncio.sleep(settle_s)
+    current = bridge.state
+    return bool(current and current.last_command_seq >= command_id)
+
+
+async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameState,
+                          *, actor_mode: bool, talk: bool = False) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+
+    deadline = time.monotonic() + min(8.0, max(0.25, decision.args.duration_ms / 1000))
+    start_position = before.player.position
+    stop_distance = decision.args.stop_distance
+    if stop_distance is None:
+        stop_distance = 90.0 if talk else (70.0 if actor_mode else 35.0)
+
+    first_command = None
+    acknowledged = False
+    best_distance = float("inf")
+    stagnant_samples = 0
+    recentered = False
+    last_actor = None
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "interrupted", "reason": "world_changed", "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.paused:
+                return {"status": "interrupted", "reason": "pause_menu_opened", "skill": decision.skill}
+            if current.dialogue.active:
+                return {"status": "completed" if talk else "interrupted",
+                    "reason": "dialogue_opened", "skill": decision.skill,
+                    "target_distance": last_actor.distance if last_actor else None}
+            if current.cutscene_active:
+                return {"status": "completed" if talk else "interrupted",
+                    "reason": "interaction_started" if talk else "cutscene_started", "skill": decision.skill}
+
+            if actor_mode:
+                actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+                if actor is None:
+                    return {"status": "failed", "reason": "target_actor_not_observed", "skill": decision.skill}
+                last_actor = actor
+                target = actor.position
+            else:
+                target = decision.args.target_position
+
+            stick_x, stick_y, target_distance = _steer_to(current, target, decision.args.strength)
+            if target_distance <= stop_distance:
+                if not talk:
+                    return {"status": "completed", "reason": "target_reached",
+                        "target_distance": target_distance,
+                        "distance": math.dist(start_position, current.player.position),
+                        "acknowledged": acknowledged, "skill": decision.skill}
+
+                # A contextual talk can become available just before the exact stop radius.
+                for _ in range(2):
+                    acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.18)
+                    sample = bridge.state
+                    if sample and sample.dialogue.active:
+                        return {"status": "completed", "reason": "dialogue_opened",
+                            "target_distance": target_distance,
+                            "distance": math.dist(start_position, sample.player.position) if sample.player else None,
+                            "acknowledged": acknowledged, "skill": decision.skill}
+                    if sample and sample.cutscene_active:
+                        return {"status": "completed", "reason": "interaction_started",
+                            "target_distance": target_distance, "acknowledged": acknowledged,
+                            "skill": decision.skill}
+                return {"status": "failed", "reason": "talk_interaction_not_started",
+                    "target_distance": target_distance, "acknowledged": acknowledged,
+                    "skill": decision.skill}
+
+            if target_distance + 2.0 < best_distance:
+                best_distance = target_distance
+                stagnant_samples = 0
+            else:
+                stagnant_samples += 1
+
+            if stagnant_samples >= 5 and not recentered:
+                bridge.release()
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=80, settle_s=0.15)
+                recentered = True
+                stagnant_samples = 0
+                continue
+            if stagnant_samples >= 8:
+                return {"status": "failed", "reason": "navigation_no_progress",
+                    "target_distance": target_distance,
+                    "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=250)
+            if first_command is None:
+                first_command = command_id
+            acknowledged |= current.last_command_seq >= first_command
+            await asyncio.sleep(0.10)
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    if after and first_command is not None:
+        acknowledged |= after.last_command_seq >= first_command
+    return {"status": "failed", "reason": "navigation_timeout",
+        "target_distance": (last_actor.distance if last_actor else None),
+        "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "acknowledged": acknowledged, "skill": decision.skill}
+
+
+def _inventory_slot(game: GameState, item_id: int) -> int | None:
+    for item in game.inventory_named:
+        if item.item_id == item_id:
+            return item.slot
+    for slot, value in enumerate(game.inventory):
+        if value == item_id:
+            return slot
+    return None
+
+
+def _menu_grid_directions(current_slot: int, target_slot: int) -> list[str]:
+    current_row, current_col = divmod(current_slot, 6)
+    target_row, target_col = divmod(target_slot, 6)
+    preferred = []
+    if current_col != target_col:
+        preferred.append("right" if target_col > current_col else "left")
+    if current_row != target_row:
+        preferred.append("down" if target_row > current_row else "up")
+    for direction in ("right", "down", "left", "up"):
+        if direction not in preferred:
+            preferred.append(direction)
+    return preferred
+
+
+async def _wait_pause_ready(bridge: Bridge, timeout_s: float = 2.5) -> GameState | None:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        current = bridge.state
+        if current and current.pause_menu.active and current.pause_menu.ready:
+            return current
+        await asyncio.sleep(0.08)
+    return None
+
+
+async def _equip_item(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    current = bridge.state
+    item_id = decision.args.item_id
+    c_slot = decision.args.slot
+    if not current or not current.player or item_id is None or c_slot is None:
+        return {"status": "failed", "reason": "equip_arguments_or_state_missing", "skill": decision.skill}
+    if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+        return {"status": "stale", "reason": "world_changed_during_inference", "skill": decision.skill}
+    if current.dialogue.active or (current.cutscene_active and current.game_over_state == 0):
+        return {"status": "stale", "reason": "gameplay_state_blocks_pause", "skill": decision.skill}
+
+    target_slot = _inventory_slot(current, item_id)
+    if target_slot is None or target_slot >= 24:
+        return {"status": "failed", "reason": "item_not_owned_or_not_assignable",
+            "item_id": item_id, "skill": decision.skill}
+    button_index = {"left": 1, "down": 2, "right": 3}[c_slot]
+    if len(current.equipped) > button_index and current.equipped[button_index] == item_id:
+        return {"status": "completed", "reason": "already_equipped", "item_id": item_id,
+            "slot": c_slot, "skill": decision.skill}
+
+    acknowledged = False
+    opened_here = not current.pause_menu.active
+    if opened_here:
+        acknowledged |= await _pulse(bridge, buttons=BUTTONS["START"], hold_ms=90, settle_s=0.12)
+    current = await _wait_pause_ready(bridge)
+    if current is None:
+        return {"status": "failed", "reason": "pause_menu_not_ready",
+            "item_id": item_id, "acknowledged": acknowledged, "skill": decision.skill}
+
+    # R is the stable right-page control in the pinned SoH revision. Cycle until the item page (0).
+    for _ in range(5):
+        if current.pause_menu.page_index == 0:
+            break
+        old_page = current.pause_menu.page_index
+        acknowledged |= await _pulse(bridge, buttons=BUTTONS["R"], hold_ms=80, settle_s=0.16)
+        current = await _wait_pause_ready(bridge, 1.5)
+        if current is None:
+            return {"status": "failed", "reason": "pause_page_transition_timeout",
+                "item_id": item_id, "acknowledged": acknowledged, "skill": decision.skill}
+        if current.pause_menu.page_index == old_page:
+            continue
+    if current.pause_menu.page_index != 0:
+        return {"status": "failed", "reason": "item_page_unreachable",
+            "item_id": item_id, "page": current.pause_menu.page_index,
+            "acknowledged": acknowledged, "skill": decision.skill}
+
+    # If the cursor sits on a page-switch sentinel, move it back toward the item grid.
+    if current.pause_menu.cursor_special_pos == 10:
+        acknowledged |= await _pulse(bridge, stick_x=60, hold_ms=100, settle_s=0.12)
+        current = await _wait_pause_ready(bridge, 1.0) or current
+    elif current.pause_menu.cursor_special_pos == 11:
+        acknowledged |= await _pulse(bridge, stick_x=-60, hold_ms=100, settle_s=0.12)
+        current = await _wait_pause_ready(bridge, 1.0) or current
+
+    visited = {}
+    for _ in range(32):
+        current = bridge.state or current
+        slots = current.pause_menu.cursor_slot
+        if not current.pause_menu.active or not current.pause_menu.ready or not slots:
+            current = await _wait_pause_ready(bridge, 1.0)
+            if current is None:
+                break
+            slots = current.pause_menu.cursor_slot
+        cursor = slots[0] if slots else -1
+        if cursor == target_slot:
+            break
+        if cursor < 0 or cursor >= 24:
+            return {"status": "failed", "reason": "invalid_item_cursor",
+                "cursor": cursor, "item_id": item_id, "skill": decision.skill}
+
+        moved = False
+        for direction in _menu_grid_directions(cursor, target_slot):
+            key = (cursor, direction)
+            if visited.get(key, 0) >= 2:
+                continue
+            visited[key] = visited.get(key, 0) + 1
+            x = {"left": -60, "right": 60}.get(direction, 0)
+            y = {"up": 60, "down": -60}.get(direction, 0)
+            acknowledged |= await _pulse(bridge, stick_x=x, stick_y=y, hold_ms=100, settle_s=0.12)
+            sample = await _wait_pause_ready(bridge, 0.9)
+            if sample is None:
+                continue
+            new_cursor = sample.pause_menu.cursor_slot[0] if sample.pause_menu.cursor_slot else cursor
+            current = sample
+            if new_cursor != cursor:
+                moved = True
+                break
+        if not moved:
+            return {"status": "failed", "reason": "item_cursor_stuck",
+                "cursor": cursor, "target_slot": target_slot, "item_id": item_id,
+                "acknowledged": acknowledged, "skill": decision.skill}
+
+    current = bridge.state or current
+    cursor = current.pause_menu.cursor_slot[0] if current.pause_menu.cursor_slot else -1
+    if cursor != target_slot:
+        return {"status": "failed", "reason": "item_cursor_target_not_reached",
+            "cursor": cursor, "target_slot": target_slot, "item_id": item_id,
+            "acknowledged": acknowledged, "skill": decision.skill}
+
+    acknowledged |= await _pulse(bridge, buttons=BUTTONS[f"C_{c_slot.upper()}"],
+        hold_ms=90, settle_s=0.15)
+
+    equip_deadline = time.monotonic() + 2.5
+    equipped = False
+    while time.monotonic() < equip_deadline:
+        sample = bridge.state
+        if sample and len(sample.equipped) > button_index and sample.equipped[button_index] == item_id:
+            equipped = True
+            current = sample
+            break
+        await asyncio.sleep(0.08)
+    if not equipped:
+        return {"status": "failed", "reason": "equip_not_confirmed",
+            "item_id": item_id, "slot": c_slot, "acknowledged": acknowledged,
+            "skill": decision.skill}
+
+    # Wait out the pause equip animation before closing. Failure to close is reported but does not
+    # erase the verified equipment success.
+    ready = await _wait_pause_ready(bridge, 2.5)
+    if ready is not None:
+        acknowledged |= await _pulse(bridge, buttons=BUTTONS["START"], hold_ms=90, settle_s=0.15)
+        close_deadline = time.monotonic() + 1.5
+        while time.monotonic() < close_deadline:
+            sample = bridge.state
+            if sample and not sample.pause_menu.active:
+                return {"status": "completed", "reason": "item_equipped",
+                    "item_id": item_id, "slot": c_slot, "pause_closed": True,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            await asyncio.sleep(0.08)
+    return {"status": "completed", "reason": "item_equipped_pause_left_open",
+        "item_id": item_id, "slot": c_slot, "pause_closed": False,
+        "acknowledged": acknowledged, "skill": decision.skill}
+
+
 async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     before = bridge.state
     if not before or not bridge.connected:
@@ -213,6 +546,14 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return {"status": "stale", "reason": "world_changed_during_inference", "skill": decision.skill}
     if not before.in_game:
         return {"status": "stale", "reason": "game_not_ready", "skill": decision.skill}
+    if decision.skill == "equip_item":
+        return await _equip_item(bridge, decision, observation)
+    if decision.skill == "navigate_to":
+        return await _navigate_local(bridge, decision, observation, actor_mode=False)
+    if decision.skill == "approach_actor":
+        return await _navigate_local(bridge, decision, observation, actor_mode=True)
+    if decision.skill == "talk_to_actor":
+        return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
     if before.paused and decision.skill not in MENU_SKILLS:
         return {"status": "stale", "reason": "pause_menu_active", "skill": decision.skill}
     if not before.paused and decision.skill in {"menu_move", "menu_confirm", "menu_cancel", "menu_assign"}:
