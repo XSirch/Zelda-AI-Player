@@ -275,9 +275,15 @@ json ProgressJson() {
 
 json ActorJson(Actor* actor, Player* player) {
     if (!actor || !player) return nullptr;
-    const auto& entry = ActorDB::Instance->RetrieveEntry(actor->id);
-    const std::string actorName = entry.entry.valid ? entry.name : "";
-    const std::string actorDescription = entry.entry.valid ? entry.desc : "";
+    std::string actorName;
+    std::string actorDescription;
+    if (ActorDB::Instance != nullptr) {
+        const auto& entry = ActorDB::Instance->RetrieveEntry(actor->id);
+        if (entry.entry.valid) {
+            actorName = entry.name.substr(0, 96);
+            actorDescription = entry.desc.substr(0, 200);
+        }
+    }
     const auto& a = actor->world.pos;
     const auto& p = player->actor.world.pos;
     const float dx = a.x - p.x;
@@ -640,7 +646,8 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnItemReceive>([](GetItemEntry itemEntry) {
         std::string detail = std::to_string(itemEntry.itemId);
-        if (itemEntry.modIndex == MOD_NONE && itemEntry.itemId <= ITEM_ROCS_FEATHER) {
+        // MOD_NONE is 0 in the pinned Shipwright revision; avoid an extra randomizer-enum include here.
+        if (itemEntry.modIndex == 0 && itemEntry.itemId <= ITEM_ROCS_FEATHER) {
             detail += ":" + SohUtils::GetItemName(itemEntry.itemId);
         }
         Event("item_received", detail);
