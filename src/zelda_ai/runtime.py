@@ -281,6 +281,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     stagnant_samples = 0
     recentered = False
     last_actor = None
+    last_progress_seq = -1
 
     try:
         while time.monotonic() < deadline:
@@ -335,11 +336,13 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     "target_distance": target_distance, "acknowledged": acknowledged,
                     "skill": decision.skill}
 
-            if target_distance + 2.0 < best_distance:
-                best_distance = target_distance
-                stagnant_samples = 0
-            else:
-                stagnant_samples += 1
+            if current.seq != last_progress_seq:
+                last_progress_seq = current.seq
+                if target_distance + 2.0 < best_distance:
+                    best_distance = target_distance
+                    stagnant_samples = 0
+                else:
+                    stagnant_samples += 1
 
             if stagnant_samples >= 5 and not recentered:
                 bridge.release()
