@@ -4,7 +4,7 @@ from zelda_ai.runtime import controller_input
 
 def decision(skill, direction, duration=700, strength=0.7):
     return Decision(goal="navigate", summary="test", skill=skill,
-        args=SkillArgs(direction=direction, duration_ms=duration, strength=strength, slot=None, choice_index=None),
+        args=SkillArgs(direction=direction, duration_ms=duration, strength=strength, slot=None, choice_index=None, song=None),
         memory_note=None)
 
 
