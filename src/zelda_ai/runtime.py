@@ -746,6 +746,7 @@ class Runtime:
         self.last_result: dict | None = None
         self.recent = deque(maxlen=12)
         self.hints = deque(maxlen=3)
+        self.dialogue_transcript = deque(maxlen=20)
         self.seen_events: set[str] = set()
         self.bridge.on_state = self.on_state
         self.subscribers: set[asyncio.Queue] = set()
@@ -929,17 +930,25 @@ class Runtime:
             if old:
                 if not old.dialogue.active and state.dialogue.active:
                     self.bridge.release()
-                    self.log("dialogue_detected", {"text_id": state.dialogue.text_id,
-                        "text": state.dialogue.text, "choices": state.dialogue.choices,
-                        "speaker": state.dialogue.speaker.model_dump() if state.dialogue.speaker else None})
+                    entry = {"text_id": state.dialogue.text_id, "text": state.dialogue.text,
+                        "choices": state.dialogue.choices,
+                        "speaker": state.dialogue.speaker.model_dump() if state.dialogue.speaker else None}
+                    if state.dialogue.text:
+                        self.dialogue_transcript.append(entry)
+                    self.log("dialogue_detected", entry)
                 elif old.dialogue.active and not state.dialogue.active:
                     self.log("dialogue_closed", {"text_id": old.dialogue.text_id})
                 elif state.dialogue.active and (
                         old.dialogue.text_id != state.dialogue.text_id or
                         old.dialogue.text != state.dialogue.text or
                         old.dialogue.choice_count != state.dialogue.choice_count):
-                    self.log("dialogue_changed", {"text_id": state.dialogue.text_id,
-                        "text": state.dialogue.text, "choices": state.dialogue.choices})
+                    entry = {"text_id": state.dialogue.text_id, "text": state.dialogue.text,
+                        "choices": state.dialogue.choices,
+                        "speaker": state.dialogue.speaker.model_dump() if state.dialogue.speaker else None}
+                    if state.dialogue.text and (not self.dialogue_transcript or
+                            self.dialogue_transcript[-1].get("text") != state.dialogue.text):
+                        self.dialogue_transcript.append(entry)
+                    self.log("dialogue_changed", entry)
             for event in state.events:
                 key = f"{state.instance_id}:{event.id}"
                 if key not in self.seen_events:
@@ -951,6 +960,20 @@ class Runtime:
                     f"Death observed after skill: {(self.last_decision or {}).get('skill', 'unknown')}. "
                     "Causality is unconfirmed; reconsider the tactic.")
         self.publish()
+
+    async def _handle_dialogue(self, game: GameState) -> bool:
+        if not game.dialogue.active:
+            return False
+        if game.dialogue.choice_count > 0 and game.dialogue.can_advance:
+            return False  # A model decision is required for a semantic choice.
+        self.bridge.release()
+        if not game.dialogue.can_advance:
+            await asyncio.sleep(0.08)
+            return True
+        acknowledged = await _pulse(self.bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.12)
+        self.log("dialogue_auto_advance", {"text_id": game.dialogue.text_id,
+            "state": game.dialogue.state, "acknowledged": acknowledged})
+        return True
 
     async def _handle_gameover(self, game: GameState) -> bool:
         if game.game_over_state == 0:
@@ -1023,6 +1046,7 @@ class Runtime:
             self._reset_trajectory_trace(game)
             self.recent.clear()
             self.hints.clear()
+            self.dialogue_transcript.clear()
             self.started = time.monotonic()
             self.state, self.reason = "running", ""
             self.log("run_started", {"contract": CONTRACT_VERSION, "checkpoint_certified": False})
@@ -1143,10 +1167,7 @@ class Runtime:
                     self.bridge.release()
                     await asyncio.sleep(0.15)
                     continue
-                # Wait locally for the current textbox to reach an actionable state.
-                if game.dialogue.active and not game.dialogue.can_advance:
-                    self.bridge.release()
-                    await asyncio.sleep(0.08)
+                if await self._handle_dialogue(game):
                     continue
                 if await self._try_replay_trajectory(game):
                     await asyncio.sleep(0.1)
@@ -1154,7 +1175,8 @@ class Runtime:
                 game = self.bridge.state or game
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
-                    "last_result": self.last_result, "events": list(self.recent)[-5:],
+                    "last_decision": self.last_decision, "last_result": self.last_result,
+                    "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene)],
                     "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
                     "stuck_score": self.stuck_score,
@@ -1190,6 +1212,8 @@ class Runtime:
                     self.store.update_run(self.run_id, mixed=True)
                     self.log("provider_rerouted", {"requested": self.config.model, "actual": result.usage.actual_model})
                 self.last_decision = decision.model_dump()
+                if not game.dialogue.active and self.dialogue_transcript:
+                    self.dialogue_transcript.clear()
                 if decision.memory_note:
                     self.store.remember(self.namespace, game.scene, decision.memory_note)
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
@@ -1226,7 +1250,7 @@ class Runtime:
             "pending_switch": self.pending_switch[0].model_dump() if self.pending_switch else None,
             "elapsed_s": round(time.monotonic() - self.started) if self.run_id else 0,
             "last_decision": self.last_decision, "last_result": self.last_result,
-            "events": list(self.recent), "bridge": self.bridge.status(),
-            "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
+            "events": list(self.recent), "dialogue_transcript": list(self.dialogue_transcript),
+            "bridge": self.bridge.status(), "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
             "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],
             "world_edges": self.store.list_world_edges(self.namespace, limit=100) if self.namespace else []}
