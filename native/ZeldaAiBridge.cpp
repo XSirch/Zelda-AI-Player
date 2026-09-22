@@ -625,6 +625,16 @@ void Snapshot() {
                 {"floor_height", player->actor.floorHeight},
                 {"wall_yaw", player->actor.wallYaw},
                 {"bg_check_flags", player->actor.bgCheckFlags},
+                {"wall_flags", player->actor.wallPoly
+                    ? SurfaceType_GetWallFlags(&gPlayState->colCtx, player->actor.wallPoly, player->actor.wallBgId) : 0},
+                {"state_flags_1", player->stateFlags1},
+                {"state_flags_2", player->stateFlags2},
+                {"climbing_ladder", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) != 0},
+                {"hanging_ledge", (player->stateFlags1 & PLAYER_STATE1_HANGING_OFF_LEDGE) != 0},
+                {"climbing_ledge", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LEDGE) != 0},
+                {"can_climb", (player->stateFlags2 & PLAYER_STATE2_DO_ACTION_CLIMB) != 0},
+                {"can_down", (player->stateFlags2 & PLAYER_STATE2_DO_ACTION_DOWN) != 0 ||
+                    (player->stateFlags1 & (PLAYER_STATE1_HANGING_OFF_LEDGE | PLAYER_STATE1_CLIMBING_LADDER)) != 0},
                 {"y_dist_to_water", player->actor.yDistToWater},
                 {"health", gSaveContext.health},
                 {"max_health", gSaveContext.healthCapacity},
