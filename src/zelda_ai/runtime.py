@@ -66,6 +66,7 @@ SKILL_CATALOG = [
     {"id": "play_song", "name": "Tocar música conhecida na ocarina", "status": "implemented", "version": "1.0"},
     {"id": "navigate_to", "name": "Servo local até posição observada", "status": "implemented", "version": "2.0"},
     {"id": "approach_actor", "name": "Aproximar-se de ator desenhado", "status": "implemented", "version": "2.0"},
+    {"id": "follow_actor", "name": "Seguir ator móvel mantendo distância", "status": "implemented", "version": "2.0"},
     {"id": "talk_to_actor", "name": "Aproximar e iniciar conversa com ator", "status": "implemented", "version": "2.0"},
     {"id": "interact_with_actor", "name": "Aproximar/interagir com ator e verificar efeito", "status": "implemented", "version": "2.0"},
     {"id": "equip_item", "name": "Equipar item possuído em C via pause menu", "status": "implemented", "version": "2.0"},
@@ -630,6 +631,77 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
         "acknowledged": acknowledged, "skill": decision.skill}
 
 
+async def _follow_actor(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    desired = decision.args.stop_distance or 150.0
+    deadline = time.monotonic() + min(12.0, max(1.0, decision.args.duration_ms / 1000))
+    start_position = before.player.position
+    start_health = before.player.health
+    first_command = None
+    acknowledged = False
+    missing = 0
+    last_distance = None
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "completed", "reason": "transition_while_following",
+                    "distance": math.dist(start_position, current.player.position) if current.player else None,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.dialogue.active or current.cutscene_active or current.paused or current.game_over_state != 0:
+                return {"status": "completed", "reason": "follow_sequence_progressed",
+                    "dialogue": current.dialogue.active, "cutscene": current.cutscene_active,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if start_health - current.player.health >= 16:
+                return {"status": "failed", "reason": "danger_detected",
+                    "health_lost": start_health - current.player.health,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            if first_command is not None:
+                acknowledged |= current.last_command_seq >= first_command
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+            if actor is None:
+                missing += 1
+                if missing >= 6:
+                    return {"status": "failed", "reason": "follow_target_lost",
+                        "last_target_distance": last_distance,
+                        "acknowledged": acknowledged, "skill": decision.skill}
+                await asyncio.sleep(0.10)
+                continue
+            missing = 0
+            last_distance = actor.distance
+
+            if actor.distance > desired + 35:
+                stick_x, stick_y, _ = _steer_to(current, actor.position, max(0.55, decision.args.strength))
+                command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=240)
+            elif actor.distance < max(45.0, desired - 50):
+                stick_x, stick_y, _ = _steer_to(current, actor.position, max(0.4, decision.args.strength))
+                command_id = bridge.send(stick_x=-stick_x, stick_y=-max(20, stick_y), lease_ms=180)
+            else:
+                command_id = bridge.send(lease_ms=160)
+
+            if first_command is None:
+                first_command = command_id
+            await asyncio.sleep(0.10)
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "completed", "reason": "follow_window_complete",
+        "last_target_distance": last_distance,
+        "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "acknowledged": bool(after and first_command is not None and
+            after.last_command_seq >= first_command) or acknowledged,
+        "skill": decision.skill}
+
+
 async def _manipulate_object(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     before = bridge.state
     if not before or not before.player:
@@ -1128,6 +1200,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _navigate_local(bridge, decision, observation, actor_mode=False)
     if decision.skill == "approach_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True)
+    if decision.skill == "follow_actor":
+        return await _follow_actor(bridge, decision, observation)
     if decision.skill == "talk_to_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
     if decision.skill == "interact_with_actor":
