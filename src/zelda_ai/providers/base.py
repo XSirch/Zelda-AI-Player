@@ -19,6 +19,7 @@ Implemented skills:
 - approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
+- fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
 
 The state contract includes scene + scene_name, room, entrance_index, player pose, camera,
 raw inventory/equipment plus inventory_named entries for items Link owns, pause-menu cursor state,
@@ -51,7 +52,9 @@ over many one-step move calls. These are local steering controllers, NOT collisi
 a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
 For free exploration, turn(left/right) plus short move probes remain valid. The runtime may replay a previously
 successful adaptive trajectory before calling you; replay success/failure appears in events. Current skills do
-not yet solve global collision paths, aim ranged weapons or guarantee combat hits.
+not yet solve global collision paths or aim ranged weapons. fight_enemy is suitable for ordinary observed enemies;
+bosses with invulnerability phases or item-specific mechanics still require you to reason about the opening and use
+the appropriate item/interaction rather than repeatedly invoking generic melee.
 If stuck_score rises or a stuck_detected event appears, change strategy: recenter, backtrack, rotate/explore,
 or abandon the current local route instead of repeating the same action.
 
