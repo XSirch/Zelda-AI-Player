@@ -303,6 +303,13 @@ void Snapshot() {
         {"player", nullptr},
         {"dialogue", json::object()},
         {"context_action", {{"code", bridge.doAction}, {"label", DoActionName(bridge.doAction)}}},
+        {"pause_menu", {{"active", false}, {"state", 0}, {"page_index", 0},
+            {"cursor_point", json::array()}, {"cursor_item", json::array()}, {"cursor_slot", json::array()},
+            {"named_item", nullptr}, {"prompt_choice", 0}}},
+        {"game_over_state", 0},
+        {"ocarina_mode", 0},
+        {"ocarina_action", 0},
+        {"last_played_song", 0},
         {"target_actor", nullptr},
         {"nearby_actors", json::array()},
         {"cutscene_active", false},
@@ -346,6 +353,24 @@ void Snapshot() {
             state["room"] = room;
             state["entrance_index"] = gSaveContext.entranceIndex;
             state["paused"] = gPlayState->pauseCtx.state != 0;
+            state["pause_menu"] = {
+                {"active", gPlayState->pauseCtx.state != 0},
+                {"state", gPlayState->pauseCtx.state},
+                {"page_index", std::min<int>(gPlayState->pauseCtx.pageIndex, 4)},
+                {"cursor_point", json::array()},
+                {"cursor_item", json::array()},
+                {"cursor_slot", json::array()},
+                {"named_item", gPlayState->pauseCtx.namedItem == PAUSE_ITEM_NONE
+                    ? json(nullptr) : json(gPlayState->pauseCtx.namedItem)},
+                {"prompt_choice", gPlayState->pauseCtx.promptChoice},
+            };
+            for (auto value : gPlayState->pauseCtx.cursorPoint) state["pause_menu"]["cursor_point"].push_back(value);
+            for (auto value : gPlayState->pauseCtx.cursorItem) state["pause_menu"]["cursor_item"].push_back(value);
+            for (auto value : gPlayState->pauseCtx.cursorSlot) state["pause_menu"]["cursor_slot"].push_back(value);
+            state["game_over_state"] = gPlayState->gameOverCtx.state;
+            state["ocarina_mode"] = gPlayState->msgCtx.ocarinaMode;
+            state["ocarina_action"] = gPlayState->msgCtx.ocarinaAction;
+            state["last_played_song"] = gPlayState->msgCtx.lastPlayedSong;
             state["cutscene_active"] =
                 (gPlayState->csCtx.state != CS_STATE_IDLE) || (Player_InCsMode(gPlayState) != 0);
             state["dialogue"] = DialogueJson(player);
@@ -435,6 +460,10 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerHealthChange>([](int16_t amount) {
         Event("health_changed", std::to_string(amount));
+    });
+
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnOcarinaSongAction>([]() {
+        if (gPlayState) Event("ocarina_song_action", std::to_string(gPlayState->msgCtx.lastPlayedSong));
     });
 }
 
