@@ -2025,7 +2025,7 @@ class Runtime:
                     await asyncio.sleep(0.08)
                     game = self.bridge.state or game
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
-                    "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
+                    "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq", "nearby_actors"}),
                     "last_decision": self.last_decision, "last_result": self.last_result,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
