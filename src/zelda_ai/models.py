@@ -128,7 +128,7 @@ class GameState(StrictModel):
 
 class SkillArgs(StrictModel):
     # Required nullable keys keep the schema compatible with strict JSON outputs.
-    direction: Literal["forward", "back", "left", "right"] | None
+    direction: Literal["forward", "back", "left", "right", "up", "down"] | None
     duration_ms: int = Field(ge=50, le=2000)
     strength: float = Field(ge=0, le=1)
     slot: Literal["left", "down", "right"] | None
@@ -146,16 +146,18 @@ class Decision(StrictModel):
 
     @model_validator(mode="after")
     def skill_arguments(self):
-        if self.skill in {"move", "turn", "sidestep"} and self.args.direction is None:
+        if self.skill in {"move", "turn", "sidestep", "menu_move"} and self.args.direction is None:
             raise ValueError(f"{self.skill} requires direction")
+        if self.skill == "move" and self.args.direction not in {"forward", "back", "left", "right"}:
+            raise ValueError("move requires forward, back, left or right")
         if self.skill in {"turn", "sidestep"} and self.args.direction not in {"left", "right"}:
             raise ValueError(f"{self.skill} requires left or right")
+        if self.skill == "menu_move" and self.args.direction not in {"up", "down", "left", "right"}:
+            raise ValueError("menu_move requires up, down, left or right")
         if self.skill == "use_item" and self.args.slot is None:
             raise ValueError("use_item requires an equipped C-button slot")
         if self.skill == "choose_dialogue" and self.args.choice_index is None:
             raise ValueError("choose_dialogue requires choice_index")
-        if self.skill == "menu_move" and self.args.direction is None:
-            raise ValueError("menu_move requires direction")
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill == "play_song" and self.args.song is None:
