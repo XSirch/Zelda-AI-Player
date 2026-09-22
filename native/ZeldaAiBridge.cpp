@@ -276,6 +276,7 @@ json ActorJson(Actor* actor, Player* player) {
         {"category", actor->category},
         {"params", actor->params},
         {"position", {a.x, a.y, a.z}},
+        {"focus_position", {actor->focus.pos.x, actor->focus.pos.y, actor->focus.pos.z}},
         {"distance", distance},
         {"targeted", actor->isTargeted != 0},
         {"drawn", actor->isDrawn != 0},
