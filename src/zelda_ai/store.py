@@ -133,7 +133,7 @@ class Store:
             safe_actions.append({"skill": skill, "args": {
                 "direction": args.get("direction"), "duration_ms": args.get("duration_ms"),
                 "strength": args.get("strength"), "slot": args.get("slot"),
-                "choice_index": args.get("choice_index")}})
+                "choice_index": args.get("choice_index"), "song": args.get("song")}})
         if not safe_actions or not any(a["skill"] in {"move", "turn"} for a in safe_actions):
             return None
         signature_payload = {"from": [origin["scene"], origin["room"]],
