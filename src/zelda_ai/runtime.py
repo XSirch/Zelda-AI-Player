@@ -266,6 +266,9 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
     acknowledged = False
     attempts = 0
     best_distance = actor.distance
+    turn_sign = 1
+    turn_flipped = False
+    previous_yaw_error = None
 
     try:
         while time.monotonic() < deadline and attempts < 8:
@@ -306,11 +309,22 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
             # using native yaw feedback, then put the camera behind Link and advance on a straight line.
             desired_yaw = _yaw_to_target(current.player.position, actor.position)
             yaw_error = _yaw_error_units(current.player.yaw, desired_yaw)
-            if abs(yaw_error) > 1200:
-                face_args = decision.args.model_copy(update={"duration_ms": 900, "strength": max(0.55, decision.args.strength)})
-                face_decision = decision.model_copy(update={"args": face_args})
-                faced = await _face_target(bridge, face_decision, current)
-                acknowledged |= bool(faced.get("acknowledged"))
+            abs_yaw_error = abs(yaw_error)
+            if (previous_yaw_error is not None and abs_yaw_error > previous_yaw_error + 350 and not turn_flipped:
+                # Camera/control sign can be inverted by the current view. Calibrate once from observed yaw feedback.
+                turn_sign *= -1
+                turn_flipped = True
+            previous_yaw_error = abs_yaw_error
+
+            if abs_yaw_error > 1200:
+                magnitude = max(32, min(66, round(abs_yaw_error / 260)))
+                stick_x = magnitude * (1 if yaw_error > 0 else -1) * turn_sign
+                command_id = bridge.send(stick_x=stick_x, stick_y=8, lease_ms=180)
+                await asyncio.sleep(0.18)
+                bridge.release()
+                await asyncio.sleep(0.06)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
                 attempts += 1
                 continue
 
@@ -347,6 +361,9 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
                 if updated:
                     if updated.distance + 3.0 < best_distance:
                         best_distance = updated.distance
+                        previous_yaw_error = None
+                        turn_flipped = False
+                        turn_sign = 1
                     elif updated.distance >= best_distance - 1.0 and attempts >= 3:
                         # Create a little clearance and retry the face/center/straight sequence.
                         recovery = await _backtrack_recovery(bridge, sample, attempts)
