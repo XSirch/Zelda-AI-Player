@@ -357,6 +357,17 @@ async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameS
                 acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=100, settle_s=0.12)
                 continue
 
+            # At a LADDER_TOP wall, OoT attaches Link by moving into the wall; A would be the wrong input.
+            if direction == "down" and (current.player.wall_flags & 0x04):
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=70, settle_s=0.04)
+                command_id = bridge.send(stick_y=50, lease_ms=220)
+                await asyncio.sleep(0.20)
+                bridge.release()
+                await asyncio.sleep(0.08)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                continue
+
             # A climb affordance is explicit engine evidence. Start it only for upward traversal.
             if direction == "up" and (current.player.can_climb or current.context_action.label == "climb"):
                 acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=110, settle_s=0.10)
@@ -365,7 +376,7 @@ async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameS
             probe = _best_traversal_probe(current, direction)
             if probe is None:
                 # If touching a ladder/climbable wall but not attached, upward A can latch it.
-                if direction == "up" and (current.player.wall_flags & 0x0A):
+                if direction == "up" and (current.player.wall_flags & 0x0E):
                     acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=110, settle_s=0.10)
                     continue
                 return {"status": "failed", "reason": "no_traversal_affordance_observed",
