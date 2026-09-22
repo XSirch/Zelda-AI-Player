@@ -504,7 +504,9 @@ async def _equip_item(bridge: Bridge, decision: Decision, observation: GameState
         return {"status": "failed", "reason": "equip_arguments_or_state_missing", "skill": decision.skill}
     if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
         return {"status": "stale", "reason": "world_changed_during_inference", "skill": decision.skill}
-    if current.dialogue.active or (current.cutscene_active and current.game_over_state == 0):
+    if current.game_over_state != 0:
+        return {"status": "stale", "reason": "game_over_active", "skill": decision.skill}
+    if current.dialogue.active or current.cutscene_active:
         return {"status": "stale", "reason": "gameplay_state_blocks_pause", "skill": decision.skill}
 
     target_slot = _inventory_slot(current, item_id)
