@@ -80,7 +80,7 @@ function InventoryPanel({ game }: { game: GameState | null }) {
   return <section className="panel inventory-panel">
     <div className="section-head"><span>INVENTÁRIO OBSERVADO</span><span className="muted">{game.inventory_named.length} slots ocupados</span></div>
     <div className="inventory-grid">{game.inventory_named.map(item =>
-      <div className="inventory-item" key={item.slot}><span>SLOT {item.slot} · ID {item.item_id}</span><strong>{item.name}</strong></div>)}
+      <div className="inventory-item" key={item.slot}><span>SLOT {item.slot} · ID {item.item_id}{item.ammo != null && item.ammo >= 0 ? ` · AMMO ${item.ammo}` : ''}</span><strong>{item.name}</strong></div>)}
     </div>
   </section>;
 }
