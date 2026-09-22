@@ -14,7 +14,7 @@ Skill = Literal[
     "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
     "navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
-    "equip_item", "equip_gear", "aim_at", "fight_enemy",
+    "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area",
 ]
 
 
@@ -218,7 +218,7 @@ class Decision(StrictModel):
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
-                              "equip_item", "equip_gear", "aim_at", "fight_enemy"} and self.args.duration_ms > 2000:
+                              "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
