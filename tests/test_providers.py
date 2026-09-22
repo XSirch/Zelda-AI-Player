@@ -8,7 +8,7 @@ import pytest
 
 from zelda_ai.models import RunConfig
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.providers.codex import CodexProvider
+from zelda_ai.providers.codex import CodexProvider, parse_codex_version
 from zelda_ai.providers.openrouter import OpenRouterProvider
 
 
@@ -113,3 +113,9 @@ def test_windows_npm_shim_avoids_shell(tmp_path, monkeypatch):
     entry.write_text("// fixture")
     monkeypatch.setattr("zelda_ai.providers.codex.shutil.which", lambda name: sys.executable if name == "node" else str(shim))
     assert executable_prefix("codex") == [sys.executable, str(entry)]
+
+
+def test_parse_codex_version_for_astra_era():
+    assert parse_codex_version("codex-cli 0.154.0") == ("0.154.0", (0, 154, 0))
+    assert parse_codex_version("zelda_ai_player/0.155.0-alpha.16 (Windows)") == ("0.155.0", (0, 155, 0))
+    assert parse_codex_version("unknown") == (None, None)
