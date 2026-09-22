@@ -95,7 +95,7 @@ def test_local_servo_steers_right_when_target_is_camera_right(state):
 
 
 def test_inventory_slot_prefers_semantic_observation(state):
-    game = state.model_copy(update={"inventory": [255, 7, 6],
+    game = type(state).model_validate({**state.model_dump(), "inventory": [255, 7, 6],
         "inventory_named": [{"slot": 1, "item_id": 7, "name": "Fairy Ocarina"}]})
     assert _inventory_slot(game, 7) == 1
     assert _inventory_slot(game, 6) == 2
