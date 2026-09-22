@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 ProviderId = Literal["codex", "openrouter", "demo"]
 Effort = str  # Actual accepted values are validated against the provider catalog.
-Skill = Literal["move", "turn", "interact", "attack", "defend", "target", "use_item", "wait"]
+Skill = Literal[
+    "move", "turn", "interact", "attack", "defend", "target", "use_item", "wait",
+    "advance_dialogue", "choose_dialogue", "camera_center", "roll", "backflip",
+    "sidestep", "jump_attack",
+]
 
 
 class StrictModel(BaseModel):
@@ -25,10 +29,47 @@ class PlayerState(StrictModel):
     age: Literal["child", "adult"] = "child"
 
 
+class ActorObservation(StrictModel):
+    actor_id: int = Field(ge=-32768, le=32767)
+    category: int = Field(ge=0, le=255)
+    params: int = Field(ge=-32768, le=32767)
+    position: tuple[float, float, float]
+    distance: float = Field(ge=0)
+    targeted: bool = False
+    text_id: int | None = Field(default=None, ge=0, le=65535)
+
+    @field_validator("position")
+    @classmethod
+    def finite_position(cls, value):
+        if not all(math.isfinite(v) for v in value):
+            raise ValueError("Non-finite actor position")
+        return value
+
+
+class DialogueState(StrictModel):
+    active: bool = False
+    text_id: int | None = Field(default=None, ge=0, le=65535)
+    text: str = Field(default="", max_length=4096)
+    state: str = Field(default="none", max_length=40)
+    state_code: int = Field(default=0, ge=0, le=255)
+    message_mode: int = Field(default=0, ge=0, le=255)
+    can_advance: bool = False
+    choice_count: int = Field(default=0, ge=0, le=3)
+    choice_index: int = Field(default=0, ge=0, le=2)
+    choices: list[str] = Field(default_factory=list, max_length=3)
+    speaker: ActorObservation | None = None
+
+
+class ContextAction(StrictModel):
+    code: int = Field(default=10, ge=0, le=255)
+    label: str = Field(default="none", max_length=32)
+
+
 class GameEvent(StrictModel):
     id: str = Field(max_length=96)
-    kind: Literal["scene_changed", "item_received", "enemy_defeated", "boss_defeated", "health_changed"]
-    detail: str = Field(default="", max_length=200)
+    # Keep event kinds extensible so a newer native observer cannot invalidate the whole heartbeat.
+    kind: str = Field(min_length=1, max_length=64)
+    detail: str = Field(default="", max_length=1000)
 
 
 class GameState(StrictModel):
@@ -39,6 +80,7 @@ class GameState(StrictModel):
     scene_epoch: int = Field(ge=0)
     scene: int = Field(ge=-1, le=65535)
     room: int = Field(ge=-1, le=255)
+    entrance_index: int = Field(default=-1, ge=-1, le=2147483647)
     in_game: bool
     player: PlayerState | None
     camera_eye: tuple[float, float, float] | None = None
@@ -47,7 +89,11 @@ class GameState(StrictModel):
     # SoH ItemEquips.buttonItems[8]: B + 3 C-buttons + 4 D-pad slots.
     # Keep accepting older four-slot payloads without truncating native telemetry.
     equipped: list[int] = Field(default_factory=list, max_length=8)
-    message_id: int | None = None
+    message_id: int | None = None  # Deprecated compatibility mirror; prefer dialogue.text_id.
+    dialogue: DialogueState = Field(default_factory=DialogueState)
+    context_action: ContextAction = Field(default_factory=ContextAction)
+    target_actor: ActorObservation | None = None
+    cutscene_active: bool = False
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=16)
     last_command_seq: int = 0
@@ -67,6 +113,7 @@ class SkillArgs(StrictModel):
     duration_ms: int = Field(ge=50, le=2000)
     strength: float = Field(ge=0, le=1)
     slot: Literal["left", "down", "right"] | None
+    choice_index: int | None = Field(ge=0, le=2)
 
 
 class Decision(StrictModel):
@@ -78,12 +125,14 @@ class Decision(StrictModel):
 
     @model_validator(mode="after")
     def skill_arguments(self):
-        if self.skill in {"move", "turn"} and self.args.direction is None:
+        if self.skill in {"move", "turn", "sidestep"} and self.args.direction is None:
             raise ValueError(f"{self.skill} requires direction")
-        if self.skill == "turn" and self.args.direction not in {"left", "right"}:
-            raise ValueError("turn requires left or right")
+        if self.skill in {"turn", "sidestep"} and self.args.direction not in {"left", "right"}:
+            raise ValueError(f"{self.skill} requires left or right")
         if self.skill == "use_item" and self.args.slot is None:
             raise ValueError("use_item requires an equipped C-button slot")
+        if self.skill == "choose_dialogue" and self.args.choice_index is None:
+            raise ValueError("choose_dialogue requires choice_index")
         return self
 
 
