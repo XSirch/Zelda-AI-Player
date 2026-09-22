@@ -2,10 +2,13 @@ from zelda_ai.models import Decision, SkillArgs
 from zelda_ai.runtime import controller_input
 
 
-def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None):
+def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
+             target_actor_id=None, target_actor_params=None, target_position=None, stop_distance=None, item_id=None):
     return Decision(goal="navigate", summary="test", skill=skill,
         args=SkillArgs(direction=direction, duration_ms=duration, strength=strength, slot=slot,
-            choice_index=choice_index, song=song), memory_note=None)
+            choice_index=choice_index, song=song, target_actor_id=target_actor_id,
+            target_actor_params=target_actor_params, target_position=target_position,
+            stop_distance=stop_distance, item_id=item_id), memory_note=None)
 
 
 def test_turn_uses_steering_plus_small_forward_bias():
