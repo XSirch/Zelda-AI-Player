@@ -729,6 +729,7 @@ async def _manipulate_object(bridge: Bridge, decision: Decision, observation: Ga
     start_epoch = current.scene_epoch
     start_context = current.context_action.label
     acknowledged = await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=180, settle_s=0.10)
+    first_move_command = None
     direction_y = 62 if decision.args.direction == "forward" else -62
     deadline = time.monotonic() + min(4.0, max(0.6, decision.args.duration_ms / 1000))
 
@@ -751,6 +752,8 @@ async def _manipulate_object(bridge: Bridge, decision: Decision, observation: Ga
                 return {"status": "completed", "reason": outcome.kind, "detail": outcome.detail,
                     "acknowledged": acknowledged, "skill": decision.skill}
 
+            if first_move_command is not None:
+                acknowledged |= current.last_command_seq >= first_move_command
             actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
             if actor is not None:
                 displacement = math.dist(start_actor_position, actor.position)
@@ -765,7 +768,8 @@ async def _manipulate_object(bridge: Bridge, decision: Decision, observation: Ga
                     "acknowledged": acknowledged, "skill": decision.skill}
 
             command_id = bridge.send(buttons=BUTTONS["A"], stick_y=direction_y, lease_ms=260)
-            acknowledged |= current.last_command_seq >= command_id
+            if first_move_command is None:
+                first_move_command = command_id
             await asyncio.sleep(0.12)
     finally:
         bridge.release()
