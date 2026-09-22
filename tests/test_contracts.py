@@ -101,3 +101,43 @@ def test_game_state_accepts_structured_dialogue_and_drawn_actor(state):
     assert validated.dialogue.text == "Hello Link"
     assert validated.dialogue.choices == ["Yes", "No"]
     assert validated.nearby_actors[0].drawn
+
+
+def test_compound_navigation_accepts_longer_window(decision):
+    nav = Decision.model_validate({**decision.model_dump(), "skill": "navigate_to",
+        "args": {**decision.args.model_dump(), "duration_ms": 8000,
+            "target_position": [120.0, 0.0, -40.0], "stop_distance": 35.0}})
+    assert nav.args.duration_ms == 8000
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(),
+            "args": {**decision.args.model_dump(), "duration_ms": 8000}})
+
+
+def test_actor_and_equip_high_level_skills_require_targets(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "approach_actor"})
+    actor = Decision.model_validate({**decision.model_dump(), "skill": "talk_to_actor",
+        "args": {**decision.args.model_dump(), "target_actor_id": 123,
+            "target_actor_params": 4, "duration_ms": 6000}})
+    assert actor.args.target_actor_id == 123
+
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "equip_item"})
+    equipped = Decision.model_validate({**decision.model_dump(), "skill": "equip_item",
+        "args": {**decision.args.model_dump(), "item_id": 7, "slot": "left",
+            "duration_ms": 8000}})
+    assert equipped.args.item_id == 7 and equipped.args.slot == "left"
+
+
+def test_game_state_accepts_semantic_scene_inventory_and_pause_ready(state):
+    enriched = type(state).model_validate({**state.model_dump(),
+        "scene_name": "Kokiri Forest",
+        "inventory": [255, 7],
+        "inventory_named": [{"slot": 1, "item_id": 7, "name": "Fairy Ocarina"}],
+        "pause_menu": {"active": True, "ready": True, "state": 6, "transition_state": 0,
+            "page_index": 0, "cursor_special_pos": 0, "cursor_point": [1, 0, 0, 0, 0],
+            "cursor_item": [7, 999, 999, 59], "cursor_slot": [1, 0, 0, 0],
+            "named_item": 7, "prompt_choice": 0}})
+    assert enriched.scene_name == "Kokiri Forest"
+    assert enriched.inventory_named[0].name == "Fairy Ocarina"
+    assert enriched.pause_menu.ready
