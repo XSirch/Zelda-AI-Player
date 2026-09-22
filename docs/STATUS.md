@@ -4,13 +4,13 @@ Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementa�
 
 ## Autonomy v2 — gameplay autônomo de longa duração (22/09/2026)
 
-- Contrato `state-v2/skills-v2/trajectory-v1/prompt-v5`: cena nomeada, dia/noite, colisão/água do player, inventário semântico com munição aplicável, progresso/equipamento visível no pause, atores observados com ActorDB, `context_actor` e grafo de mundo aprendido.
+- Contrato `state-v3/skills-v2/trajectory-v2/prompt-v7`: cena nomeada, dia/noite, colisão/água do player, inventário semântico com munição aplicável, progresso/equipamento visível no pause, atores observados com ActorDB, `context_actor` e grafo de mundo aprendido.
 - Diálogo linear é transcrito/autoavançado localmente; somente escolhas semânticas voltam ao modelo. Game-over save/continue também é local.
 - Controladores compostos implementados: `navigate_to`, `approach_actor`, `follow_actor`, `talk_to_actor`, `interact_with_actor`, `explore_area`, `manipulate_object`, `equip_item`, `equip_gear`, `aim_at`, `face_target`, `shield_face` e `fight_enemy`.
 - Navegação usa feedback de posição/câmera e detours em `BGCHECKFLAG_WALL`; mira usa feedback yaw/pitch e calibração de sinal; interações e combate só declaram sucesso com mudança de estado/evento observável quando aplicável.
 - Cada transição atravessada alimenta `world_edges` com origem/posição de saída/destino/spawn/entrance. Trajetórias bem-sucedidas continuam isoladas por provider+modelo+effort+versão do contrato.
 - `OnItemReceive` e scene flag hooks permitem confirmar efeitos sem inferir sucesso. A derrota de `ACTOR_BOSS_GANON2` emite `game_completed`; a run passa para `completed` e esse estado é preservado no shutdown.
-- Painel ao vivo mostra cena semântica, diálogo, atores/context actor, progresso, inventário/munição, equipamento atual, dia/noite e grafo observado.
+- Painel ao vivo mostra cena semântica, diálogo, `room_actors` (inclusive atores off-camera), context actor, progresso, inventário/munição, equipamento atual, dia/noite e grafo observado.
 - **Validação pendente:** novos testes foram escritos e símbolos/hooks foram confrontados com o Shipwright fixado, mas `pytest`, build Vite e build completo SoH/Windows desta v2 não foram executados porque o ambiente de autoria não resolve `github.com` para materializar o checkout. Não há alegação de que a v2 já zerou OoT.
 - Visão sob demanda continua planejada; o caminho normal permanece 100% estado estruturado para reduzir custo/tokens.
 
@@ -75,7 +75,7 @@ Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementa�
 - Só há uma instância de jogo e uma run ativa por backend.
 - Eventos UDP não certificam conclusão de quests. O texto de diálogo agora é decodificado, mas isso não equivale a um detector certificado de progresso de quest.
 - Budget local de tokens é verificado entre chamadas; o limite em USD usa reserva estimada. Cancelamentos podem deixar faturamento pendente, que deve ser auditado no provider.
-- A lista `nearby_actors` contém somente atores marcados como desenhados no frame/sala, limitada por distância e quantidade; ainda precisa de validação visual no SoH para confirmar a observabilidade pretendida.
+- `nearby_actors` continua sendo o subconjunto desenhado/próximo para compatibilidade, mas `room_actors` agora enumera os atores ativos da sala atual sem depender de `isDrawn` ou distância. O limite é 64 entradas e qualquer truncamento é declarado por `room_actor_count`/`room_actors_truncated`; isso ainda precisa de validação no SoH/Windows.
 - `equip_item` e `equip_gear` são skills semânticas verificadas por estado; páginas incomuns continuam disponíveis pelas primitives genéricas do menu.
 - Modelos OpenRouter sem JSON estruturado estão desabilitados nesta primeira versão.
 - Não há CI hospedado nem gasto de GitHub Actions; os testes são locais.
