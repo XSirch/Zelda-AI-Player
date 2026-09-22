@@ -15,14 +15,15 @@ Implemented skills:
 - pause_toggle(Start), menu_move(up/down/left/right), menu_confirm(A), menu_cancel(B), menu_assign(C slot)
 - continue_gameover(A) when the game-over flow is waiting for confirmation
 - play_song(song) after an ocarina has already been activated; the executor sends the complete learned note sequence
-- navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate
-- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor
+- navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate; use 4000-8000 ms for room-scale travel
+- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
 
 The state contract includes scene + scene_name, room, entrance_index, player pose, camera,
 raw inventory/equipment plus inventory_named entries for items Link owns, pause-menu cursor state,
-game-over state, ocarina state, decoded dialogue, context-sensitive A action,
+game-over state, ocarina state, decoded dialogue, a pause-visible progress block (quest items/songs,
+owned equipment, upgrades, current dungeon map/compass/boss key/small keys), context-sensitive A action,
 current target actor and a bounded list of nearby actors
 that the game actually drew in the current room. nearby_actors is observation, not a complete world list.
 Do not infer that an unlisted actor does not exist.
@@ -36,11 +37,16 @@ the owned item_id: it handles opening/navigating/assigning/verifying the pause m
 remain available for equipment/pages not covered by equip_item. If game_over_state is non-zero and a continue
 prompt is actionable, use continue_gameover. play_song does not open/equip the ocarina; equip/use the ocarina first.
 
-A world_transition event or a changed scene/room invalidates the previous local plan. Re-observe and replan.
+Use progress to avoid repeating already-completed acquisition goals and to recognize when a capability or
+dungeon requirement became available. progress is not a hidden quest-flag oracle: absence of a quest item does
+not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
+Re-observe and replan.
 Use context_action (speak/open/grab/climb/etc.), target_actor and nearby_actors to ground interactions.
 Actors expose engine IDs/params and positions, not guaranteed semantic names. Never invent a name from an ID.
 
-When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor
+known_world_edges contains only transitions previously traversed by this same adaptive namespace. Use an edge's
+from_position as an observed exit coordinate when returning to a known destination; do not assume an unobserved
+edge exists. When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor
 over many one-step move calls. These are local steering controllers, NOT collision-aware global pathfinding:
 a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
 For free exploration, turn(left/right) plus short move probes remain valid. The runtime may replay a previously
