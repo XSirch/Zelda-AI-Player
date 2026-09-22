@@ -132,3 +132,26 @@ async def test_choice_dialogue_is_left_for_model(store, state):
     assert not await runtime._handle_dialogue(game)
     assert runtime.dialogue_transcript[-1]["choices"] == ["Yes", "No"]
     assert transport.sent == []
+
+
+def test_game_completed_event_finishes_run_and_persists_status(store, state):
+    bridge = Bridge("x" * 32, True)
+    transport = Transport()
+    bridge.connection_made(transport)
+    bridge.datagram_received(packet(state, source="simulator"), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {"demo": DemoProvider()})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.segment_id = store.segment(runtime.run_id, runtime.config.model_dump(), runtime.namespace)
+    runtime.state = "running"
+
+    completed = GameState.model_validate({**state.model_dump(), "source": "simulator",
+        "seq": state.seq + 1, "events": [{"id": "complete-1", "kind": "game_completed",
+            "detail": "final_ganon_defeated"}]})
+    bridge.datagram_received(packet(completed, source="simulator"), ("127.0.0.1", 5000))
+
+    assert runtime.state == "completed"
+    assert runtime.reason == "game_completed"
+    assert store.detail(runtime.run_id)["status"] == "completed"
+    assert any(event["kind"] == "run_completed" for event in runtime.recent)
