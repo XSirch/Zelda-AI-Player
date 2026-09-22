@@ -4,12 +4,15 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import time
 from collections.abc import Callable
 
 from pydantic import ValidationError
 
 from .models import GameState
+
+logger = logging.getLogger(__name__)
 
 
 class Bridge(asyncio.DatagramProtocol):
@@ -24,6 +27,7 @@ class Bridge(asyncio.DatagramProtocol):
         self.changed = asyncio.Event()
         self.on_state: Callable[[GameState, GameState | None], None] | None = None
         self.rejected_packets = 0
+        self.last_validation_error: dict[str, list[str]] | None = None
 
     def connection_made(self, transport):
         self.transport = transport
@@ -40,7 +44,20 @@ class Bridge(asyncio.DatagramProtocol):
             token = packet.pop("token", None)
             if not isinstance(token, str) or not self.token or not hmac.compare_digest(token, self.token):
                 raise ValueError("Unauthorized bridge")
-            state = GameState.model_validate(packet)
+            try:
+                state = GameState.model_validate(packet)
+            except ValidationError as exc:
+                # Expose schema diagnostics, never packet contents, tokens or arbitrary keys.
+                errors = exc.errors(include_url=False, include_context=False, include_input=False)
+                fields = {e["loc"][0] if e["loc"] and e["loc"][0] in GameState.model_fields
+                          else "<unknown>" for e in errors}
+                diagnostic = {"fields": sorted(fields)[:6],
+                              "types": sorted({e["type"] for e in errors})[:6]}
+                if diagnostic != self.last_validation_error:
+                    logger.warning("SoH state rejected: %s", diagnostic)
+                self.last_validation_error = diagnostic
+                self.rejected_packets += 1
+                return  # Invalid frames must not keep stale gameplay/control alive.
             if state.source == "simulator" and not self.allow_simulator:
                 raise ValueError("Simulator disabled")
             previous = self.state
@@ -54,6 +71,7 @@ class Bridge(asyncio.DatagramProtocol):
             # A live input lease expires before ownership can pass to another instance.
             self.state, self.peer, self.last_seen = state, addr, time.monotonic()
             self.command_seq = max(self.command_seq, state.last_command_seq)
+            self.last_validation_error = None
             self.changed.set()
             if self.on_state:
                 self.on_state(state, previous)
@@ -63,6 +81,7 @@ class Bridge(asyncio.DatagramProtocol):
     def status(self) -> dict:
         return {"connected": self.connected, "last_seen_age_s": round(time.monotonic() - self.last_seen, 2)
             if self.last_seen else None, "rejected_packets": self.rejected_packets,
+            "last_validation_error": self.last_validation_error,
             "state": self.state.model_dump() if self.state else None}
 
     def send(self, *, buttons: int = 0, stick_x: int = 0, stick_y: int = 0,

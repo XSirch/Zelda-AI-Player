@@ -44,7 +44,9 @@ class GameState(StrictModel):
     camera_eye: tuple[float, float, float] | None = None
     camera_at: tuple[float, float, float] | None = None
     inventory: list[int] = Field(default_factory=list, max_length=32)
-    equipped: list[int] = Field(default_factory=list, max_length=4)
+    # SoH ItemEquips.buttonItems[8]: B + 3 C-buttons + 4 D-pad slots.
+    # Keep accepting older four-slot payloads without truncating native telemetry.
+    equipped: list[int] = Field(default_factory=list, max_length=8)
     message_id: int | None = None
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=16)

@@ -2,6 +2,16 @@
 
 Milestone 0.1, 22/09/2026. Este arquivo distingue implementação, teste e proposta.
 
+## Hotfix: bridge desconectado ao carregar o save (22/09/2026)
+
+- Causa reproduzida: o adaptador nativo envia `ItemEquips.buttonItems[8]` (B, três C-buttons e quatro slots do D-pad), mas `GameState.equipped` aceitava no máximo quatro. Os pacotes de menu eram válidos; os de gameplay eram rejeitados e o heartbeat expirava mantendo a última cena `-1`.
+- Corrigido o limite para oito, preservando compatibilidade com listas antigas de quatro e mantendo a rejeição de listas maiores. Não há truncamento silencioso dos itens.
+- `Bridge.status()` agora inclui `last_validation_error` com nomes conhecidos dos campos e tipos de erro. O backend registra mudanças desse diagnóstico, sem valores recebidos, tokens ou nomes arbitrários de campos. Um novo estado válido limpa o diagnóstico; pacotes rejeitados não renovam o heartbeat.
+- Validação deste hotfix: a falha foi reproduzida antes da correção; **13 testes de regressão passaram** depois, incluindo transição menu/gameplay, oito slots, limites, recuperação, autenticação, replay, isolamento de instância e ida/volta de comandos por UDP em loopback. Python 3.13.5 e Pydantic 2.13.4 no ambiente de teste. A suíte completa, o frontend e o SoH/Windows não foram executados novamente nesta correção.
+- Aplicação: encerrar o backend com Ctrl+C, atualizar o clone de Zelda-AI-Player e executar `uv run zelda-ai serve`, sem `--demo`. Não exige recompilar o SoH nem refazer o login. Manter a mesma pasta local de dados/token. Se for necessário reabrir o jogo, usar `launch-soh` a partir desse mesmo clone.
+- Diagnóstico sem expor credenciais: `Invoke-RestMethod http://127.0.0.1:8787/api/status | ConvertTo-Json -Depth 8`. Inspecionar `bridge.connected`, `bridge.rejected_packets` e `bridge.last_validation_error`.
+- O usuário informou que compilou e abriu o SoH no Windows após a correção local de `view.at` para `view.lookAt`. Este hotfix altera apenas Python/testes/documentação e não sobrescreve aquela alteração nativa local. Gameplay/autonomia ainda não estão certificados.
+
 | Componente | Implementação | Validação realizada |
 |---|---|---|
 | Estado, decisões e segurança de entrada | Implementado | Testes Python |
