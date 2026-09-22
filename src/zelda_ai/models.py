@@ -14,7 +14,7 @@ Skill = Literal[
     "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
     "navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
-    "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area",
+    "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area", "manipulate_object",
 ]
 
 
@@ -218,13 +218,15 @@ class Decision(StrictModel):
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
-                              "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area"} and self.args.duration_ms > 2000:
+                              "equip_item", "equip_gear", "aim_at", "fight_enemy", "explore_area",
+                              "manipulate_object"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
         if self.skill == "navigate_to" and self.args.target_position is None:
             raise ValueError("navigate_to requires target_position")
-        if self.skill in {"approach_actor", "talk_to_actor", "interact_with_actor", "fight_enemy"} and self.args.target_actor_id is None:
+        if self.skill in {"approach_actor", "talk_to_actor", "interact_with_actor", "fight_enemy",
+                           "manipulate_object"} and self.args.target_actor_id is None:
             raise ValueError(f"{self.skill} requires target_actor_id")
         if self.skill == "equip_item" and (self.args.item_id is None or self.args.slot is None):
             raise ValueError("equip_item requires item_id and C-button slot")
@@ -233,6 +235,8 @@ class Decision(StrictModel):
         if self.skill == "aim_at" and (self.args.slot is None or
                 (self.args.target_actor_id is None and self.args.target_position is None)):
             raise ValueError("aim_at requires a C-button slot and actor or position target")
+        if self.skill == "manipulate_object" and self.args.direction not in {"forward", "back"}:
+            raise ValueError("manipulate_object requires forward or back direction")
         return self
 
 
