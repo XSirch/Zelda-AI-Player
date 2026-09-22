@@ -83,6 +83,20 @@ class PauseMenuState(StrictModel):
     prompt_choice: int = Field(default=0, ge=-32768, le=32767)
 
 
+class ProgressState(StrictModel):
+    quest_items: list[str] = Field(default_factory=list, max_length=24)
+    owned_equipment: list[str] = Field(default_factory=list, max_length=12)
+    upgrade_levels: dict[str, int] = Field(default_factory=dict, max_length=8)
+    heart_pieces: int = Field(default=0, ge=0, le=15)
+    skull_tokens: int = Field(default=0, ge=0, le=999)
+    magic_acquired: bool = False
+    double_magic: bool = False
+    double_defense: bool = False
+    map_index: int = Field(default=0, ge=0, le=65535)
+    dungeon_items: list[str] = Field(default_factory=list, max_length=3)
+    small_keys: int = Field(default=0, ge=0, le=99)
+
+
 class ContextAction(StrictModel):
     code: int = Field(default=10, ge=0, le=255)
     label: str = Field(default="none", max_length=32)
@@ -116,6 +130,7 @@ class GameState(StrictModel):
     equipped: list[int] = Field(default_factory=list, max_length=8)
     message_id: int | None = None  # Deprecated compatibility mirror; prefer dialogue.text_id.
     dialogue: DialogueState = Field(default_factory=DialogueState)
+    progress: ProgressState = Field(default_factory=ProgressState)
     context_action: ContextAction = Field(default_factory=ContextAction)
     pause_menu: PauseMenuState = Field(default_factory=PauseMenuState)
     game_over_state: int = Field(default=0, ge=0, le=65535)
