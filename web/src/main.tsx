@@ -67,7 +67,7 @@ function ProgressPanel({ game }: { game: GameState | null }) {
     <div className="section-head"><span>PROGRESSO OBSERVÁVEL</span><span className="muted">PAUSE / HUD</span></div>
     <div className="progress-grid">
       <div><span>QUEST / SONGS</span><strong>{p.quest_items.length ? p.quest_items.join(' · ') : 'Nenhum registrado'}</strong></div>
-      <div><span>EQUIPAMENTO POSSUÍDO</span><strong>{p.owned_equipment.length ? p.owned_equipment.join(' · ') : 'Nenhum registrado'}</strong></div>
+      <div><span>EQUIPAMENTO</span><strong>{p.equipment?.length ? p.equipment.map(item => `${item.equipped ? '● ' : ''}${item.name}`).join(' · ') : (p.owned_equipment.length ? p.owned_equipment.join(' · ') : 'Nenhum registrado')}</strong></div>
       <div><span>DUNGEON ATUAL</span><strong>{p.dungeon_items.length ? p.dungeon_items.join(' · ') : 'Sem mapa/compass/boss key'} · {p.small_keys} chaves</strong></div>
       <div><span>UPGRADES</span><strong>{upgrades.length ? upgrades.map(([name, level]) => `${name} ${level}`).join(' · ') : 'Nenhum'}</strong></div>
       <div><span>OUTROS</span><strong>{p.heart_pieces}/4 heart pieces · {p.skull_tokens} skulltulas · magia {p.magic_acquired ? (p.double_magic ? 'dupla' : 'sim') : 'não'} · defesa dupla {p.double_defense ? 'sim' : 'não'}</strong></div>
