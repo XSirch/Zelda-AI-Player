@@ -2,7 +2,8 @@ import pytest
 
 from conftest import packet
 from zelda_ai.bridge import Bridge
-from zelda_ai.models import GameState, RunConfig
+from zelda_ai.models import Decision, GameState, RunConfig
+import zelda_ai.runtime as runtime_module
 from zelda_ai.runtime import Runtime, execute_skill
 from zelda_ai.simulator import DemoProvider
 
@@ -47,6 +48,34 @@ async def test_dialogue_preempts_world_movement(state, decision):
     assert result["status"] == "stale"
     assert result["reason"] == "dialogue_requires_handling"
     assert transport.sent == []
+
+
+@pytest.mark.asyncio
+async def test_interact_with_door_routes_to_specialized_controller(state, decision, monkeypatch):
+    bridge = Bridge("x" * 32)
+    transport = Transport()
+    bridge.connection_made(transport)
+    door = {"actor_id": 9, "name": "En_Door", "description": "Door", "category": 10,
+        "category_name": "door", "room": 0, "params": 2, "position": [120, 0, 0],
+        "focus_position": [0, 0, 0], "distance": 120.0, "targeted": False,
+        "drawn": False, "text_id": 0}
+    game = GameState.model_validate({**state.model_dump(), "room_actors": [door],
+        "room_actor_count": 1})
+    bridge.datagram_received(packet(game), ("127.0.0.1", 5000))
+    door_decision = Decision.model_validate({**decision.model_dump(), "skill": "interact_with_actor",
+        "args": {**decision.args.model_dump(), "duration_ms": 5000,
+            "target_actor_id": 9, "target_actor_params": 2}})
+
+    called = {}
+    async def fake_door_controller(bridge_arg, decision_arg, observation_arg):
+        called["actor"] = decision_arg.args.target_actor_id
+        return {"status": "completed", "reason": "door_controller_test",
+            "acknowledged": True, "skill": decision_arg.skill}
+
+    monkeypatch.setattr(runtime_module, "_interact_with_door", fake_door_controller)
+    result = await execute_skill(bridge, door_decision, game)
+    assert called["actor"] == 9
+    assert result["reason"] == "door_controller_test"
 
 
 @pytest.mark.asyncio
