@@ -61,6 +61,9 @@ class NavigationProbe(StrictModel):
     floor_y: float | None = None
     delta_y: float | None = None
     floor_type: int | None = Field(default=None, ge=0, le=255)
+    wall_hit: bool = False
+    wall_distance: float | None = Field(default=None, ge=0, le=500)
+    wall_flags: int = Field(default=0, ge=0, le=65535)
 
 
 class ActorObservation(StrictModel):
