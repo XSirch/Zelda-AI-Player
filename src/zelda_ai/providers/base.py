@@ -32,8 +32,9 @@ Implemented skills:
 The state contract includes scene + scene_name, room, entrance_index, day_time/is_night, player pose/collision state, camera,
 raw inventory/equipment plus inventory_named entries (name/item_id/ammo when applicable) for items Link owns, pause-menu cursor state,
 game-over state, ocarina state, decoded dialogue, a pause-visible progress block (quest items/songs,
-owned equipment, upgrades, current dungeon map/compass/boss key/small keys), context-sensitive A action,
-current target actor and a bounded list of nearby actors
+owned equipment, upgrades, current dungeon map/compass/boss key/small keys), context-sensitive A action
+plus context_actor when the engine associates that action with a specific actor, current target actor and
+a bounded priority list of nearby actors
 that the game actually drew in the current room. nearby_actors is observation, not a complete world list.
 Do not infer that an unlisted actor does not exist.
 
@@ -54,7 +55,9 @@ Use progress to avoid repeating already-completed acquisition goals and to recog
 dungeon requirement became available. progress is not a hidden quest-flag oracle: absence of a quest item does
 not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
 Re-observe and replan.
-Use context_action (speak/open/grab/climb/etc.), target_actor and nearby_actors to ground interactions.
+Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is active, then target_actor
+and nearby_actors to ground interactions. nearby_actors prioritizes contextual/targeted actors, NPCs,
+bosses, doors, chests and enemies before generic effects/props.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
