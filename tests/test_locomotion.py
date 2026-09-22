@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import _aim_error, _aim_stick, _equipment_point, _inventory_slot, _menu_grid_directions, _steer_to, controller_input
+from zelda_ai.runtime import _aim_error, _aim_stick, _equipment_point, _inventory_slot, _menu_grid_directions, _recovery_inputs, _steer_to, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -23,6 +23,22 @@ def test_move_forward_remains_pure_translation_command():
     assert buttons == 0
     assert x == 0
     assert y > 0
+
+
+def test_move_back_is_real_reverse_translation_command():
+    buttons, x, y = controller_input(decision("move", "back"))
+    assert buttons == 0
+    assert x == 0
+    assert y < 0
+
+
+def test_wall_recovery_backs_up_before_turning_and_alternates_arc_side():
+    first = _recovery_inputs(0)
+    second = _recovery_inputs(1)
+    assert first[0][2] < 0 and second[0][2] < 0
+    assert first[1][2] < 0 and second[1][2] < 0
+    assert first[1][1] == -second[1][1]
+    assert first[2][1] == -second[2][1]
 
 
 def test_turn_rejects_forward_and_back():
