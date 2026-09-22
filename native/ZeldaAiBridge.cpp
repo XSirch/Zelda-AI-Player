@@ -478,6 +478,11 @@ void Snapshot() {
             state["player"] = {
                 {"position", {pos.x, pos.y, pos.z}},
                 {"yaw", player->actor.shape.rot.y},
+                {"speed_xz", player->actor.speedXZ},
+                {"floor_height", player->actor.floorHeight},
+                {"wall_yaw", player->actor.wallYaw},
+                {"bg_check_flags", player->actor.bgCheckFlags},
+                {"y_dist_to_water", player->actor.yDistToWater},
                 {"health", gSaveContext.health},
                 {"max_health", gSaveContext.healthCapacity},
                 {"rupees", gSaveContext.rupees},
@@ -583,7 +588,11 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnBossDefeat>([](void* rawActor) {
         auto* actor = static_cast<Actor*>(rawActor);
-        if (actor) Event("boss_defeated", std::to_string(actor->id));
+        if (!actor) return;
+        Event("boss_defeated", std::to_string(actor->id));
+        if (actor->id == ACTOR_BOSS_GANON2) {
+            Event("game_completed", "final_ganon_defeated");
+        }
     });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnPlayerHealthChange>([](int16_t amount) {
