@@ -86,3 +86,21 @@ def test_room_transition_is_logged_and_releases_input(store, state):
     assert runtime.last_result["reason"] == "world_transition"
     assert transport.sent
     assert b'"active":false' in transport.sent[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_gameover_continue_is_handled_locally(store, state):
+    bridge = Bridge("x" * 32, True)
+    transport = Transport()
+    bridge.connection_made(transport)
+    game = GameState.model_validate({**state.model_dump(), "seq": state.seq + 1,
+        "source": "simulator", "game_over_state": 4,
+        "pause_menu": {"active": True, "ready": False, "state": 0xE,
+            "transition_state": 0, "page_index": 0, "cursor_special_pos": 0,
+            "cursor_point": [], "cursor_item": [], "cursor_slot": [],
+            "named_item": None, "prompt_choice": 0}})
+    bridge.datagram_received(packet(game, source="simulator"), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {})
+    assert await runtime._handle_gameover(game)
+    assert any(b'"buttons":32768' in payload and b'"active":true' in payload
+        for payload, _ in transport.sent)
