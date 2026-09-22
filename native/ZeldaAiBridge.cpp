@@ -304,30 +304,33 @@ json NavigationProbes(Player* player) {
         static_cast<int16_t>(0x8000), static_cast<int16_t>(0xA000),
         static_cast<int16_t>(0xC000), static_cast<int16_t>(0xE000),
     };
-    constexpr float probeDistance = 90.0f;
+    static const float distances[] = { 70.0f, 140.0f };
     json result = json::array();
     if (!player) return result;
 
     const float baseFloor = player->actor.floorHeight;
-    for (size_t i = 0; i < ARRAY_COUNT(offsets); ++i) {
-        const int16_t yaw = static_cast<int16_t>(player->actor.shape.rot.y + offsets[i]);
-        const float radians = static_cast<float>(yaw) * 3.14159265358979323846f / 32768.0f;
-        Vec3f pos = player->actor.world.pos;
-        pos.x += std::sin(radians) * probeDistance;
-        pos.z += std::cos(radians) * probeDistance;
-        pos.y += 180.0f;
-        CollisionPoly* floorPoly = nullptr;
-        s32 bgId = BGCHECK_SCENE;
-        const float floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &floorPoly, &bgId, &pos);
-        const bool found = floorPoly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
-        result.push_back({
-            {"direction", names[i]},
-            {"distance", probeDistance},
-            {"floor_found", found},
-            {"floor_y", found ? json(floorY) : json(nullptr)},
-            {"delta_y", found ? json(floorY - baseFloor) : json(nullptr)},
-            {"floor_type", found ? json(SurfaceType_GetFloorType(&gPlayState->colCtx, floorPoly, bgId)) : json(nullptr)},
-        });
+    for (float probeDistance : distances) {
+        for (size_t i = 0; i < ARRAY_COUNT(offsets); ++i) {
+            const int16_t yaw = static_cast<int16_t>(player->actor.shape.rot.y + offsets[i]);
+            const float radians = static_cast<float>(yaw) * 3.14159265358979323846f / 32768.0f;
+            Vec3f pos = player->actor.world.pos;
+            pos.x += std::sin(radians) * probeDistance;
+            pos.z += std::cos(radians) * probeDistance;
+            pos.y += 180.0f;
+            CollisionPoly* floorPoly = nullptr;
+            s32 bgId = BGCHECK_SCENE;
+            const float floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &floorPoly, &bgId, &pos);
+            const bool found = floorPoly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+            result.push_back({
+                {"direction", names[i]},
+                {"distance", probeDistance},
+                {"floor_found", found},
+                {"floor_y", found ? json(floorY) : json(nullptr)},
+                {"delta_y", found ? json(floorY - baseFloor) : json(nullptr)},
+                {"floor_type", found ? json(SurfaceType_GetFloorType(&gPlayState->colCtx, floorPoly, bgId))
+                                     : json(nullptr)},
+            });
+        }
     }
     return result;
 }
