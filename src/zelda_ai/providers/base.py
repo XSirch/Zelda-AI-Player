@@ -21,6 +21,7 @@ Implemented skills:
 - interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
 - equip_gear(item_id): equips an owned sword/shield/tunic/boots on the Equipment page and verifies progress.equipment[].equipped
+- aim_at(C slot, target_actor_id or target_position): holds an equipped ranged item, feedback-aligns camera yaw/pitch and releases a shot; alignment is success, a hit is NOT assumed
 - fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
 
 The state contract includes scene + scene_name, room, entrance_index, player pose, camera,
@@ -48,7 +49,7 @@ dungeon requirement became available. progress is not a hidden quest-flag oracle
 not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
 Re-observe and replan.
 Use context_action (speak/open/grab/climb/etc.), target_actor and nearby_actors to ground interactions.
-Observed actors expose engine IDs/params/positions and, when SoH ActorDB has metadata, name/description.
+Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
 known_world_edges contains only transitions previously traversed by this same adaptive namespace. Use an edge's
@@ -59,7 +60,8 @@ specific observed door, chest, switch or prop is the target; an unconfirmed A pr
 a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
 For free exploration, turn(left/right) plus short move probes remain valid. The runtime may replay a previously
 successful adaptive trajectory before calling you; replay success/failure appears in events. Current skills do
-not yet solve global collision paths or aim ranged weapons. fight_enemy is suitable for ordinary observed enemies;
+not yet solve global collision paths. aim_at provides local ranged alignment but does not infer line-of-sight, puzzle
+semantics or hit confirmation. fight_enemy is suitable for ordinary observed enemies;
 bosses with invulnerability phases or item-specific mechanics still require you to reason about the opening and use
 the appropriate item/interaction rather than repeatedly invoking generic melee.
 If stuck_score rises or a stuck_detected event appears, change strategy: recenter, backtrack, rotate/explore,
