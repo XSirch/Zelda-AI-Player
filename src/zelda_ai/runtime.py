@@ -17,7 +17,7 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v3/skills-v2/trajectory-v2/prompt-v7"
+CONTRACT_VERSION = "state-v3/skills-v3/trajectory-v2/prompt-v8"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "START": 0x1000, "R": 0x0010,
     "C_UP": 0x0008, "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
@@ -223,6 +223,145 @@ def _matching_actor(game: GameState, actor_id: int, params: int | None):
     matches = [actor for actor in candidates
         if actor.actor_id == actor_id and (params is None or actor.params == params)]
     return min(matches, key=lambda actor: actor.distance) if matches else None
+
+
+def _is_door_actor(actor) -> bool:
+    return actor is not None and (actor.category == 10 or actor.category_name == "door")
+
+
+async def _wait_interaction_evidence(bridge: Bridge, observation: GameState, before_event_ids: set[str],
+                                     timeout_s: float = 1.5) -> tuple[str | None, dict]:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        sample = bridge.state
+        if not sample:
+            await asyncio.sleep(0.06)
+            continue
+        if (sample.instance_id, sample.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+            return "world_transition_after_interaction", {}
+        if sample.dialogue.active:
+            return "dialogue_opened", {}
+        if sample.cutscene_active:
+            return "interaction_started", {}
+        outcome = next((event for event in sample.events
+            if event.id not in before_event_ids and event.kind in {
+                "item_received", "scene_flag_set", "scene_flag_unset"}), None)
+        if outcome is not None:
+            return outcome.kind, {"detail": outcome.detail}
+        await asyncio.sleep(0.06)
+    return None, {}
+
+
+async def _interact_with_door(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    """Door-specific servo: face the door, center camera, approach straight, then press A."""
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    actor = _matching_actor(before, decision.args.target_actor_id, decision.args.target_actor_params)
+    if not _is_door_actor(actor):
+        return {"status": "failed", "reason": "target_is_not_door", "skill": decision.skill}
+
+    start_position = before.player.position
+    deadline = time.monotonic() + min(8.0, max(2.0, decision.args.duration_ms / 1000))
+    acknowledged = False
+    attempts = 0
+    best_distance = actor.distance
+
+    try:
+        while time.monotonic() < deadline and attempts < 8:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "completed", "reason": "world_transition_after_interaction",
+                    "distance": math.dist(start_position, current.player.position) if current.player else None,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+                return {"status": "completed" if (current.dialogue.active or current.cutscene_active) else "interrupted",
+                    "reason": "interaction_started" if (current.dialogue.active or current.cutscene_active)
+                        else "gameplay_state_changed",
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+            if actor is None:
+                return {"status": "failed", "reason": "door_actor_not_observed", "skill": decision.skill}
+
+            before_event_ids = {event.id for event in current.events}
+            context_matches = bool(current.context_actor and
+                current.context_actor.actor_id == actor.actor_id and
+                (decision.args.target_actor_params is None or current.context_actor.params == actor.params))
+            if current.context_action.label in {"open", "enter"} and context_matches:
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=120, settle_s=0.05)
+                evidence, extra = await _wait_interaction_evidence(
+                    bridge, observation, before_event_ids, timeout_s=1.6)
+                if evidence:
+                    return {"status": "completed", "reason": evidence, "target_distance": actor.distance,
+                        "distance": math.dist(start_position, (bridge.state or current).player.position)
+                            if (bridge.state or current).player else None,
+                        "acknowledged": acknowledged, "skill": decision.skill, **extra}
+
+            # Do not use camera-relative orbiting near a wall-mounted target. First make Link face it
+            # using native yaw feedback, then put the camera behind Link and advance on a straight line.
+            desired_yaw = _yaw_to_target(current.player.position, actor.position)
+            yaw_error = _yaw_error_units(current.player.yaw, desired_yaw)
+            if abs(yaw_error) > 1200:
+                face_args = decision.args.model_copy(update={"duration_ms": 900, "strength": max(0.55, decision.args.strength)})
+                face_decision = decision.model_copy(update={"args": face_args})
+                faced = await _face_target(bridge, face_decision, current)
+                acknowledged |= bool(faced.get("acknowledged"))
+                attempts += 1
+                continue
+
+            acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=90, settle_s=0.07)
+            current = bridge.state or current
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params) or actor
+
+            if actor.distance <= 115.0:
+                # A slight forward bias helps the engine establish doorActor/context action on the final step.
+                command_id = bridge.send(buttons=BUTTONS["A"], stick_y=24, lease_ms=180)
+                await asyncio.sleep(0.18)
+                bridge.release()
+                await asyncio.sleep(0.05)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                evidence, extra = await _wait_interaction_evidence(
+                    bridge, observation, before_event_ids, timeout_s=1.4)
+                if evidence:
+                    return {"status": "completed", "reason": evidence, "target_distance": actor.distance,
+                        "distance": math.dist(start_position, (bridge.state or current).player.position)
+                            if (bridge.state or current).player else None,
+                        "acknowledged": acknowledged, "skill": decision.skill, **extra}
+
+            # Straight approach after Z-centering; this intentionally avoids lateral steering/orbiting.
+            hold_ms = 220 if actor.distance > 180 else 140
+            command_id = bridge.send(stick_x=0, stick_y=56, lease_ms=hold_ms)
+            await asyncio.sleep(hold_ms / 1000)
+            bridge.release()
+            await asyncio.sleep(0.06)
+            sample = bridge.state
+            if sample:
+                acknowledged |= sample.last_command_seq >= command_id
+                updated = _matching_actor(sample, decision.args.target_actor_id, decision.args.target_actor_params)
+                if updated:
+                    if updated.distance + 3.0 < best_distance:
+                        best_distance = updated.distance
+                    elif updated.distance >= best_distance - 1.0 and attempts >= 3:
+                        # Create a little clearance and retry the face/center/straight sequence.
+                        recovery = await _backtrack_recovery(bridge, sample, attempts)
+                        acknowledged |= recovery["acknowledged"]
+            attempts += 1
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "failed", "reason": "door_interaction_no_transition",
+        "target_distance": (_matching_actor(after, decision.args.target_actor_id,
+            decision.args.target_actor_params).distance if after and
+            _matching_actor(after, decision.args.target_actor_id, decision.args.target_actor_params) else None),
+        "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "attempts": attempts, "acknowledged": acknowledged, "skill": decision.skill}
 
 
 def _steer_to(game: GameState, target: tuple[float, float, float], strength: float) -> tuple[int, int, float]:
@@ -1403,6 +1542,9 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
     if decision.skill == "talk_to_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
     if decision.skill == "interact_with_actor":
+        target = _matching_actor(before, decision.args.target_actor_id, decision.args.target_actor_params)
+        if _is_door_actor(target):
+            return await _interact_with_door(bridge, decision, observation)
         return await _navigate_local(bridge, decision, observation, actor_mode=True, interact=True)
     if decision.skill == "aim_at":
         return await _aim_at(bridge, decision, observation)
