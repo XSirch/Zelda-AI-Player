@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import controller_input
+from zelda_ai.runtime import _inventory_slot, _menu_grid_directions, _steer_to, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -75,3 +75,33 @@ def test_play_song_requires_named_song():
     with pytest.raises(ValidationError):
         decision("play_song", None)
     assert decision("play_song", None, song="lullaby").args.song == "lullaby"
+
+
+def test_local_servo_steers_toward_camera_forward(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, -10.0),
+        "camera_at": (0.0, 0.0, 0.0)})
+    x, y, distance = _steer_to(game, (0.0, 0.0, 100.0), 0.8)
+    assert abs(x) <= 1
+    assert y > 0
+    assert distance == 100.0
+
+
+def test_local_servo_steers_right_when_target_is_camera_right(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, -10.0),
+        "camera_at": (0.0, 0.0, 0.0)})
+    x, y, _ = _steer_to(game, (100.0, 0.0, 0.0), 0.8)
+    assert x > 0
+    assert abs(y) <= 1
+
+
+def test_inventory_slot_prefers_semantic_observation(state):
+    game = state.model_copy(update={"inventory": [255, 7, 6],
+        "inventory_named": [{"slot": 1, "item_id": 7, "name": "Fairy Ocarina"}]})
+    assert _inventory_slot(game, 7) == 1
+    assert _inventory_slot(game, 6) == 2
+    assert _inventory_slot(game, 3) is None
+
+
+def test_menu_grid_prefers_axis_toward_target():
+    assert _menu_grid_directions(0, 7)[:2] == ["right", "down"]
+    assert _menu_grid_directions(23, 0)[:2] == ["left", "up"]
