@@ -18,7 +18,7 @@ def test_token_subsets_are_not_double_counted():
 
 
 @pytest.mark.parametrize("patch", [{"skill": "teleport"}, {"args": {"direction": None,
-    "slot": None, "choice_index": None, "duration_ms": 100, "strength": .5}}, {"shell": "anything"},
+    "slot": None, "choice_index": None, "song": None, "duration_ms": 100, "strength": .5}}, {"shell": "anything"},
     {"args": {"direction": "forward", "slot": None, "choice_index": None,
         "duration_ms": 2001, "strength": .5}}])
 def test_decision_rejects_invalid_actions(decision, patch):
