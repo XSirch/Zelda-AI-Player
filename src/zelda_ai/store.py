@@ -124,7 +124,7 @@ class Store:
     def learn_trajectory(self, namespace: str, origin: dict, destination: dict,
                          actions: list[dict]) -> str | None:
         safe_actions = []
-        for action in actions[:24]:
+        for action in actions[:96]:
             skill = action.get("skill")
             args = action.get("args")
             if skill not in {"move", "turn", "interact", "wait"} or not isinstance(args, dict):
@@ -157,7 +157,8 @@ class Store:
             return route_id
 
     def best_trajectory(self, namespace: str, scene: int, room: int,
-                        position: tuple[float, float, float] | None = None) -> dict | None:
+                        position: tuple[float, float, float] | None = None,
+                        yaw: int | None = None) -> dict | None:
         with self.engine.connect() as conn:
             rows = [dict(r) for r in conn.execute(select(trajectories).where(
                 trajectories.c.namespace == namespace,
@@ -175,7 +176,12 @@ class Store:
                 distance = math.dist(position, start)
                 if distance > 180:
                     continue
-            row["_score"] = successes * 3 - failures * 4 - distance / 120
+            yaw_distance = 0
+            if yaw is not None and row.get("start_yaw") is not None:
+                yaw_distance = abs(((yaw - row["start_yaw"] + 32768) % 65536) - 32768)
+                if yaw_distance > 16384:
+                    continue
+            row["_score"] = successes * 3 - failures * 4 - distance / 120 - yaw_distance / 8192
             candidates.append(row)
         if not candidates:
             return None

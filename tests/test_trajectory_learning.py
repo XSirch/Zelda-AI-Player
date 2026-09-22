@@ -14,7 +14,7 @@ def test_store_learns_deduplicates_and_scores_trajectory(store):
     route_id = store.learn_trajectory("adaptive:test", origin, destination, actions)
     assert route_id
     assert store.learn_trajectory("adaptive:test", origin, destination, actions) == route_id
-    route = store.best_trajectory("adaptive:test", 1, 0, (5.0, 0.0, 0.0))
+    route = store.best_trajectory("adaptive:test", 1, 0, (5.0, 0.0, 0.0), 0)
     assert route["id"] == route_id
     assert route["successes"] == 2
     store.trajectory_outcome(route_id, False)
@@ -55,3 +55,13 @@ def test_human_hint_taints_current_trajectory(store, state):
     next_state = state.model_copy(update={"room": 1, "seq": state.seq + 1})
     runtime.on_state(next_state, state)
     assert store.best_trajectory(runtime.namespace, state.scene, state.room, state.player.position) is None
+
+
+def test_trajectory_rejects_far_spawn_or_opposite_heading(store):
+    origin = {"scene": 2, "room": 0, "position": (0.0, 0.0, 0.0), "yaw": 0}
+    destination = {"scene": 2, "room": 1}
+    actions = [{"skill": "move", "args": {
+        "direction": "forward", "duration_ms": 500, "strength": .7, "slot": None}}]
+    store.learn_trajectory("adaptive:match", origin, destination, actions)
+    assert store.best_trajectory("adaptive:match", 2, 0, (500.0, 0.0, 0.0), 0) is None
+    assert store.best_trajectory("adaptive:match", 2, 0, (0.0, 0.0, 0.0), 32767) is None

@@ -137,7 +137,7 @@ class Runtime:
         self.game_instance: str | None = None
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
-        self.trajectory_trace = deque(maxlen=24)
+        self.trajectory_trace = deque(maxlen=96)
         self.trace_origin: GameState | None = None
         self.trajectory_tainted = False
         self.replaying_trajectory = False
@@ -172,12 +172,24 @@ class Runtime:
         if (not self.trace_origin or
                 (self.trace_origin.scene, self.trace_origin.room) != (state.scene, state.room)):
             self._reset_trajectory_trace(state)
+        if len(self.trajectory_trace) >= 96:
+            self.trajectory_tainted = True
+            return
         self.trajectory_trace.append({"skill": decision.skill, "args": decision.args.model_dump()})
+
+    def _discard_failed_trajectory_action(self, decision: Decision):
+        if self.replaying_trajectory or not self.trajectory_trace:
+            return
+        expected = {"skill": decision.skill, "args": decision.args.model_dump()}
+        if self.trajectory_trace[-1] == expected:
+            self.trajectory_trace.pop()
 
     def _learn_transition(self, state: GameState, old: GameState | None):
         if not old or not self.config or self.config.memory_mode != "adaptive":
             return
         if old.instance_id != state.instance_id or not old.in_game or not state.in_game:
+            return
+        if min(old.scene, state.scene, old.room, state.room) < 0:
             return
         if (old.scene, old.room) == (state.scene, state.room):
             return
@@ -200,7 +212,8 @@ class Runtime:
         if (not self.config or self.config.memory_mode != "adaptive" or self.replaying_trajectory
                 or not game.player):
             return False
-        route = self.store.best_trajectory(self.namespace, game.scene, game.room, game.player.position)
+        route = self.store.best_trajectory(self.namespace, game.scene, game.room,
+            game.player.position, game.player.yaw)
         if not route:
             return False
         attempt_key = (route["id"], game.scene_epoch)
@@ -214,7 +227,7 @@ class Runtime:
             "steps": len(route["actions"])})
         success = False
         try:
-            for raw in route["actions"][:24]:
+            for raw in route["actions"][:96]:
                 current = self.bridge.state
                 if not self.bridge.connected or not current or not current.in_game or current.paused:
                     break
@@ -474,6 +487,8 @@ class Runtime:
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
                 self._record_trajectory_action(decision, game)
                 self.last_result = await execute_skill(self.bridge, decision, game)
+                if self.last_result["status"] == "failed":
+                    self._discard_failed_trajectory_action(decision)
                 self.log("skill_failed" if self.last_result["status"] == "failed" else "skill_result", self.last_result)
                 await asyncio.sleep(0.1)
         except asyncio.CancelledError:
