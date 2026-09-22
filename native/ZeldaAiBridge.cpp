@@ -669,6 +669,17 @@ void Snapshot() {
     // Events may have been appended while producing this sample.
     state["events"] = bridge.events;
     std::string serialized = state.dump();
+    if (serialized.size() > 59000) {
+        // room_actors is the authoritative actor observation. nearby_actors is redundant,
+        // so drop that compact compatibility subset first under packet pressure.
+        state["nearby_actors"] = json::array();
+        serialized = state.dump();
+    }
+    while (serialized.size() > 59000 && state["room_actors"].is_array() && !state["room_actors"].empty()) {
+        state["room_actors"].erase(state["room_actors"].end() - 1);
+        state["room_actors_truncated"] = true;
+        serialized = state.dump();
+    }
     if (serialized.size() > 59000) return;
     bridge.packet->address = bridge.destination;
     bridge.packet->len = static_cast<int>(serialized.size());
