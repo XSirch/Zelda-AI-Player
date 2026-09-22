@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import _aim_error, _aim_stick, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
+from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -158,6 +158,22 @@ def test_traversal_intent_detects_down_without_center_enter_false_positive(state
     })
     assert _traversal_intent_direction(center) is None
     assert _door_intent_actor(state, center) is None
+
+
+def test_ladder_top_probe_is_preferred_for_descent(state):
+    game = type(state).model_validate({**state.model_dump(), "navigation_probes": [
+        {"direction": "left", "distance": 70, "floor_found": False,
+         "wall_hit": True, "wall_distance": 42, "wall_flags": 0x02},
+        {"direction": "forward_right", "distance": 70, "floor_found": False,
+         "wall_hit": True, "wall_distance": 55, "wall_flags": 0x04},
+        {"direction": "forward", "distance": 70, "floor_found": True,
+         "floor_y": -90, "delta_y": -90, "floor_type": 0,
+         "wall_hit": False, "wall_distance": None, "wall_flags": 0},
+    ]})
+    probe = _best_climb_surface_probe(game, "down")
+    assert probe is not None
+    assert probe.direction == "forward_right"
+    assert probe.wall_flags & 0x04
 
 
 def test_traversal_probe_prefers_modest_safe_descent(state):
