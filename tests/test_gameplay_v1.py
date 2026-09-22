@@ -104,3 +104,31 @@ async def test_gameover_continue_is_handled_locally(store, state):
     assert await runtime._handle_gameover(game)
     assert any(b'"buttons":32768' in payload and b'"active":true' in payload
         for payload, _ in transport.sent)
+
+
+@pytest.mark.asyncio
+async def test_linear_dialogue_auto_advances_and_preserves_transcript(store, state):
+    bridge = Bridge("x" * 32)
+    transport = Transport()
+    bridge.connection_made(transport)
+    game = with_dialogue(state, text="Listen carefully.", can_advance=True, choice_count=0)
+    bridge.datagram_received(packet(game), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {})
+    assert await runtime._handle_dialogue(game)
+    assert runtime.dialogue_transcript[-1]["text"] == "Listen carefully."
+    assert any(b'"buttons":32768' in payload and b'"active":true' in payload
+        for payload, _ in transport.sent)
+
+
+@pytest.mark.asyncio
+async def test_choice_dialogue_is_left_for_model(store, state):
+    bridge = Bridge("x" * 32)
+    transport = Transport()
+    bridge.connection_made(transport)
+    game = with_dialogue(state, text="Choose.", state="choice", state_code=4,
+        can_advance=True, choice_count=2, choices=["Yes", "No"])
+    bridge.datagram_received(packet(game), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {})
+    assert not await runtime._handle_dialogue(game)
+    assert runtime.dialogue_transcript[-1]["choices"] == ["Yes", "No"]
+    assert transport.sent == []
