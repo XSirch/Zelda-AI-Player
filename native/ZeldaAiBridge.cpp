@@ -363,12 +363,14 @@ Actor* ContextActor(Player* player, uint16_t doAction) {
 int ActorObservationPriority(Actor* actor, Actor* contextActor) {
     if (!actor) return 99;
     if (actor == contextActor || actor->isTargeted) return 0;
+    // Exits must survive observation caps even when they are off camera or far across the room.
+    if (actor->category == ACTORCAT_DOOR) return 1;
     if (actor->textId != 0 || actor->category == ACTORCAT_NPC || actor->category == ACTORCAT_BOSS ||
-        actor->category == ACTORCAT_DOOR || actor->category == ACTORCAT_CHEST) return 1;
-    if (actor->category == ACTORCAT_ENEMY) return 2;
+        actor->category == ACTORCAT_CHEST) return 2;
+    if (actor->category == ACTORCAT_ENEMY) return 3;
     if (actor->category == ACTORCAT_SWITCH || actor->category == ACTORCAT_BG ||
-        actor->category == ACTORCAT_PROP || actor->category == ACTORCAT_ITEMACTION) return 3;
-    return 4;
+        actor->category == ACTORCAT_PROP || actor->category == ACTORCAT_ITEMACTION) return 4;
+    return 5;
 }
 
 json NearbyActors(Player* player) {
