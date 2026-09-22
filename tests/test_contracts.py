@@ -190,3 +190,25 @@ def test_equip_gear_requires_item_and_progress_can_mark_equipped(decision, state
         "magic_acquired": False, "double_magic": False, "double_defense": False,
         "map_index": 0, "dungeon_items": [], "small_keys": 0}})
     assert enriched.progress.equipment[0].equipped
+
+
+@pytest.mark.parametrize("skill,args", [
+    ("follow_actor", {"target_actor_id": 10, "duration_ms": 6000}),
+    ("interact_with_actor", {"target_actor_id": 10, "duration_ms": 5000}),
+    ("manipulate_object", {"target_actor_id": 10, "direction": "forward", "duration_ms": 6000}),
+    ("face_target", {"target_position": [10, 0, 20], "duration_ms": 3000}),
+    ("shield_face", {"target_actor_id": 10, "duration_ms": 3000}),
+    ("aim_at", {"target_actor_id": 10, "slot": "left", "duration_ms": 5000}),
+    ("explore_area", {"duration_ms": 10000}),
+])
+def test_autonomy_v2_compound_skill_contracts(decision, skill, args):
+    payload = {**decision.args.model_dump(), **args}
+    parsed = Decision.model_validate({**decision.model_dump(), "skill": skill, "args": payload})
+    assert parsed.skill == skill
+
+
+def test_manipulate_object_rejects_sideways_direction(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "manipulate_object",
+            "args": {**decision.args.model_dump(), "target_actor_id": 10,
+                "direction": "left", "duration_ms": 5000}})
