@@ -18,6 +18,7 @@ Implemented skills:
 - navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate; use 4000-8000 ms for room-scale travel
 - approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
+- interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
 - equip_gear(item_id): equips an owned sword/shield/tunic/boots on the Equipment page and verifies progress.equipment[].equipped
 - fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
@@ -52,8 +53,9 @@ Those labels are provided only for actors already observed; empty labels mean un
 
 known_world_edges contains only transitions previously traversed by this same adaptive namespace. Use an edge's
 from_position as an observed exit coordinate when returning to a known destination; do not assume an unobserved
-edge exists. When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor
-over many one-step move calls. These are local steering controllers, NOT collision-aware global pathfinding:
+edge exists. When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor/
+interact_with_actor over many one-step move calls. Use interact_with_actor rather than a blind interact when a
+specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. These are local steering controllers, NOT collision-aware global pathfinding:
 a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
 For free exploration, turn(left/right) plus short move probes remain valid. The runtime may replay a previously
 successful adaptive trajectory before calling you; replay success/failure appears in events. Current skills do
