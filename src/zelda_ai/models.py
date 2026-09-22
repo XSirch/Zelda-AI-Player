@@ -13,6 +13,7 @@ Skill = Literal[
     "advance_dialogue", "choose_dialogue", "camera_center", "roll", "backflip",
     "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
+    "navigate_to", "approach_actor", "talk_to_actor", "equip_item",
 ]
 
 
@@ -28,6 +29,12 @@ class PlayerState(StrictModel):
     rupees: int = Field(ge=0, le=9999)
     magic: int = Field(default=0, ge=0, le=255)
     age: Literal["child", "adult"] = "child"
+
+
+class InventoryObservation(StrictModel):
+    slot: int = Field(ge=0, le=31)
+    item_id: int = Field(ge=0, le=255)
+    name: str = Field(min_length=1, max_length=96)
 
 
 class ActorObservation(StrictModel):
@@ -64,8 +71,11 @@ class DialogueState(StrictModel):
 
 class PauseMenuState(StrictModel):
     active: bool = False
+    ready: bool = False
     state: int = Field(default=0, ge=0, le=65535)
+    transition_state: int = Field(default=0, ge=0, le=65535)
     page_index: int = Field(default=0, ge=0, le=4)
+    cursor_special_pos: int = Field(default=0, ge=-32768, le=32767)
     cursor_point: list[int] = Field(default_factory=list, max_length=5)
     cursor_item: list[int] = Field(default_factory=list, max_length=4)
     cursor_slot: list[int] = Field(default_factory=list, max_length=4)
@@ -92,6 +102,7 @@ class GameState(StrictModel):
     seq: int = Field(ge=0)
     scene_epoch: int = Field(ge=0)
     scene: int = Field(ge=-1, le=65535)
+    scene_name: str = Field(default="", max_length=96)
     room: int = Field(ge=-1, le=255)
     entrance_index: int = Field(default=-1, ge=-1, le=2147483647)
     in_game: bool
@@ -99,6 +110,7 @@ class GameState(StrictModel):
     camera_eye: tuple[float, float, float] | None = None
     camera_at: tuple[float, float, float] | None = None
     inventory: list[int] = Field(default_factory=list, max_length=32)
+    inventory_named: list[InventoryObservation] = Field(default_factory=list, max_length=24)
     # SoH ItemEquips.buttonItems[8]: B + 3 C-buttons + 4 D-pad slots.
     # Keep accepting older four-slot payloads without truncating native telemetry.
     equipped: list[int] = Field(default_factory=list, max_length=8)
@@ -135,6 +147,18 @@ class SkillArgs(StrictModel):
     choice_index: int | None = Field(ge=0, le=2)
     song: Literal["minuet", "bolero", "serenade", "requiem", "nocturne", "prelude",
         "sarias", "eponas", "lullaby", "suns", "time", "storms"] | None
+    target_actor_id: int | None = Field(ge=-32768, le=32767)
+    target_actor_params: int | None = Field(ge=-32768, le=32767)
+    target_position: tuple[float, float, float] | None
+    stop_distance: float | None = Field(ge=12, le=600)
+    item_id: int | None = Field(ge=0, le=255)
+
+    @field_validator("target_position")
+    @classmethod
+    def finite_target_position(cls, value):
+        if value is not None and not all(math.isfinite(v) for v in value):
+            raise ValueError("Non-finite target position")
+        return value
 
 
 class Decision(StrictModel):
@@ -162,6 +186,12 @@ class Decision(StrictModel):
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
+        if self.skill == "navigate_to" and self.args.target_position is None:
+            raise ValueError("navigate_to requires target_position")
+        if self.skill in {"approach_actor", "talk_to_actor"} and self.args.target_actor_id is None:
+            raise ValueError(f"{self.skill} requires target_actor_id")
+        if self.skill == "equip_item" and (self.args.item_id is None or self.args.slot is None):
+            raise ValueError("equip_item requires item_id and C-button slot")
         return self
 
 
