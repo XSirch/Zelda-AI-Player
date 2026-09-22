@@ -39,6 +39,8 @@ class InventoryObservation(StrictModel):
 
 class ActorObservation(StrictModel):
     actor_id: int = Field(ge=-32768, le=32767)
+    name: str = Field(default="", max_length=96)
+    description: str = Field(default="", max_length=200)
     category: int = Field(ge=0, le=255)
     params: int = Field(ge=-32768, le=32767)
     position: tuple[float, float, float]
