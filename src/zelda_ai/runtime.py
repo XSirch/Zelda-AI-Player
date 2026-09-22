@@ -573,7 +573,9 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
     if decision.skill == "turn" and start_yaw is not None:
         target_turn_units = max(3600, min(18200,
             int(decision.args.duration_ms * 9.1 * max(0.35, decision.args.strength))))
-    effective_duration_ms = min(decision.args.duration_ms, 180) if decision.skill in MENU_SKILLS | {"advance_dialogue"} else decision.args.duration_ms
+    effective_duration_ms = (min(decision.args.duration_ms, 180)
+        if decision.skill in MENU_SKILLS | {"advance_dialogue"}
+        else min(decision.args.duration_ms, 2000))
     deadline = time.monotonic() + effective_duration_ms / 1000
     status, reason, acknowledged = "completed", "duration_elapsed", False
     first_command = None
