@@ -57,7 +57,7 @@ function TerrainPanel({ game }: { game: GameState | null }) {
     <div className="actors-grid">{probes.map((probe, index) =>
       <div className="actor-item" key={`${probe.direction}-${probe.distance}-${index}`}>
         <span>{probe.direction.replaceAll('_', ' ')} · {number(probe.distance)} u</span>
-        <strong>ΔY {number(probe.delta_y)} · FLOOR {probe.floor_type ?? '—'}</strong>
+        <strong>ΔY {number(probe.delta_y)} · FLOOR {probe.floor_type ?? '—'}{probe.wall_hit ? ` · WALL ${number(probe.wall_distance)}u · FLAGS 0x${probe.wall_flags.toString(16).toUpperCase()}` : ''}</strong>
       </div>)}
     </div>
   </section>;
