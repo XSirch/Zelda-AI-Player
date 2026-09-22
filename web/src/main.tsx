@@ -5,7 +5,7 @@ import type { GameState, Metrics, ModelInfo, ProviderInfo, RunConfig, RunRow, Sk
 import './style.css';
 
 const tabs = ['AO VIVO', 'BENCHMARKS', 'EXECUÇÕES', 'SKILLS', 'MEMÓRIA', 'CONEXÕES'];
-const defaults: RunConfig = { provider: 'codex', model: '', effort: null, goal: 'Explore Kokiri Forest e procure uma forma de avançar.', memory_mode: 'adaptive', max_calls: 100, max_tokens: 100000, max_cost_usd: 2, max_output_tokens: 2048, max_runtime_s: 3600, checkpoint_label: 'save-manual' };
+const defaults: RunConfig = { provider: 'codex', model: '', effort: null, goal: 'Complete Ocarina of Time autonomously and defeat final Ganon.', memory_mode: 'adaptive', max_calls: 100, max_tokens: 100000, max_cost_usd: 2, max_output_tokens: 2048, max_runtime_s: 3600, checkpoint_label: 'save-manual' };
 const number = (n?: number | null) => n == null ? '—' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(n);
 const dollars = (n?: number | null) => n == null ? 'Não faturado por API / desconhecido' : `$${n.toFixed(4)}`;
 const clock = (n: number) => `${Math.floor(n / 3600).toString().padStart(2, '0')}:${Math.floor(n / 60 % 60).toString().padStart(2, '0')}:${Math.floor(n % 60).toString().padStart(2, '0')}`;
