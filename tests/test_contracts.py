@@ -116,6 +116,27 @@ def test_game_state_accepts_structured_dialogue_and_drawn_actor(state):
     assert validated.nearby_actors[0].drawn
 
 
+def test_traverse_requires_vertical_direction_and_accepts_terrain_probes(decision, state):
+    down = Decision.model_validate({**decision.model_dump(), "skill": "traverse",
+        "args": {**decision.args.model_dump(), "direction": "down", "duration_ms": 7000}})
+    assert down.args.direction == "down"
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "traverse",
+            "args": {**decision.args.model_dump(), "direction": "left", "duration_ms": 7000}})
+
+    enriched = type(state).model_validate({**state.model_dump(),
+        "player": {**state.player.model_dump(), "wall_flags": 2,
+            "climbing_ladder": True, "can_down": True},
+        "navigation_probes": [
+            {"direction": "forward", "distance": 70, "floor_found": True,
+             "floor_y": -80, "delta_y": -80, "floor_type": 0},
+            {"direction": "back", "distance": 140, "floor_found": False,
+             "floor_y": None, "delta_y": None, "floor_type": None},
+        ]})
+    assert enriched.player.climbing_ladder
+    assert enriched.navigation_probes[0].delta_y == -80
+
+
 def test_compound_navigation_accepts_longer_window(decision):
     nav = Decision.model_validate({**decision.model_dump(), "skill": "navigate_to",
         "args": {**decision.args.model_dump(), "duration_ms": 8000,
