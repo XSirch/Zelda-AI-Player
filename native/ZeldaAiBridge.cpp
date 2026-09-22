@@ -16,6 +16,7 @@
 #include <vector>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/ShipInit.hpp"
+#include "soh/util.h"
 extern "C" {
 #include "global.h"
 extern PlayState* gPlayState;
@@ -297,14 +298,17 @@ void Snapshot() {
         {"seq", ++bridge.seq},
         {"scene_epoch", bridge.sceneEpoch},
         {"scene", -1},
+        {"scene_name", ""},
         {"room", -1},
         {"entrance_index", -1},
         {"in_game", bridge.playable},
         {"player", nullptr},
+        {"inventory_named", json::array()},
         {"dialogue", json::object()},
         {"context_action", {{"code", bridge.doAction}, {"label", DoActionName(bridge.doAction)}}},
-        {"pause_menu", {{"active", false}, {"state", 0}, {"page_index", 0},
-            {"cursor_point", json::array()}, {"cursor_item", json::array()}, {"cursor_slot", json::array()},
+        {"pause_menu", {{"active", false}, {"ready", false}, {"state", 0}, {"transition_state", 0},
+            {"page_index", 0}, {"cursor_special_pos", 0}, {"cursor_point", json::array()},
+            {"cursor_item", json::array()}, {"cursor_slot", json::array()},
             {"named_item", nullptr}, {"prompt_choice", 0}}},
         {"game_over_state", 0},
         {"ocarina_mode", 0},
@@ -350,13 +354,17 @@ void Snapshot() {
             auto& pos = player->actor.world.pos;
             state["scene_epoch"] = bridge.sceneEpoch;
             state["scene"] = scene;
+            state["scene_name"] = SohUtils::GetSceneName(scene);
             state["room"] = room;
             state["entrance_index"] = gSaveContext.entranceIndex;
             state["paused"] = gPlayState->pauseCtx.state != 0;
             state["pause_menu"] = {
                 {"active", gPlayState->pauseCtx.state != 0},
+                {"ready", gPlayState->pauseCtx.state == 6 && gPlayState->pauseCtx.unk_1E4 == 0},
                 {"state", gPlayState->pauseCtx.state},
+                {"transition_state", gPlayState->pauseCtx.unk_1E4},
                 {"page_index", std::min<int>(gPlayState->pauseCtx.pageIndex, 4)},
+                {"cursor_special_pos", gPlayState->pauseCtx.cursorSpecialPos},
                 {"cursor_point", json::array()},
                 {"cursor_item", json::array()},
                 {"cursor_slot", json::array()},
@@ -396,8 +404,19 @@ void Snapshot() {
             if (target) state["target_actor"] = ActorJson(target, player);
             state["nearby_actors"] = DrawnActors(player);
             state["inventory"] = json::array();
+            state["inventory_named"] = json::array();
             state["equipped"] = json::array();
-            for (auto item : gSaveContext.inventory.items) state["inventory"].push_back(item);
+            for (size_t slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.items); ++slot) {
+                const auto item = gSaveContext.inventory.items[slot];
+                state["inventory"].push_back(item);
+                if (item != ITEM_NONE && item != ITEM_NONE_FE) {
+                    state["inventory_named"].push_back({
+                        {"slot", slot},
+                        {"item_id", item},
+                        {"name", SohUtils::GetItemName(item)},
+                    });
+                }
+            }
             for (auto item : gSaveContext.equips.buttonItems) state["equipped"].push_back(item);
         }
     }
