@@ -14,7 +14,7 @@ Skill = Literal[
     "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
     "navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
-    "equip_item", "equip_gear", "fight_enemy",
+    "equip_item", "equip_gear", "aim_at", "fight_enemy",
 ]
 
 
@@ -45,15 +45,16 @@ class ActorObservation(StrictModel):
     category: int = Field(ge=0, le=255)
     params: int = Field(ge=-32768, le=32767)
     position: tuple[float, float, float]
+    focus_position: tuple[float, float, float] | None = None
     distance: float = Field(ge=0)
     targeted: bool = False
     drawn: bool = False
     text_id: int | None = Field(default=None, ge=0, le=65535)
 
-    @field_validator("position")
+    @field_validator("position", "focus_position")
     @classmethod
     def finite_position(cls, value):
-        if not all(math.isfinite(v) for v in value):
+        if value is not None and not all(math.isfinite(v) for v in value):
             raise ValueError("Non-finite actor position")
         return value
 
@@ -212,7 +213,7 @@ class Decision(StrictModel):
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "interact_with_actor",
-                              "equip_item", "equip_gear", "fight_enemy"} and self.args.duration_ms > 2000:
+                              "equip_item", "equip_gear", "aim_at", "fight_enemy"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
@@ -224,6 +225,9 @@ class Decision(StrictModel):
             raise ValueError("equip_item requires item_id and C-button slot")
         if self.skill == "equip_gear" and self.args.item_id is None:
             raise ValueError("equip_gear requires item_id")
+        if self.skill == "aim_at" and (self.args.slot is None or
+                (self.args.target_actor_id is None and self.args.target_position is None)):
+            raise ValueError("aim_at requires a C-button slot and actor or position target")
         return self
 
 
