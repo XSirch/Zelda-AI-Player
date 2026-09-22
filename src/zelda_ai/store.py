@@ -189,7 +189,8 @@ class Store:
             skill = action.get("skill")
             args = action.get("args")
             if skill not in {"move", "turn", "interact", "wait", "camera_center",
-                              "roll", "backflip", "sidestep", "navigate_to", "approach_actor"} or not isinstance(args, dict):
+                              "roll", "backflip", "sidestep", "navigate_to", "approach_actor",
+                              "interact_with_actor"} or not isinstance(args, dict):
                 return None
             safe_actions.append({"skill": skill, "args": {
                 "direction": args.get("direction"), "duration_ms": args.get("duration_ms"),
