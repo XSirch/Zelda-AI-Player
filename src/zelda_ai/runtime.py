@@ -17,11 +17,11 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v1/skills-v0.1/prompt-v1"
+CONTRACT_VERSION = "state-v1/skills-v0.2/prompt-v2"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "R": 0x0010,
     "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 SKILL_CATALOG = [
-    {"id": "move", "name": "Movimento relativo à câmera", "status": "implemented", "version": "0.1"},
+    {"id": "move", "name": "Translação curta", "status": "implemented", "version": "0.2"},\n    {"id": "turn", "name": "Giro local com feedback de yaw", "status": "implemented", "version": "0.2"},
     {"id": "interact", "name": "Interagir / confirmar (A)", "status": "implemented", "version": "0.1"},
     {"id": "attack", "name": "Ataque básico (B)", "status": "implemented", "version": "0.1"},
     {"id": "defend", "name": "Defesa (Z + R)", "status": "implemented", "version": "0.1"},
@@ -80,12 +80,12 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
     # Wait for a post-action sample; never report a hit or path success from elapsed time alone.
     await asyncio.sleep(0.22)
     after = bridge.state
-    distance, damage = None, None
+    distance, damage, yaw_delta = None, None, None
     if after:
         acknowledged |= first_command is not None and after.last_command_seq >= first_command
     if before.player and after and after.player and before.scene_epoch == after.scene_epoch:
         distance = math.dist(before.player.position, after.player.position)
-        damage = max(0, before.player.health - after.player.health)
+        damage = max(0, before.player.health - after.player.health)\n        yaw_delta = ((after.player.yaw - before.player.yaw + 32768) % 65536) - 32768
     if not acknowledged:
         status, reason = "failed", "input_not_acknowledged"
     elif decision.skill == "move" and distance is not None and distance < 1:
