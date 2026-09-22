@@ -16,6 +16,7 @@
 #include <vector>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/ShipInit.hpp"
+#include "soh/ActorDB.h"
 #include "soh/util.h"
 extern "C" {
 #include "global.h"
@@ -242,6 +243,9 @@ json ProgressJson() {
 
 json ActorJson(Actor* actor, Player* player) {
     if (!actor || !player) return nullptr;
+    const auto& entry = ActorDB::Instance->RetrieveEntry(actor->id);
+    const std::string actorName = entry.entry.valid ? entry.name : "";
+    const std::string actorDescription = entry.entry.valid ? entry.desc : "";
     const auto& a = actor->world.pos;
     const auto& p = player->actor.world.pos;
     const float dx = a.x - p.x;
@@ -250,6 +254,8 @@ json ActorJson(Actor* actor, Player* player) {
     const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
     return {
         {"actor_id", actor->id},
+        {"name", actorName},
+        {"description", actorDescription},
         {"category", actor->category},
         {"params", actor->params},
         {"position", {a.x, a.y, a.z}},
