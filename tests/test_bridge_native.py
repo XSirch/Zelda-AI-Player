@@ -72,3 +72,15 @@ int main() {
     subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-I", str(root / "native"),
         str(source), "-o", str(binary)], check=True, capture_output=True)
     subprocess.run([str(binary)], check=True)
+
+
+def test_native_room_actor_scan_is_not_camera_gated():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "native" / "ZeldaAiBridge.cpp").read_text()
+    start = source.index("json RoomActors(Player* player)")
+    end = source.index("std::vector<std::string> DecodeChoices", start)
+    room_scan = source[start:end]
+    assert "!actor->isDrawn" not in room_scan
+    assert "MAX_ROOM_ACTORS" in room_scan
+    assert '{"category_name", ActorCategoryName(actor->category)}' in source
+    assert '{"room", actor->room}' in source
