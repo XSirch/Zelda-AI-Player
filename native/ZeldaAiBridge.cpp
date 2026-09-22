@@ -120,7 +120,7 @@ void Snapshot() {
                 {"rupees", gSaveContext.rupees}, {"magic", gSaveContext.magic},
                 {"age", gSaveContext.linkAge == 0 ? "adult" : "child"}};
             state["camera_eye"] = {gPlayState->view.eye.x, gPlayState->view.eye.y, gPlayState->view.eye.z};
-            state["camera_at"] = {gPlayState->view.at.x, gPlayState->view.at.y, gPlayState->view.at.z};
+            state["camera_at"] = {gPlayState->view.lookAt.x, gPlayState->view.lookAt.y, gPlayState->view.lookAt.z};
             state["inventory"] = json::array();
             state["equipped"] = json::array();
             for (auto item : gSaveContext.inventory.items) state["inventory"].push_back(item);
