@@ -11,7 +11,8 @@ Effort = str  # Actual accepted values are validated against the provider catalo
 Skill = Literal[
     "move", "turn", "interact", "attack", "defend", "target", "use_item", "wait",
     "advance_dialogue", "choose_dialogue", "camera_center", "roll", "backflip",
-    "sidestep", "jump_attack",
+    "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
+    "menu_cancel", "menu_assign", "continue_gameover", "play_song",
 ]
 
 
@@ -61,6 +62,17 @@ class DialogueState(StrictModel):
     speaker: ActorObservation | None = None
 
 
+class PauseMenuState(StrictModel):
+    active: bool = False
+    state: int = Field(default=0, ge=0, le=65535)
+    page_index: int = Field(default=0, ge=0, le=4)
+    cursor_point: list[int] = Field(default_factory=list, max_length=5)
+    cursor_item: list[int] = Field(default_factory=list, max_length=4)
+    cursor_slot: list[int] = Field(default_factory=list, max_length=4)
+    named_item: int | None = Field(default=None, ge=0, le=65535)
+    prompt_choice: int = Field(default=0, ge=-32768, le=32767)
+
+
 class ContextAction(StrictModel):
     code: int = Field(default=10, ge=0, le=255)
     label: str = Field(default="none", max_length=32)
@@ -93,6 +105,11 @@ class GameState(StrictModel):
     message_id: int | None = None  # Deprecated compatibility mirror; prefer dialogue.text_id.
     dialogue: DialogueState = Field(default_factory=DialogueState)
     context_action: ContextAction = Field(default_factory=ContextAction)
+    pause_menu: PauseMenuState = Field(default_factory=PauseMenuState)
+    game_over_state: int = Field(default=0, ge=0, le=65535)
+    ocarina_mode: int = Field(default=0, ge=0, le=65535)
+    ocarina_action: int = Field(default=0, ge=0, le=65535)
+    last_played_song: int = Field(default=0, ge=0, le=65535)
     target_actor: ActorObservation | None = None
     nearby_actors: list[ActorObservation] = Field(default_factory=list, max_length=24)
     cutscene_active: bool = False
@@ -116,6 +133,8 @@ class SkillArgs(StrictModel):
     strength: float = Field(ge=0, le=1)
     slot: Literal["left", "down", "right"] | None
     choice_index: int | None = Field(ge=0, le=2)
+    song: Literal["minuet", "bolero", "serenade", "requiem", "nocturne", "prelude",
+        "sarias", "eponas", "lullaby", "suns", "time", "storms"] | None
 
 
 class Decision(StrictModel):
@@ -135,6 +154,12 @@ class Decision(StrictModel):
             raise ValueError("use_item requires an equipped C-button slot")
         if self.skill == "choose_dialogue" and self.args.choice_index is None:
             raise ValueError("choose_dialogue requires choice_index")
+        if self.skill == "menu_move" and self.args.direction is None:
+            raise ValueError("menu_move requires direction")
+        if self.skill == "menu_assign" and self.args.slot is None:
+            raise ValueError("menu_assign requires a C-button slot")
+        if self.skill == "play_song" and self.args.song is None:
+            raise ValueError("play_song requires song")
         return self
 
 
