@@ -24,7 +24,7 @@ DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
 MENU_SKILLS = {"pause_toggle", "menu_move", "menu_confirm", "menu_cancel", "menu_assign",
     "continue_gameover", "equip_item", "equip_gear"}
 NAVIGATION_SKILLS = {"move", "turn", "interact", "wait", "camera_center", "roll", "backflip", "sidestep",
-    "navigate_to", "approach_actor"}
+    "navigate_to", "approach_actor", "interact_with_actor"}
 SONG_IDS = {"minuet": 0, "bolero": 1, "serenade": 2, "requiem": 3, "nocturne": 4, "prelude": 5,
     "sarias": 6, "eponas": 7, "lullaby": 8, "suns": 9, "time": 10, "storms": 11}
 SONG_NOTES = {
