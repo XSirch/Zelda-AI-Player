@@ -549,7 +549,7 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
             desired_yaw = _yaw_to_target(current.player.position, actor.position)
             yaw_error = _yaw_error_units(current.player.yaw, desired_yaw)
             abs_yaw_error = abs(yaw_error)
-            if (previous_yaw_error is not None and abs_yaw_error > previous_yaw_error + 350 and not turn_flipped:
+            if (previous_yaw_error is not None and abs_yaw_error > previous_yaw_error + 350 and not turn_flipped):
                 # Camera/control sign can be inverted by the current view. Calibrate once from observed yaw feedback.
                 turn_sign *= -1
                 turn_flipped = True
