@@ -294,6 +294,44 @@ const char* ActorCategoryName(uint8_t category) {
     }
 }
 
+json NavigationProbes(Player* player) {
+    static const char* names[] = {
+        "forward", "forward_right", "right", "back_right",
+        "back", "back_left", "left", "forward_left",
+    };
+    static const int16_t offsets[] = {
+        0x0000, 0x2000, 0x4000, 0x6000,
+        static_cast<int16_t>(0x8000), static_cast<int16_t>(0xA000),
+        static_cast<int16_t>(0xC000), static_cast<int16_t>(0xE000),
+    };
+    constexpr float probeDistance = 90.0f;
+    json result = json::array();
+    if (!player) return result;
+
+    const float baseFloor = player->actor.floorHeight;
+    for (size_t i = 0; i < ARRAY_COUNT(offsets); ++i) {
+        const int16_t yaw = static_cast<int16_t>(player->actor.shape.rot.y + offsets[i]);
+        const float radians = static_cast<float>(yaw) * 3.14159265358979323846f / 32768.0f;
+        Vec3f pos = player->actor.world.pos;
+        pos.x += std::sin(radians) * probeDistance;
+        pos.z += std::cos(radians) * probeDistance;
+        pos.y += 180.0f;
+        CollisionPoly* floorPoly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        const float floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &floorPoly, &bgId, &pos);
+        const bool found = floorPoly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+        result.push_back({
+            {"direction", names[i]},
+            {"distance", probeDistance},
+            {"floor_found", found},
+            {"floor_y", found ? json(floorY) : json(nullptr)},
+            {"delta_y", found ? json(floorY - baseFloor) : json(nullptr)},
+            {"floor_type", found ? json(SurfaceType_GetFloorType(&gPlayState->colCtx, floorPoly, bgId)) : json(nullptr)},
+        });
+    }
+    return result;
+}
+
 json ActorJson(Actor* actor, Player* player) {
     if (!actor || !player) return nullptr;
     std::string actorName;
@@ -547,6 +585,7 @@ void Snapshot() {
         {"room_actors", json::array()},
         {"room_actor_count", 0},
         {"room_actors_truncated", false},
+        {"navigation_probes", json::array()},
         {"cutscene_active", false},
         {"paused", false},
         {"events", bridge.events},
@@ -658,6 +697,7 @@ void Snapshot() {
             state["room_actors"] = roomActors["actors"];
             state["room_actor_count"] = roomActors["count"];
             state["room_actors_truncated"] = roomActors["truncated"];
+            state["navigation_probes"] = NavigationProbes(player);
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
             state["equipped"] = json::array();
