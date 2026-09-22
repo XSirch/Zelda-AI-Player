@@ -72,6 +72,8 @@ SKILL_CATALOG = [
     {"id": "equip_item", "name": "Equipar item possuído em C via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "equip_gear", "name": "Equipar espada/escudo/túnica/botas via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "aim_at", "name": "Mira fechada e disparo com item C equipado", "status": "implemented", "version": "2.0"},
+    {"id": "face_target", "name": "Orientar Link para ator/posição", "status": "implemented", "version": "2.0"},
+    {"id": "shield_face", "name": "Orientar e sustentar escudo para alvo", "status": "implemented", "version": "2.0"},
     {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
     {"id": "manipulate_object", "name": "Agarrar/empurrar/puxar objeto observado", "status": "implemented", "version": "2.0"},
     {"id": "explore_area", "name": "Exploração local com colisão e descoberta", "status": "implemented", "version": "2.0"},
@@ -401,6 +403,106 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     return {"status": "failed", "reason": "navigation_timeout",
         "target_distance": (last_actor.distance if last_actor else None),
         "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "acknowledged": acknowledged, "skill": decision.skill}
+
+
+def _target_position(game: GameState, decision: Decision) -> tuple[float, float, float] | None:
+    if decision.args.target_actor_id is not None:
+        actor = _matching_actor(game, decision.args.target_actor_id, decision.args.target_actor_params)
+        if actor is None:
+            return None
+        return actor.focus_position or actor.position
+    return decision.args.target_position
+
+
+def _yaw_to_target(player_position: tuple[float, float, float],
+                   target: tuple[float, float, float]) -> int:
+    dx = target[0] - player_position[0]
+    dz = target[2] - player_position[2]
+    return int(round(math.atan2(dx, dz) * 32768 / math.pi))
+
+
+def _yaw_error_units(current_yaw: int, desired_yaw: int) -> int:
+    return ((desired_yaw - current_yaw + 32768) % 65536) - 32768
+
+
+async def _face_target(bridge: Bridge, decision: Decision, observation: GameState,
+                       *, shield: bool = False) -> dict:
+    current = bridge.state
+    if not current or not current.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+        return {"status": "stale", "reason": "gameplay_state_blocks_facing", "skill": decision.skill}
+
+    deadline = time.monotonic() + min(6.0, max(0.4, decision.args.duration_ms / 1000))
+    sign = 1
+    flipped = False
+    previous_abs = None
+    previous_stick = 0
+    stable = 0
+    first_command = None
+    acknowledged = False
+    last_error = None
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not current.player:
+                return {"status": "interrupted", "reason": "game_state_lost", "skill": decision.skill}
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "interrupted", "reason": "world_changed", "skill": decision.skill}
+            target = _target_position(current, decision)
+            if target is None:
+                return {"status": "failed", "reason": "face_target_not_observed", "skill": decision.skill}
+
+            desired = _yaw_to_target(current.player.position, target)
+            error = _yaw_error_units(current.player.yaw, desired)
+            last_error = error
+            abs_error = abs(error)
+            if first_command is not None:
+                acknowledged |= current.last_command_seq >= first_command
+
+            if previous_abs is not None and previous_stick != 0 and abs_error > previous_abs + 350 and not flipped:
+                sign *= -1
+                flipped = True
+
+            if abs_error <= 900:
+                stable += 1
+                if stable >= 2:
+                    bridge.release()
+                    if shield:
+                        hold_ms = max(250, min(1500, int(max(0.25, deadline - time.monotonic()) * 1000)))
+                        acknowledged |= await _pulse(bridge, buttons=BUTTONS["R"], hold_ms=min(300, hold_ms),
+                            settle_s=0.05)
+                        remaining = hold_ms - 300
+                        while remaining > 0:
+                            chunk = min(300, remaining)
+                            command_id = bridge.send(buttons=BUTTONS["R"], lease_ms=chunk)
+                            if first_command is None:
+                                first_command = command_id
+                            await asyncio.sleep(chunk / 1000)
+                            remaining -= chunk
+                        bridge.release()
+                    return {"status": "completed",
+                        "reason": "shield_oriented" if shield else "target_faced",
+                        "yaw_error": error, "yaw_error_deg": round(error * 180 / 32768, 2),
+                        "acknowledged": acknowledged, "skill": decision.skill}
+            else:
+                stable = 0
+
+            previous_abs = abs_error
+            magnitude = max(28, min(70, round(abs_error / 260)))
+            stick_x = magnitude * (1 if error > 0 else -1) * sign
+            previous_stick = stick_x
+            command_id = bridge.send(stick_x=stick_x, stick_y=10, lease_ms=240)
+            if first_command is None:
+                first_command = command_id
+            await asyncio.sleep(0.10)
+    finally:
+        bridge.release()
+
+    return {"status": "failed", "reason": "face_timeout", "yaw_error": last_error,
+        "yaw_error_deg": round(last_error * 180 / 32768, 2) if last_error is not None else None,
         "acknowledged": acknowledged, "skill": decision.skill}
 
 
@@ -1212,6 +1314,10 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _navigate_local(bridge, decision, observation, actor_mode=True, interact=True)
     if decision.skill == "aim_at":
         return await _aim_at(bridge, decision, observation)
+    if decision.skill == "face_target":
+        return await _face_target(bridge, decision, observation)
+    if decision.skill == "shield_face":
+        return await _face_target(bridge, decision, observation, shield=True)
     if decision.skill == "fight_enemy":
         return await _fight_enemy(bridge, decision, observation)
     if decision.skill == "explore_area":
