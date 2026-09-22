@@ -57,7 +57,9 @@ not explain how to obtain it. A world_transition event or a changed scene/room i
 Re-observe and replan.
 Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is active, then target_actor
 and nearby_actors to ground interactions. nearby_actors prioritizes contextual/targeted actors, NPCs,
-bosses, doors, chests and enemies before generic effects/props.
+bosses, doors, chests and enemies before generic effects/props. Actor category 10 is a door in OoT's actor
+category enum and category 11 is a chest. In an interior where the objective requires leaving or continuing,
+prefer interact_with_actor on an observed door instead of repeatedly probing the walls with free movement.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
