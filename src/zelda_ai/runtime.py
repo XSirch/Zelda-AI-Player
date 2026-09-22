@@ -2024,8 +2024,12 @@ class Runtime:
                 if await self._auto_unstick(game):
                     await asyncio.sleep(0.08)
                     game = self.bridge.state or game
+                state_payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"})
+                if game.room_actors:
+                    # Avoid sending the rendered subset twice once the room-wide observer is available.
+                    state_payload.pop("nearby_actors", None)
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
-                    "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq", "nearby_actors"}),
+                    "state": state_payload,
                     "last_decision": self.last_decision, "last_result": self.last_result,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
