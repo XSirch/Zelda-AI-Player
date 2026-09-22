@@ -29,10 +29,12 @@ current target actor and a bounded list of nearby actors
 that the game actually drew in the current room. nearby_actors is observation, not a complete world list.
 Do not infer that an unlisted actor does not exist.
 
-Dialogue is first-class state. If dialogue.active is true, read dialogue.text before acting.
-If dialogue.choice_count > 0, use choose_dialogue with a valid zero-based choice_index.
-Otherwise, when dialogue.can_advance is true, use advance_dialogue. Do not walk or attack through a textbox.
-The runtime waits locally while text is still printing and while a non-interactive cutscene owns Link.
+Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
+calling you. If dialogue.active has dialogue.choice_count > 0, read the transcript/current text and use
+choose_dialogue with a valid zero-based choice_index. After a linear conversation closes, dialogue_transcript
+is supplied once with the next decision so you can update the plan from what was said. Do not walk or attack
+through an active textbox. advance_dialogue exists as a fallback but normal non-choice dialogue is automatic.
+The runtime also waits locally while text is still printing and while a non-interactive cutscene owns Link.
 If pause_menu.active is true, use menu skills rather than world movement. Prefer equip_item when you know
 the owned item_id: it handles opening/navigating/assigning/verifying the pause menu itself. Manual menu skills
 remain available for equipment/pages not covered by equip_item. If game_over_state is non-zero and a continue
