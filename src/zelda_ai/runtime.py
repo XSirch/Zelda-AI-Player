@@ -69,7 +69,7 @@ SKILL_CATALOG = [
     {"id": "talk_to_actor", "name": "Aproximar e iniciar conversa com ator", "status": "implemented", "version": "2.0"},
     {"id": "equip_item", "name": "Equipar item possuído em C via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "aim_at", "name": "Mira calibrada para arco/estilingue/Hookshot", "status": "planned", "version": None},
-    {"id": "fight_enemy", "name": "Combate composto com feedback", "status": "planned", "version": None},
+    {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
     {"id": "manipulate_object", "name": "Empurrar/puxar/carregar/lançar objetos", "status": "planned", "version": None},
     {"id": "explore_area", "name": "Exploração e grafo de saídas", "status": "planned", "version": None},
     {"id": "death_recovery", "name": "Game over e recuperação autônoma", "status": "planned", "version": None},
@@ -373,6 +373,87 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
         "acknowledged": acknowledged, "skill": decision.skill}
 
 
+async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    actor = _matching_actor(before, decision.args.target_actor_id, decision.args.target_actor_params)
+    if actor is None:
+        return {"status": "failed", "reason": "target_actor_not_observed", "skill": decision.skill}
+    if actor.category not in {5, 9}:  # ACTORCAT_ENEMY / ACTORCAT_BOSS in the pinned SoH revision.
+        return {"status": "failed", "reason": "target_is_not_enemy_category",
+            "actor_category": actor.category, "skill": decision.skill}
+
+    start_position = before.player.position
+    start_health = before.player.health
+    deadline = time.monotonic() + min(10.0, max(0.5, decision.args.duration_ms / 1000))
+    before_events = {event.id for event in before.events}
+    acknowledged = False
+    missing_samples = 0
+    cycle = 0
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "interrupted", "reason": "world_changed", "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.dialogue.active or current.cutscene_active or current.paused:
+                return {"status": "interrupted", "reason": "gameplay_state_changed", "skill": decision.skill}
+
+            defeated = next((event for event in current.events
+                if event.id not in before_events and event.kind in {"enemy_defeated", "boss_defeated"}
+                and event.detail == str(decision.args.target_actor_id)), None)
+            if defeated is not None:
+                return {"status": "completed", "reason": defeated.kind,
+                    "health_lost": max(0, start_health - current.player.health),
+                    "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+            if actor is None:
+                missing_samples += 1
+                if missing_samples >= 5:
+                    return {"status": "failed", "reason": "enemy_lost_without_defeat_event",
+                        "health_lost": max(0, start_health - current.player.health),
+                        "acknowledged": acknowledged, "skill": decision.skill}
+                await asyncio.sleep(0.1)
+                continue
+            missing_samples = 0
+
+            if actor.distance > 260:
+                stick_x, stick_y, _ = _steer_to(current, actor.position, min(1.0, max(0.65, decision.args.strength)))
+                command_id = bridge.send(buttons=BUTTONS["Z"], stick_x=stick_x, stick_y=stick_y, lease_ms=220)
+            elif actor.distance > 120:
+                stick_x, stick_y, _ = _steer_to(current, actor.position, max(0.45, decision.args.strength))
+                command_id = bridge.send(buttons=BUTTONS["Z"], stick_x=stick_x, stick_y=max(20, stick_y), lease_ms=180)
+            else:
+                # Keep this deliberately generic. Boss-specific openings remain a planner concern.
+                pattern = cycle % 5
+                if pattern in {0, 1, 3}:
+                    buttons, stick_x, stick_y = BUTTONS["Z"] | BUTTONS["B"], 0, 12
+                elif pattern == 2:
+                    buttons, stick_x, stick_y = BUTTONS["Z"] | BUTTONS["R"], 0, 0
+                else:
+                    buttons, stick_x, stick_y = BUTTONS["Z"] | BUTTONS["A"], 0, 0
+                command_id = bridge.send(buttons=buttons, stick_x=stick_x, stick_y=stick_y, lease_ms=140)
+                cycle += 1
+
+            acknowledged |= current.last_command_seq >= command_id
+            await asyncio.sleep(0.14)
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "failed", "reason": "combat_timeout",
+        "health_lost": max(0, start_health - after.player.health) if after and after.player else None,
+        "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "acknowledged": acknowledged, "skill": decision.skill}
+
+
 def _inventory_slot(game: GameState, item_id: int) -> int | None:
     for item in game.inventory_named:
         if item.item_id == item_id:
@@ -557,6 +638,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _navigate_local(bridge, decision, observation, actor_mode=True)
     if decision.skill == "talk_to_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
+    if decision.skill == "fight_enemy":
+        return await _fight_enemy(bridge, decision, observation)
     if before.paused and decision.skill not in MENU_SKILLS:
         return {"status": "stale", "reason": "pause_menu_active", "skill": decision.skill}
     if not before.paused and decision.skill in {"menu_move", "menu_confirm", "menu_cancel", "menu_assign"}:
