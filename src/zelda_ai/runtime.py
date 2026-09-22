@@ -1423,7 +1423,7 @@ class Runtime:
         self.last_result: dict | None = None
         self.recent = deque(maxlen=12)
         self.hints = deque(maxlen=3)
-        self.dialogue_transcript = deque(maxlen=20)
+        self.dialogue_transcript = deque(maxlen=12)
         self.seen_events: set[str] = set()
         self.bridge.on_state = self.on_state
         self.subscribers: set[asyncio.Queue] = set()
@@ -1651,7 +1651,7 @@ class Runtime:
         if game.dialogue.text and (not self.dialogue_transcript or
                 self.dialogue_transcript[-1].get("text") != game.dialogue.text):
             self.dialogue_transcript.append({"text_id": game.dialogue.text_id,
-                "text": game.dialogue.text, "choices": game.dialogue.choices,
+                "text": game.dialogue.text[:1200], "choices": game.dialogue.choices,
                 "speaker": game.dialogue.speaker.model_dump() if game.dialogue.speaker else None})
         if game.dialogue.choice_count > 0 and game.dialogue.can_advance:
             return False  # A model decision is required for a semantic choice.
