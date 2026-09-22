@@ -172,3 +172,21 @@ def test_actor_metadata_is_optional_but_bounded(state):
         "drawn": True, "text_id": 4096}
     enriched = type(state).model_validate({**state.model_dump(), "nearby_actors": [actor]})
     assert enriched.nearby_actors[0].description == "Saria"
+
+
+def test_equip_gear_requires_item_and_progress_can_mark_equipped(decision, state):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "equip_gear",
+            "args": {**decision.args.model_dump(), "duration_ms": 8000}})
+    gear_decision = Decision.model_validate({**decision.model_dump(), "skill": "equip_gear",
+        "args": {**decision.args.model_dump(), "duration_ms": 8000, "item_id": 0x45}})
+    assert gear_decision.args.item_id == 0x45
+
+    enriched = type(state).model_validate({**state.model_dump(), "progress": {
+        "quest_items": [], "owned_equipment": ["Iron Boots"],
+        "equipment": [{"item_id": 0x45, "name": "Iron Boots", "equipment_type": "boots",
+            "value": 2, "equipped": True}],
+        "upgrade_levels": {}, "heart_pieces": 0, "skull_tokens": 0,
+        "magic_acquired": False, "double_magic": False, "double_defense": False,
+        "map_index": 0, "dungeon_items": [], "small_keys": 0}})
+    assert enriched.progress.equipment[0].equipped
