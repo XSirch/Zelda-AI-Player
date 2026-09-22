@@ -34,8 +34,9 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 16;
-constexpr size_t MAX_ACTORS = 24;
-constexpr float MAX_ACTOR_DISTANCE = 1400.0f;
+constexpr size_t MAX_NEARBY_ACTORS = 24;
+constexpr size_t MAX_ROOM_ACTORS = 64;
+constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
 
 int64_t NowMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -275,6 +276,24 @@ json ProgressJson() {
     };
 }
 
+const char* ActorCategoryName(uint8_t category) {
+    switch (category) {
+        case ACTORCAT_SWITCH: return "switch";
+        case ACTORCAT_BG: return "background";
+        case ACTORCAT_PLAYER: return "player";
+        case ACTORCAT_EXPLOSIVE: return "explosive";
+        case ACTORCAT_NPC: return "npc";
+        case ACTORCAT_ENEMY: return "enemy";
+        case ACTORCAT_PROP: return "prop";
+        case ACTORCAT_ITEMACTION: return "item_action";
+        case ACTORCAT_MISC: return "misc";
+        case ACTORCAT_BOSS: return "boss";
+        case ACTORCAT_DOOR: return "door";
+        case ACTORCAT_CHEST: return "chest";
+        default: return "unknown";
+    }
+}
+
 json ActorJson(Actor* actor, Player* player) {
     if (!actor || !player) return nullptr;
     std::string actorName;
@@ -297,6 +316,8 @@ json ActorJson(Actor* actor, Player* player) {
         {"name", actorName},
         {"description", actorDescription},
         {"category", actor->category},
+        {"category_name", ActorCategoryName(actor->category)},
+        {"room", actor->room},
         {"params", actor->params},
         {"position", {a.x, a.y, a.z}},
         {"focus_position", {actor->focus.pos.x, actor->focus.pos.y, actor->focus.pos.z}},
@@ -350,7 +371,7 @@ int ActorObservationPriority(Actor* actor, Actor* contextActor) {
     return 4;
 }
 
-json DrawnActors(Player* player) {
+json NearbyActors(Player* player) {
     struct Candidate {
         int priority;
         float distance;
@@ -368,7 +389,7 @@ json DrawnActors(Player* player) {
             const float dy = a.y - p.y;
             const float dz = a.z - p.z;
             const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-            if (std::isfinite(distance) && distance <= MAX_ACTOR_DISTANCE) {
+            if (std::isfinite(distance) && distance <= MAX_NEARBY_ACTOR_DISTANCE) {
                 candidates.push_back({ActorObservationPriority(actor, contextActor), distance, actor});
             }
         }
@@ -378,10 +399,48 @@ json DrawnActors(Player* player) {
         return lhs.distance < rhs.distance;
     });
     json result = json::array();
-    for (size_t i = 0; i < candidates.size() && i < MAX_ACTORS; ++i) {
+    for (size_t i = 0; i < candidates.size() && i < MAX_NEARBY_ACTORS; ++i) {
         result.push_back(ActorJson(candidates[i].actor, player));
     }
     return result;
+}
+
+json RoomActors(Player* player) {
+    struct Candidate {
+        int priority;
+        float distance;
+        Actor* actor;
+    };
+    std::vector<Candidate> candidates;
+    const int room = gPlayState->roomCtx.curRoom.num;
+    Actor* contextActor = ContextActor(player, Data().doAction);
+    for (int category = 0; category < ACTORCAT_MAX; ++category) {
+        for (Actor* actor = gPlayState->actorCtx.actorLists[category].head; actor != nullptr; actor = actor->next) {
+            if (actor == &player->actor || (actor->room != -1 && actor->room != room)) continue;
+            const auto& a = actor->world.pos;
+            const auto& p = player->actor.world.pos;
+            const float dx = a.x - p.x;
+            const float dy = a.y - p.y;
+            const float dz = a.z - p.z;
+            const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
+            if (!std::isfinite(distance)) continue;
+            candidates.push_back({ActorObservationPriority(actor, contextActor), distance, actor});
+        }
+    }
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate& lhs, const Candidate& rhs) {
+        if (lhs.priority != rhs.priority) return lhs.priority < rhs.priority;
+        return lhs.distance < rhs.distance;
+    });
+
+    json actors = json::array();
+    for (size_t i = 0; i < candidates.size() && i < MAX_ROOM_ACTORS; ++i) {
+        actors.push_back(ActorJson(candidates[i].actor, player));
+    }
+    return {
+        {"actors", actors},
+        {"count", candidates.size()},
+        {"truncated", candidates.size() > MAX_ROOM_ACTORS},
+    };
 }
 
 std::vector<std::string> DecodeChoices(MessageContext* msgCtx, int count) {
@@ -483,6 +542,9 @@ void Snapshot() {
         {"last_played_song", 0},
         {"target_actor", nullptr},
         {"nearby_actors", json::array()},
+        {"room_actors", json::array()},
+        {"room_actor_count", 0},
+        {"room_actors_truncated", false},
         {"cutscene_active", false},
         {"paused", false},
         {"events", bridge.events},
@@ -579,7 +641,11 @@ void Snapshot() {
             if (target) state["target_actor"] = ActorJson(target, player);
             Actor* contextActor = ContextActor(player, bridge.doAction);
             if (contextActor) state["context_actor"] = ActorJson(contextActor, player);
-            state["nearby_actors"] = DrawnActors(player);
+            state["nearby_actors"] = NearbyActors(player);
+            const auto roomActors = RoomActors(player);
+            state["room_actors"] = roomActors["actors"];
+            state["room_actor_count"] = roomActors["count"];
+            state["room_actors_truncated"] = roomActors["truncated"];
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
             state["equipped"] = json::array();
