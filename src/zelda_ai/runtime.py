@@ -389,6 +389,7 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
     deadline = time.monotonic() + min(10.0, max(0.5, decision.args.duration_ms / 1000))
     before_events = {event.id for event in before.events}
     acknowledged = False
+    first_command = None
     missing_samples = 0
     cycle = 0
 
@@ -403,6 +404,9 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
                 return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
             if current.dialogue.active or current.cutscene_active or current.paused:
                 return {"status": "interrupted", "reason": "gameplay_state_changed", "skill": decision.skill}
+
+            if first_command is not None:
+                acknowledged |= current.last_command_seq >= first_command
 
             defeated = next((event for event in current.events
                 if event.id not in before_events and event.kind in {"enemy_defeated", "boss_defeated"}
@@ -442,12 +446,15 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
                 command_id = bridge.send(buttons=buttons, stick_x=stick_x, stick_y=stick_y, lease_ms=140)
                 cycle += 1
 
-            acknowledged |= current.last_command_seq >= command_id
+            if first_command is None:
+                first_command = command_id
             await asyncio.sleep(0.14)
     finally:
         bridge.release()
 
     after = bridge.state
+    if after and first_command is not None:
+        acknowledged |= after.last_command_seq >= first_command
     return {"status": "failed", "reason": "combat_timeout",
         "health_lost": max(0, start_health - after.player.health) if after and after.player else None,
         "distance": math.dist(start_position, after.player.position) if after and after.player else None,
