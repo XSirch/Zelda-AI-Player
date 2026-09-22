@@ -17,7 +17,7 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v2/skills-v2/trajectory-v1/prompt-v5"
+CONTRACT_VERSION = "state-v2/skills-v2/trajectory-v2/prompt-v6"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "START": 0x1000, "R": 0x0010,
     "C_UP": 0x0008, "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
@@ -268,6 +268,61 @@ async def _pulse(bridge: Bridge, *, buttons: int = 0, stick_x: int = 0, stick_y:
     return bool(current and current.last_command_seq >= command_id)
 
 
+def _recovery_inputs(attempt: int) -> list[tuple[int, int, int, int]]:
+    """Deterministic wall escape: create clearance backwards before attempting another heading."""
+    side = 1 if attempt % 2 == 0 else -1
+    return [
+        (0, 0, -62, 380),                 # Back away from the obstacle first.
+        (0, 52 * side, -36, 300),         # Continue reversing on an arc to create turning room.
+        (0, 68 * side, 8, 280),           # Rotate toward a different heading without charging forward.
+        (BUTTONS["Z"], 0, 0, 100),        # Recenter camera after the escape.
+    ]
+
+
+async def _backtrack_recovery(bridge: Bridge, observation: GameState, attempt: int = 0) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"acknowledged": False, "distance": 0.0, "yaw_delta": 0, "world_changed": False}
+    start_position = before.player.position
+    start_yaw = before.player.yaw
+    first_command = None
+    acknowledged = False
+
+    try:
+        for buttons, stick_x, stick_y, hold_ms in _recovery_inputs(attempt):
+            current = bridge.state
+            if not current or not bridge.connected:
+                break
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"acknowledged": acknowledged, "distance": 0.0, "yaw_delta": 0,
+                    "world_changed": True}
+            if (not current.in_game or not current.player or current.paused or current.dialogue.active or
+                    current.cutscene_active or current.game_over_state != 0):
+                break
+            command_id = bridge.send(buttons=buttons, stick_x=stick_x, stick_y=stick_y,
+                lease_ms=max(50, min(500, hold_ms)))
+            if first_command is None:
+                first_command = command_id
+            await asyncio.sleep(hold_ms / 1000)
+            bridge.release()
+            await asyncio.sleep(0.05)
+            sample = bridge.state
+            if sample and first_command is not None:
+                acknowledged |= sample.last_command_seq >= first_command
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    if not after or not after.player:
+        return {"acknowledged": acknowledged, "distance": 0.0, "yaw_delta": 0, "world_changed": False}
+    if (after.instance_id, after.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+        return {"acknowledged": acknowledged, "distance": 0.0, "yaw_delta": 0, "world_changed": True}
+    return {"acknowledged": acknowledged,
+        "distance": math.dist(start_position, after.player.position),
+        "yaw_delta": ((after.player.yaw - start_yaw + 32768) % 65536) - 32768,
+        "world_changed": False}
+
+
 async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameState,
                           *, actor_mode: bool, talk: bool = False, interact: bool = False) -> dict:
     before = bridge.state
@@ -286,7 +341,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     best_distance = float("inf")
     stagnant_samples = 0
     recentered = False
-    detour_attempts = 0
+    recovery_attempts = 0
     last_actor = None
     last_progress_seq = -1
 
@@ -365,17 +420,28 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
             if current.seq != last_progress_seq:
                 last_progress_seq = current.seq
                 if target_distance + 2.0 < best_distance:
+                    progress_gain = best_distance - target_distance
                     best_distance = target_distance
                     stagnant_samples = 0
+                    if math.isfinite(progress_gain) and progress_gain >= 12.0:
+                        recovery_attempts = 0
+                        recentered = False
                 else:
                     stagnant_samples += 1
 
-            if (current.player.bg_check_flags & 0x008) and stagnant_samples >= 4 and detour_attempts < 2:
-                # Local collision recovery only: sidestep around the contact, then resume target steering.
-                side = 60 if detour_attempts == 0 else -60
-                acknowledged |= await _pulse(bridge, stick_x=side, stick_y=20, hold_ms=260, settle_s=0.06)
-                detour_attempts += 1
+            wall_contact = bool(current.player.bg_check_flags & 0x008)
+            obstructed = (wall_contact and stagnant_samples >= 2) or stagnant_samples >= 4
+            if obstructed and recovery_attempts < 2:
+                # Back up first. A sidestep alone often keeps Link pinned against an interior wall/corner.
+                recovery = await _backtrack_recovery(bridge, current, recovery_attempts)
+                acknowledged |= recovery["acknowledged"]
+                recovery_attempts += 1
                 stagnant_samples = 0
+                best_distance = float("inf")
+                recentered = False
+                if recovery["world_changed"]:
+                    return {"status": "interrupted", "reason": "world_changed_during_recovery",
+                        "acknowledged": acknowledged, "skill": decision.skill}
                 continue
             if stagnant_samples >= 5 and not recentered:
                 bridge.release()
@@ -383,10 +449,11 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 recentered = True
                 stagnant_samples = 0
                 continue
-            if stagnant_samples >= 8:
+            if stagnant_samples >= 7:
                 return {"status": "failed", "reason": "navigation_no_progress",
                     "target_distance": target_distance,
                     "distance": math.dist(start_position, current.player.position),
+                    "recovery_attempts": recovery_attempts,
                     "acknowledged": acknowledged, "skill": decision.skill}
 
             command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=250)
@@ -900,6 +967,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
     stagnant = 0
     turn_ticks = 0
     turn_side = 1
+    recovery_attempts = 0
     first_command = None
     acknowledged = False
 
@@ -949,14 +1017,35 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                     stagnant += 1
                 else:
                     stagnant = max(0, stagnant - 1)
+                    if moved >= 4.0:
+                        recovery_attempts = 0
 
-            if (current.player.bg_check_flags & 0x008) or stagnant >= 3:
-                turn_ticks = max(turn_ticks, 5)
+            wall_contact = bool(current.player.bg_check_flags & 0x008)
+            if (wall_contact or stagnant >= 3) and recovery_attempts < 3:
+                # Unknown rooms need clearance before another probe. Alternate reverse arcs on each retry.
+                recovery = await _backtrack_recovery(bridge, current, recovery_attempts)
+                acknowledged |= recovery["acknowledged"]
+                recovery_attempts += 1
+                stagnant = 0
+                sample = bridge.state
+                if recovery["world_changed"] and sample:
+                    return {"status": "completed", "reason": "transition_discovered_during_recovery",
+                        "from": [observation.scene, observation.room],
+                        "to": [sample.scene, sample.room],
+                        "distance": math.dist(start_position, sample.player.position) if sample.player else None,
+                        "acknowledged": acknowledged, "skill": decision.skill}
+                if sample and sample.player:
+                    last_position = sample.player.position
+                    last_seq = sample.seq
+                continue
+
+            if (wall_contact or stagnant >= 3) and recovery_attempts >= 3:
+                turn_ticks = max(turn_ticks, 6)
                 stagnant = 0
                 turn_side *= -1
 
             if turn_ticks > 0:
-                buttons, stick_x, stick_y = 0, 58 * turn_side, 10
+                buttons, stick_x, stick_y = 0, 58 * turn_side, 8
                 turn_ticks -= 1
             else:
                 buttons, stick_x, stick_y = 0, 0, 58
@@ -1439,6 +1528,8 @@ class Runtime:
         self.replay_attempts: set[tuple[str, int]] = set()
         self.stuck_score = 0
         self.stuck_notified_at = 0
+        self.unstick_attempted_at_score = 0
+        self.unstick_attempts = 0
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -1474,7 +1565,7 @@ class Runtime:
             self.replay_attempts.clear()
             self.trajectory_tainted = True
             self.log("stuck_detected", {"score": self.stuck_score, "last_skill": decision.skill,
-                "instruction": "Replan; do not repeat the same failed local action."})
+                "instruction": "Replan. Create clearance by moving back before rotating; do not repeat the same forward/lateral probe."})
 
     def _reset_trajectory_trace(self, state: GameState | None = None, *, tainted: bool = False):
         self.trajectory_trace.clear()
@@ -1601,6 +1692,8 @@ class Runtime:
                 self.replay_attempts.clear()
                 self.stuck_score = 0
                 self.stuck_notified_at = 0
+                self.unstick_attempted_at_score = 0
+                self.unstick_attempts = 0
                 self.last_result = {"status": "interrupted", "reason": "world_transition",
                     "from": [old.scene, old.room], "to": [state.scene, state.room]}
                 self.log("world_transition", {"from_scene": old.scene, "from_room": old.room,
@@ -1681,6 +1774,31 @@ class Runtime:
                 "prompt_choice": game.pause_menu.prompt_choice, "acknowledged": acknowledged})
         else:
             await asyncio.sleep(0.15)
+        return True
+
+    async def _auto_unstick(self, game: GameState) -> bool:
+        if (self.stuck_score < 6 or self.stuck_score <= self.unstick_attempted_at_score or
+                not game.player or game.paused or game.dialogue.active or game.cutscene_active or
+                game.game_over_state != 0):
+            return False
+        # If the game already exposes an actionable A prompt, let the planner interact instead of backing away.
+        if game.context_action.label != "none":
+            return False
+
+        self.unstick_attempted_at_score = self.stuck_score
+        attempt = self.unstick_attempts
+        self.unstick_attempts += 1
+        self.trajectory_tainted = True
+        recovery = await _backtrack_recovery(self.bridge, game, attempt)
+        moved = recovery["distance"]
+        turned = abs(recovery["yaw_delta"])
+        if recovery["world_changed"] or moved >= 8.0 or turned >= 1200:
+            self.stuck_score = max(2, self.stuck_score - 2)
+        self.last_result = {"status": "completed" if recovery["acknowledged"] else "failed",
+            "reason": "auto_unstick_reverse_escape", "distance": moved,
+            "yaw_delta": recovery["yaw_delta"], "recovery_attempt": attempt + 1,
+            "acknowledged": recovery["acknowledged"]}
+        self.log("auto_unstick", self.last_result)
         return True
 
     async def _defensive_guard(self):
@@ -1766,6 +1884,8 @@ class Runtime:
             self.replaying_trajectory = False
             self.stuck_score = 0
             self.stuck_notified_at = 0
+            self.unstick_attempted_at_score = 0
+            self.unstick_attempts = 0
             self._reset_trajectory_trace(game)
             self.recent.clear()
             self.hints.clear()
@@ -1896,6 +2016,9 @@ class Runtime:
                     await asyncio.sleep(0.1)
                     continue
                 game = self.bridge.state or game
+                if await self._auto_unstick(game):
+                    await asyncio.sleep(0.08)
+                    game = self.bridge.state or game
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
                     "last_decision": self.last_decision, "last_result": self.last_result,
