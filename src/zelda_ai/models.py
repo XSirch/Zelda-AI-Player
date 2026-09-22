@@ -36,6 +36,7 @@ class ActorObservation(StrictModel):
     position: tuple[float, float, float]
     distance: float = Field(ge=0)
     targeted: bool = False
+    drawn: bool = False
     text_id: int | None = Field(default=None, ge=0, le=65535)
 
     @field_validator("position")
@@ -93,6 +94,7 @@ class GameState(StrictModel):
     dialogue: DialogueState = Field(default_factory=DialogueState)
     context_action: ContextAction = Field(default_factory=ContextAction)
     target_actor: ActorObservation | None = None
+    nearby_actors: list[ActorObservation] = Field(default_factory=list, max_length=24)
     cutscene_active: bool = False
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=16)
