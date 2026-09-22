@@ -740,6 +740,17 @@ class Runtime:
             return
         if (old.scene, old.room) == (state.scene, state.room):
             return
+        edge_id = self.store.learn_world_edge(self.namespace,
+            {"scene": old.scene, "scene_name": old.scene_name, "room": old.room,
+             "position": old.player.position if old.player else None},
+            {"scene": state.scene, "scene_name": state.scene_name, "room": state.room,
+             "position": state.player.position if state.player else None,
+             "entrance_index": state.entrance_index})
+        if edge_id:
+            self.log("world_edge_observed", {"edge_id": edge_id,
+                "from": [old.scene, old.room], "from_name": old.scene_name,
+                "to": [state.scene, state.room], "to_name": state.scene_name,
+                "entrance_index": state.entrance_index})
         if (not self.replaying_trajectory and not self.trajectory_tainted and self.trace_origin
                 and self.trajectory_trace):
             origin = self.trace_origin
@@ -1035,6 +1046,7 @@ class Runtime:
                     "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
                     "last_result": self.last_result, "events": list(self.recent)[-5:],
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene)],
+                    "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
                     "stuck_score": self.stuck_score,
                     "human_hints": list(self.hints)}
                 prompt = json.dumps(observation, separators=(",", ":"), ensure_ascii=False)
@@ -1106,4 +1118,5 @@ class Runtime:
             "last_decision": self.last_decision, "last_result": self.last_result,
             "events": list(self.recent), "bridge": self.bridge.status(),
             "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
-            "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else []}
+            "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],
+            "world_edges": self.store.list_world_edges(self.namespace, limit=100) if self.namespace else []}
