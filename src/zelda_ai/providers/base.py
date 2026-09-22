@@ -16,10 +16,10 @@ Implemented skills:
 - continue_gameover(A) when the game-over flow is waiting for confirmation
 - play_song(song) after an ocarina has already been activated; the executor sends the complete learned note sequence
 - navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate; use 4000-8000 ms for room-scale travel
-- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
+- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks an observed current-room actor; use 3000-8000 ms
 - follow_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a moving observed actor for a bounded window; useful for races/guides
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
-- interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
+- interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; doors use a dedicated face → camera-center → straight approach → A controller to avoid orbiting; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
 - equip_gear(item_id): equips an owned sword/shield/tunic/boots on the Equipment page and verifies progress.equipment[].equipped
 - aim_at(C slot, target_actor_id or target_position): holds an equipped ranged item, feedback-aligns camera yaw/pitch and releases a shot; alignment is success, a hit is NOT assumed
@@ -60,8 +60,10 @@ Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is 
 and room_actors to ground interactions; use nearby_actors only as the compact rendered/proximity subset.
 Each actor now includes category_name and room as well as numeric category/id/params. Doors can therefore be
 identified directly with category_name="door" (numeric category 10), and chests with category_name="chest".
-In an interior where the objective requires leaving or continuing, inspect room_actors first and prefer
-interact_with_actor on an observed door instead of probing walls blindly.
+In an interior where the objective requires leaving or continuing, inspect room_actors first. If a door
+is observed, call interact_with_actor on that door DIRECTLY. Do not use explore_area, navigate_to the door's
+position, approach_actor repeatedly, or free turn/move probes first: the door-specific controller owns facing,
+camera centering, straight-line approach and the A press. Replan only if that controller returns a real failure.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 
