@@ -67,6 +67,7 @@ SKILL_CATALOG = [
     {"id": "navigate_to", "name": "Servo local até posição observada", "status": "implemented", "version": "2.0"},
     {"id": "approach_actor", "name": "Aproximar-se de ator desenhado", "status": "implemented", "version": "2.0"},
     {"id": "talk_to_actor", "name": "Aproximar e iniciar conversa com ator", "status": "implemented", "version": "2.0"},
+    {"id": "interact_with_actor", "name": "Aproximar/interagir com ator e verificar efeito", "status": "implemented", "version": "2.0"},
     {"id": "equip_item", "name": "Equipar item possuído em C via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "equip_gear", "name": "Equipar espada/escudo/túnica/botas via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "aim_at", "name": "Mira calibrada para arco/estilingue/Hookshot", "status": "planned", "version": None},
@@ -265,7 +266,7 @@ async def _pulse(bridge: Bridge, *, buttons: int = 0, stick_x: int = 0, stick_y:
 
 
 async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameState,
-                          *, actor_mode: bool, talk: bool = False) -> dict:
+                          *, actor_mode: bool, talk: bool = False, interact: bool = False) -> dict:
     before = bridge.state
     if not before or not before.player:
         return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
@@ -273,8 +274,9 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     deadline = time.monotonic() + min(8.0, max(0.25, decision.args.duration_ms / 1000))
     start_position = before.player.position
     stop_distance = decision.args.stop_distance
+    interaction_mode = talk or interact
     if stop_distance is None:
-        stop_distance = 90.0 if talk else (70.0 if actor_mode else 35.0)
+        stop_distance = 90.0 if interaction_mode else (70.0 if actor_mode else 35.0)
 
     first_command = None
     acknowledged = False
@@ -290,18 +292,20 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
             if not current or not bridge.connected:
                 raise RuntimeError("bridge_disconnected")
             if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
-                return {"status": "interrupted", "reason": "world_changed", "skill": decision.skill}
+                return {"status": "completed" if interaction_mode else "interrupted",
+                    "reason": "world_transition_after_interaction" if interaction_mode else "world_changed",
+                    "skill": decision.skill}
             if not current.in_game or not current.player:
                 return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
             if current.paused:
                 return {"status": "interrupted", "reason": "pause_menu_opened", "skill": decision.skill}
             if current.dialogue.active:
-                return {"status": "completed" if talk else "interrupted",
+                return {"status": "completed" if interaction_mode else "interrupted",
                     "reason": "dialogue_opened", "skill": decision.skill,
                     "target_distance": last_actor.distance if last_actor else None}
             if current.cutscene_active:
-                return {"status": "completed" if talk else "interrupted",
-                    "reason": "interaction_started" if talk else "cutscene_started", "skill": decision.skill}
+                return {"status": "completed" if interaction_mode else "interrupted",
+                    "reason": "interaction_started" if interaction_mode else "cutscene_started", "skill": decision.skill}
 
             if actor_mode:
                 actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
@@ -314,26 +318,43 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
 
             stick_x, stick_y, target_distance = _steer_to(current, target, decision.args.strength)
             if target_distance <= stop_distance:
-                if not talk:
+                if not interaction_mode:
                     return {"status": "completed", "reason": "target_reached",
                         "target_distance": target_distance,
                         "distance": math.dist(start_position, current.player.position),
                         "acknowledged": acknowledged, "skill": decision.skill}
 
-                # A contextual talk can become available just before the exact stop radius.
-                for _ in range(2):
-                    acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.18)
+                before_event_ids = {event.id for event in current.events}
+                before_epoch = current.scene_epoch
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.12)
+                interaction_deadline = time.monotonic() + 1.2
+                while time.monotonic() < interaction_deadline:
                     sample = bridge.state
-                    if sample and sample.dialogue.active:
+                    if not sample:
+                        break
+                    if sample.scene_epoch != before_epoch:
+                        return {"status": "completed", "reason": "world_transition_after_interaction",
+                            "target_distance": target_distance, "acknowledged": acknowledged,
+                            "skill": decision.skill}
+                    if sample.dialogue.active:
                         return {"status": "completed", "reason": "dialogue_opened",
                             "target_distance": target_distance,
                             "distance": math.dist(start_position, sample.player.position) if sample.player else None,
                             "acknowledged": acknowledged, "skill": decision.skill}
-                    if sample and sample.cutscene_active:
+                    if sample.cutscene_active:
                         return {"status": "completed", "reason": "interaction_started",
                             "target_distance": target_distance, "acknowledged": acknowledged,
                             "skill": decision.skill}
-                return {"status": "failed", "reason": "talk_interaction_not_started",
+                    outcome = next((event for event in sample.events
+                        if event.id not in before_event_ids and event.kind in {
+                            "item_received", "scene_flag_set", "scene_flag_unset"}), None)
+                    if outcome is not None:
+                        return {"status": "completed", "reason": outcome.kind,
+                            "detail": outcome.detail, "target_distance": target_distance,
+                            "acknowledged": acknowledged, "skill": decision.skill}
+                    await asyncio.sleep(0.08)
+                return {"status": "failed",
+                    "reason": "talk_interaction_not_started" if talk else "interaction_unconfirmed",
                     "target_distance": target_distance, "acknowledged": acknowledged,
                     "skill": decision.skill}
 
@@ -794,6 +815,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _navigate_local(bridge, decision, observation, actor_mode=True)
     if decision.skill == "talk_to_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
+    if decision.skill == "interact_with_actor":
+        return await _navigate_local(bridge, decision, observation, actor_mode=True, interact=True)
     if decision.skill == "fight_enemy":
         return await _fight_enemy(bridge, decision, observation)
     if before.paused and decision.skill not in MENU_SKILLS:
