@@ -154,3 +154,21 @@ def test_game_state_accepts_pause_visible_progress(state):
     assert "Kokiri's Emerald" in enriched.progress.quest_items
     assert "Deku Shield" in enriched.progress.owned_equipment
     assert enriched.progress.small_keys == 1
+
+
+def test_fight_enemy_requires_observed_actor_target(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "fight_enemy",
+            "args": {**decision.args.model_dump(), "duration_ms": 8000}})
+    fight = Decision.model_validate({**decision.model_dump(), "skill": "fight_enemy",
+        "args": {**decision.args.model_dump(), "duration_ms": 8000,
+            "target_actor_id": 37, "target_actor_params": 0}})
+    assert fight.args.target_actor_id == 37
+
+
+def test_actor_metadata_is_optional_but_bounded(state):
+    actor = {"actor_id": 12, "name": "En_Sa", "description": "Saria", "category": 4,
+        "params": 0, "position": [1, 2, 3], "distance": 4.0, "targeted": False,
+        "drawn": True, "text_id": 4096}
+    enriched = type(state).model_validate({**state.model_dump(), "nearby_actors": [actor]})
+    assert enriched.nearby_actors[0].description == "Saria"
