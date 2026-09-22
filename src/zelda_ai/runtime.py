@@ -862,6 +862,21 @@ class Runtime:
                     "Causality is unconfirmed; reconsider the tactic.")
         self.publish()
 
+    async def _handle_gameover(self, game: GameState) -> bool:
+        if game.game_over_state == 0:
+            return False
+        self.bridge.release()
+        pause_state = game.pause_menu.state
+        if pause_state in {0xE, 0x10}:
+            if game.pause_menu.prompt_choice != 0:
+                await _pulse(self.bridge, stick_x=-60, hold_ms=90, settle_s=0.12)
+            acknowledged = await _pulse(self.bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.18)
+            self.log("gameover_auto_confirm", {"pause_state": pause_state,
+                "prompt_choice": game.pause_menu.prompt_choice, "acknowledged": acknowledged})
+        else:
+            await asyncio.sleep(0.15)
+        return True
+
     async def validate_model(self, config: RunConfig) -> ModelInfo:
         if config.provider not in self.providers:
             raise ValueError("Provider not available")
@@ -1030,6 +1045,8 @@ class Runtime:
                     if time.monotonic() - self.started >= self.config.max_runtime_s:
                         raise ProviderFailure("runtime_budget_reached")
                     await asyncio.sleep(0.25)
+                    continue
+                if await self._handle_gameover(game):
                     continue
                 # Do not spend inference calls while an uninterruptible animation/cutscene owns Link.
                 if game.cutscene_active and not game.dialogue.active and game.game_over_state == 0:
