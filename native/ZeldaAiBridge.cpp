@@ -185,23 +185,39 @@ json ProgressJson() {
     }
 
     json ownedEquipment = json::array();
-    const std::pair<uint16_t, int> equipmentItems[] = {
-        {EQUIP_FLAG_SWORD_KOKIRI, ITEM_SWORD_KOKIRI},
-        {EQUIP_FLAG_SWORD_MASTER, ITEM_SWORD_MASTER},
-        {EQUIP_FLAG_SWORD_BGS, ITEM_SWORD_BGS},
-        {EQUIP_FLAG_SHIELD_DEKU, ITEM_SHIELD_DEKU},
-        {EQUIP_FLAG_SHIELD_HYLIAN, ITEM_SHIELD_HYLIAN},
-        {EQUIP_FLAG_SHIELD_MIRROR, ITEM_SHIELD_MIRROR},
-        {EQUIP_FLAG_TUNIC_KOKIRI, ITEM_TUNIC_KOKIRI},
-        {EQUIP_FLAG_TUNIC_GORON, ITEM_TUNIC_GORON},
-        {EQUIP_FLAG_TUNIC_ZORA, ITEM_TUNIC_ZORA},
-        {EQUIP_FLAG_BOOTS_KOKIRI, ITEM_BOOTS_KOKIRI},
-        {EQUIP_FLAG_BOOTS_IRON, ITEM_BOOTS_IRON},
-        {EQUIP_FLAG_BOOTS_HOVER, ITEM_BOOTS_HOVER},
+    json equipment = json::array();
+    struct EquipmentEntry {
+        uint16_t flag;
+        int item;
+        int type;
+        int value;
+        const char* typeName;
     };
-    for (const auto& [flag, item] : equipmentItems) {
-        if (gSaveContext.inventory.equipment & flag) {
-            ownedEquipment.push_back(SohUtils::GetItemName(item));
+    const EquipmentEntry equipmentItems[] = {
+        {EQUIP_FLAG_SWORD_KOKIRI, ITEM_SWORD_KOKIRI, EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_KOKIRI, "sword"},
+        {EQUIP_FLAG_SWORD_MASTER, ITEM_SWORD_MASTER, EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_MASTER, "sword"},
+        {EQUIP_FLAG_SWORD_BGS, ITEM_SWORD_BGS, EQUIP_TYPE_SWORD, EQUIP_VALUE_SWORD_BIGGORON, "sword"},
+        {EQUIP_FLAG_SHIELD_DEKU, ITEM_SHIELD_DEKU, EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_DEKU, "shield"},
+        {EQUIP_FLAG_SHIELD_HYLIAN, ITEM_SHIELD_HYLIAN, EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_HYLIAN, "shield"},
+        {EQUIP_FLAG_SHIELD_MIRROR, ITEM_SHIELD_MIRROR, EQUIP_TYPE_SHIELD, EQUIP_VALUE_SHIELD_MIRROR, "shield"},
+        {EQUIP_FLAG_TUNIC_KOKIRI, ITEM_TUNIC_KOKIRI, EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_KOKIRI, "tunic"},
+        {EQUIP_FLAG_TUNIC_GORON, ITEM_TUNIC_GORON, EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_GORON, "tunic"},
+        {EQUIP_FLAG_TUNIC_ZORA, ITEM_TUNIC_ZORA, EQUIP_TYPE_TUNIC, EQUIP_VALUE_TUNIC_ZORA, "tunic"},
+        {EQUIP_FLAG_BOOTS_KOKIRI, ITEM_BOOTS_KOKIRI, EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_KOKIRI, "boots"},
+        {EQUIP_FLAG_BOOTS_IRON, ITEM_BOOTS_IRON, EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_IRON, "boots"},
+        {EQUIP_FLAG_BOOTS_HOVER, ITEM_BOOTS_HOVER, EQUIP_TYPE_BOOTS, EQUIP_VALUE_BOOTS_HOVER, "boots"},
+    };
+    for (const auto& row : equipmentItems) {
+        if (gSaveContext.inventory.equipment & row.flag) {
+            const auto& name = SohUtils::GetItemName(row.item);
+            ownedEquipment.push_back(name);
+            equipment.push_back({
+                {"item_id", row.item},
+                {"name", name},
+                {"equipment_type", row.typeName},
+                {"value", row.value},
+                {"equipped", CUR_EQUIP_VALUE(row.type) == row.value},
+            });
         }
     }
 
@@ -220,6 +236,7 @@ json ProgressJson() {
     return {
         {"quest_items", questItems},
         {"owned_equipment", ownedEquipment},
+        {"equipment", equipment},
         {"upgrade_levels", {
             {"quiver", CUR_UPG_VALUE(UPG_QUIVER)},
             {"bomb_bag", CUR_UPG_VALUE(UPG_BOMB_BAG)},
