@@ -72,7 +72,7 @@ SKILL_CATALOG = [
     {"id": "equip_gear", "name": "Equipar espada/escudo/túnica/botas via pause menu", "status": "implemented", "version": "2.0"},
     {"id": "aim_at", "name": "Mira fechada e disparo com item C equipado", "status": "implemented", "version": "2.0"},
     {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
-    {"id": "manipulate_object", "name": "Empurrar/puxar/carregar/lançar objetos", "status": "planned", "version": None},
+    {"id": "manipulate_object", "name": "Agarrar/empurrar/puxar objeto observado", "status": "implemented", "version": "2.0"},
     {"id": "explore_area", "name": "Exploração local com colisão e descoberta", "status": "implemented", "version": "2.0"},
     {"id": "death_recovery", "name": "Game over e recuperação autônoma", "status": "planned", "version": None},
     {"id": "vision_fallback", "name": "Visão sob demanda após falhas estruturadas", "status": "planned", "version": None},
@@ -630,6 +630,81 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
         "acknowledged": acknowledged, "skill": decision.skill}
 
 
+async def _manipulate_object(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    actor = _matching_actor(before, decision.args.target_actor_id, decision.args.target_actor_params)
+    if actor is None:
+        return {"status": "failed", "reason": "target_actor_not_observed", "skill": decision.skill}
+
+    approach = await _navigate_local(bridge, decision, observation, actor_mode=True)
+    if approach.get("status") != "completed":
+        return {"status": approach.get("status", "failed"),
+            "reason": f"approach_failed:{approach.get('reason', 'unknown')}",
+            "skill": decision.skill}
+
+    current = bridge.state
+    if not current or not current.player:
+        return {"status": "failed", "reason": "state_lost_after_approach", "skill": decision.skill}
+    actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+    if actor is None:
+        return {"status": "failed", "reason": "target_actor_lost_after_approach", "skill": decision.skill}
+
+    start_actor_position = actor.position
+    start_player_position = current.player.position
+    before_events = {event.id for event in current.events}
+    start_epoch = current.scene_epoch
+    start_context = current.context_action.label
+    acknowledged = await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=180, settle_s=0.10)
+    direction_y = 62 if decision.args.direction == "forward" else -62
+    deadline = time.monotonic() + min(4.0, max(0.6, decision.args.duration_ms / 1000))
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not current.player:
+                return {"status": "interrupted", "reason": "game_state_lost", "skill": decision.skill}
+            if current.scene_epoch != start_epoch:
+                return {"status": "completed", "reason": "world_transition_after_manipulation",
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if current.dialogue.active or current.cutscene_active:
+                return {"status": "completed", "reason": "interaction_started",
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            outcome = next((event for event in current.events
+                if event.id not in before_events and event.kind in {
+                    "item_received", "scene_flag_set", "scene_flag_unset"}), None)
+            if outcome is not None:
+                return {"status": "completed", "reason": outcome.kind, "detail": outcome.detail,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+            if actor is not None:
+                displacement = math.dist(start_actor_position, actor.position)
+                if displacement >= 8.0:
+                    return {"status": "completed", "reason": "object_displaced",
+                        "object_distance": displacement,
+                        "player_distance": math.dist(start_player_position, current.player.position),
+                        "acknowledged": acknowledged, "skill": decision.skill}
+            if current.context_action.label in {"throw", "drop"} and current.context_action.label != start_context:
+                return {"status": "completed", "reason": "object_grabbed",
+                    "context_action": current.context_action.label,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            command_id = bridge.send(buttons=BUTTONS["A"], stick_y=direction_y, lease_ms=260)
+            acknowledged |= current.last_command_seq >= command_id
+            await asyncio.sleep(0.12)
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "failed", "reason": "object_manipulation_unconfirmed",
+        "player_distance": math.dist(start_player_position, after.player.position)
+            if after and after.player else None,
+        "acknowledged": acknowledged, "skill": decision.skill}
+
+
 async def _explore_area(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     before = bridge.state
     if not before or not before.player:
@@ -1063,6 +1138,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return await _fight_enemy(bridge, decision, observation)
     if decision.skill == "explore_area":
         return await _explore_area(bridge, decision, observation)
+    if decision.skill == "manipulate_object":
+        return await _manipulate_object(bridge, decision, observation)
     if before.paused and decision.skill not in MENU_SKILLS:
         return {"status": "stale", "reason": "pause_menu_active", "skill": decision.skill}
     if not before.paused and decision.skill in {"menu_move", "menu_confirm", "menu_cancel", "menu_assign"}:
