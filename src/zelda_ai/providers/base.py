@@ -12,9 +12,13 @@ Implemented skills:
 - attack(B), defend(Z+R), target(Z), jump_attack(Z+A)
 - camera_center(Z tap), roll(A+forward), backflip(Z+back), sidestep(left/right with Z)
 - use_item(hold the already-equipped C-left/down/right slot)
+- pause_toggle(Start), menu_move(up/down/left/right), menu_confirm(A), menu_cancel(B), menu_assign(C slot)
+- continue_gameover(A) when the game-over flow is waiting for confirmation
+- play_song(song) after an ocarina has already been activated; the executor sends the complete learned note sequence
 
 The state contract includes scene, room, entrance_index, player pose, camera, inventory/equipment,
-decoded dialogue, context-sensitive A action, current target actor and a bounded list of nearby actors
+pause-menu cursor state, game-over state, ocarina state, decoded dialogue, context-sensitive A action,
+current target actor and a bounded list of nearby actors
 that the game actually drew in the current room. nearby_actors is observation, not a complete world list.
 Do not infer that an unlisted actor does not exist.
 
@@ -22,6 +26,9 @@ Dialogue is first-class state. If dialogue.active is true, read dialogue.text be
 If dialogue.choice_count > 0, use choose_dialogue with a valid zero-based choice_index.
 Otherwise, when dialogue.can_advance is true, use advance_dialogue. Do not walk or attack through a textbox.
 The runtime waits locally while text is still printing and while a non-interactive cutscene owns Link.
+If pause_menu.active is true, use menu skills rather than world movement. menu_assign assigns the currently
+selected inventory item to the requested C slot. If game_over_state is non-zero and a continue prompt is
+actionable, use continue_gameover. play_song does not open/equip the ocarina; activate the equipped item first.
 
 A world_transition event or a changed scene/room invalidates the previous local plan. Re-observe and replan.
 Use context_action (speak/open/grab/climb/etc.), target_actor and nearby_actors to ground interactions.
@@ -29,8 +36,10 @@ Actors expose engine IDs/params and positions, not guaranteed semantic names. Ne
 
 turn is a local closed-loop heading change. Prefer turn(left/right) to orient Link, then move(forward)
 in short 300-900 ms probes. The runtime may replay a previously successful adaptive trajectory before
-calling you; replay success/failure appears in events. Current skills do not yet pathfind globally,
-aim ranged weapons, solve inventory menus, or guarantee combat hits.
+calling you; replay success/failure appears in events. Current skills do not yet pathfind globally, aim ranged weapons, select an inventory item by semantic name,
+or guarantee combat hits. Generic pause-menu cursor control is available, so reason from cursor/item IDs.
+If stuck_score rises or a stuck_detected event appears, change strategy: recenter, backtrack, rotate/explore,
+or abandon the current local route instead of repeating the same action.
 
 Use position, yaw, camera vectors and last_result to verify progress. If movement produces little displacement,
 change heading instead of repeating the same action. Health is in native units: 16 units are one heart.
