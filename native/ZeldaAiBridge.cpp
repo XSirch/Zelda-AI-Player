@@ -208,12 +208,12 @@ json ProgressJson() {
     json dungeonItems = json::array();
     const int mapIndex = gSaveContext.mapIndex;
     int smallKeys = 0;
-    if (mapIndex >= 0 && mapIndex < static_cast<int>(ARRAY_COUNT(gSaveContext.inventory.dungeonItems))) {
+    if (mapIndex < static_cast<int>(ARRAY_COUNT(gSaveContext.inventory.dungeonItems))) {
         if (CHECK_DUNGEON_ITEM(DUNGEON_KEY_BOSS, mapIndex)) dungeonItems.push_back("Boss Key");
         if (CHECK_DUNGEON_ITEM(DUNGEON_COMPASS, mapIndex)) dungeonItems.push_back("Compass");
         if (CHECK_DUNGEON_ITEM(DUNGEON_MAP, mapIndex)) dungeonItems.push_back("Dungeon Map");
     }
-    if (mapIndex >= 0 && mapIndex < static_cast<int>(ARRAY_COUNT(gSaveContext.inventory.dungeonKeys))) {
+    if (mapIndex < static_cast<int>(ARRAY_COUNT(gSaveContext.inventory.dungeonKeys))) {
         smallKeys = std::max<int>(gSaveContext.inventory.dungeonKeys[mapIndex], 0);
     }
 
