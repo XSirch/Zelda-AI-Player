@@ -281,11 +281,11 @@ class RunConfig(StrictModel):
     effort: Effort | None = None
     goal: str = Field(default="Complete Ocarina of Time autonomously and defeat final Ganon.", min_length=1, max_length=400)
     memory_mode: Literal["isolated", "adaptive"] = "adaptive"
-    max_calls: int = Field(default=100, ge=1, le=10000)
-    max_tokens: int = Field(default=100000, ge=1000, le=10000000)
+    max_calls: int = Field(default=5000, ge=1, le=10000)
+    max_tokens: int = Field(default=5000000, ge=1000, le=10000000)
     max_cost_usd: float = Field(default=2, gt=0, le=1000)
     max_output_tokens: int = Field(default=2048, ge=256, le=16384)
-    max_runtime_s: int = Field(default=3600, ge=10, le=86400)
+    max_runtime_s: int = Field(default=43200, ge=10, le=86400)
     checkpoint_label: str = Field(default="manual", max_length=120)
 
 
