@@ -232,7 +232,8 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
     if decision.skill == "turn" and start_yaw is not None:
         target_turn_units = max(3600, min(18200,
             int(decision.args.duration_ms * 9.1 * max(0.35, decision.args.strength))))
-    deadline = time.monotonic() + decision.args.duration_ms / 1000
+    effective_duration_ms = min(decision.args.duration_ms, 180) if decision.skill in MENU_SKILLS | {"advance_dialogue"} else decision.args.duration_ms
+    deadline = time.monotonic() + effective_duration_ms / 1000
     status, reason, acknowledged = "completed", "duration_elapsed", False
     first_command = None
     try:
@@ -413,7 +414,7 @@ class Runtime:
 
     async def _try_replay_trajectory(self, game: GameState) -> bool:
         if (not self.config or self.config.memory_mode != "adaptive" or self.replaying_trajectory
-                or not game.player):
+                or not game.player or game.paused or game.dialogue.active or game.game_over_state != 0):
             return False
         route = self.store.best_trajectory(self.namespace, game.scene, game.room,
             game.player.position, game.player.yaw)
@@ -446,7 +447,7 @@ class Runtime:
                 self.last_result = await execute_skill(self.bridge, decision, current)
                 self.log("trajectory_replay_step", {"trajectory_id": route["id"],
                     "skill": decision.skill, "result": self.last_result})
-                if self.last_result["status"] == "failed":
+                if self.last_result["status"] != "completed":
                     break
                 await asyncio.sleep(0.05)
             current = self.bridge.state
@@ -471,6 +472,8 @@ class Runtime:
                     old.scene_epoch != state.scene_epoch):
                 self.bridge.release()
                 self.replay_attempts.clear()
+                self.stuck_score = 0
+                self.stuck_notified_at = 0
                 self.last_result = {"status": "interrupted", "reason": "world_transition",
                     "from": [old.scene, old.room], "to": [state.scene, state.room]}
                 self.log("world_transition", {"from_scene": old.scene, "from_room": old.room,
@@ -553,6 +556,8 @@ class Runtime:
             self.last_decision = self.last_result = None
             self.replay_attempts.clear()
             self.replaying_trajectory = False
+            self.stuck_score = 0
+            self.stuck_notified_at = 0
             self._reset_trajectory_trace(game)
             self.recent.clear()
             self.hints.clear()
@@ -670,7 +675,7 @@ class Runtime:
                     await asyncio.sleep(0.25)
                     continue
                 # Do not spend inference calls while an uninterruptible animation/cutscene owns Link.
-                if game.cutscene_active and not game.dialogue.active:
+                if game.cutscene_active and not game.dialogue.active and game.game_over_state == 0:
                     self.bridge.release()
                     await asyncio.sleep(0.15)
                     continue
