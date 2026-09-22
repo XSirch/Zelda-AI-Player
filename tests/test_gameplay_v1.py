@@ -1,11 +1,21 @@
 import pytest
 
 from conftest import packet
-from test_bridge_native import Transport
 from zelda_ai.bridge import Bridge
 from zelda_ai.models import GameState, RunConfig
 from zelda_ai.runtime import Runtime, execute_skill
 from zelda_ai.simulator import DemoProvider
+
+
+class Transport:
+    def __init__(self):
+        self.sent = []
+
+    def sendto(self, data, addr):
+        self.sent.append((data, addr))
+
+    def close(self):
+        pass
 
 
 def with_dialogue(state, **overrides):
