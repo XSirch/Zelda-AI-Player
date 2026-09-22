@@ -20,7 +20,8 @@ class DemoProvider:
         data = json.loads(prompt)
         direction = "right" if (data.get("last_result") or {}).get("status") == "failed" else "forward"
         decision = Decision(goal="Testar o ciclo de controle", summary="Movimento sintético para validar a integração.",
-            skill="move", args=SkillArgs(direction=direction, duration_ms=500, strength=0.5, slot=None, choice_index=None, song=None),
+            skill="move", args=SkillArgs(direction=direction, duration_ms=500, strength=0.5, slot=None, choice_index=None, song=None,
+                target_actor_id=None, target_actor_params=None, target_position=None, stop_distance=None, item_id=None),
             memory_note=None)
         return InferenceResult(decision.model_dump_json(), Usage(input_tokens=0, output_tokens=0,
             cached_input_tokens=0, reasoning_output_tokens=0, cost_usd=0, actual_model="deterministic-demo"))
