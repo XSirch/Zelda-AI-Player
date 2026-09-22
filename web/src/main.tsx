@@ -32,6 +32,20 @@ function Monitor({ game }: { game: GameState | null }) {
     <div className="monitor-foot"><span>{game ? `SCENE ${game.scene} / ROOM ${game.room} / SAMPLE ${game.seq}` : 'AGUARDANDO TELEMETRIA'}</span>{active && <button className="small" onClick={stop}>Desconectar vídeo</button>}</div>{error && <p className="error">{error}</p>}</section>;
 }
 
+function DialoguePanel({ game }: { game: GameState | null }) {
+  const dialogue = game?.dialogue;
+  if (!dialogue?.active) return null;
+  return <section className="panel dialogue-panel">
+    <div className="section-head"><span>DIÁLOGO ATIVO</span><span className="muted">TEXT {dialogue.text_id ?? '—'} · {dialogue.state}</span></div>
+    <div className="dialogue-body">
+      <p className="dialogue-text">{dialogue.text || 'Texto ainda sendo decodificado…'}</p>
+      {dialogue.speaker && <p className="muted">SPEAKER ACTOR {dialogue.speaker.actor_id} · CAT {dialogue.speaker.category} · {number(dialogue.speaker.distance)} u</p>}
+      {dialogue.choices.length > 0 && <ol className="choice-list">{dialogue.choices.map((choice, index) =>
+        <li key={`${dialogue.text_id}-${index}`} className={index === dialogue.choice_index ? 'selected-choice' : ''}>{choice || `Opção ${index + 1}`}</li>)}</ol>}
+    </div>
+  </section>;
+}
+
 function MetricStrip({ metrics }: { metrics: Metrics | null }) {
   const items = [['CHAMADAS', number(metrics?.calls)], ['TOKENS TOTAIS', number(metrics?.total_tokens)], ['CUSTO REGISTRADO', dollars(metrics?.cost_usd)], ['MORTES', number(metrics?.deaths)], ['LATÊNCIA MÉDIA', metrics?.mean_latency_ms == null ? '—' : `${number(metrics.mean_latency_ms / 1000)} s`]];
   return <div className="metrics">{items.map(([label, value]) => <div className="metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>;
@@ -94,7 +108,7 @@ function App() {
       {game?.source === 'simulator' && <div className="notice">MODO SIMULADO — não é gameplay real e não pertence ao benchmark de Zelda.</div>}
       {error && <div role="alert" className="error-banner"><span>{error}</span><button aria-label="Fechar erro" onClick={() => setError('')}>×</button></div>}
       {snap?.reason && <div className="notice">Execução: {snap.reason}</div>}
-      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div></div>
+      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><DialoguePanel game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div><div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div><div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div><div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div><div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div></div>
       <section className="panel"><div className="section-head">03 / DECISÃO E RESULTADO</div><div className="decision"><span className="eyebrow">{snap?.last_decision?.skill ?? 'SEM AÇÃO'}</span><h3>{snap?.last_decision?.goal ?? 'Pronto para uma nova execução'}</h3><p>{snap?.last_decision?.summary ?? 'O modelo recebe um estado compacto e devolve uma decisão estruturada.'}</p>{snap?.last_result && <code>{snap.last_result.status} / {snap.last_result.reason}</code>}</div></section></div>
       <section className="panel controls"><div className="section-head">02 / AGENTE</div><form onSubmit={event => { event.preventDefault(); void action(start); }}>
         <label>Provider<select value={config.provider} onChange={e => update('provider', e.target.value)}><option value="codex">Codex · ChatGPT</option><option value="openrouter">OpenRouter · API</option>{providers.some(p => p.id === 'demo') && <option value="demo">Simulador determinístico</option>}</select></label>
