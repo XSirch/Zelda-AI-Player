@@ -254,7 +254,8 @@ def _door_intent_actor(game: GameState, decision: Decision):
         near = [door for door in doors if math.dist(door.position, (px, py, pz)) <= 180.0]
         return min(near, key=lambda actor: actor.distance) if near else None
 
-    if decision.skill in {"move", "turn", "camera_center", "explore_area"} and len(doors) == 1:
+    explicit_door = bool(tokens & {"door", "porta"})
+    if explicit_door and decision.skill in {"move", "turn", "camera_center", "explore_area"} and len(doors) == 1:
         return doors[0]
     return None
 
@@ -263,10 +264,10 @@ def _traversal_intent_direction(decision: Decision) -> str | None:
     if decision.skill == "traverse":
         return decision.args.direction
     tokens = set(re.findall(r"[a-zà-ÿ]+", f"{decision.goal} {decision.summary}".lower()))
-    if tokens & {"descend", "descending", "down", "lower", "downstairs",
+    if tokens & {"descend", "descending", "down", "downstairs",
                  "descer", "descendo", "baixo", "embaixo"}:
         return "down"
-    if tokens & {"ascend", "ascending", "climb", "up", "upstairs",
+    if tokens & {"ascend", "ascending", "climb", "upstairs",
                  "subir", "subindo", "cima"}:
         return "up"
     return None
@@ -328,13 +329,14 @@ async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameS
                 return {"status": "interrupted", "reason": "gameplay_state_changed", "skill": decision.skill}
 
             vertical = current.player.position[1] - start_y
-            if direction == "down" and vertical <= -35.0 and not current.player.climbing_ladder:
+            grounded = bool(current.player.bg_check_flags & 0x001)
+            if direction == "down" and vertical <= -35.0 and not current.player.climbing_ladder and grounded:
                 return {"status": "completed", "reason": "descended",
                     "vertical_distance": vertical,
                     "distance": math.dist(start_position, current.player.position),
                     "health_lost": max(0, start_health - current.player.health),
                     "acknowledged": acknowledged, "skill": decision.skill}
-            if direction == "up" and vertical >= 35.0 and not current.player.climbing_ladder:
+            if direction == "up" and vertical >= 35.0 and not current.player.climbing_ladder and grounded:
                 return {"status": "completed", "reason": "ascended",
                     "vertical_distance": vertical,
                     "distance": math.dist(start_position, current.player.position),
