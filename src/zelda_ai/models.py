@@ -25,6 +25,11 @@ class StrictModel(BaseModel):
 class PlayerState(StrictModel):
     position: tuple[float, float, float]
     yaw: int = Field(ge=-32768, le=32767)
+    speed_xz: float = 0.0
+    floor_height: float = 0.0
+    wall_yaw: int = Field(default=0, ge=-32768, le=32767)
+    bg_check_flags: int = Field(default=0, ge=0, le=65535)
+    y_dist_to_water: float = 0.0
     health: int = Field(ge=0, le=320)  # Native OoT units: 16 = one heart.
     max_health: int = Field(ge=0, le=320)
     rupees: int = Field(ge=0, le=9999)
