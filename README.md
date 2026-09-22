@@ -12,7 +12,7 @@ Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**
 - OpenRouter por API, catálogo dinâmico, JSON estruturado, reasoning effort quando anunciado e custo efetivamente retornado. Sem retry pago automático.
 - Bridge C++ para SoH: telemetria a 5 Hz por UDP autenticado em localhost, input analógico/botões por leases de até 500 ms, proteção contra replay e comandos de outra cena.
 - Skills básicas: movimento relativo à câmera, A, B, Z, Z+R, C-buttons já equipados e espera. O resultado reporta deslocamento/ACK/dano observado, não inventa acerto de flecha ou vitória.
-- Memória persistente de notas/hipóteses; isolamento por run ou experiência por modelo + effort + versão do contrato. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
+- Memória persistente de notas/hipóteses e trajetórias de navegação. No modo Adaptive, sequências autônomas que conseguem mudar de sala/cena são persistidas por modelo + effort + versão do contrato e reaplicadas localmente em runs futuras antes de gastar outra inferência. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
 
 ## Testar o painel e o ciclo sem jogo ou créditos
 

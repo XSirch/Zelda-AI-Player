@@ -21,8 +21,9 @@ Milestone 0.1, 22/09/2026. Este arquivo distingue implementação, teste e propo
 | Controle C++ com lease | Implementado | Compilado e executado com g++ |
 | Integração SoH/padmgr | Código e instalador implementados | Assinaturas verificadas no upstream; não compilado dentro do SoH |
 | Painel React/Vite | Código implementado | Sintaxe TS/TSX; npm bloqueado por DNS, sem build/typecheck completo/revisão visual |
-| Memória de experiência | Notas persistentes implementadas | Isolamento/deduplicação testados |
-| Mira, navegação e combate adaptativo | Planejados | Não implementados |
+| Memória de experiência | Notas + trajetórias persistentes por modelo/effort | Rotas são promovidas em transições autônomas e reaplicadas localmente; validação real no SoH pendente |
+| Locomoção adaptativa | Giro com feedback de yaw + replay de trajetórias | Implementado; teste real no SoH pendente |
+| Mira, navegação espacial e combate adaptativo | Planejados | Não implementados |
 | Conclusão de dungeons/jogo certificada | Planejada | Sem métrica percentual inventada |
 
 ## Próxima validação local: gate de integração, não uma política de bloqueio
@@ -36,7 +37,7 @@ Milestone 0.1, 22/09/2026. Este arquivo distingue implementação, teste e propo
 
 **M2 — percepção utilizável:** texto de diálogo decodificado, ações contextuais, identificação de atores visíveis com filtro de sala/visibilidade/oclusão, geometria navegável limitada, estado de menus e mapa aprendido. Testes de observabilidade para não vazar puzzles/baús/flags ocultos.
 
-**M3 — controle de longa duração:** feedback de navegação, câmera, mira calibrada de arco/Hookshot, equipar itens via menus, estratégias de combate parametrizadas, logs de acerto/falha e calibração. Skills devem possuir critérios observáveis de sucesso e testes por encontro.
+**M3 — controle de longa duração:** ampliar o replay de trajetórias para navegação espacial com entidades/colisão observáveis, controle explícito de câmera, mira calibrada de arco/Hookshot, equipar itens via menus, estratégias de combate parametrizadas, logs de acerto/falha e calibração. Skills devem possuir critérios observáveis de sucesso e testes por encontro.
 
 **M4 — aprendizado e benchmark certificado:** saves/checkpoints e RNG reproduzíveis, orçamento de treino, memória por modelo, seleção/promoção de skills candidatas em ambiente separado, curvas de aprendizagem, milestones de dungeons e detector de conclusão validado. Não misturar treino, dicas humanas e avaliação cega.
 
@@ -51,3 +52,14 @@ Milestone 0.1, 22/09/2026. Este arquivo distingue implementação, teste e propo
 - Budget local de tokens é verificado entre chamadas; o limite em USD usa reserva estimada. Cancelamentos podem deixar faturamento pendente, que deve ser auditado no provider.
 - Modelos OpenRouter sem JSON estruturado estão desabilitados nesta primeira versão.
 - Não há CI hospedado nem gasto de GitHub Actions; os testes são locais.
+
+
+## Adaptive trajectory learning (22/09/2026)
+
+- `memory_mode=adaptive` é o padrão para novas runs no painel; `isolated` continua disponível para zero-shot/benchmark limpo.
+- O runtime grava até 96 ações locais de navegação e promove a sequência quando ocorre uma mudança válida de scene/room.
+- Rotas são isoladas por provider + modelo + effort + versão do contrato e persistem no SQLite entre runs e reinícios.
+- Antes de gastar uma nova chamada de modelo, o runtime procura uma rota conhecida compatível com scene/room, posição e yaw de spawn e tenta reproduzi-la localmente.
+- Sucessos/falhas de replay alteram a prioridade da rota. Rotas com repetidas falhas deixam de ser selecionadas.
+- Ações que falham são removidas do traço candidato. Dicas humanas e `Assumir controle` invalidam o traço atual para impedir que assistência contamine aprendizado autônomo.
+- O painel MEMÓRIA exibe origem, destino, número de passos, sucessos e falhas das trajetórias.
