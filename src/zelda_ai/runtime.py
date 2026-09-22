@@ -964,6 +964,11 @@ class Runtime:
     async def _handle_dialogue(self, game: GameState) -> bool:
         if not game.dialogue.active:
             return False
+        if game.dialogue.text and (not self.dialogue_transcript or
+                self.dialogue_transcript[-1].get("text") != game.dialogue.text):
+            self.dialogue_transcript.append({"text_id": game.dialogue.text_id,
+                "text": game.dialogue.text, "choices": game.dialogue.choices,
+                "speaker": game.dialogue.speaker.model_dump() if game.dialogue.speaker else None})
         if game.dialogue.choice_count > 0 and game.dialogue.can_advance:
             return False  # A model decision is required for a semantic choice.
         self.bridge.release()
