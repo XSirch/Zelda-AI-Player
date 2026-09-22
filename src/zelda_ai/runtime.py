@@ -78,6 +78,7 @@ SKILL_CATALOG = [
     {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
     {"id": "manipulate_object", "name": "Agarrar/empurrar/puxar objeto observado", "status": "implemented", "version": "2.0"},
     {"id": "explore_area", "name": "Exploração local com colisão e descoberta", "status": "implemented", "version": "2.0"},
+    {"id": "traverse", "name": "Subir/descer escadas, ladders e superfícies escaláveis", "status": "implemented", "version": "3.0"},
     {"id": "gameover_recovery", "name": "Save/continue e respawn automáticos", "status": "implemented", "version": "2.0"},
     {"id": "vision_fallback", "name": "Visão sob demanda após falhas estruturadas", "status": "planned", "version": None},
 ]
