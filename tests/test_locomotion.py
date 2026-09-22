@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import _inventory_slot, _menu_grid_directions, _steer_to, controller_input
+from zelda_ai.runtime import _equipment_point, _inventory_slot, _menu_grid_directions, _steer_to, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -105,3 +105,13 @@ def test_inventory_slot_prefers_semantic_observation(state):
 def test_menu_grid_prefers_axis_toward_target():
     assert _menu_grid_directions(0, 7)[:2] == ["right", "down"]
     assert _menu_grid_directions(23, 0)[:2] == ["left", "up"]
+
+
+def test_equipment_grid_mapping_matches_vanilla_layout():
+    assert _equipment_point(0x3B) == 1   # Kokiri Sword
+    assert _equipment_point(0x3D) == 3   # BGS
+    assert _equipment_point(0x3E) == 5   # Deku Shield
+    assert _equipment_point(0x43) == 11  # Zora Tunic
+    assert _equipment_point(0x45) == 14  # Iron Boots
+    assert _equipment_point(0x46) == 15  # Hover Boots
+    assert _equipment_point(7) is None
