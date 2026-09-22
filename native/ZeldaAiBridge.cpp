@@ -21,6 +21,7 @@
 #include "soh/util.h"
 extern "C" {
 #include "global.h"
+#include "message_data_fmt.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 }
