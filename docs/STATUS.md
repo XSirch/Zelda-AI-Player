@@ -4,7 +4,7 @@ Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementa�
 
 ## Autonomy v2 — gameplay autônomo de longa duração (22/09/2026)
 
-- Contrato `state-v3/skills-v2/trajectory-v2/prompt-v7`: cena nomeada, dia/noite, colisão/água do player, inventário semântico com munição aplicável, progresso/equipamento visível no pause, atores observados com ActorDB, `context_actor` e grafo de mundo aprendido.
+- Contrato `state-v3/skills-v3/trajectory-v2/prompt-v8`: cena nomeada, dia/noite, colisão/água do player, inventário semântico com munição aplicável, progresso/equipamento visível no pause, atores observados com ActorDB, `context_actor` e grafo de mundo aprendido.
 - Diálogo linear é transcrito/autoavançado localmente; somente escolhas semânticas voltam ao modelo. Game-over save/continue também é local.
 - Controladores compostos implementados: `navigate_to`, `approach_actor`, `follow_actor`, `talk_to_actor`, `interact_with_actor`, `explore_area`, `manipulate_object`, `equip_item`, `equip_gear`, `aim_at`, `face_target`, `shield_face` e `fight_enemy`.
 - Navegação usa feedback de posição/câmera e detours em `BGCHECKFLAG_WALL`; mira usa feedback yaw/pitch e calibração de sinal; interações e combate só declaram sucesso com mudança de estado/evento observável quando aplicável.
