@@ -313,22 +313,51 @@ json NavigationProbes(Player* player) {
         for (size_t i = 0; i < ARRAY_COUNT(offsets); ++i) {
             const int16_t yaw = static_cast<int16_t>(player->actor.shape.rot.y + offsets[i]);
             const float radians = static_cast<float>(yaw) * 3.14159265358979323846f / 32768.0f;
-            Vec3f pos = player->actor.world.pos;
-            pos.x += std::sin(radians) * probeDistance;
-            pos.z += std::cos(radians) * probeDistance;
-            pos.y += 180.0f;
+            const float dirX = std::sin(radians);
+            const float dirZ = std::cos(radians);
+
+            Vec3f floorPos = player->actor.world.pos;
+            floorPos.x += dirX * probeDistance;
+            floorPos.z += dirZ * probeDistance;
+            floorPos.y += 180.0f;
             CollisionPoly* floorPoly = nullptr;
-            s32 bgId = BGCHECK_SCENE;
-            const float floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &floorPoly, &bgId, &pos);
-            const bool found = floorPoly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+            s32 floorBgId = BGCHECK_SCENE;
+            const float floorY = BgCheck_EntityRaycastFloor3(
+                &gPlayState->colCtx, &floorPoly, &floorBgId, &floorPos);
+            const bool floorFound = floorPoly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+
+            Vec3f wallStart = player->actor.world.pos;
+            wallStart.y += 26.0f;
+            Vec3f wallEnd = wallStart;
+            wallEnd.x += dirX * probeDistance;
+            wallEnd.z += dirZ * probeDistance;
+            Vec3f wallHitPos{};
+            CollisionPoly* wallPoly = nullptr;
+            s32 wallBgId = BGCHECK_SCENE;
+            const bool wallHit = BgCheck_EntityLineTest1(
+                &gPlayState->colCtx, &wallStart, &wallEnd, &wallHitPos, &wallPoly,
+                true, false, false, true, &wallBgId) != 0;
+            const float wallDistance = wallHit
+                ? std::sqrt(
+                    (wallHitPos.x - wallStart.x) * (wallHitPos.x - wallStart.x) +
+                    (wallHitPos.y - wallStart.y) * (wallHitPos.y - wallStart.y) +
+                    (wallHitPos.z - wallStart.z) * (wallHitPos.z - wallStart.z))
+                : 0.0f;
+            const int wallFlags = wallHit && wallPoly
+                ? SurfaceType_GetWallFlags(&gPlayState->colCtx, wallPoly, wallBgId) : 0;
+
             result.push_back({
                 {"direction", names[i]},
                 {"distance", probeDistance},
-                {"floor_found", found},
-                {"floor_y", found ? json(floorY) : json(nullptr)},
-                {"delta_y", found ? json(floorY - baseFloor) : json(nullptr)},
-                {"floor_type", found ? json(SurfaceType_GetFloorType(&gPlayState->colCtx, floorPoly, bgId))
-                                     : json(nullptr)},
+                {"floor_found", floorFound},
+                {"floor_y", floorFound ? json(floorY) : json(nullptr)},
+                {"delta_y", floorFound ? json(floorY - baseFloor) : json(nullptr)},
+                {"floor_type", floorFound
+                    ? json(SurfaceType_GetFloorType(&gPlayState->colCtx, floorPoly, floorBgId))
+                    : json(nullptr)},
+                {"wall_hit", wallHit},
+                {"wall_distance", wallHit ? json(wallDistance) : json(nullptr)},
+                {"wall_flags", wallFlags},
             });
         }
     }
