@@ -1503,6 +1503,8 @@ class Runtime:
             self.trajectory_trace.pop()
 
     def _learn_transition(self, state: GameState, old: GameState | None):
+        if self.state not in {"running", "paused"}:
+            return
         if not old or not self.config or self.config.memory_mode != "adaptive":
             return
         if old.instance_id != state.instance_id or not old.in_game or not state.in_game:
@@ -1607,7 +1609,7 @@ class Runtime:
             if old:
                 if not old.dialogue.active and state.dialogue.active:
                     self.bridge.release()
-                    entry = {"text_id": state.dialogue.text_id, "text": state.dialogue.text,
+                    entry = {"text_id": state.dialogue.text_id, "text": state.dialogue.text[:1200],
                         "choices": state.dialogue.choices,
                         "speaker": state.dialogue.speaker.model_dump() if state.dialogue.speaker else None}
                     if state.dialogue.text:
@@ -1619,7 +1621,7 @@ class Runtime:
                         old.dialogue.text_id != state.dialogue.text_id or
                         old.dialogue.text != state.dialogue.text or
                         old.dialogue.choice_count != state.dialogue.choice_count):
-                    entry = {"text_id": state.dialogue.text_id, "text": state.dialogue.text,
+                    entry = {"text_id": state.dialogue.text_id, "text": state.dialogue.text[:1200],
                         "choices": state.dialogue.choices,
                         "speaker": state.dialogue.speaker.model_dump() if state.dialogue.speaker else None}
                     if state.dialogue.text and (not self.dialogue_transcript or
@@ -1638,6 +1640,8 @@ class Runtime:
                         self.store.end_segments(self.run_id)
                         self.log("run_completed", {"reason": event.detail, "scene": state.scene,
                             "scene_name": state.scene_name})
+                        if self.task and self.task is not asyncio.current_task():
+                            self.task.cancel()
             if old and old.player and state.player and old.player.health > 0 and state.player.health == 0:
                 self.log("player_died", {"scene": state.scene, "last_skill": self.last_decision})
                 self.store.remember(self.namespace, state.scene,
