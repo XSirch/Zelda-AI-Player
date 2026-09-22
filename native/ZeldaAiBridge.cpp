@@ -294,6 +294,76 @@ const char* ActorCategoryName(uint8_t category) {
     }
 }
 
+json NavigationProbes(Player* player) {
+    static const char* names[] = {
+        "forward", "forward_right", "right", "back_right",
+        "back", "back_left", "left", "forward_left",
+    };
+    static const int16_t offsets[] = {
+        0x0000, 0x2000, 0x4000, 0x6000,
+        static_cast<int16_t>(0x8000), static_cast<int16_t>(0xA000),
+        static_cast<int16_t>(0xC000), static_cast<int16_t>(0xE000),
+    };
+    static const float distances[] = { 70.0f, 140.0f };
+    json result = json::array();
+    if (!player) return result;
+
+    const float baseFloor = player->actor.floorHeight;
+    for (float probeDistance : distances) {
+        for (size_t i = 0; i < ARRAY_COUNT(offsets); ++i) {
+            const int16_t yaw = static_cast<int16_t>(player->actor.shape.rot.y + offsets[i]);
+            const float radians = static_cast<float>(yaw) * 3.14159265358979323846f / 32768.0f;
+            const float dirX = std::sin(radians);
+            const float dirZ = std::cos(radians);
+
+            Vec3f floorPos = player->actor.world.pos;
+            floorPos.x += dirX * probeDistance;
+            floorPos.z += dirZ * probeDistance;
+            floorPos.y += 180.0f;
+            CollisionPoly* floorPoly = nullptr;
+            s32 floorBgId = BGCHECK_SCENE;
+            const float floorY = BgCheck_EntityRaycastFloor3(
+                &gPlayState->colCtx, &floorPoly, &floorBgId, &floorPos);
+            const bool floorFound = floorPoly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+
+            Vec3f wallStart = player->actor.world.pos;
+            wallStart.y += 26.0f;
+            Vec3f wallEnd = wallStart;
+            wallEnd.x += dirX * probeDistance;
+            wallEnd.z += dirZ * probeDistance;
+            Vec3f wallHitPos{};
+            CollisionPoly* wallPoly = nullptr;
+            s32 wallBgId = BGCHECK_SCENE;
+            const bool wallHit = BgCheck_EntityLineTest1(
+                &gPlayState->colCtx, &wallStart, &wallEnd, &wallHitPos, &wallPoly,
+                true, false, false, true, &wallBgId) != 0;
+            const float wallDistance = wallHit
+                ? std::sqrt(
+                    (wallHitPos.x - wallStart.x) * (wallHitPos.x - wallStart.x) +
+                    (wallHitPos.y - wallStart.y) * (wallHitPos.y - wallStart.y) +
+                    (wallHitPos.z - wallStart.z) * (wallHitPos.z - wallStart.z))
+                : 0.0f;
+            const int wallFlags = wallHit && wallPoly
+                ? SurfaceType_GetWallFlags(&gPlayState->colCtx, wallPoly, wallBgId) : 0;
+
+            result.push_back({
+                {"direction", names[i]},
+                {"distance", probeDistance},
+                {"floor_found", floorFound},
+                {"floor_y", floorFound ? json(floorY) : json(nullptr)},
+                {"delta_y", floorFound ? json(floorY - baseFloor) : json(nullptr)},
+                {"floor_type", floorFound
+                    ? json(SurfaceType_GetFloorType(&gPlayState->colCtx, floorPoly, floorBgId))
+                    : json(nullptr)},
+                {"wall_hit", wallHit},
+                {"wall_distance", wallHit ? json(wallDistance) : json(nullptr)},
+                {"wall_flags", wallFlags},
+            });
+        }
+    }
+    return result;
+}
+
 json ActorJson(Actor* actor, Player* player) {
     if (!actor || !player) return nullptr;
     std::string actorName;
@@ -547,6 +617,7 @@ void Snapshot() {
         {"room_actors", json::array()},
         {"room_actor_count", 0},
         {"room_actors_truncated", false},
+        {"navigation_probes", json::array()},
         {"cutscene_active", false},
         {"paused", false},
         {"events", bridge.events},
@@ -625,6 +696,16 @@ void Snapshot() {
                 {"floor_height", player->actor.floorHeight},
                 {"wall_yaw", player->actor.wallYaw},
                 {"bg_check_flags", player->actor.bgCheckFlags},
+                {"wall_flags", player->actor.wallPoly
+                    ? SurfaceType_GetWallFlags(&gPlayState->colCtx, player->actor.wallPoly, player->actor.wallBgId) : 0},
+                {"state_flags_1", player->stateFlags1},
+                {"state_flags_2", player->stateFlags2},
+                {"climbing_ladder", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) != 0},
+                {"hanging_ledge", (player->stateFlags1 & PLAYER_STATE1_HANGING_OFF_LEDGE) != 0},
+                {"climbing_ledge", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LEDGE) != 0},
+                {"can_climb", (player->stateFlags2 & PLAYER_STATE2_DO_ACTION_CLIMB) != 0},
+                {"can_down", (player->stateFlags2 & PLAYER_STATE2_DO_ACTION_DOWN) != 0 ||
+                    (player->stateFlags1 & (PLAYER_STATE1_HANGING_OFF_LEDGE | PLAYER_STATE1_CLIMBING_LADDER)) != 0},
                 {"y_dist_to_water", player->actor.yDistToWater},
                 {"health", gSaveContext.health},
                 {"max_health", gSaveContext.healthCapacity},
@@ -648,6 +729,7 @@ void Snapshot() {
             state["room_actors"] = roomActors["actors"];
             state["room_actor_count"] = roomActors["count"];
             state["room_actors_truncated"] = roomActors["truncated"];
+            state["navigation_probes"] = NavigationProbes(player);
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
             state["equipped"] = json::array();

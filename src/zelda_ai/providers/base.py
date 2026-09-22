@@ -16,10 +16,10 @@ Implemented skills:
 - continue_gameover(A) when the game-over flow is waiting for confirmation
 - play_song(song) after an ocarina has already been activated; the executor sends the complete learned note sequence
 - navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate; use 4000-8000 ms for room-scale travel
-- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
+- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks an observed current-room actor; use 3000-8000 ms
 - follow_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a moving observed actor for a bounded window; useful for races/guides
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
-- interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
+- interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; doors use a dedicated face → camera-center → straight approach → A controller to avoid orbiting; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
 - equip_gear(item_id): equips an owned sword/shield/tunic/boots on the Equipment page and verifies progress.equipment[].equipped
 - aim_at(C slot, target_actor_id or target_position): holds an equipped ranged item, feedback-aligns camera yaw/pitch and releases a shot; alignment is success, a hit is NOT assumed
@@ -28,6 +28,7 @@ Implemented skills:
 - fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
 - explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger; wall recovery backs away before turning
+- traverse(up/down): local terrain traversal for stairs, drops, ladders and climbable surfaces. It uses player ladder/ledge state plus navigation_probes and monitors real vertical progress
 
 The state contract includes scene + scene_name, room, entrance_index, day_time/is_night, player pose/collision state, camera,
 raw inventory/equipment plus inventory_named entries (name/item_id/ammo when applicable) for items Link owns, pause-menu cursor state,
@@ -36,8 +37,11 @@ owned equipment, upgrades, current dungeon map/compass/boss key/small keys), con
 plus context_actor when the engine associates that action with a specific actor, current target actor,
 nearby_actors (small rendered/proximity subset), and room_actors: the active actor list for the current room
 plus room-global actors, independent of camera rendering. room_actor_count reports the eligible active count and
-room_actors_truncated says whether the 64-entry safety cap was reached. This is current engine state, not a hidden
-future-world list: actors from unloaded rooms/scenes are not exposed.
+room_actors_truncated says whether the 64-entry safety cap was reached. player also exposes wall_flags and traversal
+state (climbing_ladder, hanging_ledge, climbing_ledge, can_climb, can_down). navigation_probes samples floor height
+around Link in eight directions at two radii; delta_y is relative to Link's current floor and lets you detect stairs,
+safe drops and changes in elevation that are not actors. This is current engine state, not a hidden future-world list:
+actors from unloaded rooms/scenes are not exposed.
 
 Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
 calling you. If dialogue.active has dialogue.choice_count > 0, read the transcript/current text and use
@@ -60,8 +64,14 @@ Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is 
 and room_actors to ground interactions; use nearby_actors only as the compact rendered/proximity subset.
 Each actor now includes category_name and room as well as numeric category/id/params. Doors can therefore be
 identified directly with category_name="door" (numeric category 10), and chests with category_name="chest".
-In an interior where the objective requires leaving or continuing, inspect room_actors first and prefer
-interact_with_actor on an observed door instead of probing walls blindly.
+In an interior where the objective requires leaving or continuing, inspect room_actors first. If a door
+is observed, call interact_with_actor on that door DIRECTLY. Do not use explore_area, navigate_to the door's
+position, approach_actor repeatedly, or free turn/move probes first: the door-specific controller owns facing,
+camera centering, straight-line approach and the A press. Replan only if that controller returns a real failure.
+For vertical movement, do not search for a ladder actor first: ladders/stairs can be collision geometry. If the goal
+is to go lower or higher, use traverse(down/up) directly. The traversal controller consumes navigation_probes and
+ladder/ledge state locally. If Link is already climbing a ladder, down/up stick is handled continuously without
+another model call. Do not press A repeatedly on a ladder; in OoT A may dismount/drop rather than climb.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 

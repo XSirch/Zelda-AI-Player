@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import _aim_error, _aim_stick, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, controller_input
+from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -108,6 +108,86 @@ def test_local_servo_steers_right_when_target_is_camera_right(state):
     x, y, _ = _steer_to(game, (100.0, 0.0, 0.0), 0.8)
     assert x > 0
     assert abs(y) <= 1
+
+
+def test_explicit_exit_intent_promotes_unique_room_door(state):
+    door = {"actor_id": 9, "name": "En_Door", "description": "Door", "category": 10,
+        "category_name": "door", "room": 0, "params": 2, "position": [120, 0, 0],
+        "focus_position": [0, 0, 0], "distance": 120.0, "targeted": False,
+        "drawn": False, "text_id": 0}
+    game = type(state).model_validate({**state.model_dump(), "room_actors": [door],
+        "room_actor_count": 1})
+    exit_move = decision("move", "forward").model_copy(update={
+        "goal": "Exit the room through the door",
+        "summary": "Leave this interior now.",
+    })
+    assert _door_intent_actor(game, exit_move).actor_id == 9
+
+    ordinary_move = decision("move", "forward").model_copy(update={
+        "goal": "Explore the center of the room",
+        "summary": "Move toward open floor.",
+    })
+    assert _door_intent_actor(game, ordinary_move) is None
+
+
+def test_navigate_to_door_coordinate_promotes_only_with_exit_intent(state):
+    door = {"actor_id": 9, "name": "En_Door", "description": "Door", "category": 10,
+        "category_name": "door", "room": 0, "params": 2, "position": [120, 0, 0],
+        "focus_position": [0, 0, 0], "distance": 120.0, "targeted": False,
+        "drawn": False, "text_id": 0}
+    game = type(state).model_validate({**state.model_dump(), "room_actors": [door],
+        "room_actor_count": 1})
+    nav = decision("navigate_to", None, duration=5000, target_position=[130, 0, 5],
+        stop_distance=35).model_copy(update={
+            "goal": "Reach the exit door",
+            "summary": "Navigate to the door.",
+        })
+    assert _door_intent_actor(game, nav).actor_id == 9
+
+
+def test_traversal_intent_detects_down_without_center_enter_false_positive(state):
+    down = decision("move", "forward").model_copy(update={
+        "goal": "Descend the ladder",
+        "summary": "Go down to the lower level.",
+    })
+    assert _traversal_intent_direction(down) == "down"
+
+    center = decision("move", "forward").model_copy(update={
+        "goal": "Explore the center of the platform",
+        "summary": "Move toward center.",
+    })
+    assert _traversal_intent_direction(center) is None
+    assert _door_intent_actor(state, center) is None
+
+
+def test_ladder_top_probe_is_preferred_for_descent(state):
+    game = type(state).model_validate({**state.model_dump(), "navigation_probes": [
+        {"direction": "left", "distance": 70, "floor_found": False,
+         "wall_hit": True, "wall_distance": 42, "wall_flags": 0x02},
+        {"direction": "forward_right", "distance": 70, "floor_found": False,
+         "wall_hit": True, "wall_distance": 55, "wall_flags": 0x04},
+        {"direction": "forward", "distance": 70, "floor_found": True,
+         "floor_y": -90, "delta_y": -90, "floor_type": 0,
+         "wall_hit": False, "wall_distance": None, "wall_flags": 0},
+    ]})
+    probe = _best_climb_surface_probe(game, "down")
+    assert probe is not None
+    assert probe.direction == "forward_right"
+    assert probe.wall_flags & 0x04
+
+
+def test_traversal_probe_prefers_modest_safe_descent(state):
+    game = type(state).model_validate({**state.model_dump(), "navigation_probes": [
+        {"direction": "forward", "distance": 70, "floor_found": True,
+         "floor_y": -35, "delta_y": -35, "floor_type": 0},
+        {"direction": "right", "distance": 70, "floor_found": True,
+         "floor_y": -200, "delta_y": -200, "floor_type": 0},
+        {"direction": "back", "distance": 140, "floor_found": True,
+         "floor_y": 0, "delta_y": 0, "floor_type": 0},
+    ]})
+    probe = _best_traversal_probe(game, "down")
+    assert probe is not None
+    assert probe.direction == "forward"
 
 
 def test_matching_actor_uses_off_camera_room_actor(state):

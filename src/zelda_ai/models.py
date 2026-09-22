@@ -15,7 +15,7 @@ Skill = Literal[
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
     "navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
     "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-    "fight_enemy", "explore_area", "manipulate_object",
+    "fight_enemy", "explore_area", "manipulate_object", "traverse",
 ]
 
 
@@ -31,6 +31,14 @@ class PlayerState(StrictModel):
     wall_yaw: int = Field(default=0, ge=-32768, le=32767)
     bg_check_flags: int = Field(default=0, ge=0, le=65535)
     y_dist_to_water: float = 0.0
+    wall_flags: int = Field(default=0, ge=0, le=65535)
+    state_flags_1: int = Field(default=0, ge=0, le=4294967295)
+    state_flags_2: int = Field(default=0, ge=0, le=4294967295)
+    climbing_ladder: bool = False
+    hanging_ledge: bool = False
+    climbing_ledge: bool = False
+    can_climb: bool = False
+    can_down: bool = False
     health: int = Field(ge=0, le=320)  # Native OoT units: 16 = one heart.
     max_health: int = Field(ge=0, le=320)
     rupees: int = Field(ge=0, le=9999)
@@ -43,6 +51,19 @@ class InventoryObservation(StrictModel):
     item_id: int = Field(ge=0, le=255)
     name: str = Field(min_length=1, max_length=96)
     ammo: int | None = Field(default=None, ge=-1, le=127)
+
+
+class NavigationProbe(StrictModel):
+    direction: Literal["forward", "forward_right", "right", "back_right",
+        "back", "back_left", "left", "forward_left"]
+    distance: float = Field(gt=0, le=500)
+    floor_found: bool = False
+    floor_y: float | None = None
+    delta_y: float | None = None
+    floor_type: int | None = Field(default=None, ge=0, le=255)
+    wall_hit: bool = False
+    wall_distance: float | None = Field(default=None, ge=0, le=500)
+    wall_flags: int = Field(default=0, ge=0, le=65535)
 
 
 class ActorObservation(StrictModel):
@@ -167,6 +188,7 @@ class GameState(StrictModel):
     room_actors: list[ActorObservation] = Field(default_factory=list, max_length=64)
     room_actor_count: int = Field(default=0, ge=0, le=4096)
     room_actors_truncated: bool = False
+    navigation_probes: list[NavigationProbe] = Field(default_factory=list, max_length=16)
     cutscene_active: bool = False
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=16)
@@ -213,10 +235,12 @@ class Decision(StrictModel):
 
     @model_validator(mode="after")
     def skill_arguments(self):
-        if self.skill in {"move", "turn", "sidestep", "menu_move"} and self.args.direction is None:
+        if self.skill in {"move", "turn", "sidestep", "menu_move", "traverse"} and self.args.direction is None:
             raise ValueError(f"{self.skill} requires direction")
         if self.skill == "move" and self.args.direction not in {"forward", "back", "left", "right"}:
             raise ValueError("move requires forward, back, left or right")
+        if self.skill == "traverse" and self.args.direction not in {"up", "down"}:
+            raise ValueError("traverse requires up or down")
         if self.skill in {"turn", "sidestep"} and self.args.direction not in {"left", "right"}:
             raise ValueError(f"{self.skill} requires left or right")
         if self.skill == "menu_move" and self.args.direction not in {"up", "down", "left", "right"}:
@@ -229,7 +253,7 @@ class Decision(StrictModel):
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill not in {"navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
                               "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-                              "fight_enemy", "explore_area", "manipulate_object"} and self.args.duration_ms > 2000:
+                              "fight_enemy", "explore_area", "manipulate_object", "traverse"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")

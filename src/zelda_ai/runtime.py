@@ -6,6 +6,7 @@ import contextlib
 import hashlib
 import json
 import math
+import re
 import time
 from collections import deque
 
@@ -17,14 +18,14 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v3/skills-v2/trajectory-v2/prompt-v7"
+CONTRACT_VERSION = "state-v3/skills-v3/trajectory-v2/prompt-v8"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "START": 0x1000, "R": 0x0010,
     "C_UP": 0x0008, "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
 MENU_SKILLS = {"pause_toggle", "menu_move", "menu_confirm", "menu_cancel", "menu_assign",
     "continue_gameover", "equip_item", "equip_gear"}
 NAVIGATION_SKILLS = {"move", "turn", "interact", "wait", "camera_center", "roll", "backflip", "sidestep",
-    "navigate_to", "approach_actor", "interact_with_actor"}
+    "navigate_to", "approach_actor", "interact_with_actor", "traverse"}
 SONG_IDS = {"minuet": 0, "bolero": 1, "serenade": 2, "requiem": 3, "nocturne": 4, "prelude": 5,
     "sarias": 6, "eponas": 7, "lullaby": 8, "suns": 9, "time": 10, "storms": 11}
 SONG_NOTES = {
@@ -77,6 +78,7 @@ SKILL_CATALOG = [
     {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
     {"id": "manipulate_object", "name": "Agarrar/empurrar/puxar objeto observado", "status": "implemented", "version": "2.0"},
     {"id": "explore_area", "name": "Exploração local com colisão e descoberta", "status": "implemented", "version": "2.0"},
+    {"id": "traverse", "name": "Subir/descer escadas, ladders e superfícies escaláveis", "status": "implemented", "version": "3.0"},
     {"id": "gameover_recovery", "name": "Save/continue e respawn automáticos", "status": "implemented", "version": "2.0"},
     {"id": "vision_fallback", "name": "Visão sob demanda após falhas estruturadas", "status": "planned", "version": None},
 ]
@@ -223,6 +225,399 @@ def _matching_actor(game: GameState, actor_id: int, params: int | None):
     matches = [actor for actor in candidates
         if actor.actor_id == actor_id and (params is None or actor.params == params)]
     return min(matches, key=lambda actor: actor.distance) if matches else None
+
+
+def _is_door_actor(actor) -> bool:
+    return actor is not None and (actor.category == 10 or actor.category_name == "door")
+
+
+def _door_intent_actor(game: GameState, decision: Decision):
+    doors = [actor for actor in game.room_actors if _is_door_actor(actor)]
+    if not doors:
+        return None
+
+    if decision.args.target_actor_id is not None:
+        target = _matching_actor(game, decision.args.target_actor_id, decision.args.target_actor_params)
+        if _is_door_actor(target):
+            return target
+
+    tokens = set(re.findall(r"[a-zà-ÿ]+", f"{decision.goal} {decision.summary}".lower()))
+    exit_intent = bool(tokens & {
+        "door", "exit", "leave", "outside", "entrance", "enter",
+        "porta", "sair", "saída", "saida", "entrada",
+    })
+    if not exit_intent:
+        return None
+
+    if decision.skill == "navigate_to" and decision.args.target_position is not None:
+        px, py, pz = decision.args.target_position
+        near = [door for door in doors if math.dist(door.position, (px, py, pz)) <= 180.0]
+        return min(near, key=lambda actor: actor.distance) if near else None
+
+    explicit_door = bool(tokens & {"door", "porta"})
+    if explicit_door and decision.skill in {"move", "turn", "camera_center", "explore_area"} and len(doors) == 1:
+        return doors[0]
+    return None
+
+
+def _traversal_intent_direction(decision: Decision) -> str | None:
+    if decision.skill == "traverse":
+        return decision.args.direction
+    tokens = set(re.findall(r"[a-zà-ÿ]+", f"{decision.goal} {decision.summary}".lower()))
+    if tokens & {"descend", "descending", "down", "downstairs",
+                 "descer", "descendo", "baixo", "embaixo"}:
+        return "down"
+    if tokens & {"ascend", "ascending", "climb", "upstairs",
+                 "subir", "subindo", "cima"}:
+        return "up"
+    return None
+
+
+def _probe_stick(direction: str) -> tuple[int, int]:
+    scale = 48
+    diagonal = 36
+    return {
+        "forward": (0, scale),
+        "forward_right": (diagonal, diagonal),
+        "right": (scale, 0),
+        "back_right": (diagonal, -diagonal),
+        "back": (0, -scale),
+        "back_left": (-diagonal, -diagonal),
+        "left": (-scale, 0),
+        "forward_left": (-diagonal, diagonal),
+    }[direction]
+
+
+def _best_traversal_probe(game: GameState, direction: str):
+    probes = [p for p in game.navigation_probes if p.floor_found and p.delta_y is not None]
+    if direction == "down":
+        candidates = [p for p in probes if -240.0 <= p.delta_y <= -8.0]
+        if not candidates:
+            return None
+        # Prefer a modest safe descent over the largest drop; stairs/ladder landings win naturally.
+        return min(candidates, key=lambda p: (abs(p.delta_y + 45.0), p.distance))
+    candidates = [p for p in probes if 8.0 <= p.delta_y <= 120.0]
+    if not candidates:
+        return None
+    return min(candidates, key=lambda p: (p.delta_y, p.distance))
+
+
+def _best_climb_surface_probe(game: GameState, direction: str):
+    # OoT wall flags: LADDER=0x02, LADDER_TOP=0x04, CLIMBABLE=0x08.
+    candidates = [p for p in game.navigation_probes
+        if p.wall_hit and p.wall_distance is not None and (p.wall_flags & 0x0E)]
+    if direction == "down":
+        tops = [p for p in candidates if p.wall_flags & 0x04]
+        if tops:
+            return min(tops, key=lambda p: (p.wall_distance, p.distance))
+        ladders = [p for p in candidates if p.wall_flags & 0x02]
+        return min(ladders, key=lambda p: (p.wall_distance, p.distance)) if ladders else None
+    climbable = [p for p in candidates if p.wall_flags & (0x02 | 0x08)]
+    return min(climbable, key=lambda p: (p.wall_distance, p.distance)) if climbable else None
+
+
+async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameState,
+                          direction: str) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    start_y = before.player.position[1]
+    start_position = before.player.position
+    start_health = before.player.health
+    deadline = time.monotonic() + min(10.0, max(2.0, decision.args.duration_ms / 1000))
+    acknowledged = False
+    probe_attempts = 0
+    last_probe = None
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "completed", "reason": "world_changed_during_traversal",
+                    "direction": direction, "acknowledged": acknowledged, "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+                return {"status": "interrupted", "reason": "gameplay_state_changed", "skill": decision.skill}
+
+            vertical = current.player.position[1] - start_y
+            grounded = bool(current.player.bg_check_flags & 0x001)
+            if direction == "down" and vertical <= -35.0 and not current.player.climbing_ladder and grounded:
+                return {"status": "completed", "reason": "descended",
+                    "vertical_distance": vertical,
+                    "distance": math.dist(start_position, current.player.position),
+                    "health_lost": max(0, start_health - current.player.health),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if direction == "up" and vertical >= 35.0 and not current.player.climbing_ladder and grounded:
+                return {"status": "completed", "reason": "ascended",
+                    "vertical_distance": vertical,
+                    "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            # Once latched to a ladder, vertical stick is the reliable control. Do not press A:
+            # in OoT A can dismount/drop instead of climbing.
+            if current.player.climbing_ladder:
+                stick_y = -58 if direction == "down" else 58
+                command_id = bridge.send(stick_y=stick_y, lease_ms=300)
+                await asyncio.sleep(0.26)
+                bridge.release()
+                await asyncio.sleep(0.05)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                continue
+
+            # Hanging at a ledge while descending: A-button "Down" releases to the lower surface.
+            if direction == "down" and current.player.hanging_ledge and current.context_action.label == "down":
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=100, settle_s=0.12)
+                continue
+
+            surface_probe = _best_climb_surface_probe(current, direction)
+            if surface_probe is not None and not current.player.climbing_ladder:
+                # Unlike floor deltas, this is direct collision-surface evidence of a ladder/climb wall.
+                # Center behind Link, then move toward the probed surface until OoT latches the climb state.
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=70, settle_s=0.04)
+                stick_x, stick_y = _probe_stick(surface_probe.direction)
+                command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=220)
+                await asyncio.sleep(0.20)
+                bridge.release()
+                await asyncio.sleep(0.08)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                last_probe = surface_probe.direction
+                probe_attempts += 1
+                if sample and sample.player and sample.player.climbing_ladder:
+                    continue
+                # A climbable wall approached from below may require the explicit Climb affordance.
+                if direction == "up" and sample and sample.player and (
+                        sample.player.can_climb or sample.context_action.label == "climb"):
+                    acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=100, settle_s=0.08)
+                continue
+
+            # At a LADDER_TOP wall, OoT attaches Link by moving into the wall; A would be the wrong input.
+            if direction == "down" and (current.player.wall_flags & 0x04):
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=70, settle_s=0.04)
+                command_id = bridge.send(stick_y=50, lease_ms=220)
+                await asyncio.sleep(0.20)
+                bridge.release()
+                await asyncio.sleep(0.08)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                continue
+
+            # A climb affordance is explicit engine evidence. Start it only for upward traversal.
+            if direction == "up" and (current.player.can_climb or current.context_action.label == "climb"):
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=110, settle_s=0.10)
+                continue
+
+            probe = _best_traversal_probe(current, direction)
+            if probe is None:
+                # If touching a ladder/climbable wall but not attached, upward A can latch it.
+                if direction == "up" and (current.player.wall_flags & 0x0E):
+                    acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=110, settle_s=0.10)
+                    continue
+                return {"status": "failed", "reason": "no_traversal_affordance_observed",
+                    "direction": direction, "vertical_distance": vertical,
+                    "probe_attempts": probe_attempts, "acknowledged": acknowledged, "skill": decision.skill}
+
+            last_probe = probe.direction
+            # Z puts the camera behind Link so the relative terrain probe maps predictably to the stick.
+            acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=80, settle_s=0.06)
+            stick_x, stick_y = _probe_stick(probe.direction)
+            # Approach drops cautiously; stairs can be traversed continuously but ledges should be probed.
+            hold_ms = 260 if abs(probe.delta_y or 0) <= 70 else 180
+            command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=hold_ms)
+            await asyncio.sleep(hold_ms / 1000)
+            bridge.release()
+            await asyncio.sleep(0.08)
+            sample = bridge.state
+            acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+            probe_attempts += 1
+
+            if sample and sample.player and start_health - sample.player.health >= 16:
+                return {"status": "failed", "reason": "descent_caused_damage",
+                    "direction": direction, "health_lost": start_health - sample.player.health,
+                    "vertical_distance": sample.player.position[1] - start_y,
+                    "probe": last_probe, "acknowledged": acknowledged, "skill": decision.skill}
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    vertical = after.player.position[1] - start_y if after and after.player else 0.0
+    progressed = (direction == "down" and vertical <= -20.0) or (direction == "up" and vertical >= 20.0)
+    return {"status": "completed" if progressed else "failed",
+        "reason": "traversal_progress" if progressed else "traversal_timeout",
+        "direction": direction, "vertical_distance": vertical, "probe": last_probe,
+        "probe_attempts": probe_attempts, "acknowledged": acknowledged, "skill": decision.skill}
+
+
+def _as_door_interaction(decision: Decision, door) -> Decision:
+    args = decision.args.model_copy(update={
+        "target_actor_id": door.actor_id,
+        "target_actor_params": door.params,
+        "target_position": None,
+        "stop_distance": None,
+        "duration_ms": max(5000, decision.args.duration_ms),
+    })
+    return Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "interact_with_actor",
+        "summary": f"Use dedicated door controller: {decision.summary}"[:280],
+        "args": args.model_dump(),
+    })
+
+
+async def _wait_interaction_evidence(bridge: Bridge, observation: GameState, before_event_ids: set[str],
+                                     timeout_s: float = 1.5) -> tuple[str | None, dict]:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        sample = bridge.state
+        if not sample:
+            await asyncio.sleep(0.06)
+            continue
+        if (sample.instance_id, sample.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+            return "world_transition_after_interaction", {}
+        if sample.dialogue.active:
+            return "dialogue_opened", {}
+        if sample.cutscene_active:
+            return "interaction_started", {}
+        outcome = next((event for event in sample.events
+            if event.id not in before_event_ids and event.kind in {
+                "item_received", "scene_flag_set", "scene_flag_unset"}), None)
+        if outcome is not None:
+            return outcome.kind, {"detail": outcome.detail}
+        await asyncio.sleep(0.06)
+    return None, {}
+
+
+async def _interact_with_door(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    """Door-specific servo: face the door, center camera, approach straight, then press A."""
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    actor = _matching_actor(before, decision.args.target_actor_id, decision.args.target_actor_params)
+    if not _is_door_actor(actor):
+        return {"status": "failed", "reason": "target_is_not_door", "skill": decision.skill}
+
+    start_position = before.player.position
+    deadline = time.monotonic() + min(8.0, max(2.0, decision.args.duration_ms / 1000))
+    acknowledged = False
+    attempts = 0
+    best_distance = actor.distance
+    turn_sign = 1
+    turn_flipped = False
+    previous_yaw_error = None
+
+    try:
+        while time.monotonic() < deadline and attempts < 8:
+            current = bridge.state
+            if not current or not bridge.connected:
+                raise RuntimeError("bridge_disconnected")
+            if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
+                return {"status": "completed", "reason": "world_transition_after_interaction",
+                    "distance": math.dist(start_position, current.player.position) if current.player else None,
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            if not current.in_game or not current.player:
+                return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+            if current.paused or current.dialogue.active or current.cutscene_active or current.game_over_state != 0:
+                return {"status": "completed" if (current.dialogue.active or current.cutscene_active) else "interrupted",
+                    "reason": "interaction_started" if (current.dialogue.active or current.cutscene_active)
+                        else "gameplay_state_changed",
+                    "acknowledged": acknowledged, "skill": decision.skill}
+
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params)
+            if actor is None:
+                return {"status": "failed", "reason": "door_actor_not_observed", "skill": decision.skill}
+
+            before_event_ids = {event.id for event in current.events}
+            context_matches = bool(current.context_actor and
+                current.context_actor.actor_id == actor.actor_id and
+                (decision.args.target_actor_params is None or current.context_actor.params == actor.params))
+            if current.context_action.label in {"open", "enter"} and context_matches:
+                acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=120, settle_s=0.05)
+                evidence, extra = await _wait_interaction_evidence(
+                    bridge, observation, before_event_ids, timeout_s=1.6)
+                if evidence:
+                    return {"status": "completed", "reason": evidence, "target_distance": actor.distance,
+                        "distance": math.dist(start_position, (bridge.state or current).player.position)
+                            if (bridge.state or current).player else None,
+                        "acknowledged": acknowledged, "skill": decision.skill, **extra}
+
+            # Do not use camera-relative orbiting near a wall-mounted target. First make Link face it
+            # using native yaw feedback, then put the camera behind Link and advance on a straight line.
+            desired_yaw = _yaw_to_target(current.player.position, actor.position)
+            yaw_error = _yaw_error_units(current.player.yaw, desired_yaw)
+            abs_yaw_error = abs(yaw_error)
+            if (previous_yaw_error is not None and abs_yaw_error > previous_yaw_error + 350 and not turn_flipped:
+                # Camera/control sign can be inverted by the current view. Calibrate once from observed yaw feedback.
+                turn_sign *= -1
+                turn_flipped = True
+            previous_yaw_error = abs_yaw_error
+
+            if abs_yaw_error > 1200:
+                magnitude = max(32, min(66, round(abs_yaw_error / 260)))
+                stick_x = magnitude * (1 if yaw_error > 0 else -1) * turn_sign
+                command_id = bridge.send(stick_x=stick_x, stick_y=8, lease_ms=180)
+                await asyncio.sleep(0.18)
+                bridge.release()
+                await asyncio.sleep(0.06)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                attempts += 1
+                continue
+
+            acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=90, settle_s=0.07)
+            current = bridge.state or current
+            actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params) or actor
+
+            if actor.distance <= 115.0:
+                # A slight forward bias helps the engine establish doorActor/context action on the final step.
+                command_id = bridge.send(buttons=BUTTONS["A"], stick_y=24, lease_ms=180)
+                await asyncio.sleep(0.18)
+                bridge.release()
+                await asyncio.sleep(0.05)
+                sample = bridge.state
+                acknowledged |= bool(sample and sample.last_command_seq >= command_id)
+                evidence, extra = await _wait_interaction_evidence(
+                    bridge, observation, before_event_ids, timeout_s=1.4)
+                if evidence:
+                    return {"status": "completed", "reason": evidence, "target_distance": actor.distance,
+                        "distance": math.dist(start_position, (bridge.state or current).player.position)
+                            if (bridge.state or current).player else None,
+                        "acknowledged": acknowledged, "skill": decision.skill, **extra}
+
+            # Straight approach after Z-centering; this intentionally avoids lateral steering/orbiting.
+            hold_ms = 220 if actor.distance > 180 else 140
+            command_id = bridge.send(stick_x=0, stick_y=56, lease_ms=hold_ms)
+            await asyncio.sleep(hold_ms / 1000)
+            bridge.release()
+            await asyncio.sleep(0.06)
+            sample = bridge.state
+            if sample:
+                acknowledged |= sample.last_command_seq >= command_id
+                updated = _matching_actor(sample, decision.args.target_actor_id, decision.args.target_actor_params)
+                if updated:
+                    if updated.distance + 3.0 < best_distance:
+                        best_distance = updated.distance
+                        previous_yaw_error = None
+                        turn_flipped = False
+                        turn_sign = 1
+                    elif updated.distance >= best_distance - 1.0 and attempts >= 3:
+                        # Create a little clearance and retry the face/center/straight sequence.
+                        recovery = await _backtrack_recovery(bridge, sample, attempts)
+                        acknowledged |= recovery["acknowledged"]
+            attempts += 1
+    finally:
+        bridge.release()
+
+    after = bridge.state
+    return {"status": "failed", "reason": "door_interaction_no_transition",
+        "target_distance": (_matching_actor(after, decision.args.target_actor_id,
+            decision.args.target_actor_params).distance if after and
+            _matching_actor(after, decision.args.target_actor_id, decision.args.target_actor_params) else None),
+        "distance": math.dist(start_position, after.player.position) if after and after.player else None,
+        "attempts": attempts, "acknowledged": acknowledged, "skill": decision.skill}
 
 
 def _steer_to(game: GameState, target: tuple[float, float, float], strength: float) -> tuple[int, int, float]:
@@ -1390,6 +1785,26 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         return {"status": "stale", "reason": "world_changed_during_inference", "skill": decision.skill}
     if not before.in_game:
         return {"status": "stale", "reason": "game_not_ready", "skill": decision.skill}
+
+    door = _door_intent_actor(before, decision)
+    if door is not None and decision.skill != "interact_with_actor":
+        requested_skill = decision.skill
+        promoted = _as_door_interaction(decision, door)
+        result = await _interact_with_door(bridge, promoted, observation)
+        result["requested_skill"] = requested_skill
+        result["door_intent_promoted"] = True
+        return result
+
+    traversal_direction = _traversal_intent_direction(decision)
+    if decision.skill == "traverse":
+        return await _traverse_local(bridge, decision, observation, traversal_direction)
+    if traversal_direction in {"up", "down"} and decision.skill in {
+            "move", "turn", "camera_center", "explore_area", "navigate_to"}:
+        result = await _traverse_local(bridge, decision, observation, traversal_direction)
+        result["requested_skill"] = decision.skill
+        result["traversal_intent_promoted"] = True
+        return result
+
     if decision.skill == "equip_item":
         return await _equip_item(bridge, decision, observation)
     if decision.skill == "equip_gear":
@@ -1403,6 +1818,9 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
     if decision.skill == "talk_to_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True, talk=True)
     if decision.skill == "interact_with_actor":
+        target = _matching_actor(before, decision.args.target_actor_id, decision.args.target_actor_params)
+        if _is_door_actor(target):
+            return await _interact_with_door(bridge, decision, observation)
         return await _navigate_local(bridge, decision, observation, actor_mode=True, interact=True)
     if decision.skill == "aim_at":
         return await _aim_at(bridge, decision, observation)

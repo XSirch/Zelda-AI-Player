@@ -84,3 +84,16 @@ def test_native_room_actor_scan_is_not_camera_gated():
     assert "MAX_ROOM_ACTORS" in room_scan
     assert '{"category_name", ActorCategoryName(actor->category)}' in source
     assert '{"room", actor->room}' in source
+
+
+def test_native_traversal_state_and_terrain_probes_are_exposed():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "native" / "ZeldaAiBridge.cpp").read_text()
+    assert "SurfaceType_GetWallFlags" in source
+    assert '{"climbing_ladder", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) != 0}' in source
+    assert '{"hanging_ledge", (player->stateFlags1 & PLAYER_STATE1_HANGING_OFF_LEDGE) != 0}' in source
+    assert "json NavigationProbes(Player* player)" in source
+    assert 'state["navigation_probes"] = NavigationProbes(player);' in source
+    assert "70.0f, 140.0f" in source
+    assert "BgCheck_EntityLineTest1" in source
+    assert '{"wall_flags", wallFlags}' in source
