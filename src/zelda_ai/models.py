@@ -13,7 +13,7 @@ Skill = Literal[
     "advance_dialogue", "choose_dialogue", "camera_center", "roll", "backflip",
     "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
-    "navigate_to", "approach_actor", "talk_to_actor", "equip_item", "fight_enemy",
+    "navigate_to", "approach_actor", "talk_to_actor", "equip_item", "equip_gear", "fight_enemy",
 ]
 
 
@@ -85,9 +85,18 @@ class PauseMenuState(StrictModel):
     prompt_choice: int = Field(default=0, ge=-32768, le=32767)
 
 
+class EquipmentObservation(StrictModel):
+    item_id: int = Field(ge=0, le=255)
+    name: str = Field(min_length=1, max_length=96)
+    equipment_type: Literal["sword", "shield", "tunic", "boots"]
+    value: int = Field(ge=1, le=4)
+    equipped: bool = False
+
+
 class ProgressState(StrictModel):
     quest_items: list[str] = Field(default_factory=list, max_length=24)
     owned_equipment: list[str] = Field(default_factory=list, max_length=12)
+    equipment: list[EquipmentObservation] = Field(default_factory=list, max_length=12)
     upgrade_levels: dict[str, int] = Field(default_factory=dict, max_length=8)
     heart_pieces: int = Field(default=0, ge=0, le=15)
     skull_tokens: int = Field(default=0, ge=0, le=999)
@@ -201,7 +210,7 @@ class Decision(StrictModel):
             raise ValueError("choose_dialogue requires choice_index")
         if self.skill == "menu_assign" and self.args.slot is None:
             raise ValueError("menu_assign requires a C-button slot")
-        if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "equip_item", "fight_enemy"} and self.args.duration_ms > 2000:
+        if self.skill not in {"navigate_to", "approach_actor", "talk_to_actor", "equip_item", "equip_gear", "fight_enemy"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
@@ -211,6 +220,8 @@ class Decision(StrictModel):
             raise ValueError(f"{self.skill} requires target_actor_id")
         if self.skill == "equip_item" and (self.args.item_id is None or self.args.slot is None):
             raise ValueError("equip_item requires item_id and C-button slot")
+        if self.skill == "equip_gear" and self.args.item_id is None:
+            raise ValueError("equip_gear requires item_id")
         return self
 
 
