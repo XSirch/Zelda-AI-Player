@@ -149,7 +149,7 @@ class SkillArgs(StrictModel):
         "sarias", "eponas", "lullaby", "suns", "time", "storms"] | None
     target_actor_id: int | None = Field(ge=-32768, le=32767)
     target_actor_params: int | None = Field(ge=-32768, le=32767)
-    target_position: tuple[float, float, float] | None
+    target_position: list[float] | None = Field(min_length=3, max_length=3)
     stop_distance: float | None = Field(ge=12, le=600)
     item_id: int | None = Field(ge=0, le=255)
 
