@@ -2,7 +2,7 @@
 
 Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**, com estado estruturado, Codex/ChatGPT, OpenRouter e painel administrativo.
 
-**Estado: milestone 0.1 — fundação executável, não um agente capaz de zerar o jogo.** Backend e protocolo foram testados com simulador explícito. A integração nativa completa ainda precisa ser compilada e validada no SoH/Windows; os providers precisam do seu login para um teste real. Não há ROM, assets de Zelda ou credenciais no repositório.
+**Estado: milestone 0.2 em desenvolvimento — percepção/eventos e controles sistêmicos implementados, ainda não um agente certificado para zerar o jogo.** A revisão Autonomy v1 adiciona diálogo decodificado, transições, atores observados, pause/game-over/ocarina e recovery local. A integração nativa desta revisão ainda precisa ser recompilada e validada no SoH/Windows; os providers precisam do seu login para um teste real. Não há ROM, assets de Zelda ou credenciais no repositório.
 
 ## O que existe nesta versão
 
@@ -10,8 +10,10 @@ Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**
 - Painel React/TypeScript: monitor local, provider/modelo/effort, limites, iniciar/pausar/retomar/encerrar, assumir controle, instruções humanas, memória, skills e comparação de registros.
 - Codex app-server por JSON-RPC/stdio, login oficial ChatGPT em perfil isolado, catálogo dinâmico e contabilização dos tokens informados pela CLI. Não usa OAuth como API key.
 - OpenRouter por API, catálogo dinâmico, JSON estruturado, reasoning effort quando anunciado e custo efetivamente retornado. Sem retry pago automático.
-- Bridge C++ para SoH: telemetria a 5 Hz por UDP autenticado em localhost, input analógico/botões por leases de até 500 ms, proteção contra replay e comandos de outra cena.
-- Skills básicas: movimento relativo à câmera, A, B, Z, Z+R, C-buttons já equipados e espera. O resultado reporta deslocamento/ACK/dano observado, não inventa acerto de flecha ou vitória.
+- Bridge C++ para SoH: telemetria a 5 Hz por UDP autenticado em localhost, input analógico/botões por leases de até 500 ms, proteção contra replay/comandos stale e preempção em mudança de scene/room.
+- Percepção estruturada: texto de diálogo decodificado, choices/speaker, ação contextual do botão A, target, até 24 atores realmente desenhados na sala, entrance, cutscene, pause menu, game-over e ocarina. Screenshots continuam fora do prompt normal.
+- Skills locais: movimento/giro, interação e diálogo, ataque/defesa/target, roll/backflip/sidestep/jump attack, C-buttons já equipados, pause/menu genérico, atribuição do item selecionado a C, continue após game-over e execução das 12 músicas normais da ocarina. O resultado continua exigindo evidência observável; não inventa acerto ou vitória.
+- O runtime espera localmente enquanto texto/cutscene não está acionável, detecta repetição de falhas (stuck) e manda o planner trocar de estratégia em vez de repetir a mesma ação.
 - Memória persistente de notas/hipóteses e trajetórias de navegação. No modo Adaptive, sequências autônomas que conseguem mudar de sala/cena são persistidas por modelo + effort + versão do contrato e reaplicadas localmente em runs futuras antes de gastar outra inferência. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
 
 ## Testar o painel e o ciclo sem jogo ou créditos
@@ -52,6 +54,8 @@ uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI
 O instalador confere o commit e o blob de `padmgr.c`, copia apenas nossos três arquivos C++ e aplica um ponto de input antes do cálculo nativo de press/release. É idempotente; não dá `reset --hard`, não deleta assets e não reescreve o upstream arbitrariamente.
 
 Siga as instruções de build do [Shipwright na revisão fixada](https://github.com/HarbourMasters/Shipwright/tree/d30fc192f2eb01ceea45bd1e12de61636cafbf86). Reconfigure o CMake depois de instalar o bridge, pois novos arquivos foram adicionados. **O build completo do SoH não foi executado aqui.**
+
+> **Autonomy v1 altera o código nativo da bridge.** Se você já tinha compilado uma revisão anterior, execute novamente `uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI`, reconfigure o CMake e recompile o SoH antes de testar diálogo/transições/menu/ocarina.
 
 Depois de compilar, abra dois terminais na raiz deste projeto:
 

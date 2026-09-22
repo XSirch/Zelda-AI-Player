@@ -21,17 +21,17 @@ SoH custom build -- UDP 127.0.0.1:8766 --> Bridge Python
 
 ## Decisão, estado e cadência
 
-`models.py` define o contrato v1. O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
+`models.py` define o contrato Autonomy v1 (`state-v2/skills-v1`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
 
-A versão inicial tem skills curtas de 50–2000 ms. Isso ainda pode gerar muitas chamadas em sessões longas. O ganho adicional prometido por navegação/combate de longa duração exige implementar esses controladores; não existe nesta versão. Use `max_calls` baixo nos primeiros testes.
+As primitives motoras continuam curtas e limitadas, mas diálogo, escolha, menu, ocarina e algumas ações compostas executam loops locais sem uma chamada de modelo por frame. Navegação espacial com colisão, mira e combate composto de longa duração continuam fora desta versão e não devem ser simulados pelo planner.
 
-Dados expostos: posição/orientação, vida/magia/rupias, IDs de inventário/equipamento, câmera, cena/sala, message_id e eventos dos hooks. Não há enumeração de inimigos atrás de paredes, solução de puzzles, cheats ou escrita em HP/inventário. Também não existe, ainda, semântica de atores visíveis, colisão, texto decodificado de diálogo ou mapa espacial. O estado não é classificado como benchmark humano-observável estrito: contém coordenadas exatas.
+Dados expostos: posição/orientação, vida/magia/rupias, IDs de inventário/equipamento, câmera, cena/sala/entrance, diálogo decodificado e choices, ação contextual, estado de pause/game-over/ocarina, target e uma lista limitada de atores marcados pelo motor como desenhados na sala atual. A lista é limitada a 24 atores a até 1400 unidades e não pretende enumerar a cena inteira. Não há solução de puzzles, cheats, escrita em HP/inventário, navmesh global ou flags ocultos deliberadamente expostos. O estado ainda não é classificado como benchmark humano-observável estrito: contém coordenadas exatas e IDs internos.
 
 ## Controle nativo
 
 O instalador insere `ZeldaAiBridge_OverrideInput` antes do cálculo original das bordas dos botões em `padmgr.c`, apenas no controle 0. A duração usa relógio monotônico real, não frames de renderização. Uma lease expira em até 500 ms; perda de conexão devolve o input original ao jogador.
 
-Pacotes precisam conter token, instance_id, scene_epoch, base_seq e seq. Comandos de cenas diferentes, antigos ou repetidos são descartados. O token usa loopback; não exponha a porta como serviço remoto. A lista de eventos nativos é uma janela de 16 entradas com IDs e deduplicação, não um transporte lossless para auditoria de conclusão do jogo.
+Pacotes precisam conter token, instance_id, scene_epoch, base_seq e seq. Comandos de mundos diferentes, antigos ou repetidos são descartados. Mudança observada de scene ou room incrementa o epoch de controle, libera a lease vigente e gera evento de replanejamento. O token usa loopback; não exponha a porta como serviço remoto. A lista de eventos nativos é uma janela de 16 entradas com IDs e deduplicação, não um transporte lossless para auditoria de conclusão do jogo.
 
 ## Providers
 

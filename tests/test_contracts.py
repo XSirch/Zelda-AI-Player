@@ -18,8 +18,9 @@ def test_token_subsets_are_not_double_counted():
 
 
 @pytest.mark.parametrize("patch", [{"skill": "teleport"}, {"args": {"direction": None,
-    "slot": None, "duration_ms": 100, "strength": .5}}, {"shell": "anything"},
-    {"args": {"direction": "forward", "slot": None, "duration_ms": 2001, "strength": .5}}])
+    "slot": None, "choice_index": None, "song": None, "duration_ms": 100, "strength": .5}}, {"shell": "anything"},
+    {"args": {"direction": "forward", "slot": None, "choice_index": None,
+        "duration_ms": 2001, "strength": .5}}])
 def test_decision_rejects_invalid_actions(decision, patch):
     with pytest.raises(ValidationError):
         Decision.model_validate({**decision.model_dump(), **patch})
@@ -72,3 +73,28 @@ def test_cost_preflight_rejects_unknown_pricing():
         reserve_cost(model_info({"id": "test"}), "{}", 2048)
     info = model_info({"id": "test", "pricing": {"prompt": "0.000001", "completion": "0.000002"}})
     assert reserve_cost(info, json.dumps({"state": "test"}), 2048) > .004096
+
+
+def test_dialogue_choice_requires_index(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "choose_dialogue"})
+    chosen = Decision.model_validate({**decision.model_dump(), "skill": "choose_dialogue",
+        "args": {**decision.args.model_dump(), "choice_index": 1}})
+    assert chosen.args.choice_index == 1
+
+
+def test_game_state_accepts_structured_dialogue_and_drawn_actor(state):
+    actor = {"actor_id": 123, "category": 4, "params": 0, "position": [10, 0, 5],
+        "distance": 11.2, "targeted": False, "drawn": True, "text_id": 4097}
+    enriched = state.model_copy(update={
+        "dialogue": {"active": True, "text_id": 4097, "text": "Hello Link",
+            "state": "choice", "state_code": 4, "message_mode": 8, "can_advance": True,
+            "choice_count": 2, "choice_index": 0, "choices": ["Yes", "No"], "speaker": actor},
+        "context_action": {"code": 15, "label": "speak"},
+        "nearby_actors": [actor],
+        "entrance_index": 52,
+    })
+    validated = type(state).model_validate(enriched.model_dump())
+    assert validated.dialogue.text == "Hello Link"
+    assert validated.dialogue.choices == ["Yes", "No"]
+    assert validated.nearby_actors[0].drawn
