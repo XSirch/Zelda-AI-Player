@@ -17,11 +17,13 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v1/skills-v0.2/prompt-v2"
+CONTRACT_VERSION = "state-v1/skills-v0.3/trajectory-v1/prompt-v3"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "R": 0x0010,
     "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
+NAVIGATION_SKILLS = {"move", "turn", "interact", "wait"}
 SKILL_CATALOG = [
-    {"id": "move", "name": "Translação curta", "status": "implemented", "version": "0.2"},\n    {"id": "turn", "name": "Giro local com feedback de yaw", "status": "implemented", "version": "0.2"},
+    {"id": "move", "name": "Translação curta", "status": "implemented", "version": "0.2"},
+    {"id": "turn", "name": "Giro local com feedback de yaw", "status": "implemented", "version": "0.2"},
     {"id": "interact", "name": "Interagir / confirmar (A)", "status": "implemented", "version": "0.1"},
     {"id": "attack", "name": "Ataque básico (B)", "status": "implemented", "version": "0.1"},
     {"id": "defend", "name": "Defesa (Z + R)", "status": "implemented", "version": "0.1"},
@@ -40,6 +42,9 @@ def controller_input(decision: Decision) -> tuple[int, int, int]:
         amount = round(80 * args.strength)
         x, y = {"forward": (0, amount), "back": (0, -amount), "left": (-amount, 0), "right": (amount, 0)}[args.direction]
         return 0, x, y
+    if skill == "turn":
+        amount = max(28, round(72 * args.strength))
+        return 0, -amount if args.direction == "left" else amount, 12
     button = {"interact": BUTTONS["A"], "attack": BUTTONS["B"], "defend": BUTTONS["Z"] | BUTTONS["R"],
         "target": BUTTONS["Z"], "wait": 0}.get(skill)
     if skill == "use_item":
@@ -56,6 +61,11 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
     if before.paused or not before.in_game:
         return {"status": "stale", "reason": "game_not_ready"}
     buttons, x, y = controller_input(decision)
+    start_yaw = before.player.yaw if before.player else None
+    target_turn_units = None
+    if decision.skill == "turn" and start_yaw is not None:
+        target_turn_units = max(3600, min(18200,
+            int(decision.args.duration_ms * 9.1 * max(0.35, decision.args.strength))))
     deadline = time.monotonic() + decision.args.duration_ms / 1000
     status, reason, acknowledged = "completed", "duration_elapsed", False
     first_command = None
@@ -70,6 +80,11 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
             if current.paused or not current.in_game:
                 reason = "game_not_ready"
                 break
+            if target_turn_units is not None and current.player:
+                delta = ((current.player.yaw - start_yaw + 32768) % 65536) - 32768
+                if abs(delta) >= target_turn_units:
+                    reason = "heading_reached"
+                    break
             command_id = bridge.send(buttons=buttons, stick_x=x, stick_y=y, lease_ms=300)
             if first_command is None:
                 first_command = command_id
@@ -85,13 +100,16 @@ async def execute_skill(bridge: Bridge, decision: Decision, observation: GameSta
         acknowledged |= first_command is not None and after.last_command_seq >= first_command
     if before.player and after and after.player and before.scene_epoch == after.scene_epoch:
         distance = math.dist(before.player.position, after.player.position)
-        damage = max(0, before.player.health - after.player.health)\n        yaw_delta = ((after.player.yaw - before.player.yaw + 32768) % 65536) - 32768
+        damage = max(0, before.player.health - after.player.health)
+        yaw_delta = ((after.player.yaw - before.player.yaw + 32768) % 65536) - 32768
     if not acknowledged:
         status, reason = "failed", "input_not_acknowledged"
     elif decision.skill == "move" and distance is not None and distance < 1:
         status, reason = "failed", "no_displacement_observed"
-    return {"status": status, "reason": reason, "distance": distance, "health_lost": damage,
-        "acknowledged": acknowledged, "skill": decision.skill}
+    elif decision.skill == "turn" and yaw_delta is not None and abs(yaw_delta) < 900:
+        status, reason = "failed", "no_heading_change_observed"
+    return {"status": status, "reason": reason, "distance": distance, "yaw_delta": yaw_delta,
+        "health_lost": damage, "acknowledged": acknowledged, "skill": decision.skill}
 
 
 class Runtime:
@@ -119,6 +137,11 @@ class Runtime:
         self.game_instance: str | None = None
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
+        self.trajectory_trace = deque(maxlen=24)
+        self.trace_origin: GameState | None = None
+        self.trajectory_tainted = False
+        self.replaying_trajectory = False
+        self.replay_attempts: set[tuple[str, int]] = set()
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -135,7 +158,94 @@ class Runtime:
             self.store.event(self.run_id, kind, data)
         self.publish(True)
 
+    def _reset_trajectory_trace(self, state: GameState | None = None, *, tainted: bool = False):
+        self.trajectory_trace.clear()
+        self.trace_origin = state.model_copy(deep=True) if state and state.player else None
+        self.trajectory_tainted = tainted
+
+    def _record_trajectory_action(self, decision: Decision, state: GameState):
+        if self.replaying_trajectory or not self.config or self.config.memory_mode != "adaptive":
+            return
+        if decision.skill not in NAVIGATION_SKILLS:
+            self._reset_trajectory_trace(state)
+            return
+        if (not self.trace_origin or
+                (self.trace_origin.scene, self.trace_origin.room) != (state.scene, state.room)):
+            self._reset_trajectory_trace(state)
+        self.trajectory_trace.append({"skill": decision.skill, "args": decision.args.model_dump()})
+
+    def _learn_transition(self, state: GameState, old: GameState | None):
+        if not old or not self.config or self.config.memory_mode != "adaptive":
+            return
+        if old.instance_id != state.instance_id or not old.in_game or not state.in_game:
+            return
+        if (old.scene, old.room) == (state.scene, state.room):
+            return
+        if (not self.replaying_trajectory and not self.trajectory_tainted and self.trace_origin
+                and self.trajectory_trace):
+            origin = self.trace_origin
+            route_id = self.store.learn_trajectory(self.namespace,
+                {"scene": origin.scene, "room": origin.room,
+                 "position": origin.player.position if origin.player else None,
+                 "yaw": origin.player.yaw if origin.player else None},
+                {"scene": state.scene, "room": state.room},
+                list(self.trajectory_trace))
+            if route_id:
+                self.log("trajectory_learned", {"trajectory_id": route_id,
+                    "from": [origin.scene, origin.room], "to": [state.scene, state.room],
+                    "steps": len(self.trajectory_trace)})
+        self._reset_trajectory_trace(state)
+
+    async def _try_replay_trajectory(self, game: GameState) -> bool:
+        if (not self.config or self.config.memory_mode != "adaptive" or self.replaying_trajectory
+                or not game.player):
+            return False
+        route = self.store.best_trajectory(self.namespace, game.scene, game.room, game.player.position)
+        if not route:
+            return False
+        attempt_key = (route["id"], game.scene_epoch)
+        if attempt_key in self.replay_attempts:
+            return False
+        self.replay_attempts.add(attempt_key)
+        self.replaying_trajectory = True
+        self.log("trajectory_replay_started", {"trajectory_id": route["id"],
+            "from": [route["from_scene"], route["from_room"]],
+            "to": [route["to_scene"], route["to_room"]],
+            "steps": len(route["actions"])})
+        success = False
+        try:
+            for raw in route["actions"][:24]:
+                current = self.bridge.state
+                if not self.bridge.connected or not current or not current.in_game or current.paused:
+                    break
+                if (current.scene, current.room) == (route["to_scene"], route["to_room"]):
+                    success = True
+                    break
+                if (current.scene, current.room) != (route["from_scene"], route["from_room"]):
+                    break
+                decision = Decision(goal="Replay learned trajectory",
+                    summary="Replaying a previously successful local route.",
+                    skill=raw["skill"], args=raw["args"], memory_note=None)
+                self.last_decision = decision.model_dump()
+                self.last_result = await execute_skill(self.bridge, decision, current)
+                self.log("trajectory_replay_step", {"trajectory_id": route["id"],
+                    "skill": decision.skill, "result": self.last_result})
+                if self.last_result["status"] == "failed":
+                    break
+                await asyncio.sleep(0.05)
+            current = self.bridge.state
+            success = bool(current and (current.scene, current.room) ==
+                (route["to_scene"], route["to_room"]))
+            self.store.trajectory_outcome(route["id"], success)
+            self.log("trajectory_replay_succeeded" if success else "trajectory_replay_failed",
+                {"trajectory_id": route["id"], "scene": current.scene if current else None,
+                 "room": current.room if current else None})
+            return success
+        finally:
+            self.replaying_trajectory = False
+
     def on_state(self, state: GameState, old: GameState | None):
+        self._learn_transition(state, old)
         if self.run_id and self.state in {"running", "paused"}:
             if old and old.instance_id != state.instance_id:
                 self.log("game_instance_changed")
@@ -201,6 +311,9 @@ class Runtime:
             self.segment_id = self.store.segment(self.run_id, config.model_dump(), self.namespace)
             self.seen_events = {f"{game.instance_id}:{e.id}" for e in game.events}
             self.last_decision = self.last_result = None
+            self.replay_attempts.clear()
+            self.replaying_trajectory = False
+            self._reset_trajectory_trace(game)
             self.recent.clear()
             self.hints.clear()
             self.started = time.monotonic()
@@ -231,6 +344,7 @@ class Runtime:
             if action in {"pause", "stop", "take_control"}:
                 if action == "take_control":
                     self.store.update_run(self.run_id, assisted=True)
+                    self._reset_trajectory_trace(self.bridge.state, tainted=True)
                     self.log("take_control")
                 await self.halt("stopped" if action == "stop" else "paused", action)
             elif action == "resume":
@@ -268,6 +382,8 @@ class Runtime:
         self.pending_switch = None
         self.namespace = self.new_namespace(self.config)
         self.segment_id = self.store.segment(self.run_id, self.config.model_dump(), self.namespace)
+        self.replay_attempts.clear()
+        self._reset_trajectory_trace(self.bridge.state)
         self.store.update_run(self.run_id, mixed=True)
         self.log("model_changed", {"provider": self.config.provider,
             "model": self.config.model, "effort": self.config.effort})
@@ -277,6 +393,7 @@ class Runtime:
             raise ValueError("No active run")
         self.hints.append(text)
         self.store.update_run(self.run_id, assisted=True)
+        self._reset_trajectory_trace(self.bridge.state, tainted=True)
         self.log("human_hint", {"text": text})
 
     def budget_check(self, prompt: str):
@@ -312,6 +429,10 @@ class Runtime:
                         raise ProviderFailure("runtime_budget_reached")
                     await asyncio.sleep(0.25)
                     continue
+                if await self._try_replay_trajectory(game):
+                    await asyncio.sleep(0.1)
+                    continue
+                game = self.bridge.state or game
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
                     "last_result": self.last_result, "events": list(self.recent)[-5:],
@@ -351,6 +472,7 @@ class Runtime:
                 if decision.memory_note:
                     self.store.remember(self.namespace, game.scene, decision.memory_note)
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
+                self._record_trajectory_action(decision, game)
                 self.last_result = await execute_skill(self.bridge, decision, game)
                 self.log("skill_failed" if self.last_result["status"] == "failed" else "skill_result", self.last_result)
                 await asyncio.sleep(0.1)
@@ -376,4 +498,5 @@ class Runtime:
             "elapsed_s": round(time.monotonic() - self.started) if self.run_id else 0,
             "last_decision": self.last_decision, "last_result": self.last_result,
             "events": list(self.recent), "bridge": self.bridge.status(),
-            "memory": self.store.recall(self.namespace, limit=30) if self.namespace else []}
+            "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
+            "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else []}

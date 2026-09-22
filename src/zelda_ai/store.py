@@ -1,7 +1,9 @@
 """Small transactional store; SQLite locally, SQLAlchemy URL for other deployments."""
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import time
 import uuid
 from collections import Counter
@@ -30,6 +32,13 @@ events = Table("events", metadata,
 memories = Table("memories", metadata,
     Column("id", String, primary_key=True), Column("namespace", String, index=True),
     Column("scene", Integer), Column("note", String), Column("created_at", Float))
+trajectories = Table("trajectories", metadata,
+    Column("id", String, primary_key=True), Column("namespace", String, index=True),
+    Column("signature", String, index=True), Column("from_scene", Integer, index=True),
+    Column("from_room", Integer), Column("start_position", JSON), Column("start_yaw", Integer),
+    Column("to_scene", Integer), Column("to_room", Integer), Column("actions", JSON, nullable=False),
+    Column("successes", Integer, default=1), Column("failures", Integer, default=0),
+    Column("created_at", Float), Column("updated_at", Float))
 
 
 def uid() -> str:
@@ -112,6 +121,87 @@ class Store:
             return [dict(row) for row in conn.execute(query.order_by(memories.c.created_at.desc())
                 .limit(limit)).mappings()]
 
+    def learn_trajectory(self, namespace: str, origin: dict, destination: dict,
+                         actions: list[dict]) -> str | None:
+        safe_actions = []
+        for action in actions[:24]:
+            skill = action.get("skill")
+            args = action.get("args")
+            if skill not in {"move", "turn", "interact", "wait"} or not isinstance(args, dict):
+                return None
+            safe_actions.append({"skill": skill, "args": {
+                "direction": args.get("direction"), "duration_ms": args.get("duration_ms"),
+                "strength": args.get("strength"), "slot": args.get("slot")}})
+        if not safe_actions or not any(a["skill"] in {"move", "turn"} for a in safe_actions):
+            return None
+        signature_payload = {"from": [origin["scene"], origin["room"]],
+            "to": [destination["scene"], destination["room"]], "actions": safe_actions}
+        signature = hashlib.sha256(json.dumps(signature_payload, sort_keys=True,
+            separators=(",", ":")).encode()).hexdigest()
+        now = time.time()
+        with self.engine.begin() as conn:
+            row = conn.execute(select(trajectories).where(
+                trajectories.c.namespace == namespace,
+                trajectories.c.signature == signature)).mappings().first()
+            if row:
+                conn.execute(trajectories.update().where(trajectories.c.id == row["id"]).values(
+                    successes=(row["successes"] or 0) + 1, updated_at=now))
+                return row["id"]
+            route_id = uid()
+            conn.execute(trajectories.insert().values(id=route_id, namespace=namespace,
+                signature=signature, from_scene=origin["scene"], from_room=origin["room"],
+                start_position=list(origin.get("position") or []),
+                start_yaw=origin.get("yaw"), to_scene=destination["scene"],
+                to_room=destination["room"], actions=safe_actions, successes=1, failures=0,
+                created_at=now, updated_at=now))
+            return route_id
+
+    def best_trajectory(self, namespace: str, scene: int, room: int,
+                        position: tuple[float, float, float] | None = None) -> dict | None:
+        with self.engine.connect() as conn:
+            rows = [dict(r) for r in conn.execute(select(trajectories).where(
+                trajectories.c.namespace == namespace,
+                trajectories.c.from_scene == scene,
+                trajectories.c.from_room == room).order_by(trajectories.c.updated_at.desc())
+                .limit(20)).mappings()]
+        candidates = []
+        for row in rows:
+            successes, failures = row.get("successes") or 0, row.get("failures") or 0
+            if successes < 1 or failures >= max(2, successes * 2):
+                continue
+            distance = 0.0
+            start = row.get("start_position") or []
+            if position is not None and len(start) == 3:
+                distance = math.dist(position, start)
+                if distance > 180:
+                    continue
+            row["_score"] = successes * 3 - failures * 4 - distance / 120
+            candidates.append(row)
+        if not candidates:
+            return None
+        best = max(candidates, key=lambda r: (r["_score"], r.get("updated_at") or 0))
+        best.pop("_score", None)
+        return best
+
+    def trajectory_outcome(self, route_id: str, success: bool):
+        with self.engine.begin() as conn:
+            row = conn.execute(select(trajectories.c.successes, trajectories.c.failures)
+                .where(trajectories.c.id == route_id)).mappings().first()
+            if not row:
+                return
+            values = {"updated_at": time.time()}
+            key = "successes" if success else "failures"
+            values[key] = (row[key] or 0) + 1
+            conn.execute(trajectories.update().where(trajectories.c.id == route_id).values(**values))
+
+    def list_trajectories(self, namespace: str, limit: int = 30) -> list[dict]:
+        if not namespace:
+            return []
+        with self.engine.connect() as conn:
+            return [dict(r) for r in conn.execute(select(trajectories).where(
+                trajectories.c.namespace == namespace).order_by(trajectories.c.updated_at.desc())
+                .limit(limit)).mappings()]
+
     def list_runs(self, limit: int = 50) -> list[dict]:
         with self.engine.connect() as conn:
             result = [dict(row) for row in conn.execute(select(runs).order_by(runs.c.created_at.desc())
@@ -166,4 +256,7 @@ class Store:
             "mean_latency_ms": sum(latencies) / len(latencies) if latencies else None,
             "deaths": kinds["player_died"], "boss_events": len(bosses),
             "interventions": kinds["human_hint"] + kinds["take_control"],
-            "skill_failures": kinds["skill_failed"], "vision_calls": 0}
+            "skill_failures": kinds["skill_failed"], "vision_calls": 0,
+            "trajectories_learned": kinds["trajectory_learned"],
+            "trajectory_replays": kinds["trajectory_replay_started"],
+            "trajectory_replay_successes": kinds["trajectory_replay_succeeded"]}

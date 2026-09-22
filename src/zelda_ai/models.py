@@ -78,8 +78,10 @@ class Decision(StrictModel):
 
     @model_validator(mode="after")
     def skill_arguments(self):
-        if self.skill == "move" and self.args.direction is None:
-            raise ValueError("move requires direction")
+        if self.skill in {"move", "turn"} and self.args.direction is None:
+            raise ValueError(f"{self.skill} requires direction")
+        if self.skill == "turn" and self.args.direction not in {"left", "right"}:
+            raise ValueError("turn requires left or right")
         if self.skill == "use_item" and self.args.slot is None:
             raise ValueError("use_item requires an equipped C-button slot")
         return self
@@ -118,7 +120,7 @@ class RunConfig(StrictModel):
     model: str = Field(min_length=1, max_length=200)
     effort: Effort | None = None
     goal: str = Field(default="Explore o ambiente e avance no jogo.", min_length=1, max_length=400)
-    memory_mode: Literal["isolated", "adaptive"] = "isolated"
+    memory_mode: Literal["isolated", "adaptive"] = "adaptive"
     max_calls: int = Field(default=100, ge=1, le=10000)
     max_tokens: int = Field(default=100000, ge=1000, le=10000000)
     max_cost_usd: float = Field(default=2, gt=0, le=1000)
