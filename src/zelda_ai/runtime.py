@@ -1267,6 +1267,13 @@ class Runtime:
                 if key not in self.seen_events:
                     self.seen_events.add(key)
                     self.log(event.kind, {"detail": event.detail, "scene": state.scene, "room": state.room})
+                    if event.kind == "game_completed" and self.state == "running":
+                        self.bridge.release()
+                        self.state, self.reason = "completed", "game_completed"
+                        self.store.update_run(self.run_id, status="completed", reason="game_completed")
+                        self.store.end_segments(self.run_id)
+                        self.log("run_completed", {"reason": event.detail, "scene": state.scene,
+                            "scene_name": state.scene_name})
             if old and old.player and state.player and old.player.health > 0 and state.player.health == 0:
                 self.log("player_died", {"scene": state.scene, "last_skill": self.last_decision})
                 self.store.remember(self.namespace, state.scene,
