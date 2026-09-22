@@ -272,7 +272,7 @@ class RunConfig(StrictModel):
     provider: ProviderId
     model: str = Field(min_length=1, max_length=200)
     effort: Effort | None = None
-    goal: str = Field(default="Explore o ambiente e avance no jogo.", min_length=1, max_length=400)
+    goal: str = Field(default="Complete Ocarina of Time autonomously and defeat final Ganon.", min_length=1, max_length=400)
     memory_mode: Literal["isolated", "adaptive"] = "adaptive"
     max_calls: int = Field(default=100, ge=1, le=10000)
     max_tokens: int = Field(default=100000, ge=1000, le=10000000)
