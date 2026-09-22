@@ -28,3 +28,23 @@ def test_turn_rejects_forward_and_back():
     for direction in ("forward", "back"):
         with pytest.raises(ValidationError):
             decision("turn", direction)
+
+
+def test_compound_local_combat_inputs():
+    assert controller_input(decision("backflip", None))[0] == 0x2000
+    assert controller_input(decision("backflip", None))[2] < 0
+    assert controller_input(decision("roll", None))[0] == 0x8000
+    assert controller_input(decision("roll", None))[2] > 0
+    assert controller_input(decision("jump_attack", None))[0] == 0xA000
+
+
+def test_sidestep_uses_target_plus_lateral_stick():
+    left = controller_input(decision("sidestep", "left"))
+    right = controller_input(decision("sidestep", "right"))
+    assert left[0] == right[0] == 0x2000
+    assert left[1] < 0 < right[1]
+
+
+def test_advance_dialogue_is_single_a_action():
+    action = decision("advance_dialogue", None, duration=120, strength=0)
+    assert controller_input(action) == (0x8000, 0, 0)
