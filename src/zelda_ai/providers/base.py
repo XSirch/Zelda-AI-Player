@@ -26,7 +26,7 @@ Implemented skills:
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
 - explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger
 
-The state contract includes scene + scene_name, room, entrance_index, player pose, camera,
+The state contract includes scene + scene_name, room, entrance_index, day_time/is_night, player pose/collision state, camera,
 raw inventory/equipment plus inventory_named entries for items Link owns, pause-menu cursor state,
 game-over state, ocarina state, decoded dialogue, a pause-visible progress block (quest items/songs,
 owned equipment, upgrades, current dungeon map/compass/boss key/small keys), context-sensitive A action,
@@ -46,6 +46,7 @@ swords, shields, tunics and boots listed in progress.equipment; this is required
 Boots and tunic changes. Manual menu skills remain available for unusual pages not covered by these controllers. If game_over_state is non-zero and a continue
 prompt is actionable, use continue_gameover. play_song does not open/equip the ocarina; equip/use the ocarina first.
 
+memory is scene-local experience; recent_global_memory carries recent strategic facts learned in other scenes.
 Use progress to avoid repeating already-completed acquisition goals and to recognize when a capability or
 dungeon requirement became available. progress is not a hidden quest-flag oracle: absence of a quest item does
 not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
