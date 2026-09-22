@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import _aim_error, _aim_stick, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, controller_input
+from zelda_ai.runtime import _aim_error, _aim_stick, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -143,6 +143,35 @@ def test_navigate_to_door_coordinate_promotes_only_with_exit_intent(state):
             "summary": "Navigate to the door.",
         })
     assert _door_intent_actor(game, nav).actor_id == 9
+
+
+def test_traversal_intent_detects_down_without_center_enter_false_positive(state):
+    down = decision("move", "forward").model_copy(update={
+        "goal": "Descend the ladder",
+        "summary": "Go down to the lower level.",
+    })
+    assert _traversal_intent_direction(down) == "down"
+
+    center = decision("move", "forward").model_copy(update={
+        "goal": "Explore the center of the platform",
+        "summary": "Move toward center.",
+    })
+    assert _traversal_intent_direction(center) is None
+    assert _door_intent_actor(state, center) is None
+
+
+def test_traversal_probe_prefers_modest_safe_descent(state):
+    game = type(state).model_validate({**state.model_dump(), "navigation_probes": [
+        {"direction": "forward", "distance": 70, "floor_found": True,
+         "floor_y": -35, "delta_y": -35, "floor_type": 0},
+        {"direction": "right", "distance": 70, "floor_found": True,
+         "floor_y": -200, "delta_y": -200, "floor_type": 0},
+        {"direction": "back", "distance": 140, "floor_found": True,
+         "floor_y": 0, "delta_y": 0, "floor_type": 0},
+    ]})
+    probe = _best_traversal_probe(game, "down")
+    assert probe is not None
+    assert probe.direction == "forward"
 
 
 def test_matching_actor_uses_off_camera_room_actor(state):
