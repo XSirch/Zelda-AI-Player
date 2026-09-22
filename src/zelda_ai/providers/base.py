@@ -33,10 +33,11 @@ The state contract includes scene + scene_name, room, entrance_index, day_time/i
 raw inventory/equipment plus inventory_named entries (name/item_id/ammo when applicable) for items Link owns, pause-menu cursor state,
 game-over state, ocarina state, decoded dialogue, a pause-visible progress block (quest items/songs,
 owned equipment, upgrades, current dungeon map/compass/boss key/small keys), context-sensitive A action
-plus context_actor when the engine associates that action with a specific actor, current target actor and
-a bounded priority list of nearby actors
-that the game actually drew in the current room. nearby_actors is observation, not a complete world list.
-Do not infer that an unlisted actor does not exist.
+plus context_actor when the engine associates that action with a specific actor, current target actor,
+nearby_actors (small rendered/proximity subset), and room_actors: the active actor list for the current room
+plus room-global actors, independent of camera rendering. room_actor_count reports the eligible active count and
+room_actors_truncated says whether the 64-entry safety cap was reached. This is current engine state, not a hidden
+future-world list: actors from unloaded rooms/scenes are not exposed.
 
 Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
 calling you. If dialogue.active has dialogue.choice_count > 0, read the transcript/current text and use
@@ -56,10 +57,11 @@ dungeon requirement became available. progress is not a hidden quest-flag oracle
 not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
 Re-observe and replan.
 Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is active, then target_actor
-and nearby_actors to ground interactions. nearby_actors prioritizes contextual/targeted actors, NPCs,
-bosses, doors, chests and enemies before generic effects/props. Actor category 10 is a door in OoT's actor
-category enum and category 11 is a chest. In an interior where the objective requires leaving or continuing,
-prefer interact_with_actor on an observed door instead of repeatedly probing the walls with free movement.
+and room_actors to ground interactions; use nearby_actors only as the compact rendered/proximity subset.
+Each actor now includes category_name and room as well as numeric category/id/params. Doors can therefore be
+identified directly with category_name="door" (numeric category 10), and chests with category_name="chest".
+In an interior where the objective requires leaving or continuing, inspect room_actors first and prefer
+interact_with_actor on an observed door instead of probing walls blindly.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 

@@ -47,13 +47,14 @@ function DialoguePanel({ game }: { game: GameState | null }) {
 }
 
 function ActorsPanel({ game }: { game: GameState | null }) {
-  if (!game?.nearby_actors?.length) return null;
+  const actors = game?.room_actors?.length ? game.room_actors : game?.nearby_actors ?? [];
+  if (!game || !actors.length) return null;
   return <section className="panel actors-panel">
-    <div className="section-head"><span>ATORES OBSERVADOS</span><span className="muted">SOMENTE DRAWN / SALA ATUAL</span></div>
-    <div className="actors-grid">{game.nearby_actors.map((actor, index) =>
-      <div className="actor-item" key={`${actor.actor_id}-${actor.params}-${index}`}>
+    <div className="section-head"><span>ATORES DA SALA</span><span className="muted">{game.room_actor_count || actors.length} ATIVOS{game.room_actors_truncated ? ' · LISTA LIMITADA A 64' : ''}</span></div>
+    <div className="actors-grid">{actors.map((actor, index) =>
+      <div className="actor-item" key={`${actor.actor_id}-${actor.params}-${actor.room}-${index}`}>
         <span>{actor.description || actor.name || `Actor ${actor.actor_id}`}</span>
-        <strong>ID {actor.actor_id} · CAT {actor.category} · PARAM {actor.params} · {number(actor.distance)} u{actor.targeted ? ' · TARGET' : ''}</strong>
+        <strong>ID {actor.actor_id} · {actor.category_name || `CAT ${actor.category}`} · ROOM {actor.room} · PARAM {actor.params} · {number(actor.distance)} u{actor.drawn ? ' · DRAWN' : ' · OFF-CAMERA'}{actor.targeted ? ' · TARGET' : ''}</strong>
       </div>)}
     </div>
   </section>;

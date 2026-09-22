@@ -86,6 +86,19 @@ def test_dialogue_choice_requires_index(decision):
     assert chosen.args.choice_index == 1
 
 
+def test_game_state_accepts_complete_room_actor_observation(state):
+    door = {"actor_id": 9, "name": "En_Door", "description": "Door", "category": 10,
+        "category_name": "door", "room": 0, "params": 1, "position": [140, 0, -20],
+        "focus_position": [140, 30, -20], "distance": 141.4, "targeted": False,
+        "drawn": False, "text_id": 0}
+    enriched = type(state).model_validate({**state.model_dump(),
+        "room_actors": [door], "room_actor_count": 1, "room_actors_truncated": False})
+    assert enriched.room_actors[0].category_name == "door"
+    assert enriched.room_actors[0].drawn is False
+    assert enriched.room_actors[0].room == 0
+    assert enriched.room_actor_count == 1
+
+
 def test_game_state_accepts_structured_dialogue_and_drawn_actor(state):
     actor = {"actor_id": 123, "category": 4, "params": 0, "position": [10, 0, 5],
         "distance": 11.2, "targeted": False, "drawn": True, "text_id": 4097}

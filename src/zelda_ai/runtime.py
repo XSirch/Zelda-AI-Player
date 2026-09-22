@@ -17,7 +17,7 @@ from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 
-CONTRACT_VERSION = "state-v2/skills-v2/trajectory-v2/prompt-v6"
+CONTRACT_VERSION = "state-v3/skills-v2/trajectory-v2/prompt-v7"
 BUTTONS = {"A": 0x8000, "B": 0x4000, "Z": 0x2000, "START": 0x1000, "R": 0x0010,
     "C_UP": 0x0008, "C_LEFT": 0x0002, "C_DOWN": 0x0004, "C_RIGHT": 0x0001}
 DIALOGUE_SKILLS = {"advance_dialogue", "choose_dialogue"}
@@ -215,7 +215,9 @@ async def _play_song(bridge: Bridge, decision: Decision, observation: GameState)
 
 
 def _matching_actor(game: GameState, actor_id: int, params: int | None):
-    candidates = list(game.nearby_actors)
+    # room_actors is the authoritative current-room set. nearby_actors remains a smaller
+    # rendered/proximity subset for compact UI/telemetry compatibility.
+    candidates = list(game.room_actors) + list(game.nearby_actors)
     if game.target_actor is not None:
         candidates.append(game.target_actor)
     matches = [actor for actor in candidates
@@ -957,7 +959,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
     if before.paused or before.dialogue.active or before.cutscene_active or before.game_over_state != 0:
         return {"status": "stale", "reason": "gameplay_state_blocks_exploration", "skill": decision.skill}
 
-    baseline_actors = {(actor.actor_id, actor.params) for actor in before.nearby_actors}
+    baseline_actors = {(actor.actor_id, actor.params) for actor in before.room_actors}
     baseline_context = before.context_action.label
     start_health = before.player.health
     start_position = before.player.position
@@ -991,7 +993,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
 
             if first_command is not None:
                 acknowledged |= current.last_command_seq >= first_command
-            new_actors = [actor for actor in current.nearby_actors
+            new_actors = [actor for actor in current.room_actors
                 if (actor.actor_id, actor.params) not in baseline_actors]
             if new_actors:
                 actor = min(new_actors, key=lambda row: row.distance)
@@ -1813,7 +1815,7 @@ class Runtime:
                     self.bridge.release()
                     await asyncio.sleep(0.10)
                     continue
-                threat = next((actor for actor in game.nearby_actors
+                threat = next((actor for actor in game.room_actors
                     if actor.category in {5, 9} and actor.distance <= 180), None)
                 if threat is None:
                     self.bridge.release()
@@ -2022,8 +2024,12 @@ class Runtime:
                 if await self._auto_unstick(game):
                     await asyncio.sleep(0.08)
                     game = self.bridge.state or game
+                state_payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"})
+                if game.room_actors:
+                    # Avoid sending the rendered subset twice once the room-wide observer is available.
+                    state_payload.pop("nearby_actors", None)
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
-                    "state": game.model_dump(exclude={"events", "upstream_revision", "last_command_seq"}),
+                    "state": state_payload,
                     "last_decision": self.last_decision, "last_result": self.last_result,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],

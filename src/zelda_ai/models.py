@@ -50,6 +50,8 @@ class ActorObservation(StrictModel):
     name: str = Field(default="", max_length=96)
     description: str = Field(default="", max_length=200)
     category: int = Field(ge=0, le=255)
+    category_name: str = Field(default="", max_length=32)
+    room: int = Field(default=-1, ge=-1, le=255)
     params: int = Field(ge=-32768, le=32767)
     position: tuple[float, float, float]
     focus_position: tuple[float, float, float] | None = None
@@ -162,6 +164,9 @@ class GameState(StrictModel):
     last_played_song: int = Field(default=0, ge=0, le=65535)
     target_actor: ActorObservation | None = None
     nearby_actors: list[ActorObservation] = Field(default_factory=list, max_length=24)
+    room_actors: list[ActorObservation] = Field(default_factory=list, max_length=64)
+    room_actor_count: int = Field(default=0, ge=0, le=4096)
+    room_actors_truncated: bool = False
     cutscene_active: bool = False
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=16)
