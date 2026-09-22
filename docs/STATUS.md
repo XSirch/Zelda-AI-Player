@@ -2,6 +2,18 @@
 
 Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementação, teste e proposta.
 
+## Autonomy v2 — gameplay autônomo de longa duração (22/09/2026)
+
+- Contrato `state-v2/skills-v2/trajectory-v1/prompt-v5`: cena nomeada, dia/noite, colisão/água do player, inventário semântico com munição aplicável, progresso/equipamento visível no pause, atores observados com ActorDB, `context_actor` e grafo de mundo aprendido.
+- Diálogo linear é transcrito/autoavançado localmente; somente escolhas semânticas voltam ao modelo. Game-over save/continue também é local.
+- Controladores compostos implementados: `navigate_to`, `approach_actor`, `follow_actor`, `talk_to_actor`, `interact_with_actor`, `explore_area`, `manipulate_object`, `equip_item`, `equip_gear`, `aim_at`, `face_target`, `shield_face` e `fight_enemy`.
+- Navegação usa feedback de posição/câmera e detours em `BGCHECKFLAG_WALL`; mira usa feedback yaw/pitch e calibração de sinal; interações e combate só declaram sucesso com mudança de estado/evento observável quando aplicável.
+- Cada transição atravessada alimenta `world_edges` com origem/posição de saída/destino/spawn/entrance. Trajetórias bem-sucedidas continuam isoladas por provider+modelo+effort+versão do contrato.
+- `OnItemReceive` e scene flag hooks permitem confirmar efeitos sem inferir sucesso. A derrota de `ACTOR_BOSS_GANON2` emite `game_completed`; a run passa para `completed` e esse estado é preservado no shutdown.
+- Painel ao vivo mostra cena semântica, diálogo, atores/context actor, progresso, inventário/munição, equipamento atual, dia/noite e grafo observado.
+- **Validação pendente:** novos testes foram escritos e símbolos/hooks foram confrontados com o Shipwright fixado, mas `pytest`, build Vite e build completo SoH/Windows desta v2 não foram executados porque o ambiente de autoria não resolve `github.com` para materializar o checkout. Não há alegação de que a v2 já zerou OoT.
+- Visão sob demanda continua planejada; o caminho normal permanece 100% estado estruturado para reduzir custo/tokens.
+
 ## Autonomy v1 — transições, diálogo e controles sistêmicos (22/09/2026)
 
 - O contrato foi elevado para `state-v2/skills-v1/trajectory-v1/prompt-v4`. Mudanças de `scene`, `room` ou `scene_epoch` agora invalidam imediatamente a ação corrente, liberam a lease de input e forçam nova observação/planejamento.
@@ -36,8 +48,8 @@ Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementa�
 | Memória de experiência | Notas + trajetórias persistentes por modelo/effort | Rotas são promovidas em transições autônomas e reaplicadas localmente; validação real no SoH pendente |
 | Locomoção adaptativa | Giro + replay + primitives de esquiva + stuck detector | Implementado; teste real no SoH pendente |
 | Diálogo, pause, game-over e ocarina | Estado estruturado + primitives locais | Implementado; teste real no SoH pendente |
-| Mira, navegação espacial com colisão e combate composto | Planejados | Não implementados |
-| Conclusão de dungeons/jogo certificada | Planejada | Sem métrica percentual inventada |
+| Navegação espacial, mira, interação, follow, manipulação e combate composto | Implementados em skills-v2 | Revisão estática feita; teste real SoH pendente |
+| Conclusão do jogo | Evento explícito no Ganon final e estado `completed` | Ainda não validado em run completa |
 
 ## Próxima validação local: gate de integração, não uma política de bloqueio
 
@@ -48,9 +60,9 @@ Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementa�
 
 ## Backlog de gameplay
 
-**M2 — percepção utilizável:** diálogo decodificado, ações contextuais, transições, estado de pause/game-over/ocarina e atores desenhados estão implementados no código. Restam geometria navegável/colisão observável, identificação semântica segura de entidades, mapa mundial persistente e validação real de que o filtro não vaza informação oculta.
+**M2 — percepção utilizável:** implementada em v2 com diálogo, context actor, ActorDB somente para atores observados, colisão/água, progresso/equipamento, inventário/munição, dia/noite e grafo persistente de transições observadas. Resta validar no SoH real e adicionar visão sob demanda somente para lacunas não representáveis por estado.
 
-**M3 — controle de longa duração:** pause/menu genérico, músicas e primitives de combate curto foram adicionados. Restam navegação espacial até entidades/saídas, mira calibrada de arco/Hookshot, `equip_item` por identidade semântica, combate composto parametrizado, manipulação de puzzles e critérios observáveis por encontro.
+**M3 — controle de longa duração:** navegação local, follow, interação, exploração, manipulação, mira, combate genérico, equipamento semântico, ocarina, diálogo e game-over estão implementados. Restam estratégias específicas para encontros/puzzles que os primitives genéricos não resolvam e validação/calibração em gameplay real.
 
 **M4 — aprendizado e benchmark certificado:** saves/checkpoints e RNG reproduzíveis, orçamento de treino, memória por modelo, seleção/promoção de skills candidatas em ambiente separado, curvas de aprendizagem, milestones de dungeons e detector de conclusão validado. Não misturar treino, dicas humanas e avaliação cega.
 
@@ -64,7 +76,7 @@ Milestone 0.2 em desenvolvimento, 22/09/2026. Este arquivo distingue implementa�
 - Eventos UDP não certificam conclusão de quests. O texto de diálogo agora é decodificado, mas isso não equivale a um detector certificado de progresso de quest.
 - Budget local de tokens é verificado entre chamadas; o limite em USD usa reserva estimada. Cancelamentos podem deixar faturamento pendente, que deve ser auditado no provider.
 - A lista `nearby_actors` contém somente atores marcados como desenhados no frame/sala, limitada por distância e quantidade; ainda precisa de validação visual no SoH para confirmar a observabilidade pretendida.
-- Menu genérico não é ainda uma skill semântica de equipamento: o modelo vê IDs/cursor e opera primitives.
+- `equip_item` e `equip_gear` são skills semânticas verificadas por estado; páginas incomuns continuam disponíveis pelas primitives genéricas do menu.
 - Modelos OpenRouter sem JSON estruturado estão desabilitados nesta primeira versão.
 - Não há CI hospedado nem gasto de GitHub Actions; os testes são locais.
 

@@ -79,7 +79,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             yield
         finally:
             runtime = getattr(app.state, "runtime", None)
-            if runtime:
+            if runtime and runtime.state in {"running", "paused"}:
                 await runtime.halt("stopped", "server_shutdown")
             bridge.close()
             if simulator_task:

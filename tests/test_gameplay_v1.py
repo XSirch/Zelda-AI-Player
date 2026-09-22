@@ -86,3 +86,72 @@ def test_room_transition_is_logged_and_releases_input(store, state):
     assert runtime.last_result["reason"] == "world_transition"
     assert transport.sent
     assert b'"active":false' in transport.sent[-1][0]
+
+
+@pytest.mark.asyncio
+async def test_gameover_continue_is_handled_locally(store, state):
+    bridge = Bridge("x" * 32, True)
+    transport = Transport()
+    bridge.connection_made(transport)
+    game = GameState.model_validate({**state.model_dump(), "seq": state.seq + 1,
+        "source": "simulator", "game_over_state": 4,
+        "pause_menu": {"active": True, "ready": False, "state": 0xE,
+            "transition_state": 0, "page_index": 0, "cursor_special_pos": 0,
+            "cursor_point": [], "cursor_item": [], "cursor_slot": [],
+            "named_item": None, "prompt_choice": 0}})
+    bridge.datagram_received(packet(game, source="simulator"), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {})
+    assert await runtime._handle_gameover(game)
+    assert any(b'"buttons":32768' in payload and b'"active":true' in payload
+        for payload, _ in transport.sent)
+
+
+@pytest.mark.asyncio
+async def test_linear_dialogue_auto_advances_and_preserves_transcript(store, state):
+    bridge = Bridge("x" * 32)
+    transport = Transport()
+    bridge.connection_made(transport)
+    game = with_dialogue(state, text="Listen carefully.", can_advance=True, choice_count=0)
+    bridge.datagram_received(packet(game), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {})
+    assert await runtime._handle_dialogue(game)
+    assert runtime.dialogue_transcript[-1]["text"] == "Listen carefully."
+    assert any(b'"buttons":32768' in payload and b'"active":true' in payload
+        for payload, _ in transport.sent)
+
+
+@pytest.mark.asyncio
+async def test_choice_dialogue_is_left_for_model(store, state):
+    bridge = Bridge("x" * 32)
+    transport = Transport()
+    bridge.connection_made(transport)
+    game = with_dialogue(state, text="Choose.", state="choice", state_code=4,
+        can_advance=True, choice_count=2, choices=["Yes", "No"])
+    bridge.datagram_received(packet(game), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {})
+    assert not await runtime._handle_dialogue(game)
+    assert runtime.dialogue_transcript[-1]["choices"] == ["Yes", "No"]
+    assert transport.sent == []
+
+
+def test_game_completed_event_finishes_run_and_persists_status(store, state):
+    bridge = Bridge("x" * 32, True)
+    transport = Transport()
+    bridge.connection_made(transport)
+    bridge.datagram_received(packet(state, source="simulator"), ("127.0.0.1", 5000))
+    runtime = Runtime(bridge, store, {"demo": DemoProvider()})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.segment_id = store.segment(runtime.run_id, runtime.config.model_dump(), runtime.namespace)
+    runtime.state = "running"
+
+    completed = GameState.model_validate({**state.model_dump(), "source": "simulator",
+        "seq": state.seq + 1, "events": [{"id": "complete-1", "kind": "game_completed",
+            "detail": "final_ganon_defeated"}]})
+    bridge.datagram_received(packet(completed, source="simulator"), ("127.0.0.1", 5000))
+
+    assert runtime.state == "completed"
+    assert runtime.reason == "game_completed"
+    assert store.detail(runtime.run_id)["status"] == "completed"
+    assert any(event["kind"] == "run_completed" for event in runtime.recent)

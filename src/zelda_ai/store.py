@@ -32,6 +32,13 @@ events = Table("events", metadata,
 memories = Table("memories", metadata,
     Column("id", String, primary_key=True), Column("namespace", String, index=True),
     Column("scene", Integer), Column("note", String), Column("created_at", Float))
+world_edges = Table("world_edges", metadata,
+    Column("id", String, primary_key=True), Column("namespace", String, index=True),
+    Column("from_scene", Integer, index=True), Column("from_scene_name", String),
+    Column("from_room", Integer), Column("from_position", JSON),
+    Column("to_scene", Integer, index=True), Column("to_scene_name", String),
+    Column("to_room", Integer), Column("to_position", JSON), Column("entrance_index", Integer),
+    Column("traversals", Integer, default=1), Column("created_at", Float), Column("updated_at", Float))
 trajectories = Table("trajectories", metadata,
     Column("id", String, primary_key=True), Column("namespace", String, index=True),
     Column("signature", String, index=True), Column("from_scene", Integer, index=True),
@@ -121,6 +128,60 @@ class Store:
             return [dict(row) for row in conn.execute(query.order_by(memories.c.created_at.desc())
                 .limit(limit)).mappings()]
 
+    def learn_world_edge(self, namespace: str, origin: dict, destination: dict) -> str | None:
+        if not namespace or min(origin.get("scene", -1), origin.get("room", -1),
+                                destination.get("scene", -1), destination.get("room", -1)) < 0:
+            return None
+        now = time.time()
+        with self.engine.begin() as conn:
+            row = conn.execute(select(world_edges).where(
+                world_edges.c.namespace == namespace,
+                world_edges.c.from_scene == origin["scene"],
+                world_edges.c.from_room == origin["room"],
+                world_edges.c.to_scene == destination["scene"],
+                world_edges.c.to_room == destination["room"],
+                world_edges.c.entrance_index == destination.get("entrance_index", -1),
+            )).mappings().first()
+            values = {
+                "from_scene_name": origin.get("scene_name", ""),
+                "from_position": list(origin.get("position") or []),
+                "to_scene_name": destination.get("scene_name", ""),
+                "to_position": list(destination.get("position") or []),
+                "updated_at": now,
+            }
+            if row:
+                conn.execute(world_edges.update().where(world_edges.c.id == row["id"]).values(
+                    traversals=(row["traversals"] or 0) + 1, **values))
+                return row["id"]
+            edge_id = uid()
+            conn.execute(world_edges.insert().values(id=edge_id, namespace=namespace,
+                from_scene=origin["scene"], from_scene_name=origin.get("scene_name", ""),
+                from_room=origin["room"], from_position=list(origin.get("position") or []),
+                to_scene=destination["scene"], to_scene_name=destination.get("scene_name", ""),
+                to_room=destination["room"], to_position=list(destination.get("position") or []),
+                entrance_index=destination.get("entrance_index", -1), traversals=1,
+                created_at=now, updated_at=now))
+            return edge_id
+
+    def world_neighbors(self, namespace: str, scene: int, room: int, limit: int = 12) -> list[dict]:
+        if not namespace:
+            return []
+        with self.engine.connect() as conn:
+            rows = conn.execute(select(world_edges).where(
+                world_edges.c.namespace == namespace,
+                world_edges.c.from_scene == scene,
+                world_edges.c.from_room == room).order_by(
+                    world_edges.c.traversals.desc(), world_edges.c.updated_at.desc()).limit(limit)).mappings()
+            return [dict(row) for row in rows]
+
+    def list_world_edges(self, namespace: str, limit: int = 100) -> list[dict]:
+        if not namespace:
+            return []
+        with self.engine.connect() as conn:
+            return [dict(row) for row in conn.execute(select(world_edges).where(
+                world_edges.c.namespace == namespace).order_by(
+                    world_edges.c.updated_at.desc()).limit(limit)).mappings()]
+
     def learn_trajectory(self, namespace: str, origin: dict, destination: dict,
                          actions: list[dict]) -> str | None:
         safe_actions = []
@@ -128,12 +189,17 @@ class Store:
             skill = action.get("skill")
             args = action.get("args")
             if skill not in {"move", "turn", "interact", "wait", "camera_center",
-                              "roll", "backflip", "sidestep"} or not isinstance(args, dict):
+                              "roll", "backflip", "sidestep", "navigate_to", "approach_actor",
+                              "interact_with_actor"} or not isinstance(args, dict):
                 return None
             safe_actions.append({"skill": skill, "args": {
                 "direction": args.get("direction"), "duration_ms": args.get("duration_ms"),
                 "strength": args.get("strength"), "slot": args.get("slot"),
-                "choice_index": args.get("choice_index"), "song": args.get("song")}})
+                "choice_index": args.get("choice_index"), "song": args.get("song"),
+                "target_actor_id": args.get("target_actor_id"),
+                "target_actor_params": args.get("target_actor_params"),
+                "target_position": args.get("target_position"),
+                "stop_distance": args.get("stop_distance"), "item_id": args.get("item_id")}})
         if not safe_actions or not any(a["skill"] in {"move", "turn"} for a in safe_actions):
             return None
         signature_payload = {"from": [origin["scene"], origin["room"]],
@@ -263,6 +329,7 @@ class Store:
             "known_cost_usd": round(cost, 8), "cost_usd": None if codex_calls or unknown_cost else round(cost, 8),
             "mean_latency_ms": sum(latencies) / len(latencies) if latencies else None,
             "deaths": kinds["player_died"], "boss_events": len(bosses),
+            "game_completions": kinds["game_completed"],
             "interventions": kinds["human_hint"] + kinds["take_control"],
             "skill_failures": kinds["skill_failed"], "vision_calls": 0,
             "trajectories_learned": kinds["trajectory_learned"],

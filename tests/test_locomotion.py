@@ -1,11 +1,14 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.runtime import controller_input
+from zelda_ai.runtime import _aim_error, _aim_stick, _equipment_point, _inventory_slot, _menu_grid_directions, _steer_to, controller_input
 
 
-def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None):
+def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
+             target_actor_id=None, target_actor_params=None, target_position=None, stop_distance=None, item_id=None):
     return Decision(goal="navigate", summary="test", skill=skill,
         args=SkillArgs(direction=direction, duration_ms=duration, strength=strength, slot=slot,
-            choice_index=choice_index, song=song), memory_note=None)
+            choice_index=choice_index, song=song, target_actor_id=target_actor_id,
+            target_actor_params=target_actor_params, target_position=target_position,
+            stop_distance=stop_distance, item_id=item_id), memory_note=None)
 
 
 def test_turn_uses_steering_plus_small_forward_bias():
@@ -72,3 +75,61 @@ def test_play_song_requires_named_song():
     with pytest.raises(ValidationError):
         decision("play_song", None)
     assert decision("play_song", None, song="lullaby").args.song == "lullaby"
+
+
+def test_local_servo_steers_toward_camera_forward(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, -10.0),
+        "camera_at": (0.0, 0.0, 0.0)})
+    x, y, distance = _steer_to(game, (0.0, 0.0, 100.0), 0.8)
+    assert abs(x) <= 1
+    assert y > 0
+    assert distance == 100.0
+
+
+def test_local_servo_steers_right_when_target_is_camera_right(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, -10.0),
+        "camera_at": (0.0, 0.0, 0.0)})
+    x, y, _ = _steer_to(game, (100.0, 0.0, 0.0), 0.8)
+    assert x > 0
+    assert abs(y) <= 1
+
+
+def test_inventory_slot_prefers_semantic_observation(state):
+    game = type(state).model_validate({**state.model_dump(), "inventory": [255, 7, 6],
+        "inventory_named": [{"slot": 1, "item_id": 7, "name": "Fairy Ocarina"}]})
+    assert _inventory_slot(game, 7) == 1
+    assert _inventory_slot(game, 6) == 2
+    assert _inventory_slot(game, 3) is None
+
+
+def test_menu_grid_prefers_axis_toward_target():
+    assert _menu_grid_directions(0, 7)[:2] == ["right", "down"]
+    assert _menu_grid_directions(23, 0)[:2] == ["left", "up"]
+
+
+def test_equipment_grid_mapping_matches_vanilla_layout():
+    assert _equipment_point(0x3B) == 1   # Kokiri Sword
+    assert _equipment_point(0x3D) == 3   # BGS
+    assert _equipment_point(0x3E) == 5   # Deku Shield
+    assert _equipment_point(0x43) == 11  # Zora Tunic
+    assert _equipment_point(0x45) == 14  # Iron Boots
+    assert _equipment_point(0x46) == 15  # Hover Boots
+    assert _equipment_point(7) is None
+
+
+def test_aim_error_zero_when_camera_points_at_target(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, 0.0),
+        "camera_at": (0.0, 0.0, 10.0)})
+    yaw, pitch = _aim_error(game, (0.0, 0.0, 100.0))
+    assert abs(yaw) < 1e-6
+    assert abs(pitch) < 1e-6
+
+
+def test_aim_error_and_stick_point_toward_right_and_up(state):
+    game = state.model_copy(update={"camera_eye": (0.0, 0.0, 0.0),
+        "camera_at": (0.0, 0.0, 10.0)})
+    yaw, pitch = _aim_error(game, (10.0, 10.0, 100.0))
+    assert yaw > 0 and pitch > 0
+    assert _aim_stick(yaw, 1) > 0
+    assert _aim_stick(pitch, 1) > 0
+    assert _aim_stick(yaw, -1) < 0

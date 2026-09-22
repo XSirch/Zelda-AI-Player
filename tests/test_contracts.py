@@ -18,9 +18,12 @@ def test_token_subsets_are_not_double_counted():
 
 
 @pytest.mark.parametrize("patch", [{"skill": "teleport"}, {"args": {"direction": None,
-    "slot": None, "choice_index": None, "song": None, "duration_ms": 100, "strength": .5}}, {"shell": "anything"},
-    {"args": {"direction": "forward", "slot": None, "choice_index": None,
-        "duration_ms": 2001, "strength": .5}}])
+    "slot": None, "choice_index": None, "song": None, "target_actor_id": None,
+        "target_actor_params": None, "target_position": None, "stop_distance": None,
+        "item_id": None, "duration_ms": 100, "strength": .5}}, {"shell": "anything"},
+    {"args": {"direction": "forward", "slot": None, "choice_index": None, "song": None, "target_actor_id": None,
+        "target_actor_params": None, "target_position": None, "stop_distance": None,
+        "item_id": None, "duration_ms": 2001, "strength": .5}}])
 def test_decision_rejects_invalid_actions(decision, patch):
     with pytest.raises(ValidationError):
         Decision.model_validate({**decision.model_dump(), **patch})
@@ -98,3 +101,114 @@ def test_game_state_accepts_structured_dialogue_and_drawn_actor(state):
     assert validated.dialogue.text == "Hello Link"
     assert validated.dialogue.choices == ["Yes", "No"]
     assert validated.nearby_actors[0].drawn
+
+
+def test_compound_navigation_accepts_longer_window(decision):
+    nav = Decision.model_validate({**decision.model_dump(), "skill": "navigate_to",
+        "args": {**decision.args.model_dump(), "duration_ms": 8000,
+            "target_position": [120.0, 0.0, -40.0], "stop_distance": 35.0}})
+    assert nav.args.duration_ms == 8000
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(),
+            "args": {**decision.args.model_dump(), "duration_ms": 8000}})
+
+
+def test_actor_and_equip_high_level_skills_require_targets(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "approach_actor"})
+    actor = Decision.model_validate({**decision.model_dump(), "skill": "talk_to_actor",
+        "args": {**decision.args.model_dump(), "target_actor_id": 123,
+            "target_actor_params": 4, "duration_ms": 6000}})
+    assert actor.args.target_actor_id == 123
+
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "equip_item"})
+    equipped = Decision.model_validate({**decision.model_dump(), "skill": "equip_item",
+        "args": {**decision.args.model_dump(), "item_id": 7, "slot": "left",
+            "duration_ms": 8000}})
+    assert equipped.args.item_id == 7 and equipped.args.slot == "left"
+
+
+def test_game_state_accepts_semantic_scene_inventory_and_pause_ready(state):
+    enriched = type(state).model_validate({**state.model_dump(),
+        "scene_name": "Kokiri Forest",
+        "inventory": [255, 7],
+        "inventory_named": [{"slot": 1, "item_id": 7, "name": "Fairy Ocarina"}],
+        "pause_menu": {"active": True, "ready": True, "state": 6, "transition_state": 0,
+            "page_index": 0, "cursor_special_pos": 0, "cursor_point": [1, 0, 0, 0, 0],
+            "cursor_item": [7, 999, 999, 59], "cursor_slot": [1, 0, 0, 0],
+            "named_item": 7, "prompt_choice": 0}})
+    assert enriched.scene_name == "Kokiri Forest"
+    assert enriched.inventory_named[0].name == "Fairy Ocarina"
+    assert enriched.pause_menu.ready
+
+
+def test_game_state_accepts_pause_visible_progress(state):
+    enriched = type(state).model_validate({**state.model_dump(), "progress": {
+        "quest_items": ["Kokiri's Emerald", "Saria's Song"],
+        "owned_equipment": ["Kokiri Sword", "Deku Shield"],
+        "upgrade_levels": {"bullet_bag": 1, "wallet": 1},
+        "heart_pieces": 2, "skull_tokens": 4, "magic_acquired": False,
+        "double_magic": False, "double_defense": False, "map_index": 0,
+        "dungeon_items": ["Dungeon Map"], "small_keys": 1}})
+    assert "Kokiri's Emerald" in enriched.progress.quest_items
+    assert "Deku Shield" in enriched.progress.owned_equipment
+    assert enriched.progress.small_keys == 1
+
+
+def test_fight_enemy_requires_observed_actor_target(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "fight_enemy",
+            "args": {**decision.args.model_dump(), "duration_ms": 8000}})
+    fight = Decision.model_validate({**decision.model_dump(), "skill": "fight_enemy",
+        "args": {**decision.args.model_dump(), "duration_ms": 8000,
+            "target_actor_id": 37, "target_actor_params": 0}})
+    assert fight.args.target_actor_id == 37
+
+
+def test_actor_metadata_is_optional_but_bounded(state):
+    actor = {"actor_id": 12, "name": "En_Sa", "description": "Saria", "category": 4,
+        "params": 0, "position": [1, 2, 3], "distance": 4.0, "targeted": False,
+        "drawn": True, "text_id": 4096}
+    enriched = type(state).model_validate({**state.model_dump(), "nearby_actors": [actor]})
+    assert enriched.nearby_actors[0].description == "Saria"
+
+
+def test_equip_gear_requires_item_and_progress_can_mark_equipped(decision, state):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "equip_gear",
+            "args": {**decision.args.model_dump(), "duration_ms": 8000}})
+    gear_decision = Decision.model_validate({**decision.model_dump(), "skill": "equip_gear",
+        "args": {**decision.args.model_dump(), "duration_ms": 8000, "item_id": 0x45}})
+    assert gear_decision.args.item_id == 0x45
+
+    enriched = type(state).model_validate({**state.model_dump(), "progress": {
+        "quest_items": [], "owned_equipment": ["Iron Boots"],
+        "equipment": [{"item_id": 0x45, "name": "Iron Boots", "equipment_type": "boots",
+            "value": 2, "equipped": True}],
+        "upgrade_levels": {}, "heart_pieces": 0, "skull_tokens": 0,
+        "magic_acquired": False, "double_magic": False, "double_defense": False,
+        "map_index": 0, "dungeon_items": [], "small_keys": 0}})
+    assert enriched.progress.equipment[0].equipped
+
+
+@pytest.mark.parametrize("skill,args", [
+    ("follow_actor", {"target_actor_id": 10, "duration_ms": 6000}),
+    ("interact_with_actor", {"target_actor_id": 10, "duration_ms": 5000}),
+    ("manipulate_object", {"target_actor_id": 10, "direction": "forward", "duration_ms": 6000}),
+    ("face_target", {"target_position": [10, 0, 20], "duration_ms": 3000}),
+    ("shield_face", {"target_actor_id": 10, "duration_ms": 3000}),
+    ("aim_at", {"target_actor_id": 10, "slot": "left", "duration_ms": 5000}),
+    ("explore_area", {"duration_ms": 10000}),
+])
+def test_autonomy_v2_compound_skill_contracts(decision, skill, args):
+    payload = {**decision.args.model_dump(), **args}
+    parsed = Decision.model_validate({**decision.model_dump(), "skill": skill, "args": payload})
+    assert parsed.skill == skill
+
+
+def test_manipulate_object_rejects_sideways_direction(decision):
+    with pytest.raises(ValidationError):
+        Decision.model_validate({**decision.model_dump(), "skill": "manipulate_object",
+            "args": {**decision.args.model_dump(), "target_actor_id": 10,
+                "direction": "left", "duration_ms": 5000}})

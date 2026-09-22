@@ -21,11 +21,11 @@ SoH custom build -- UDP 127.0.0.1:8766 --> Bridge Python
 
 ## Decisão, estado e cadência
 
-`models.py` define o contrato Autonomy v1 (`state-v2/skills-v1`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
+`models.py` define o contrato Autonomy v2 (`state-v2/skills-v2/trajectory-v1/prompt-v5`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
 
-As primitives motoras continuam curtas e limitadas, mas diálogo, escolha, menu, ocarina e algumas ações compostas executam loops locais sem uma chamada de modelo por frame. Navegação espacial com colisão, mira e combate composto de longa duração continuam fora desta versão e não devem ser simulados pelo planner.
+Primitives motoras continuam curtas e limitadas. Controladores compostos locais executam navegação até posição/ator, follow, conversa/interação, exploração, manipulação, mira, facing/escudo, combate genérico, equipamento, ocarina, diálogo linear e game-over sem uma chamada de modelo por frame. O planner escolhe subobjetivos e estratégias; sucesso de interação/combate exige evidência observável.
 
-Dados expostos: posição/orientação, vida/magia/rupias, IDs de inventário/equipamento, câmera, cena/sala/entrance, diálogo decodificado e choices, ação contextual, estado de pause/game-over/ocarina, target e uma lista limitada de atores marcados pelo motor como desenhados na sala atual. A lista é limitada a 24 atores a até 1400 unidades e não pretende enumerar a cena inteira. Não há solução de puzzles, cheats, escrita em HP/inventário, navmesh global ou flags ocultos deliberadamente expostos. O estado ainda não é classificado como benchmark humano-observável estrito: contém coordenadas exatas e IDs internos.
+Dados expostos: posição/orientação/colisão/água, vida/magia/rupias, inventário possuído com nomes e munição aplicável, equipamento/progresso visível no pause, câmera, cena nomeada/sala/entrance/dia-noite, diálogo, ação contextual e ator associado, target e uma lista limitada de atores realmente desenhados. A lista continua limitada a 24 atores/1400 unidades, mas prioriza contexto/target/NPC/boss/door/chest/enemy. Não há solução de puzzles, escrita direta em HP/inventário, navmesh global nem eventChkInf/flags ocultos de roteiro deliberadamente expostos. O estado ainda não é classificado como benchmark humano-observável estrito: contém coordenadas exatas e IDs internos.
 
 ## Controle nativo
 
@@ -43,7 +43,7 @@ Modelos podem conhecer Zelda do pré-treino; memória vazia não implica desconh
 
 ## Persistência e segurança
 
-SQLite local com WAL; SQLAlchemy permite uma URL alternativa com o driver instalado pelo operador. Não requer PostgreSQL ou Docker para começar. Tabelas: runs, segments, calls, events, memories. Reiniciar o backend marca runs anteriores como interrompidas; não retoma inferências pagas automaticamente.
+SQLite local com WAL; SQLAlchemy permite uma URL alternativa com o driver instalado pelo operador. Não requer PostgreSQL ou Docker para começar. Tabelas: runs, segments, calls, events, memories, trajectories e world_edges. Reiniciar o backend marca runs anteriores como interrompidas; não retoma inferências pagas automaticamente.
 
 HTTP aceita apenas hosts locais. Mutação exige nonce de sessão, e origens web externas são rejeitadas. WebSocket autentica pela primeira mensagem, não por segredo em URL. Chave OpenRouter digitada no painel é mantida apenas em memória. Arquivos locais de credenciais, saves, ROMs e banco ficam fora do Git.
 

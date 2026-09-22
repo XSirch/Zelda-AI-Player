@@ -17,7 +17,8 @@ def state():
 @pytest.fixture
 def decision():
     return Decision(goal="Explore", summary="Move toward an untested direction.", skill="move",
-        args={"direction": "forward", "duration_ms": 100, "strength": 0.5, "slot": None, "choice_index": None, "song": None}, memory_note=None)
+        args={"direction": "forward", "duration_ms": 100, "strength": 0.5, "slot": None, "choice_index": None, "song": None, "target_actor_id": None,
+            "target_actor_params": None, "target_position": None, "stop_distance": None, "item_id": None}, memory_note=None)
 
 
 @pytest.fixture

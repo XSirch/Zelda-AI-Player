@@ -2,7 +2,7 @@
 
 Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**, com estado estruturado, Codex/ChatGPT, OpenRouter e painel administrativo.
 
-**Estado: milestone 0.2 em desenvolvimento — percepção/eventos e controles sistêmicos implementados, ainda não um agente certificado para zerar o jogo.** A revisão Autonomy v1 adiciona diálogo decodificado, transições, atores observados, pause/game-over/ocarina e recovery local. A integração nativa desta revisão ainda precisa ser recompilada e validada no SoH/Windows; os providers precisam do seu login para um teste real. Não há ROM, assets de Zelda ou credenciais no repositório.
+**Estado: milestone 0.3 / Autonomy v2 em desenvolvimento — harness de gameplay autônomo implementado, ainda não certificado como capaz de zerar o jogo.** A v2 adiciona percepção semântica, diálogo automático, navegação/combate/mira/equipamento compostos, grafo de mundo aprendido, recuperação de game-over e detector explícito de vitória. A bridge desta revisão precisa ser recompilada e validada no SoH/Windows antes de considerar essas capacidades operacionais. Não há ROM, assets de Zelda ou credenciais no repositório.
 
 ## O que existe nesta versão
 
@@ -11,10 +11,10 @@ Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**
 - Codex app-server por JSON-RPC/stdio, login oficial ChatGPT em perfil isolado, catálogo dinâmico e contabilização dos tokens informados pela CLI. Não usa OAuth como API key.
 - OpenRouter por API, catálogo dinâmico, JSON estruturado, reasoning effort quando anunciado e custo efetivamente retornado. Sem retry pago automático.
 - Bridge C++ para SoH: telemetria a 5 Hz por UDP autenticado em localhost, input analógico/botões por leases de até 500 ms, proteção contra replay/comandos stale e preempção em mudança de scene/room.
-- Percepção estruturada: texto de diálogo decodificado, choices/speaker, ação contextual do botão A, target, até 24 atores realmente desenhados na sala, entrance, cutscene, pause menu, game-over e ocarina. Screenshots continuam fora do prompt normal.
-- Skills locais: movimento/giro, interação e diálogo, ataque/defesa/target, roll/backflip/sidestep/jump attack, C-buttons já equipados, pause/menu genérico, atribuição do item selecionado a C, continue após game-over e execução das 12 músicas normais da ocarina. O resultado continua exigindo evidência observável; não inventa acerto ou vitória.
-- O runtime espera localmente enquanto texto/cutscene não está acionável, detecta repetição de falhas (stuck) e manda o planner trocar de estratégia em vez de repetir a mesma ação.
-- Memória persistente de notas/hipóteses e trajetórias de navegação. No modo Adaptive, sequências autônomas que conseguem mudar de sala/cena são persistidas por modelo + effort + versão do contrato e reaplicadas localmente em runs futuras antes de gastar outra inferência. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
+- Percepção estruturada: cena nomeada, room/entrance, dia/noite, pose/colisão/água, diálogo decodificado, ação contextual associada ao ator quando disponível, target, atores desenhados priorizados por relevância, inventário com nomes/munição aplicável, equipamento/progresso visível no pause, cutscene, game-over e ocarina. Screenshots continuam fora do prompt normal.
+- Skills compostas locais: navegação até posição/ator, follow, conversa/interação com evidência, exploração, manipulação, combate genérico, mira com feedback, orientação/escudo, equipamento de C-buttons e gear, menu, game-over e as 12 músicas normais. O modelo escolhe objetivo/skill; correções de frame ficam no runtime.
+- Diálogo linear é transcrito e avançado localmente sem gastar uma inferência por página. Game-over é salvo/continuado localmente. A derrota do Ganon final emite `game_completed` e encerra a run como `completed`.
+- Memória persistente de notas/hipóteses, trajetórias e grafo de mundo observado. Cada transição realmente atravessada registra origem/saída, destino/spawn e entrance; não é preenchida a partir de walkthrough oculto. No modo Adaptive, sequências autônomas que conseguem mudar de sala/cena são persistidas por modelo + effort + versão do contrato e reaplicadas localmente em runs futuras antes de gastar outra inferência. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
 
 ## Testar o painel e o ciclo sem jogo ou créditos
 
@@ -55,7 +55,7 @@ O instalador confere o commit e o blob de `padmgr.c`, copia apenas nossos três 
 
 Siga as instruções de build do [Shipwright na revisão fixada](https://github.com/HarbourMasters/Shipwright/tree/d30fc192f2eb01ceea45bd1e12de61636cafbf86). Reconfigure o CMake depois de instalar o bridge, pois novos arquivos foram adicionados. **O build completo do SoH não foi executado aqui.**
 
-> **Autonomy v1 altera o código nativo da bridge.** Se você já tinha compilado uma revisão anterior, execute novamente `uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI`, reconfigure o CMake e recompile o SoH antes de testar diálogo/transições/menu/ocarina.
+> **Autonomy v2 altera novamente o código nativo da bridge.** Se você já tinha compilado uma revisão anterior, execute novamente `uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI`, reconfigure o CMake e recompile o SoH antes de testar diálogo/transições/menu/ocarina.
 
 Depois de compilar, abra dois terminais na raiz deste projeto:
 
@@ -67,7 +67,7 @@ uv run zelda-ai serve
 uv run zelda-ai launch-soh "D:\Projetos\Shipwright-AI\build\CAMINHO_REAL\soh.exe"
 ```
 
-`launch-soh` injeta o token local e a porta no ambiente do processo. Abra/carregue um save manualmente. O painel precisa mostrar **BRIDGE Conectado** e um estado jogável antes de autorizar uma run. A IA não controla a seleção de saves nesta versão.
+`launch-soh` injeta o token local e a porta no ambiente do processo. Abra/carregue um save manualmente. O painel precisa mostrar **BRIDGE Conectado** e um estado jogável antes de autorizar uma run. Depois de iniciar a run, o objetivo padrão é completar OoT e derrotar o Ganon final sem intervenção humana. A seleção inicial de save ainda não é controlada pela IA.
 
 ## Autenticação e modelos
 
@@ -114,6 +114,6 @@ cd web
 npm run build
 ```
 
-26 testes passaram no ambiente de autoria: contratos, métricas, isolamento, limites, segurança HTTP, protocolo Codex com subprocesso de teste, API OpenRouter com transporte simulado, UDP e ciclo completo demo. O teste C++ compila e executa `InputLease.hpp` com `g++`/`clang++` quando disponível; isso **não substitui** compilar o adaptador dentro do SoH.
+A suíte histórica havia passado antes da Autonomy v2. Para esta revisão, novos testes de contratos/controladores/grafo/diálogo/game-over/conclusão foram escritos, mas **não puderam ser executados no ambiente de autoria porque o checkout via GitHub continua bloqueado por DNS**. O build Vite e a recompilação completa do SoH/Windows também permanecem pendentes. O teste isolado de `InputLease.hpp` não substitui compilar o adaptador dentro do SoH.
 
 Veja [docs/STATUS.md](docs/STATUS.md) para fronteiras do milestone e próximo trabalho, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para os contratos e [AGENTS.md](AGENTS.md) para desenvolvimento.

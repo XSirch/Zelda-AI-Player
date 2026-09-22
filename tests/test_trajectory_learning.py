@@ -65,3 +65,28 @@ def test_trajectory_rejects_far_spawn_or_opposite_heading(store):
     store.learn_trajectory("adaptive:match", origin, destination, actions)
     assert store.best_trajectory("adaptive:match", 2, 0, (500.0, 0.0, 0.0), 0) is None
     assert store.best_trajectory("adaptive:match", 2, 0, (0.0, 0.0, 0.0), 32767) is None
+
+
+def test_transition_builds_observed_world_graph(store, state):
+    bridge = Bridge("x" * 32, True)
+    runtime = Runtime(bridge, store, {})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo", memory_mode="adaptive")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.state = "running"
+
+    origin = type(state).model_validate({**state.model_dump(), "scene_name": "Link's House",
+        "player": {**state.player.model_dump(), "position": [10, 0, 20]}})
+    destination = type(state).model_validate({**state.model_dump(), "seq": state.seq + 1,
+        "scene_epoch": state.scene_epoch + 1, "scene": 84, "scene_name": "Kokiri Forest",
+        "room": 0, "entrance_index": 187, "player": {**state.player.model_dump(),
+            "position": [-30, 0, 45]}})
+    runtime.on_state(destination, origin)
+
+    edges = store.world_neighbors(runtime.namespace, origin.scene, origin.room)
+    assert len(edges) == 1
+    assert edges[0]["from_scene_name"] == "Link's House"
+    assert edges[0]["to_scene_name"] == "Kokiri Forest"
+    assert edges[0]["entrance_index"] == 187
+    assert edges[0]["from_position"] == [10.0, 0.0, 20.0]
+    assert edges[0]["to_position"] == [-30.0, 0.0, 45.0]
