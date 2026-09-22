@@ -42,6 +42,7 @@ class InventoryObservation(StrictModel):
     slot: int = Field(ge=0, le=31)
     item_id: int = Field(ge=0, le=255)
     name: str = Field(min_length=1, max_length=96)
+    ammo: int | None = Field(default=None, ge=-1, le=127)
 
 
 class ActorObservation(StrictModel):
