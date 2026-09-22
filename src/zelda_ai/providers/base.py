@@ -19,6 +19,7 @@ Implemented skills:
 - approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a currently drawn actor; use 3000-8000 ms
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
+- equip_gear(item_id): equips an owned sword/shield/tunic/boots on the Equipment page and verifies progress.equipment[].equipped
 - fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
 
 The state contract includes scene + scene_name, room, entrance_index, player pose, camera,
@@ -36,8 +37,9 @@ is supplied once with the next decision so you can update the plan from what was
 through an active textbox. advance_dialogue exists as a fallback but normal non-choice dialogue is automatic.
 The runtime also waits locally while text is still printing and while a non-interactive cutscene owns Link.
 If pause_menu.active is true, use menu skills rather than world movement. Prefer equip_item when you know
-the owned item_id: it handles opening/navigating/assigning/verifying the pause menu itself. Manual menu skills
-remain available for equipment/pages not covered by equip_item. If game_over_state is non-zero and a continue
+the owned item_id: it handles opening/navigating/assigning/verifying the pause menu itself. Use equip_gear for
+swords, shields, tunics and boots listed in progress.equipment; this is required for mechanics such as Iron/Hover
+Boots and tunic changes. Manual menu skills remain available for unusual pages not covered by these controllers. If game_over_state is non-zero and a continue
 prompt is actionable, use continue_gameover. play_song does not open/equip the ocarina; equip/use the ocarina first.
 
 Use progress to avoid repeating already-completed acquisition goals and to recognize when a capability or
