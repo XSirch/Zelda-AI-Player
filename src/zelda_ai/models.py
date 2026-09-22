@@ -137,6 +137,8 @@ class GameState(StrictModel):
     scene_name: str = Field(default="", max_length=96)
     room: int = Field(ge=-1, le=255)
     entrance_index: int = Field(default=-1, ge=-1, le=2147483647)
+    day_time: int = Field(default=0, ge=0, le=65535)
+    is_night: bool = False
     in_game: bool
     player: PlayerState | None
     camera_eye: tuple[float, float, float] | None = None
