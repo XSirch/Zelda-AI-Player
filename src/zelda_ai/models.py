@@ -67,6 +67,8 @@ class NavigationProbe(StrictModel):
 
 
 class ActorObservation(StrictModel):
+    actor_uid: str | None = Field(default=None, max_length=96)
+    yaw: int | None = Field(default=None, ge=-32768, le=32767)
     actor_id: int = Field(ge=-32768, le=32767)
     name: str = Field(default="", max_length=96)
     description: str = Field(default="", max_length=200)
@@ -145,7 +147,20 @@ class ContextAction(StrictModel):
     label: str = Field(default="none", max_length=32)
 
 
+class InputReceipt(StrictModel):
+    seq: int = Field(ge=1)
+    owner_epoch: int = Field(ge=0)
+    status: Literal["accepted", "consumed", "completed", "superseded", "cancelled", "rejected"]
+    first_tick: int = Field(ge=0)
+    last_tick: int = Field(ge=0)
+    pressed: int = Field(ge=0, le=65535)
+    released: int = Field(ge=0, le=65535)
+    apply_latency_ms: int | None = Field(default=None, ge=0)
+    reason: str = Field(default="", max_length=80)
+
+
 class GameEvent(StrictModel):
+    actor_uid: str | None = Field(default=None, max_length=96)
     id: str = Field(max_length=96)
     # Keep event kinds extensible so a newer native observer cannot invalidate the whole heartbeat.
     kind: str = Field(min_length=1, max_length=64)
@@ -153,7 +168,20 @@ class GameEvent(StrictModel):
 
 
 class GameState(StrictModel):
-    protocol: Literal[1] = 1
+    protocol: Literal[1, 2] = 1
+    kind: Literal["full"] = "full"
+    capabilities: list[str] = Field(default_factory=list, max_length=16)
+    bridge_build: str = Field(default="legacy", max_length=80)
+    full_seq: int = Field(default=0, ge=0)
+    capture_tick: int = Field(default=0, ge=0)
+    context_epoch: int = Field(default=0, ge=0)
+    input_tick: int = Field(default=0, ge=0)
+    owner_epoch: int = Field(default=0, ge=0)
+    last_received_seq: int = Field(default=0, ge=0)
+    last_applied_command_seq: int = Field(default=0, ge=0)
+    input_receipts: list[InputReceipt] = Field(default_factory=list, max_length=64)
+    event_floor: int = Field(default=0, ge=0)
+    event_seq: int = Field(default=0, ge=0)
     source: Literal["soh", "simulator"]
     instance_id: str = Field(min_length=1, max_length=80)
     seq: int = Field(ge=0)
@@ -184,6 +212,7 @@ class GameState(StrictModel):
     ocarina_action: int = Field(default=0, ge=0, le=65535)
     last_played_song: int = Field(default=0, ge=0, le=65535)
     target_actor: ActorObservation | None = None
+    target_candidate: ActorObservation | None = None
     nearby_actors: list[ActorObservation] = Field(default_factory=list, max_length=24)
     room_actors: list[ActorObservation] = Field(default_factory=list, max_length=64)
     room_actor_count: int = Field(default=0, ge=0, le=4096)
@@ -191,7 +220,7 @@ class GameState(StrictModel):
     navigation_probes: list[NavigationProbe] = Field(default_factory=list, max_length=16)
     cutscene_active: bool = False
     paused: bool = False
-    events: list[GameEvent] = Field(default_factory=list, max_length=16)
+    events: list[GameEvent] = Field(default_factory=list, max_length=64)
     last_command_seq: int = 0
     upstream_revision: str = Field(default="unknown", max_length=64)
 
@@ -201,6 +230,46 @@ class GameState(StrictModel):
         if value is not None and not all(math.isfinite(v) for v in value):
             raise ValueError("Non-finite position")
         return value
+
+
+class RealtimeState(StrictModel):
+    protocol: Literal[2]
+    kind: Literal["fast"]
+    source: Literal["soh"]
+    instance_id: str = Field(min_length=1, max_length=80)
+    seq: int = Field(ge=1)
+    full_seq: int = Field(ge=1)
+    capture_tick: int = Field(ge=0)
+    scene_epoch: int = Field(ge=0)
+    context_epoch: int = Field(ge=0)
+    scene: int = Field(ge=-1, le=65535)
+    room: int = Field(ge=-1, le=255)
+    in_game: bool
+    player: PlayerState | None
+    camera_eye: tuple[float, float, float] | None
+    camera_at: tuple[float, float, float] | None
+    paused: bool
+    cutscene_active: bool
+    game_over_state: int = Field(ge=0, le=65535)
+    ocarina_mode: int = Field(ge=0, le=65535)
+    dialogue: DialogueState
+    context_action: ContextAction
+    context_actor: ActorObservation | None
+    target_actor: ActorObservation | None
+    target_candidate: ActorObservation | None
+    room_actors: list[ActorObservation] = Field(max_length=64)
+    room_actor_count: int = Field(ge=0, le=4096)
+    room_actors_truncated: bool
+    navigation_probes: list[NavigationProbe] = Field(max_length=16)
+    input_tick: int = Field(ge=0)
+    owner_epoch: int = Field(ge=0)
+    last_received_seq: int = Field(ge=0)
+    last_command_seq: int = Field(ge=0)
+    last_applied_command_seq: int = Field(ge=0)
+    input_receipts: list[InputReceipt] = Field(max_length=64)
+    events: list[GameEvent] = Field(max_length=64)
+    event_floor: int = Field(ge=0)
+    event_seq: int = Field(ge=0)
 
 
 class SkillArgs(StrictModel):
@@ -213,6 +282,7 @@ class SkillArgs(StrictModel):
     song: Literal["minuet", "bolero", "serenade", "requiem", "nocturne", "prelude",
         "sarias", "eponas", "lullaby", "suns", "time", "storms"] | None
     target_actor_id: int | None = Field(ge=-32768, le=32767)
+    target_actor_uid: str | None = Field(default=None, max_length=96)
     target_actor_params: int | None = Field(ge=-32768, le=32767)
     target_position: list[float] | None = Field(min_length=3, max_length=3)
     stop_distance: float | None = Field(ge=12, le=600)
@@ -232,6 +302,18 @@ class Decision(StrictModel):
     skill: Skill
     args: SkillArgs
     memory_note: str | None = Field(max_length=400)
+
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs):
+        schema = super().model_json_schema(*args, **kwargs)
+        # Providers require nullable fields to be present, while old persisted decisions omit the new UID.
+        args_schema = schema.get("$defs", {}).get("SkillArgs", {})
+        properties = args_schema.get("properties", {})
+        if properties:
+            args_schema["required"] = list(properties)
+            for value in properties.values():
+                value.pop("default", None)
+        return schema
 
     @model_validator(mode="after")
     def skill_arguments(self):
@@ -311,11 +393,11 @@ class RunConfig(StrictModel):
     effort: Effort | None = None
     goal: str = Field(default="Complete Ocarina of Time autonomously and defeat final Ganon.", min_length=1, max_length=400)
     memory_mode: Literal["isolated", "adaptive"] = "adaptive"
-    max_calls: int = Field(default=5000, ge=1, le=10000)
-    max_tokens: int = Field(default=5000000, ge=1000, le=10000000)
-    max_cost_usd: float = Field(default=2, gt=0, le=1000)
+    max_calls: int = Field(default=5000, ge=0, le=10000, description="Run call limit; 0 disables this limit.")
+    max_tokens: int = Field(default=5000000, ge=0, le=10000000, description="Run token limit; 0 disables this limit.")
+    max_cost_usd: float = Field(default=2, ge=0, le=1000, description="Run USD limit; 0 disables this limit.")
     max_output_tokens: int = Field(default=2048, ge=256, le=16384)
-    max_runtime_s: int = Field(default=43200, ge=10, le=86400)
+    max_runtime_s: int = Field(default=43200, ge=0, le=86400, description="Run duration limit; 0 disables this limit.")
     checkpoint_label: str = Field(default="manual", max_length=120)
 
 

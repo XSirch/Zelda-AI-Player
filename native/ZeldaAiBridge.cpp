@@ -1,7 +1,8 @@
 // Integration target: HarbourMasters/Shipwright d30fc192f2eb01ceea45bd1e12de61636cafbf86.
 // Compile with SoH; this is not a DLL for an unmodified release executable.
 #include "ZeldaAiBridge.h"
-#include "InputLease.hpp"
+#include "InputScheduler.hpp"
+#include "ActorRegistry.hpp"
 #include <SDL2/SDL_net.h>
 #include <nlohmann/json.hpp>
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <mutex>
 #include <random>
 #include <string>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
@@ -33,7 +35,8 @@ std::string Message_TTS_Decode(uint8_t* sourceBuf, uint16_t startOffset, uint16_
 namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
-constexpr size_t MAX_EVENTS = 16;
+constexpr size_t MAX_EVENTS = 64;
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.1";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -105,12 +108,18 @@ struct BridgeData {
     uint64_t sceneEpoch = 0;
     uint64_t eventSeq = 0;
     int64_t lastSent = 0;
+    uint64_t fullSeq = 0, captureTick = 0, contextEpoch = 0, eventAck = 0;
+    int previousMode = -1;
+    bool forceFull = true;
+    OSContPad lastDelivered{};
+    bool wasOwned = false;
+    zelda_ai::ActorRegistry actors;
     bool playable = false;
     int16_t lastScene = -1;
     int16_t lastRoom = -1;
     uint16_t doAction = DO_ACTION_NONE;
     std::deque<json> events;
-    zelda_ai::InputLease lease;
+    zelda_ai::InputScheduler scheduler;
 
     void Init() {
         if (initialized) return;
@@ -132,29 +141,60 @@ struct BridgeData {
 
     void Poll() {
         if (!socket || !packet) return;
-        for (int count = 0; count < 16 && SDLNet_UDP_Recv(socket, packet) > 0; ++count) {
+        int count = 0;
+        for (; count < 64 && SDLNet_UDP_Recv(socket, packet) > 0; ++count) {
             if (packet->address.host != destination.host || packet->address.port != destination.port ||
-                packet->len > 4096) continue;
+                packet->len > 8192) continue;
             try {
                 auto data = json::parse(packet->data, packet->data + packet->len);
-                if (data.at("protocol") != 1 || data.at("token") != token || data.at("instance_id") != instance)
+                if (data.at("protocol") != 2 || data.at("token") != token || data.at("instance_id") != instance)
                     continue;
-                zelda_ai::InputCommand command;
-                command.seq = data.at("seq").get<uint64_t>();
-                command.sceneEpoch = data.at("scene_epoch").get<uint64_t>();
-                command.baseSeq = data.at("base_seq").get<uint64_t>();
-                int buttonValue = data.at("buttons").get<int>();
-                if (buttonValue < 0 || buttonValue > 65535) continue;
-                command.buttons = static_cast<uint16_t>(buttonValue);
-                command.stickX = data.at("stick_x").get<int>();
-                command.stickY = data.at("stick_y").get<int>();
+                auto number = [&](const char* name) -> uint64_t {
+                    const auto& v = data.at(name);
+                    if (!v.is_number_unsigned()) throw std::runtime_error("invalid sequence");
+                    return v.get<uint64_t>();
+                };
+                const std::string kind = data.at("kind").get<std::string>();
+                if (kind == "observe_ack") {
+                    eventAck = std::max(eventAck, std::min(number("event_cursor"), eventSeq));
+                    if (data.value("request_full", false)) forceFull = true;
+                    continue;
+                }
+                zelda_ai::ScheduledInput command;
+                command.seq = number("seq");
+                command.ownerEpoch = number("owner_epoch");
+                command.sceneEpoch = number("scene_epoch");
+                command.contextEpoch = number("context_epoch");
+                command.baseSeq = number("base_seq");
+                if (kind == "release") command.kind = zelda_ai::InputKind::Release;
+                else if (kind == "cancel") command.kind = zelda_ai::InputKind::Cancel;
+                else if (kind == "renew") command.kind = zelda_ai::InputKind::Renew;
+                else if (kind == "sequence") command.kind = zelda_ai::InputKind::Sequence;
+                else if (kind == "setpoint") command.kind = zelda_ai::InputKind::Setpoint;
+                else continue;
+                auto pad = [](const json& row) -> zelda_ai::PadState {
+                    const int buttons = row.at("buttons").get<int>();
+                    if (buttons < 0 || buttons > 65535) throw std::runtime_error("invalid buttons");
+                    return {static_cast<uint16_t>(buttons), row.at("stick_x").get<int>(),
+                            row.at("stick_y").get<int>()};
+                };
+                command.pad = pad(data);
                 command.leaseMs = data.at("lease_ms").get<int>();
-                command.active = data.at("active").get<bool>() && playable;
-                lease.Apply(command, sceneEpoch, seq, NowMs());
-            } catch (const json::exception&) {
-                // Invalid datagrams cannot affect the game.
+                if (command.kind == zelda_ai::InputKind::Sequence) {
+                    const auto& steps = data.at("steps");
+                    if (!steps.is_array() || steps.size() > 8) continue;
+                    const int edges = data.at("edge_buttons").get<int>();
+                    if (edges < 0 || edges > 65535) continue;
+                    command.edgeButtons = static_cast<uint16_t>(edges);
+                    for (const auto& row : steps) command.steps.push_back({pad(row), row.at("ticks").get<int>()});
+                }
+                if (!playable && command.kind != zelda_ai::InputKind::Release) continue;
+                scheduler.Accept(command, NowMs());
+            } catch (const std::exception&) {
+                // Malformed, unauthorized or out-of-context packets never drive the controller.
             }
         }
+        if (count == 64) scheduler.Release("input_queue_overflow");
     }
 };
 
@@ -364,11 +404,11 @@ json NavigationProbes(Player* player) {
     return result;
 }
 
-json ActorJson(Actor* actor, Player* player) {
+json ActorJson(Actor* actor, Player* player, bool metadata = true) {
     if (!actor || !player) return nullptr;
     std::string actorName;
     std::string actorDescription;
-    if (ActorDB::Instance != nullptr) {
+    if (metadata && ActorDB::Instance != nullptr) {
         const auto& entry = ActorDB::Instance->RetrieveEntry(actor->id);
         if (entry.entry.valid) {
             actorName = entry.name.substr(0, 96);
@@ -383,6 +423,8 @@ json ActorJson(Actor* actor, Player* player) {
     const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
     return {
         {"actor_id", actor->id},
+        {"actor_uid", Data().actors.Get(actor)},
+        {"yaw", actor->shape.rot.y},
         {"name", actorName},
         {"description", actorDescription},
         {"category", actor->category},
@@ -477,7 +519,7 @@ json NearbyActors(Player* player) {
     return result;
 }
 
-json RoomActors(Player* player) {
+json RoomActors(Player* player, bool metadata = true) {
     struct Candidate {
         int priority;
         float distance;
@@ -506,7 +548,7 @@ json RoomActors(Player* player) {
 
     json actors = json::array();
     for (size_t i = 0; i < candidates.size() && i < MAX_ROOM_ACTORS; ++i) {
-        actors.push_back(ActorJson(candidates[i].actor, player));
+        actors.push_back(ActorJson(candidates[i].actor, player, metadata));
     }
     return {
         {"actors", actors},
@@ -573,23 +615,86 @@ json DialogueJson(Player* player) {
 
 void Snapshot() {
     auto& bridge = Data();
-    std::scoped_lock lock(bridge.mutex);
+    std::unique_lock lock(bridge.mutex);
     bridge.Init();
-    if (!bridge.socket || !bridge.packet || NowMs() - bridge.lastSent < 200) return;
-    bridge.lastSent = NowMs();
+    if (!bridge.socket || !bridge.packet) return;
+    const auto now = NowMs();
     bridge.playable = GameInteractor::IsSaveLoaded(true) && gPlayState != nullptr;
-    if (!bridge.playable) {
-        bridge.lease.Release();
-        bridge.lastScene = -1;
-        bridge.lastRoom = -1;
+    int mode = 0;
+    if (bridge.playable) {
+        const int16_t scene = gPlayState->sceneNum;
+        const int16_t room = gPlayState->roomCtx.curRoom.num;
+        if (bridge.lastScene != scene || bridge.lastRoom != room) {
+            if (bridge.lastScene >= 0 && bridge.lastScene != scene)
+                PushEventLocked(bridge, "scene_changed", std::to_string(bridge.lastScene) + "->" + std::to_string(scene));
+            else if (bridge.lastRoom >= 0 && bridge.lastRoom != room)
+                PushEventLocked(bridge, "room_changed", std::to_string(bridge.lastRoom) + "->" + std::to_string(room));
+            ++bridge.sceneEpoch;
+            bridge.lastScene = scene;
+            bridge.lastRoom = room;
+            bridge.forceFull = true;
+        }
+        mode = 1 | (gPlayState->pauseCtx.state != 0 ? 2 : 0)
+            | (gPlayState->msgCtx.msgLength != 0 ? 4 : 0)
+            | ((gPlayState->csCtx.state != CS_STATE_IDLE || Player_InCsMode(gPlayState) != 0) ? 8 : 0)
+            | (gPlayState->gameOverCtx.state != 0 ? 16 : 0)
+            | (gPlayState->msgCtx.ocarinaMode != 0 ? 32 : 0);
+    } else {
+        bridge.scheduler.Release("game_not_ready");
+        bridge.lastScene = bridge.lastRoom = -1;
     }
+    if (mode != bridge.previousMode) {
+        ++bridge.contextEpoch;
+        bridge.previousMode = mode;
+        bridge.forceFull = true;
+    }
+    bridge.scheduler.SetContext(bridge.sceneEpoch, bridge.contextEpoch);
+    bridge.Poll();
+    const bool full = bridge.forceFull || now - bridge.lastSent >= 200 || !bridge.fullSeq;
+    if (!bridge.playable && !full) return;
+    ++bridge.captureTick;
+    const uint64_t sampleSeq = ++bridge.seq;
+    if (full) {
+        bridge.lastSent = now;
+        bridge.fullSeq = sampleSeq;
+        bridge.forceFull = false;
+    }
+    bridge.scheduler.ObserveSample(sampleSeq, now);
+    json receipts = json::array();
+    for (const auto& r : bridge.scheduler.Receipts()) {
+        receipts.push_back({{"seq", r.seq}, {"owner_epoch", r.ownerEpoch},
+            {"status", zelda_ai::ReceiptStatusName(r.status)}, {"first_tick", r.firstTick},
+            {"last_tick", r.lastTick}, {"pressed", r.pressed}, {"released", r.released},
+            {"apply_latency_ms", r.applyLatencyMs < 0 ? json(nullptr) : json(r.applyLatencyMs)},
+            {"reason", r.reason}});
+    }
+    json pendingEvents = json::array();
+    for (const auto& event : bridge.events) {
+        if (std::stoull(event.at("id").get<std::string>()) > bridge.eventAck && pendingEvents.size() < 16)
+            pendingEvents.push_back(event);
+    }
+    const uint64_t eventFloor = bridge.events.empty() ? bridge.eventSeq + 1
+        : std::stoull(bridge.events.front().at("id").get<std::string>());
 
     json state = {
-        {"protocol", 1},
+        {"protocol", 2},
+        {"kind", full ? "full" : "fast"},
+        {"full_seq", bridge.fullSeq},
+        {"capture_tick", bridge.captureTick},
+        {"context_epoch", bridge.contextEpoch},
+        {"input_tick", bridge.scheduler.inputTick},
+        {"owner_epoch", bridge.scheduler.ownerEpoch},
+        {"last_received_seq", bridge.scheduler.lastReceivedSeq},
+        {"last_applied_command_seq", bridge.scheduler.lastAppliedSeq},
+        {"input_receipts", receipts},
+        {"event_floor", eventFloor},
+        {"event_seq", bridge.eventSeq},
+        {"bridge_build", BRIDGE_BUILD},
+        {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "actor_uid", "event_cursor"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
-        {"seq", ++bridge.seq},
+        {"seq", sampleSeq},
         {"scene_epoch", bridge.sceneEpoch},
         {"scene", -1},
         {"scene_name", ""},
@@ -613,6 +718,9 @@ void Snapshot() {
         {"ocarina_action", 0},
         {"last_played_song", 0},
         {"target_actor", nullptr},
+        {"target_candidate", nullptr},
+        {"camera_eye", nullptr},
+        {"camera_at", nullptr},
         {"nearby_actors", json::array()},
         {"room_actors", json::array()},
         {"room_actor_count", 0},
@@ -620,38 +728,19 @@ void Snapshot() {
         {"navigation_probes", json::array()},
         {"cutscene_active", false},
         {"paused", false},
-        {"events", bridge.events},
-        {"last_command_seq", bridge.lease.lastCommandSeq},
+        {"events", pendingEvents},
+        {"last_command_seq", bridge.scheduler.lastCommandSeq},
         {"upstream_revision", REVISION},
     };
 
-    if (bridge.playable) {
+    const bool playable = bridge.playable;
+    lock.unlock();
+
+    if (playable) {
         Player* player = GET_PLAYER(gPlayState);
         if (player) {
             const int16_t scene = gPlayState->sceneNum;
             const int16_t room = gPlayState->roomCtx.curRoom.num;
-
-            if (bridge.lastScene == -1) {
-                bridge.lastScene = scene;
-                bridge.lastRoom = room;
-            } else if (scene != bridge.lastScene) {
-                const int16_t previous = bridge.lastScene;
-                ++bridge.sceneEpoch;
-                bridge.lease.Release();
-                bridge.lastScene = scene;
-                bridge.lastRoom = room;
-                PushEventLocked(bridge, "scene_changed",
-                    std::to_string(previous) + "->" + std::to_string(scene));
-            } else if (bridge.lastRoom == -1) {
-                bridge.lastRoom = room;
-            } else if (room != bridge.lastRoom) {
-                const int16_t previous = bridge.lastRoom;
-                ++bridge.sceneEpoch;
-                bridge.lease.Release();
-                bridge.lastRoom = room;
-                PushEventLocked(bridge, "room_changed",
-                    std::to_string(previous) + "->" + std::to_string(room));
-            }
 
             auto& pos = player->actor.world.pos;
             state["scene_epoch"] = bridge.sceneEpoch;
@@ -686,7 +775,7 @@ void Snapshot() {
             state["cutscene_active"] =
                 (gPlayState->csCtx.state != CS_STATE_IDLE) || (Player_InCsMode(gPlayState) != 0);
             state["dialogue"] = DialogueJson(player);
-            state["progress"] = ProgressJson();
+            if (full) state["progress"] = ProgressJson();
             state["message_id"] =
                 state["dialogue"]["active"].get<bool>() ? state["dialogue"]["text_id"] : json(nullptr);
             state["player"] = {
@@ -720,12 +809,13 @@ void Snapshot() {
                 gPlayState->view.lookAt.x, gPlayState->view.lookAt.y, gPlayState->view.lookAt.z,
             };
             Actor* target = gPlayState->actorCtx.targetCtx.targetedActor;
-            if (!target) target = gPlayState->actorCtx.targetCtx.arrowPointedActor;
-            if (target) state["target_actor"] = ActorJson(target, player);
+            if (target) state["target_actor"] = ActorJson(target, player, full);
+            Actor* candidate = gPlayState->actorCtx.targetCtx.arrowPointedActor;
+            if (candidate) state["target_candidate"] = ActorJson(candidate, player, full);
             Actor* contextActor = ContextActor(player, bridge.doAction);
-            if (contextActor) state["context_actor"] = ActorJson(contextActor, player);
-            state["nearby_actors"] = NearbyActors(player);
-            const auto roomActors = RoomActors(player);
+            if (contextActor) state["context_actor"] = ActorJson(contextActor, player, full);
+            if (full) state["nearby_actors"] = NearbyActors(player);
+            const auto roomActors = RoomActors(player, full);
             state["room_actors"] = roomActors["actors"];
             state["room_actor_count"] = roomActors["count"];
             state["room_actors_truncated"] = roomActors["truncated"];
@@ -733,7 +823,7 @@ void Snapshot() {
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
             state["equipped"] = json::array();
-            for (size_t slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.items); ++slot) {
+            if (full) for (size_t slot = 0; slot < ARRAY_COUNT(gSaveContext.inventory.items); ++slot) {
                 const auto item = gSaveContext.inventory.items[slot];
                 state["inventory"].push_back(item);
                 if (item != ITEM_NONE && item != ITEM_NONE_FE) {
@@ -746,14 +836,19 @@ void Snapshot() {
                     });
                 }
             }
-            for (auto item : gSaveContext.equips.buttonItems) state["equipped"].push_back(item);
+            if (full) for (auto item : gSaveContext.equips.buttonItems) state["equipped"].push_back(item);
         }
     }
 
-    // Events may have been appended while producing this sample.
-    state["events"] = bridge.events;
+    if (!full) {
+        static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
+            "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
+            "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
+            "nearby_actors"};
+        for (const char* field : slowFields) state.erase(field);
+    }
     std::string serialized = state.dump();
-    if (serialized.size() > 59000) {
+    if (full && serialized.size() > 59000) {
         // room_actors is the authoritative actor observation. nearby_actors is redundant,
         // so drop that compact compatibility subset first under packet pressure.
         state["nearby_actors"] = json::array();
@@ -765,6 +860,7 @@ void Snapshot() {
         serialized = state.dump();
     }
     if (serialized.size() > 59000) return;
+    lock.lock();
     bridge.packet->address = bridge.destination;
     bridge.packet->len = static_cast<int>(serialized.size());
     std::copy(serialized.begin(), serialized.end(), bridge.packet->data);
@@ -783,11 +879,21 @@ void RegisterZeldaAiBridge() {
         std::scoped_lock lock(bridge.mutex);
         const int16_t previous = bridge.lastScene;
         ++bridge.sceneEpoch;
-        bridge.lease.Release();
+        ++bridge.contextEpoch;
+        bridge.scheduler.SetContext(bridge.sceneEpoch, bridge.contextEpoch);
+        bridge.forceFull = true;
+        bridge.actors.Clear();
         bridge.lastScene = scene;
         bridge.lastRoom = -1;
         PushEventLocked(bridge, "scene_changed",
             std::to_string(previous) + "->" + std::to_string(scene));
+    });
+
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorInit>([](void* actor) {
+        Data().actors.Spawn(actor);
+    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnActorDestroy>([](void* actor) {
+        Data().actors.Destroy(actor);
     });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnTransitionEnd>([](int16_t scene) {
@@ -828,15 +934,22 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnEnemyDefeat>([](void* rawActor) {
         auto* actor = static_cast<Actor*>(rawActor);
-        if (actor) Event("enemy_defeated", std::to_string(actor->id));
+        if (!actor) return;
+        auto& bridge = Data();
+        std::scoped_lock lock(bridge.mutex);
+        PushEventLocked(bridge, "enemy_defeated", std::to_string(actor->id));
+        bridge.events.back()["actor_uid"] = bridge.actors.Get(actor);
     });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnBossDefeat>([](void* rawActor) {
         auto* actor = static_cast<Actor*>(rawActor);
         if (!actor) return;
-        Event("boss_defeated", std::to_string(actor->id));
+        auto& bridge = Data();
+        std::scoped_lock lock(bridge.mutex);
+        PushEventLocked(bridge, "boss_defeated", std::to_string(actor->id));
+        bridge.events.back()["actor_uid"] = bridge.actors.Get(actor);
         if (actor->id == ACTOR_BOSS_GANON2) {
-            Event("game_completed", "final_ganon_defeated");
+            PushEventLocked(bridge, "game_completed", "final_ganon_defeated");
         }
     });
 
@@ -852,10 +965,33 @@ void RegisterZeldaAiBridge() {
 static RegisterShipInitFunc registration(RegisterZeldaAiBridge);
 } // namespace
 
-extern "C" void ZeldaAiBridge_OverrideInput(int32_t controller, uint16_t* buttons, int8_t* stickX, int8_t* stickY) {
-    if (controller != 0 || !buttons || !stickX || !stickY) return;
+extern "C" void ZeldaAiBridge_ConsumeInput(int32_t controller, void* rawInput, int32_t mode) {
+    if (controller != 0 || !rawInput || mode == 0) return;
+    // GameState_ReqPadData uses mode=1. Non-consuming mode=0 reads do not advance actions.
+    auto* input = static_cast<Input*>(rawInput);
     auto& bridge = Data();
     std::scoped_lock lock(bridge.mutex);
     bridge.Poll();
-    bridge.lease.Read(NowMs(), *buttons, *stickX, *stickY);
+    const auto delivery = bridge.scheduler.Consume(NowMs(),
+        {input->cur.button, input->cur.stick_x, input->cur.stick_y});
+    if (delivery.owned || bridge.wasOwned) {
+        input->prev = bridge.lastDelivered;
+        if (delivery.owned) {
+            input->cur.button = delivery.pad.buttons;
+            input->cur.stick_x = static_cast<int8_t>(delivery.pad.stickX);
+            input->cur.stick_y = static_cast<int8_t>(delivery.pad.stickY);
+            input->cur.right_stick_x = input->cur.right_stick_y = 0;
+        }
+        const uint16_t changed = input->prev.button ^ input->cur.button;
+        input->press.button = changed & input->cur.button;
+        input->rel.button = changed & input->prev.button;
+        PadUtils_UpdateRelXY(input);
+        PadUtils_UpdateRelRXY(input);
+        input->press.stick_x = static_cast<int8_t>(input->cur.stick_x - input->prev.stick_x);
+        input->press.stick_y = static_cast<int8_t>(input->cur.stick_y - input->prev.stick_y);
+        input->press.right_stick_x = static_cast<int8_t>(input->cur.right_stick_x - input->prev.right_stick_x);
+        input->press.right_stick_y = static_cast<int8_t>(input->cur.right_stick_y - input->prev.right_stick_y);
+    }
+    bridge.wasOwned = delivery.owned;
+    bridge.lastDelivered = input->cur;
 }

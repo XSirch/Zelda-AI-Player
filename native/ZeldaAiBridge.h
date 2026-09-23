@@ -3,7 +3,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-void ZeldaAiBridge_OverrideInput(int32_t controller, uint16_t* buttons, int8_t* stickX, int8_t* stickY);
+// Installed in PadMgr_RequestPadData, after the normal controller copy.
+void ZeldaAiBridge_ConsumeInput(int32_t controller, void* input, int32_t mode);
 #ifdef __cplusplus
 }
 #endif
