@@ -50,7 +50,7 @@ def test_turn_rejects_forward_and_back():
 
 
 def test_compound_local_combat_inputs():
-    assert controller_input(decision("backflip", None))[0] == 0x2000
+    assert controller_input(decision("backflip", None))[0] == 0xA000
     assert controller_input(decision("backflip", None))[2] < 0
     assert controller_input(decision("roll", None))[0] == 0x8000
     assert controller_input(decision("roll", None))[2] > 0
@@ -60,7 +60,7 @@ def test_compound_local_combat_inputs():
 def test_sidestep_uses_target_plus_lateral_stick():
     left = controller_input(decision("sidestep", "left"))
     right = controller_input(decision("sidestep", "right"))
-    assert left[0] == right[0] == 0x2000
+    assert left[0] == right[0] == 0xA000
     assert left[1] < 0 < right[1]
 
 

@@ -3,7 +3,7 @@ import pytest
 from conftest import packet
 from zelda_ai.bridge import Bridge
 from zelda_ai.models import Decision, GameState, RunConfig
-import zelda_ai.runtime as runtime_module
+import zelda_ai.skills.executor as runtime_module
 from zelda_ai.runtime import Runtime, execute_skill
 from zelda_ai.simulator import DemoProvider
 
@@ -19,7 +19,7 @@ class Transport:
         pass
 
 
-def with_dialogue(state, **overrides):
+def with_dialogue(base_state, **overrides):
     dialogue = {
         "active": True,
         "text_id": 0x1001,
@@ -34,7 +34,7 @@ def with_dialogue(state, **overrides):
         "speaker": None,
         **overrides,
     }
-    return GameState.model_validate({**state.model_dump(), "seq": state.seq + 1, "dialogue": dialogue})
+    return GameState.model_validate({**base_state.model_dump(), "seq": base_state.seq + 1, "dialogue": dialogue})
 
 
 @pytest.mark.asyncio
