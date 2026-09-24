@@ -35,6 +35,7 @@ C:\Projetos\Shipwright-AI
 - **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
 - **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu, músicas e combate genérico.
 - **Parada independente do provider:** stop/take-control revoga o input antes de aguardar cleanup de inferência ou validação de modelo.
+- **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem P50/P95/P99 e edges observados. Movimento recusa quando o probe não comprova piso seguro.
 - **Aprendizado versionado:** dados anteriores são preservados; traces falhos/intervenções não são promovidos como experiência autônoma.
 
 > `consumed` significa que o input chegou ao consumidor do jogo. Não significa automaticamente que um golpe acertou, uma esquiva teve efeito ou uma animação terminou.

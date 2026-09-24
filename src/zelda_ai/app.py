@@ -7,6 +7,7 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -51,6 +52,10 @@ class LoginInput(BaseModel):
 
 class HintInput(BaseModel):
     text: str = Field(min_length=1, max_length=400)
+
+
+class InputDiagnosticRequest(BaseModel):
+    action: Literal["tap_a", "tap_b", "target", "forward", "back", "backflip", "stress_a", "stress_b"]
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -172,6 +177,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def control(action: str):
         await app.state.runtime.control(action)
         return app.state.runtime.snapshot()
+
+    @app.post("/api/diagnostics/input")
+    async def input_diagnostic(body: InputDiagnosticRequest):
+        result = await app.state.runtime.input_diagnostic(body.action)
+        return {"result": result, "snapshot": app.state.runtime.snapshot()}
+
+    @app.post("/api/diagnostics/release")
+    async def release_input_diagnostic():
+        result = app.state.runtime.release_diagnostic_control()
+        return {"result": result, "snapshot": app.state.runtime.snapshot()}
 
     @app.post("/api/model")
     async def switch_model(config: SwitchConfig):

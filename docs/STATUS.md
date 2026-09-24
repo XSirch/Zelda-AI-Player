@@ -46,3 +46,11 @@ The local controller still contains heuristic skills and bounded fallbacks. This
 The pinned Shipwright successfully configured with generator `Visual Studio 18 2026`, toolset `v143`, Windows SDK 10.0.26100.0, and generated `soh.o2r`. The first full Release build reached `ZeldaAiBridge.cpp` and exposed an MSVC narrowing error where Shipwright's controller button field is wider than the protocol's 16-bit N64 button mask.
 
 The current revision fixes this at the boundary with an explicit low-16-bit conversion (`ToN64PadState`) and adds a native scheduler test covering a wider raw button value. A full SoH rebuild is still required to certify the fix.
+
+
+## Local input diagnostics
+
+The live Realtime panel now exposes explicit provider-free input diagnostics. They are blocked while an agent is starting/running/paused, are not written to run metrics or learned memory, and revoke autonomous control immediately after each test. The panel reports exact consumed receipt edges and per-test p50/p95/p99 latency. Forward/back/backflip require a locally observed safe floor probe; these checks are conservative local guards, not a global path-safety proof.
+
+
+Emergency diagnostic handoff is independent of the long-running diagnostic coroutine: the UI can revoke controller ownership immediately, the active test then exits as `control_revoked`, and starting a run is blocked until diagnostic cleanup completes.

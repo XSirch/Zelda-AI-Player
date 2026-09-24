@@ -5,6 +5,7 @@ import asyncio
 import hmac
 import json
 import logging
+import math
 import time
 from collections import OrderedDict, deque
 from collections.abc import Callable
@@ -212,7 +213,11 @@ class Bridge(asyncio.DatagramProtocol):
     def status(self) -> dict:
         def percentile(values, fraction):
             ordered = sorted(values)
-            return round(ordered[min(len(ordered)-1, int((len(ordered)-1)*fraction))], 2) if ordered else None
+            if not ordered:
+                return None
+            index = min(len(ordered)-1, max(0, math.ceil(len(ordered)*fraction)-1))
+            return round(ordered[index], 2)
+        last_consumed = next((row for row in reversed(list(self.receipts.values())) if row.first_tick > 0), None)
         return {"connected": self.connected, "last_seen_age_s": round(time.monotonic()-self.last_seen, 3)
             if self.last_seen else None, "rejected_packets": self.rejected_packets,
             "last_validation_error": self.last_validation_error,
@@ -222,6 +227,8 @@ class Bridge(asyncio.DatagramProtocol):
                 "state_interval_p95_ms": percentile(self._intervals, .95),
                 "native_apply_p50_ms": percentile(self._apply_latencies, .5),
                 "native_apply_p95_ms": percentile(self._apply_latencies, .95),
+                "native_apply_p99_ms": percentile(self._apply_latencies, .99),
+                "last_receipt": last_consumed.model_dump() if last_consumed else None,
                 "dropped_samples": self.dropped_samples, "event_gaps": self.event_gaps,
                 "fast_base_misses": self.fast_base_misses,
                 "ack_semantics": "input_consumer_delivery" if self.realtime else "accepted_only_legacy"},
@@ -269,9 +276,9 @@ class Bridge(asyncio.DatagramProtocol):
         return self._command("setpoint" if active else "cancel", buttons=buttons,
             stick_x=stick_x, stick_y=stick_y, lease_ms=lease_ms if active else (200 if self.realtime else 0))
 
-    async def pulse(self, *, buttons=0, stick_x=0, stick_y=0, hold_ticks=1, baseline_buttons=0,
-                    edge_buttons=None, timeout=1.5) -> bool:
-        """Return delivery evidence, NOT gameplay-effect confirmation. No automatic paid/model calls."""
+    async def pulse_receipt(self, *, buttons=0, stick_x=0, stick_y=0, hold_ticks=1,
+                            baseline_buttons=0, edge_buttons=None, timeout=1.5) -> InputReceipt | None:
+        """Return the exact native sequence receipt; consumption is delivery evidence, not gameplay success."""
         self.authority.check()
         if not self.realtime:
             raise RuntimeError("native_sequence_not_supported")
@@ -289,17 +296,13 @@ class Bridge(asyncio.DatagramProtocol):
             while time.monotonic() < deadline:
                 current = await self.next_state(last_seq, timeout=min(.35, max(.001, deadline-time.monotonic())))
                 last_seq = current.seq
-                if (current.instance_id, current.scene_epoch, current.context_epoch) != context:
-                    # e.g. A opened a menu. Evidence is kept, but no old-context renewal is sent.
-                    row = self.receipts.get(seq)
-                    return bool(row and row.first_tick)
                 row = self.receipts.get(seq)
-                if row and row.status in {"rejected", "cancelled", "superseded"}:
-                    return False
-                if row and row.status == "completed":
-                    return row.first_tick > 0
+                if (current.instance_id, current.scene_epoch, current.context_epoch) != context:
+                    return row
+                if row and row.status in {"rejected", "cancelled", "superseded", "completed"}:
+                    return row
                 self._command("renew", lease_ms=300)
-            return False
+            return self.receipts.get(seq)
         finally:
             current = self.state
             same_context = bool(current and (current.instance_id, current.scene_epoch, current.context_epoch) == context)
@@ -307,6 +310,14 @@ class Bridge(asyncio.DatagramProtocol):
                 self._command("cancel", buttons=baseline_buttons, lease_ms=200)
             else:
                 self.release()
+
+    async def pulse(self, *, buttons=0, stick_x=0, stick_y=0, hold_ticks=1, baseline_buttons=0,
+                    edge_buttons=None, timeout=1.5) -> bool:
+        """Return delivery evidence, NOT gameplay-effect confirmation. No automatic paid/model calls."""
+        row = await self.pulse_receipt(buttons=buttons, stick_x=stick_x, stick_y=stick_y,
+            hold_ticks=hold_ticks, baseline_buttons=baseline_buttons, edge_buttons=edge_buttons,
+            timeout=timeout)
+        return bool(row and row.first_tick > 0 and row.status not in {"rejected", "cancelled", "superseded"})
 
     def command_consumed(self, seq: int | None) -> bool:
         if seq is None:

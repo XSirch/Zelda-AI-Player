@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, bootstrap, saveJson } from './api';
-import type { GameState, Metrics, ModelInfo, ProviderInfo, RunConfig, RunRow, Skill, Snapshot } from './types';
+import type { GameState, InputDiagnosticAction, InputDiagnosticResult, Metrics, ModelInfo, ProviderInfo, RunConfig, RunRow, Skill, Snapshot } from './types';
 import './style.css';
 import { BudgetSummary, RunBudgetFields } from './RunBudgetFields';
 import { RealtimePanel } from './RealtimePanel';
@@ -118,6 +118,8 @@ function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [controlBusy, setControlBusy] = useState(false);
+  const [diagnosticBusy, setDiagnosticBusy] = useState(false);
+  const [diagnosticResult, setDiagnosticResult] = useState<InputDiagnosticResult | null>(null);
   function acceptSnapshot(next: Snapshot) {
     setSnap(old => old && (old.control_generation ?? 0) > (next.control_generation ?? 0) ? old : next);
   }
@@ -170,13 +172,29 @@ function App() {
     finally { setControlBusy(false); }
   }
   async function start() { acceptSnapshot(await api<Snapshot>('/runs', config)); }
+  async function diagnosticInput(action: InputDiagnosticAction) {
+    setDiagnosticBusy(true); setError('');
+    try {
+      const response = await api<{result: InputDiagnosticResult; snapshot: Snapshot}>('/diagnostics/input', {action});
+      setDiagnosticResult(response.result);
+      acceptSnapshot(response.snapshot);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+    finally { setDiagnosticBusy(false); }
+  }
+  async function releaseDiagnostic() {
+    setError('');
+    try {
+      const response = await api<{result: {released: boolean}; snapshot: Snapshot}>('/diagnostics/release', {});
+      acceptSnapshot(response.snapshot);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+  }
 
   return <div className="app"><aside><div className="brand"><span className="brand-mark">Z / AI</span><b>ZELDA<br/>AI PLAYER</b><small>AGENT LAB · 0.1</small></div><nav aria-label="Navegação principal">{tabs.map((name, index) => <button key={name} className={tab === name ? 'selected' : ''} onClick={() => { setTab(name); setDetail(null); }}><span>0{index + 1}</span>{name}</button>)}</nav><div className="sidebar-bottom"><span className={connected ? 'led on' : 'led'} />{connected ? 'RUNTIME CONECTADO' : 'RUNTIME OFFLINE'}<p>Estado estruturado.<br/>Nenhum screenshot no prompt.</p></div></aside>
     <main><header><div><p className="eyebrow">OCARINA OF TIME / SHIP OF HARKINIAN</p><h1>{tab === 'AO VIVO' ? 'Sala de controle' : tab[0] + tab.slice(1).toLowerCase()}</h1></div><div className="run-status"><span className={snap?.status === 'running' ? 'led on' : 'led'} />{snap?.status ?? 'OFFLINE'}<strong>{clock(snap?.elapsed_s ?? 0)}</strong></div></header>
       {game?.source === 'simulator' && <div className="notice">MODO SIMULADO — não é gameplay real e não pertence ao benchmark de Zelda.</div>}
       {error && <div role="alert" className="error-banner"><span>{error}</span><button aria-label="Fechar erro" onClick={() => setError('')}>×</button></div>}
       {snap?.reason && <div className="notice">Execução: {snap.reason}</div>}
-      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><RealtimePanel bridge={snap?.bridge}/><DialoguePanel game={game}/><ProgressPanel game={game}/><InventoryPanel game={game}/><TerrainPanel game={game}/><ActorsPanel game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div><div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div><div><span>ATOR CONTEXTUAL</span><strong>{game?.context_actor ? (game.context_actor.description || game.context_actor.name || `ID ${game.context_actor.actor_id}`) : '—'}</strong></div><div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div><div><span>HORÁRIO</span><strong>{game ? `${game.is_night ? 'Noite' : 'Dia'} · 0x${game.day_time.toString(16).padStart(4, '0').toUpperCase()}` : '—'}</strong></div><div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div><div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div><div><span>PAUSE</span><strong>{game?.pause_menu?.active ? `Página ${game.pause_menu.page_index} · ${game.pause_menu.ready ? 'pronto' : `transição ${game.pause_menu.transition_state}`} · cursor ${game.pause_menu.cursor_slot?.[game.pause_menu.page_index] ?? '—'}` : 'Fechado'}</strong></div><div><span>GAME OVER</span><strong>{game?.game_over_state ? `Estado ${game.game_over_state}` : 'Não'}</strong></div><div><span>OCARINA</span><strong>{game?.ocarina_mode ? `Modo ${game.ocarina_mode} · última ${game.last_played_song}` : 'Inativa'}</strong></div></div>
+      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><RealtimePanel bridge={snap?.bridge} runtimeStatus={snap?.status} busy={diagnosticBusy || !!snap?.diagnostic_active} result={diagnosticResult ?? snap?.diagnostic ?? null} onDiagnostic={action => void diagnosticInput(action)} onRelease={() => void releaseDiagnostic()}/><DialoguePanel game={game}/><ProgressPanel game={game}/><InventoryPanel game={game}/><TerrainPanel game={game}/><ActorsPanel game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div><div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div><div><span>ATOR CONTEXTUAL</span><strong>{game?.context_actor ? (game.context_actor.description || game.context_actor.name || `ID ${game.context_actor.actor_id}`) : '—'}</strong></div><div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div><div><span>HORÁRIO</span><strong>{game ? `${game.is_night ? 'Noite' : 'Dia'} · 0x${game.day_time.toString(16).padStart(4, '0').toUpperCase()}` : '—'}</strong></div><div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div><div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div><div><span>PAUSE</span><strong>{game?.pause_menu?.active ? `Página ${game.pause_menu.page_index} · ${game.pause_menu.ready ? 'pronto' : `transição ${game.pause_menu.transition_state}`} · cursor ${game.pause_menu.cursor_slot?.[game.pause_menu.page_index] ?? '—'}` : 'Fechado'}</strong></div><div><span>GAME OVER</span><strong>{game?.game_over_state ? `Estado ${game.game_over_state}` : 'Não'}</strong></div><div><span>OCARINA</span><strong>{game?.ocarina_mode ? `Modo ${game.ocarina_mode} · última ${game.last_played_song}` : 'Inativa'}</strong></div></div>
       <section className="panel"><div className="section-head">03 / DECISÃO E RESULTADO</div><div className="decision"><span className="eyebrow">{snap?.last_decision?.skill ?? 'SEM AÇÃO'}</span><h3>{snap?.last_decision?.goal ?? 'Pronto para uma nova execução'}</h3><p>{snap?.last_decision?.summary ?? 'O modelo recebe um estado compacto e devolve uma decisão estruturada.'}</p>{snap?.last_result && <code>{snap.last_result.status} / {snap.last_result.reason}</code>}</div></section></div>
       <section className="panel controls"><div className="section-head">02 / AGENTE</div><form onSubmit={event => { event.preventDefault(); void action(start); }}>
         <label>Provider<select value={config.provider} onChange={e => update('provider', e.target.value)}><option value="codex">Codex · ChatGPT</option><option value="openrouter">OpenRouter · API</option>{providers.some(p => p.id === 'demo') && <option value="demo">Simulador determinístico</option>}</select></label>
@@ -186,7 +204,7 @@ function App() {
         {active ? <><div className="current-model">EM EXECUÇÃO<br/><b>{snap?.config?.model}</b><br/>{snap?.config?.effort ?? 'effort padrão'}</div><BudgetSummary config={snap?.config ?? null}/><button type="button" disabled={busy || !config.model} onClick={() => void action(async () => acceptSnapshot(await api<Snapshot>('/model', {provider: config.provider, model: config.model, effort: config.effort})))}>Aplicar modelo na próxima decisão</button>{snap?.pending_switch && <p className="notice">Troca pendente: {snap.pending_switch.model}</p>}</> : <>
         <label>Objetivo<textarea rows={3} maxLength={400} value={config.goal} onChange={e => update('goal', e.target.value)}/></label><label>Memória<select value={config.memory_mode} onChange={e => update('memory_mode', e.target.value)}><option value="adaptive">Adaptive — aprende e reutiliza rotas deste modelo + effort</option><option value="isolated">Zero-shot — não reutiliza experiência entre runs</option></select></label>
         <RunBudgetFields config={config} update={update}/>
-        <button className="primary" disabled={busy || !connected || !snap?.bridge.connected || !config.model || !selectedProvider?.connected}>Iniciar execução</button></>}
+        <button className="primary" disabled={busy || diagnosticBusy || !!snap?.diagnostic_active || !connected || !snap?.bridge.connected || !config.model || !selectedProvider?.connected}>Iniciar execução</button></>}
         </form>{(active || snap?.status === 'starting') && <div className="buttons">
           {active && <button disabled={controlBusy} onClick={() => void control(snap?.status === 'running' ? 'pause' : 'resume')}>{snap?.status === 'running' ? 'Pausar IA' : 'Retomar IA'}</button>}
           {active && <button onClick={() => void control('take_control')}>Assumir controle</button>}
