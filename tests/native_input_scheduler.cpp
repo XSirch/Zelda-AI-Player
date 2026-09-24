@@ -21,6 +21,11 @@ ScheduledInput tap(uint64_t seq = 1, uint64_t owner = 1) {
     c.pad = {Z, 0, 0}; c.steps = {{{uint16_t(Z | A), 0, 0}, 1}, {{Z, 0, 0}, 1}};
     return c;
 }
+void button_width() {
+    const auto pad = ToN64PadState(0x1A000u, -80, 80);
+    assert(pad.buttons == A);
+    assert(pad.stickX == -80 && pad.stickY == 80);
+}
 void one_tap() {
     auto s = ready(); auto c = tap();
     assert(s.Accept(c, 0)); assert(s.Receipt(1)->firstTick == 0);
@@ -132,7 +137,7 @@ void renewed_sequence_deadline() {
 int main(int argc, char** argv) {
     assert(argc == 2); std::string name = argv[1];
     #define CASE(n) if (name == #n) { n(); std::cout << #n << " OK\n"; return 0; }
-    CASE(one_tap) CASE(repeated_press) CASE(release_before_consume) CASE(latest_setpoint)
+    CASE(button_width) CASE(one_tap) CASE(repeated_press) CASE(release_before_consume) CASE(latest_setpoint)
     CASE(duplicate_once) CASE(duplicate_does_not_renew) CASE(stale_owner) CASE(scene_change)
     CASE(context_change) CASE(watchdog_not_frames) CASE(old_sample) CASE(emergency_stale_state)
     CASE(bad_values) CASE(busy_does_not_drop_action) CASE(bounded_receipts) CASE(renewed_sequence_deadline)

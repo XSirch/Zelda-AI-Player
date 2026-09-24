@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-CASES = ['one_tap', 'repeated_press', 'release_before_consume', 'latest_setpoint',
+CASES = ['button_width', 'one_tap', 'repeated_press', 'release_before_consume', 'latest_setpoint',
          'duplicate_once', 'duplicate_does_not_renew', 'stale_owner', 'scene_change',
          'context_change', 'watchdog_not_frames', 'old_sample', 'emergency_stale_state',
          'bad_values', 'busy_does_not_drop_action', 'bounded_receipts', 'renewed_sequence_deadline']

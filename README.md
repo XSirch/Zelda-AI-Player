@@ -123,6 +123,8 @@ O integrador instala `ZeldaAiBridge.cpp`, `ZeldaAiBridge.h`, `InputScheduler.hpp
 
 ### 3. Reconfigurar CMake
 
+No computador atual, o projeto foi configurado com **Visual Studio 2026 (generator VS 18)** mantendo o toolset **v143** para a revisão fixada do Shipwright. O componente MSVC v143 precisa estar instalado no Visual Studio Installer.
+
 ```powershell
 cd C:\Projetos\Shipwright-AI
 git submodule update --init --recursive
@@ -130,7 +132,7 @@ git submodule update --init --recursive
 & 'C:\Program Files\CMake\bin\cmake.exe' `
   -S . `
   -B "build/x64" `
-  -G "Visual Studio 17 2022" `
+  -G "Visual Studio 18 2026" `
   -T v143 `
   -A x64
 ```

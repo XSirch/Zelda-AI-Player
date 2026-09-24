@@ -972,8 +972,9 @@ extern "C" void ZeldaAiBridge_ConsumeInput(int32_t controller, void* rawInput, i
     auto& bridge = Data();
     std::scoped_lock lock(bridge.mutex);
     bridge.Poll();
-    const auto delivery = bridge.scheduler.Consume(NowMs(),
-        {input->cur.button, input->cur.stick_x, input->cur.stick_y});
+    const auto humanInput = zelda_ai::ToN64PadState(
+        static_cast<uint32_t>(input->cur.button), input->cur.stick_x, input->cur.stick_y);
+    const auto delivery = bridge.scheduler.Consume(NowMs(), humanInput);
     if (delivery.owned || bridge.wasOwned) {
         input->prev = bridge.lastDelivered;
         if (delivery.owned) {
@@ -982,9 +983,13 @@ extern "C" void ZeldaAiBridge_ConsumeInput(int32_t controller, void* rawInput, i
             input->cur.stick_y = static_cast<int8_t>(delivery.pad.stickY);
             input->cur.right_stick_x = input->cur.right_stick_y = 0;
         }
-        const uint16_t changed = input->prev.button ^ input->cur.button;
-        input->press.button = changed & input->cur.button;
-        input->rel.button = changed & input->prev.button;
+        const auto previousButtons = zelda_ai::ToN64PadState(
+            static_cast<uint32_t>(input->prev.button), 0, 0).buttons;
+        const auto currentButtons = zelda_ai::ToN64PadState(
+            static_cast<uint32_t>(input->cur.button), 0, 0).buttons;
+        const uint16_t changed = static_cast<uint16_t>(previousButtons ^ currentButtons);
+        input->press.button = changed & currentButtons;
+        input->rel.button = changed & previousButtons;
         PadUtils_UpdateRelXY(input);
         PadUtils_UpdateRelRXY(input);
         input->press.stick_x = static_cast<int8_t>(input->cur.stick_x - input->prev.stick_x);
