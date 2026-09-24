@@ -13,6 +13,12 @@ struct PadState {
     int stickY = 0;
     bool Valid() const { return stickX >= -80 && stickX <= 80 && stickY >= -80 && stickY <= 80; }
 };
+
+// Shipwright may expose OSContPad.button as a wider integer on modern toolchains.
+// The N64 gameplay button mask used by this protocol is explicitly the low 16 bits.
+inline PadState ToN64PadState(uint32_t buttons, int stickX, int stickY) {
+    return {static_cast<uint16_t>(buttons & 0xFFFFu), stickX, stickY};
+}
 struct InputStep {
     PadState pad;
     int ticks = 1; // Input consumer invocations, NOT renderer frames.

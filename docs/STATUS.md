@@ -39,3 +39,10 @@ That run also emitted a Starlette/httpx deprecation warning and Pydantic seriali
 - Robust combat across enemies/bosses, global navmesh navigation, goal-bound route replay and process-level isolation of the fast motor.
 
 The local controller still contains heuristic skills and bounded fallbacks. This is not an autonomous completion claim.
+
+
+## Windows SoH build observation — Visual Studio 2026
+
+The pinned Shipwright successfully configured with generator `Visual Studio 18 2026`, toolset `v143`, Windows SDK 10.0.26100.0, and generated `soh.o2r`. The first full Release build reached `ZeldaAiBridge.cpp` and exposed an MSVC narrowing error where Shipwright's controller button field is wider than the protocol's 16-bit N64 button mask.
+
+The current revision fixes this at the boundary with an explicit low-16-bit conversion (`ToN64PadState`) and adds a native scheduler test covering a wider raw button value. A full SoH rebuild is still required to certify the fix.
