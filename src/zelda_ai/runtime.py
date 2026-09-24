@@ -12,6 +12,7 @@ from .bridge import Bridge
 from .budgets import budget_reason, runtime_exhausted
 from .control.authority import owned
 from .control.feedback import feedback
+from .control.diagnostics import run_input_diagnostic
 from .models import Decision, GameState, ModelInfo, RunConfig, SwitchConfig
 from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
@@ -114,6 +115,7 @@ class Runtime:
         self.stuck_notified_at = 0
         self.unstick_attempted_at_score = 0
         self.unstick_attempts = 0
+        self.last_diagnostic: dict | None = None
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -571,6 +573,26 @@ class Runtime:
                 self.task = asyncio.create_task(self.loop(self.lifecycle))
             self.publish(True)
 
+    async def input_diagnostic(self, action: str) -> dict:
+        """Run a local controller diagnostic without provider calls, run accounting or learned memory."""
+        async with self.lock:
+            if self.state in {"starting", "running", "paused"}:
+                raise ValueError("Stop the agent before running input diagnostics")
+            game = self.bridge.state
+            if not self.bridge.connected or not game or not game.in_game or not game.player:
+                raise ValueError("Load a playable SoH save before running input diagnostics")
+            if not self.bridge.realtime:
+                raise ValueError("Input diagnostics require BRIDGE V2")
+            self.bridge.enable_control()
+            try:
+                result = await run_input_diagnostic(self.bridge, action)
+                self.last_diagnostic = result
+            finally:
+                # Diagnostics never leave autonomous authority enabled and never enter run memory.
+                self.bridge.revoke()
+            self.publish(True)
+            return result
+
     async def switch(self, change: SwitchConfig):
         async with self.lock:
             if self.state not in {"running", "paused"} or not self.config or not self.run_id:
@@ -699,6 +721,7 @@ class Runtime:
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": state_payload,
                     "last_decision": self.last_decision, "last_result": self.last_result,
+            "diagnostic": self.last_diagnostic,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],

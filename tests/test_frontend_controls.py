@@ -17,3 +17,11 @@ def test_stop_control_does_not_share_provider_busy():
     assert 'disabled' not in stop
     assert 'action(' not in stop
     assert 'control_generation' in text
+
+
+def test_realtime_panel_has_local_diagnostics_without_model_controls():
+    text = Path('web/src/RealtimePanel.tsx').read_text(encoding='utf-8')
+    assert 'DIAGNÓSTICO LOCAL' in text
+    assert 'SEM MODELO · SEM BENCHMARK' in text
+    for label in ['Frente 1 s', 'Ré 1 s', 'Backflip', 'A ×20', 'B ×20']:
+        assert label in text

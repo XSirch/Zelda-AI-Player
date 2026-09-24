@@ -215,3 +215,20 @@ def test_provider_schema_requires_nullable_uid_but_legacy_decisions_load(decisio
     assert 'default' not in args['properties']['target_actor_uid']
     legacy = decision.model_dump(); legacy['args'].pop('target_actor_uid', None)
     assert Decision.model_validate(legacy).args.target_actor_uid is None
+
+
+@pytest.mark.asyncio
+async def test_pulse_receipt_exposes_exact_native_edges(state):
+    bridge = ready(state)
+    task = asyncio.create_task(bridge.pulse_receipt(buttons=0x8000, timeout=.3))
+    await asyncio.sleep(0)
+    sequence = next(p for p in bridge.transport.sent if p.get('kind') == 'sequence')
+    seq = sequence['seq']
+    feed(bridge, fast(state, input_receipts=[receipt(seq, status='completed', first_tick=4, last_tick=5,
+        pressed=0x8000, released=0x8000, apply_latency_ms=7)]))
+    row = await task
+    assert row and row.seq == seq and row.apply_latency_ms == 7
+    assert row.pressed == row.released == 0x8000
+    status = bridge.status()['realtime']
+    assert status['native_apply_p99_ms'] == 7
+    assert status['last_receipt']['seq'] == seq

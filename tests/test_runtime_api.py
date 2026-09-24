@@ -68,12 +68,15 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
         boot = client.get("/api/bootstrap").json()
         headers = {"X-Zelda-Session": boot["session_token"]}
         assert client.post("/api/control/pause", json={}).status_code == 403
+        assert client.post("/api/diagnostics/input", json={"action": "tap_a"}).status_code == 403
         assert client.get("/api/status", headers={"Origin": "https://attacker.invalid"}).status_code == 403
         assert client.get("/api/status", headers={"Host": "attacker.invalid"}).status_code == 400
         for _ in range(30):
             if client.get("/api/status").json()["bridge"]["connected"]: break
             time.sleep(.02)
         assert client.get("/api/status").json()["bridge"]["connected"]
+        legacy_diag = client.post("/api/diagnostics/input", json={"action": "tap_a"}, headers=headers)
+        assert legacy_diag.status_code == 400 and "BRIDGE V2" in legacy_diag.text
         payload = RunConfig(provider="demo", model="deterministic-demo", max_calls=2).model_dump()
         start = client.post("/api/runs", json=payload, headers=headers)
         assert start.status_code == 200, start.text
