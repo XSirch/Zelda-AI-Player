@@ -21,7 +21,7 @@ This change implements the input/observation foundation of the reviewed rollout,
 ## Deploy
 
 1. Stop the backend and game. Back up the application's data directory normally; do not remove its database/auth profile.
-2. Check out the feature branch and run `uv sync` and `uv run pytest -q`.
+2. Use the current `main` (`git switch main; git pull --ff-only origin main`) and run `uv sync` and `uv run pytest -q`.
 3. Run `uv run python scripts/integrate_soh.py <your-pinned-Shipwright-checkout>`.
    The installer recognizes the verified original or the previous hook, validates the reconstructed upstream file, backs up files outside the CMake source glob, and installs every required header. It does not reset the checkout or touch game assets.
 4. Reconfigure and rebuild the pinned Shipwright C++ project. **An existing soh.exe does not change when adapter source changes.**

@@ -67,7 +67,7 @@ int main() {
     cmd.leaseMs=300; cmd.baseSeq=11; assert(!lease.Apply(cmd,2,10,1400));
     cmd.baseSeq=10; assert(lease.Apply(cmd,2,10,1400));
     lease.Release(); assert(!lease.Read(1401,b,x,y));
-}''')
+}''', encoding="utf-8")
     binary = tmp_path / "lease-test"
     subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-I", str(root / "native"),
         str(source), "-o", str(binary)], check=True, capture_output=True)
@@ -76,7 +76,7 @@ int main() {
 
 def test_native_room_actor_scan_is_not_camera_gated():
     root = Path(__file__).resolve().parents[1]
-    source = (root / "native" / "ZeldaAiBridge.cpp").read_text()
+    source = (root / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
     start = source.index("json RoomActors(Player* player, bool metadata")
     end = source.index("std::vector<std::string> DecodeChoices", start)
     room_scan = source[start:end]
@@ -88,7 +88,7 @@ def test_native_room_actor_scan_is_not_camera_gated():
 
 def test_native_traversal_state_and_terrain_probes_are_exposed():
     root = Path(__file__).resolve().parents[1]
-    source = (root / "native" / "ZeldaAiBridge.cpp").read_text()
+    source = (root / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
     assert "SurfaceType_GetWallFlags" in source
     assert '{"climbing_ladder", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) != 0}' in source
     assert '{"hanging_ledge", (player->stateFlags1 & PLAYER_STATE1_HANGING_OFF_LEDGE) != 0}' in source

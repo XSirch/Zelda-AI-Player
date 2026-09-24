@@ -37,7 +37,7 @@ def test_unknown_or_duplicate_changes_are_not_overwritten(original, extra):
 
 def test_manifest_covers_included_project_headers():
     native = Path(__file__).parents[1] / 'native'
-    for line in (native / 'ZeldaAiBridge.cpp').read_text().splitlines():
+    for line in (native / 'ZeldaAiBridge.cpp').read_text(encoding='utf-8').splitlines():
         if line.startswith('#include "'):
             name = line.split('"')[1]
             if '/' not in name and (native / name).exists():

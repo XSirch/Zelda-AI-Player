@@ -32,5 +32,5 @@ def test_escape_uses_player_world_yaw_not_camera(state):
 
 def test_consumer_hook_ignores_non_consuming_reads():
     from pathlib import Path
-    native = (Path(__file__).parents[1]/'native/ZeldaAiBridge.cpp').read_text()
+    native = (Path(__file__).parents[1]/'native/ZeldaAiBridge.cpp').read_text(encoding='utf-8')
     assert 'if (controller != 0 || !rawInput || mode == 0) return;' in native
