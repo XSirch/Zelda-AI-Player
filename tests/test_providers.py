@@ -87,7 +87,7 @@ for line in sys.stdin:
         for event,data in events:
             data["threadId"]="thread-test"
             print(json.dumps({"method":event,"params":data}),flush=True)
-''')
+''', encoding="utf-8")
     original = asyncio.create_subprocess_exec
     async def fake_exec(*args, **kwargs):
         return await original(sys.executable, str(script), **kwargs)
@@ -107,10 +107,10 @@ for line in sys.stdin:
 def test_windows_npm_shim_avoids_shell(tmp_path, monkeypatch):
     from zelda_ai.providers.codex import executable_prefix
     shim = tmp_path / "codex.cmd"
-    shim.write_text("@echo off")
+    shim.write_text("@echo off", encoding="utf-8")
     entry = tmp_path / "node_modules/@openai/codex/bin/codex.js"
     entry.parent.mkdir(parents=True)
-    entry.write_text("// fixture")
+    entry.write_text("// fixture", encoding="utf-8")
     monkeypatch.setattr("zelda_ai.providers.codex.shutil.which", lambda name: sys.executable if name == "node" else str(shim))
     assert executable_prefix("codex") == [sys.executable, str(entry)]
 

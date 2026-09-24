@@ -1,129 +1,242 @@
 # Zelda AI Player
 
-Laboratório local para agentes jogarem **Ocarina of Time no Ship of Harkinian**, com estado estruturado, Codex/ChatGPT, OpenRouter e painel administrativo.
+Harness local para agentes jogarem **The Legend of Zelda: Ocarina of Time** no **Ship of Harkinian (SoH)** usando estado estruturado do jogo, controle nativo, Codex/ChatGPT ou OpenRouter e painel administrativo web.
 
-**Estado: milestone 0.3 / Autonomy v2 em desenvolvimento — harness de gameplay autônomo implementado, ainda não certificado como capaz de zerar o jogo.** A v2 adiciona percepção semântica, diálogo automático, navegação/combate/mira/equipamento compostos, grafo de mundo aprendido, recuperação de game-over e detector explícito de vitória. A bridge desta revisão precisa ser recompilada e validada no SoH/Windows antes de considerar essas capacidades operacionais. Não há ROM, assets de Zelda ou credenciais no repositório.
+## Status atual
 
-## O que existe nesta versão
+**Realtime Input Foundation v2.1 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
 
-- FastAPI/Python, persistência local SQLite/SQLAlchemy, telemetria WebSocket e histórico de runs/segmentos/chamadas/eventos.
-- Painel React/TypeScript: monitor local, provider/modelo/effort, limites, iniciar/pausar/retomar/encerrar, assumir controle, instruções humanas, memória, skills e comparação de registros.
-- Codex app-server por JSON-RPC/stdio, login oficial ChatGPT em perfil isolado, catálogo dinâmico e contabilização dos tokens informados pela CLI. Não usa OAuth como API key.
-- OpenRouter por API, catálogo dinâmico, JSON estruturado, reasoning effort quando anunciado e custo efetivamente retornado. Sem retry pago automático.
-- Bridge C++ para SoH: telemetria a 5 Hz por UDP autenticado em localhost, input analógico/botões por leases de até 500 ms, proteção contra replay/comandos stale e preempção em mudança de scene/room.
-- Percepção estruturada: cena nomeada, room/entrance, dia/noite, pose/colisão/água, diálogo decodificado, ação contextual, `room_actors` inclusive off-camera, estado de ladder/ledge/wall flags e `navigation_probes` de terreno em 8 direções × 2 distâncias, inventário semântico, equipamento/progresso, cutscene, game-over e ocarina. Screenshots continuam fora do prompt normal.
-- Skills compostas locais: navegação até posição/ator, controlador dedicado de porta, `traverse(up/down)` para escadas/ladders/ledges, follow, conversa/interação, exploração, manipulação, combate, mira, equipamento, menu, game-over e as 12 músicas. O modelo escolhe objetivo/skill; correções de frame ficam no runtime.
-- Diálogo linear é transcrito e avançado localmente sem gastar uma inferência por página. Game-over é salvo/continuado localmente. A derrota do Ganon final emite `game_completed` e encerra a run como `completed`.
-- Memória persistente de notas/hipóteses, trajetórias e grafo de mundo observado. Cada transição realmente atravessada registra origem/saída, destino/spawn e entrance; não é preenchida a partir de walkthrough oculto. No modo Adaptive, sequências autônomas que conseguem mudar de sala/cena são persistidas por modelo + effort + versão do contrato e reaplicadas localmente em runs futuras antes de gastar outra inferência. **Não há treinamento de pesos nem geração automática de código de combate nesta versão.**
+O próximo trabalho principal continua sendo Navigation V2 (geometria/navmesh/A*) e Combat V2 por inimigo/boss. O combate atual é genérico e a navegação global ainda não possui navmesh completo.
 
-## Testar o painel e o ciclo sem jogo ou créditos
+Revisão SoH fixada:
 
-Requisitos: Python 3.12+, `uv`, Node 22.16+ e npm. Execute na raiz do clone:
+```text
+HarbourMasters/Shipwright
+d30fc192f2eb01ceea45bd1e12de61636cafbf86
+```
+
+Diretórios Windows atuais:
+
+```text
+C:\Projetos\Zelda-AI-Player
+C:\Projetos\Shipwright-AI
+```
+
+## Implementado
+
+- **Backend:** Python/FastAPI, SQLite/SQLAlchemy, WebSocket e histórico de runs, segmentos, chamadas, eventos, memória, trajetórias e grafo de mundo.
+- **Painel React/TypeScript:** provider/modelo/effort, budgets, iniciar/pausar/retomar/encerrar, assumir controle, telemetria de bridge/input, skills, memória e benchmarks.
+- **Providers:** Codex app-server com login ChatGPT isolado e OpenRouter por API. Não existe retry pago automático.
+- **Bridge V2:** UDP autenticado em localhost com snapshots rápidos para controle e snapshots completos aproximadamente a cada 200 ms para dados mais pesados.
+- **Input scheduler nativo:** setpoints contínuos separados de sequências discretas, deduplicação, owner epochs, watchdog monotônico e receipts de `accepted`, `consumed` e `completed`.
+- **Hook no consumo do controle:** sequências avançam nas leituras que efetivamente consomem `Input`, não em timers do Python nem em frames de renderização.
+- **Percepção estruturada:** pose, yaw, câmera, scene/room, colisão, terreno, diálogo, inventário, equipamento, targeting, atores da sala inclusive off-camera, game-over, cutscene e ocarina.
+- **Actor UID:** inimigos iguais deixam de ser identificados apenas por `actor_id`; cada vida/spawn observado recebe identidade própria.
+- **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
+- **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu, músicas e combate genérico.
+- **Parada independente do provider:** stop/take-control revoga o input antes de aguardar cleanup de inferência ou validação de modelo.
+- **Aprendizado versionado:** dados anteriores são preservados; traces falhos/intervenções não são promovidos como experiência autônoma.
+
+> `consumed` significa que o input chegou ao consumidor do jogo. Não significa automaticamente que um golpe acertou, uma esquiva teve efeito ou uma animação terminou.
+
+## Budgets: `0 = sem limite`
+
+| Campo | Valor 0 |
+| --- | --- |
+| `max_calls` | sem teto de chamadas no harness |
+| `max_tokens` | sem teto acumulado de tokens no harness |
+| `max_cost_usd` | sem teto de USD do harness |
+| `max_runtime_s` | sem limite de duração da run |
+
+Exemplo sem tetos impostos pelo harness:
+
+```json
+{
+  "max_calls": 0,
+  "max_tokens": 0,
+  "max_cost_usd": 0,
+  "max_runtime_s": 0,
+  "max_output_tokens": 2048
+}
+```
+
+`max_output_tokens` é um limite **por resposta OpenRouter** e continua positivo. `max_cost_usd = 0` não torna o OpenRouter gratuito; apenas desativa o teto adicional do Zelda AI Player.
+
+## Atualizar a main
 
 ```powershell
-git clone https://github.com/XSirch/Zelda-AI-Player.git
-cd Zelda-AI-Player
+cd C:\Projetos\Zelda-AI-Player
+
+git switch main
+git fetch origin
+git pull --ff-only origin main
+
 uv sync
-cd web
+uv run pytest -q
+```
+
+Se houver alterações locais importantes, preserve-as antes do pull com commit próprio ou `git stash push -u`. Não use `reset --hard` apenas para atualizar.
+
+## Build do painel
+
+```powershell
+cd C:\Projetos\Zelda-AI-Player\web
 npm install
 npm run build
 cd ..
-uv run zelda-ai serve --demo
 ```
 
-Abra **http://127.0.0.1:8787**. Em **AO VIVO**, selecione **Simulador determinístico** e inicie. O banner SIMULADO é permanente; não é gameplay nem um modelo de IA. O contador de tokens/custo do simulador é zero porque não chama provider algum.
+Painel de produção: **http://127.0.0.1:8787**
 
-Para desenvolvimento do frontend, mantenha `uv run zelda-ai serve --demo` em um terminal e execute `npm run dev` em `web/` em outro. Acesse **http://127.0.0.1:5173**. O Vite faz proxy de API e WebSocket para o backend.
+## Integrar e recompilar o SoH
 
-> A instalação npm não foi concluída no ambiente de autoria por indisponibilidade de DNS. A sintaxe TS/TSX foi verificada, mas o typecheck completo, build Vite e inspeção visual do painel **não foram executados**. Não há lockfile inventado. Gere e versione os lockfiles após resolver dependências no ambiente local.
+O `soh.exe` oficial não contém esta bridge. É necessário recompilar o checkout fixado.
 
-## Conectar o SoH real
-
-O executável oficial sem modificações não publica este protocolo. É necessário compilar uma cópia separada do Shipwright com o adaptador incluído. Use uma extração de jogo obtida legitimamente; este projeto não fornece nem baixa ROMs.
+### 1. Confirmar o upstream
 
 ```powershell
-# Exemplo: clone separado, fora de Zelda-AI-Player
-git clone --recursive https://github.com/HarbourMasters/Shipwright.git D:\Projetos\Shipwright-AI
-git -C D:\Projetos\Shipwright-AI checkout d30fc192f2eb01ceea45bd1e12de61636cafbf86
-git -C D:\Projetos\Shipwright-AI submodule update --init --recursive
-
-# Na raiz de Zelda-AI-Player
-uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI
+git -C C:\Projetos\Shipwright-AI rev-parse HEAD
 ```
 
-O instalador confere o commit e o blob de `padmgr.c`, copia apenas nossos três arquivos C++ e aplica um ponto de input antes do cálculo nativo de press/release. É idempotente; não dá `reset --hard`, não deleta assets e não reescreve o upstream arbitrariamente.
+Esperado:
 
-Siga as instruções de build do [Shipwright na revisão fixada](https://github.com/HarbourMasters/Shipwright/tree/d30fc192f2eb01ceea45bd1e12de61636cafbf86). Reconfigure o CMake depois de instalar o bridge, pois novos arquivos foram adicionados. **O build completo do SoH não foi executado aqui.**
+```text
+d30fc192f2eb01ceea45bd1e12de61636cafbf86
+```
 
-> **Autonomy v2 altera novamente o código nativo da bridge.** Se você já tinha compilado uma revisão anterior, execute novamente `uv run python scripts/integrate_soh.py D:\Projetos\Shipwright-AI`, reconfigure o CMake e recompile o SoH antes de testar diálogo/transições/menu/ocarina.
-
-Depois de compilar, abra dois terminais na raiz deste projeto:
+Checkout do zero:
 
 ```powershell
-# Terminal 1: backend real, sem --demo
+git clone --recursive https://github.com/HarbourMasters/Shipwright.git C:\Projetos\Shipwright-AI
+git -C C:\Projetos\Shipwright-AI checkout d30fc192f2eb01ceea45bd1e12de61636cafbf86
+git -C C:\Projetos\Shipwright-AI submodule update --init --recursive
+```
+
+### 2. Instalar a bridge V2
+
+```powershell
+cd C:\Projetos\Zelda-AI-Player
+uv run python scripts/integrate_soh.py C:\Projetos\Shipwright-AI
+```
+
+O integrador instala `ZeldaAiBridge.cpp`, `ZeldaAiBridge.h`, `InputScheduler.hpp` e `ActorRegistry.hpp`. Ele valida o `padmgr.c`, reconhece a integração anterior, guarda backup fora do glob do CMake e aborta em alterações desconhecidas.
+
+### 3. Reconfigurar CMake
+
+```powershell
+cd C:\Projetos\Shipwright-AI
+git submodule update --init --recursive
+
+& 'C:\Program Files\CMake\bin\cmake.exe' `
+  -S . `
+  -B "build/x64" `
+  -G "Visual Studio 17 2022" `
+  -T v143 `
+  -A x64
+```
+
+### 4. Gerar assets e compilar Release
+
+```powershell
+& 'C:\Program Files\CMake\bin\cmake.exe' `
+  --build .\build\x64 `
+  --config Release `
+  --target GenerateSohOtr
+
+& 'C:\Program Files\CMake\bin\cmake.exe' `
+  --build .\build\x64 `
+  --config Release
+```
+
+Localize o executável:
+
+```powershell
+Get-ChildItem C:\Projetos\Shipwright-AI\build\x64 -Recurse -Filter soh.exe |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 5 FullName, LastWriteTime
+```
+
+## Executar com a bridge autenticada
+
+Terminal 1:
+
+```powershell
+cd C:\Projetos\Zelda-AI-Player
 uv run zelda-ai serve
-
-# Terminal 2: substitua pelo caminho real do executável compilado
-uv run zelda-ai launch-soh "D:\Projetos\Shipwright-AI\build\CAMINHO_REAL\soh.exe"
 ```
 
-`launch-soh` injeta o token local e a porta no ambiente do processo. Abra/carregue um save manualmente. O painel precisa mostrar **BRIDGE Conectado** e um estado jogável antes de autorizar uma run. Depois de iniciar a run, o objetivo padrão é completar OoT e derrotar o Ganon final sem intervenção humana. A seleção inicial de save ainda não é controlada pela IA.
-
-## Autenticação e modelos
-
-### Codex / ChatGPT
-
-Instale a CLI oficial do Codex e deixe o executável `codex` no PATH. Para Windows, o instalador oficial resolve a versão estável mais recente:
+Terminal 2:
 
 ```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
-codex --version
+cd C:\Projetos\Zelda-AI-Player
+uv run zelda-ai launch-soh "C:\Projetos\Shipwright-AI\build\x64\Release\soh.exe"
+```
+
+Use o caminho real do seu build. O `launch-soh` injeta token e porta no ambiente do processo.
+
+No painel, confirme **BRIDGE Conectado**, **BRIDGE V2**, event gaps = 0 e um save jogável carregado. Um executável antigo aparecerá como bridge legado/sem RT.
+
+## Codex / ChatGPT
+
+```powershell
 where.exe codex
+codex --version
 ```
 
-GPT-6 Astra requer Codex CLI 0.153.0 ou mais recente. O painel mostra a versão do app-server detectada e marca a compatibilidade com Astra. Quando `gpt-6-astra` estiver presente no `model/list` da sua conta, ele é a preferência inicial do provider Codex; se não estiver disponível, o seletor recua para outro modelo realmente anunciado pelo catálogo, sem inventar acesso.
-
-Em **CONEXÕES → Conectar ChatGPT**, conclua o login na página oficial e clique em **Verificar conexões**. O código de dispositivo é uma alternativa quando suportado pela CLI.
-
-A autenticação fica em `.local/codex`, sob gerenciamento da CLI. Por isolamento, o projeto **não copia** as credenciais do seu perfil global; será necessário autenticar esse perfil uma vez. Alternativa no PowerShell:
+Se precisar apontar explicitamente o executável:
 
 ```powershell
-$env:CODEX_HOME = Join-Path (Get-Location) ".local\codex"
-codex login
+$codex = (Get-Command codex.exe -CommandType Application).Source
+$env:ZELDA_CODEX_COMMAND = $codex
+[Environment]::SetEnvironmentVariable("ZELDA_CODEX_COMMAND", $codex, "User")
 ```
 
-O subprocesso trabalha num diretório vazio, sem carregar os projetos/MCPs pessoais, com ferramentas de shell e pesquisa desabilitadas e sandbox de leitura. O modelo de gameplay deve somente devolver o JSON da decisão. Não há bloqueios de worktree impostos ao agente que desenvolve o projeto.
+Depois reinicie o backend.
 
-Os modelos e efforts vêm de `model/list`, não de nomes inventados. O consumo usa os limites/créditos da sua conta Codex, e **não é representado como custo zero ou como fatura estimada da API OpenAI**. A disponibilidade e a quota dependem da sua conta. O limite de saída configurado no painel aplica-se ao OpenRouter; o adaptador Codex não oferece um teto de saída por chamada.
+## OpenRouter
 
-### OpenRouter
+A chave pode ser informada no painel ou por `OPENROUTER_API_KEY` em um `.env` local. Uso/custo ausente permanece desconhecido. Não há retry automático de chamada paga.
 
-Informe a chave mascarada em **CONEXÕES** (memória do processo) ou copie `.env.example` para `.env` e preencha `OPENROUTER_API_KEY` no seu computador. Nesta versão só são selecionáveis modelos que anunciam `structured_outputs`.
-
-Não presumimos que todos aceitam os mesmos efforts. O seletor utiliza o metadado `reasoning.supported_efforts`. Custo desconhecido ou tokens ausentes ficam explicitamente pendentes e impedem novas inferências na run. Falhas, cancelamentos ou respostas truncadas podem ter sido cobrados; não repetimos automaticamente a chamada.
-
-## Vídeo não consome tokens
-
-Em **Selecionar janela**, escolha a janela do SoH no diálogo do navegador. O vídeo é apenas um `MediaStream` local, exibido em `<video>`, sem upload ao backend ou ao modelo. O modelo recebe somente texto/estado. Fechar a captura não encerra a run; pausar a IA não pausa o jogo.
-
-## Custos e comparação
-
-- Totais = tokens de entrada + saída. Cache e reasoning são subconjuntos, nunca somados novamente.
-- Há limites de chamadas, tokens, duração e uma reserva conservadora antes de cada chamada OpenRouter. Uma chamada em andamento pode ultrapassar um orçamento de tokens; a reserva de USD não é garantia contratual do provider. Para teto de cobrança, configure também limite na chave do provider.
-- Trocas de modelo/effort são aplicadas **entre decisões** e criam segmentos. A run passa a ser mista.
-- Dicas e controle humano marcam a run como assistida. Partidas simuladas nunca são rotuladas como SoH.
-- O fingerprint atual identifica revisão e estado inicial observado, **não** um save state/RNG certificado. Não produzimos um percentual de conclusão ou ranking de quem zerou.
-- O núcleo, contrato de decisão e skills são compartilhados. Codex e OpenRouter usam transportes e envelopes diferentes; não alegamos equivalência perfeita dos harnesses internos.
-- A tela de inspeção/exportação contém as últimas 200 entradas por tipo. O banco local guarda o histórico integral.
-
-## Testes
+## Testes e validação atual
 
 ```powershell
+cd C:\Projetos\Zelda-AI-Player
 uv run pytest -q
-cd web
+```
+
+Na primeira execução Windows da V2 após o merge, foram reportados:
+
+```text
+156 passed
+17 skipped
+1 failed
+```
+
+A única falha era de **encoding do próprio teste**: `Path.read_text()` usou `cp1252` no Windows/Python 3.14 ao ler TSX em UTF-8. A revisão seguinte passa `encoding="utf-8"` explicitamente nas leituras/escritas de fixtures textuais relevantes. Rode a suíte novamente para registrar o resultado final.
+
+Os dois warnings observados nessa execução (Starlette/httpx e serialização Pydantic em um fixture) não causaram essa falha, mas permanecem candidatos a limpeza.
+
+Também valide:
+
+```powershell
+cd C:\Projetos\Zelda-AI-Player\web
 npm run build
 ```
 
-A suíte histórica havia passado antes da Autonomy v2. Para esta revisão, novos testes de contratos/controladores/grafo/diálogo/game-over/conclusão foram escritos, mas **não puderam ser executados no ambiente de autoria porque o checkout via GitHub continua bloqueado por DNS**. O build Vite e a recompilação completa do SoH/Windows também permanecem pendentes. O teste isolado de `InputLease.hpp` não substitui compilar o adaptador dentro do SoH.
+## Ainda pendente
 
-Veja [docs/STATUS.md](docs/STATUS.md) para fronteiras do milestone e próximo trabalho, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para os contratos e [AGENTS.md](AGENTS.md) para desenvolvimento.
+- navmesh/A* global derivado da geometria do jogo;
+- plataformas/obstáculos dinâmicos;
+- adapters específicos de ação/animação para inimigos e bosses;
+- política de combate robusta contra todo o jogo;
+- replay de trajetória certificado e vinculado ao objetivo atual;
+- isolamento do motor realtime em processo separado de SQLite/UI;
+- medição real p50/p95/p99 no SoH/Windows;
+- certificação de uma run completa até o Ganon.
+
+Documentação:
+
+- [Realtime Input Foundation](docs/REALTIME_V2.md)
+- [Status](docs/STATUS.md)
+- [Arquitetura](docs/ARCHITECTURE.md)
+- [Instruções para agentes](AGENTS.md)
