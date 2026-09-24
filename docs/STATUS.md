@@ -51,3 +51,6 @@ The current revision fixes this at the boundary with an explicit low-16-bit conv
 ## Local input diagnostics
 
 The live Realtime panel now exposes explicit provider-free input diagnostics. They are blocked while an agent is starting/running/paused, are not written to run metrics or learned memory, and revoke autonomous control immediately after each test. The panel reports exact consumed receipt edges and per-test p50/p95/p99 latency. Forward/back/backflip require a locally observed safe floor probe; these checks are conservative local guards, not a global path-safety proof.
+
+
+Emergency diagnostic handoff is independent of the long-running diagnostic coroutine: the UI can revoke controller ownership immediately, the active test then exits as `control_revoked`, and starting a run is blocked until diagnostic cleanup completes.

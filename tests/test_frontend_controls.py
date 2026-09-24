@@ -25,3 +25,11 @@ def test_realtime_panel_has_local_diagnostics_without_model_controls():
     assert 'SEM MODELO · SEM BENCHMARK' in text
     for label in ['Frente 1 s', 'Ré 1 s', 'Backflip', 'A ×20', 'B ×20']:
         assert label in text
+
+
+def test_diagnostic_panel_has_emergency_handoff():
+    text = Path('web/src/RealtimePanel.tsx').read_text(encoding='utf-8')
+    assert 'LIBERAR CONTROLE' in text
+    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    assert '/diagnostics/release' in main
+    assert 'diagnostic_active' in main

@@ -116,6 +116,7 @@ class Runtime:
         self.unstick_attempted_at_score = 0
         self.unstick_attempts = 0
         self.last_diagnostic: dict | None = None
+        self.diagnostic_active = False
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -467,6 +468,8 @@ class Runtime:
         async with self.lock:
             if self.state in {"starting", "running", "paused"}:
                 raise ValueError("Stop the current run before starting another")
+            if self.diagnostic_active:
+                raise ValueError("Release or wait for the input diagnostic before starting a run")
             game = self.bridge.state
             if not self.bridge.connected or not game or not game.in_game or not game.player:
                 raise ValueError("Connect the bridge and load a playable save in SoH first")
@@ -578,20 +581,33 @@ class Runtime:
         async with self.lock:
             if self.state in {"starting", "running", "paused"}:
                 raise ValueError("Stop the agent before running input diagnostics")
+            if self.diagnostic_active:
+                raise ValueError("Another input diagnostic is already running")
             game = self.bridge.state
             if not self.bridge.connected or not game or not game.in_game or not game.player:
                 raise ValueError("Load a playable SoH save before running input diagnostics")
             if not self.bridge.realtime:
                 raise ValueError("Input diagnostics require BRIDGE V2")
+            self.diagnostic_active = True
             self.bridge.enable_control()
-            try:
-                result = await run_input_diagnostic(self.bridge, action)
-                self.last_diagnostic = result
-            finally:
-                # Diagnostics never leave autonomous authority enabled and never enter run memory.
-                self.bridge.revoke()
             self.publish(True)
+        try:
+            result = await run_input_diagnostic(self.bridge, action)
+            self.last_diagnostic = result
             return result
+        finally:
+            # Never hold the runtime lock while motor tests run; emergency handoff stays available.
+            self.bridge.revoke()
+            async with self.lock:
+                self.diagnostic_active = False
+            self.publish(True)
+
+    def release_diagnostic_control(self) -> dict:
+        """Immediate human handoff. Safe to call while the diagnostic coroutine is still running."""
+        if self.diagnostic_active:
+            self.bridge.revoke()
+        self.publish(True)
+        return {"released": True, "diagnostic_active": self.diagnostic_active}
 
     async def switch(self, change: SwitchConfig):
         async with self.lock:
@@ -721,7 +737,6 @@ class Runtime:
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": state_payload,
                     "last_decision": self.last_decision, "last_result": self.last_result,
-            "diagnostic": self.last_diagnostic,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
@@ -802,6 +817,7 @@ class Runtime:
             "pending_switch": self.pending_switch[0].model_dump() if self.pending_switch else None,
             "elapsed_s": round(time.monotonic() - self.started) if self.run_id else 0,
             "last_decision": self.last_decision, "last_result": self.last_result,
+            "diagnostic": self.last_diagnostic, "diagnostic_active": self.diagnostic_active,
             "events": list(self.recent), "dialogue_transcript": list(self.dialogue_transcript),
             "bridge": self.bridge.status(), "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
             "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],

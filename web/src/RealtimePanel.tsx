@@ -11,12 +11,13 @@ const actions: Array<[InputDiagnosticAction, string]> = [
   ['stress_b', 'B ×20'],
 ];
 
-export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnostic }: {
+export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnostic, onRelease }: {
   bridge: Snapshot['bridge'] | undefined;
   runtimeStatus?: string;
   busy: boolean;
   result: InputDiagnosticResult | null;
   onDiagnostic: (action: InputDiagnosticAction) => void;
+  onRelease: () => void;
 }) {
   const rt = bridge?.realtime;
   const ms = (value?: number | null) => value == null ? '—' : `${value.toFixed(1)} ms`;
@@ -36,7 +37,8 @@ export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnosti
     <div className="diagnostic-block">
       <div className="section-head"><span>DIAGNÓSTICO LOCAL</span><span>SEM MODELO · SEM BENCHMARK</span></div>
       <div className="diagnostic-actions">{actions.map(([action, label]) =>
-        <button type="button" key={action} disabled={blocked} onClick={() => onDiagnostic(action)}>{busy ? 'AGUARDE' : label}</button>)}</div>
+        <button type="button" key={action} disabled={blocked} onClick={() => onDiagnostic(action)}>{busy ? 'AGUARDE' : label}</button>)}
+        {busy && <button type="button" className="danger" onClick={onRelease}>LIBERAR CONTROLE</button>}</div>
       <p className="muted">Frente, ré e backflip só executam quando o probe local comprova piso seguro. A/B podem interagir ou atacar: use em uma área segura. Pare a IA antes de testar.</p>
       {result && <div className="diagnostic-result">
         <div><span>TESTE</span><strong>{result.action}</strong></div>

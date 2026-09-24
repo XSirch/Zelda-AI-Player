@@ -198,3 +198,25 @@ def test_backflip_and_sidestep_have_action_edge(decision):
     buttons, x, y = controller_input(side)
     assert buttons == BUTTONS['Z'] | BUTTONS['A']
     assert x <= -50 and y == 0
+
+
+@pytest.mark.asyncio
+async def test_run_start_is_blocked_while_diagnostic_active(state, store, decision):
+    bridge = connected(state)
+    provider = Provider(decision)
+    rt = Runtime(bridge, store, {'codex': provider})
+    rt.diagnostic_active = True
+    with pytest.raises(ValueError, match='diagnostic'):
+        await rt.start(unlimited())
+
+
+def test_diagnostic_release_revokes_without_runtime_lock(state, store, decision):
+    bridge = connected(state)
+    rt = Runtime(bridge, store, {'codex': Provider(decision)})
+    rt.diagnostic_active = True
+    bridge.enable_control()
+    before = bridge.authority.generation
+    result = rt.release_diagnostic_control()
+    assert result['released'] is True
+    assert bridge.authority.generation > before
+    assert not bridge.authority.enabled

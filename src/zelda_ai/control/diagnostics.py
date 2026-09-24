@@ -6,6 +6,7 @@ import time
 from collections.abc import Iterable
 
 from ..bridge import Bridge
+from ..control.authority import ControlRevoked
 from ..models import GameState, InputReceipt
 
 A, B, Z = 0x8000, 0x4000, 0x2000
@@ -145,6 +146,8 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
                     expected_edges = 1
                     receipts.append(await bridge.pulse_receipt(buttons=Z | A, stick_y=-60,
                         baseline_buttons=Z, edge_buttons=A, hold_ticks=1))
+    except ControlRevoked:
+        reason = "control_revoked"
     except RuntimeError as exc:
         reason = str(exc) or "controller_runtime_error"
 
@@ -157,7 +160,7 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
             reason = "edge_mismatch"
     status = "completed" if reason in {"completed", "motion_window_complete"} and summary["lost"] == 0 else (
         "interrupted" if reason in {"gameplay_state_changed", "state_feedback_timeout",
-            "terrain_probe_not_safe", "bridge_disconnected", "state_feedback_stale"} else "failed")
+            "terrain_probe_not_safe", "bridge_disconnected", "state_feedback_stale", "control_revoked"} else "failed")
     distance = None
     if start and start.player and after and after.player and start.scene_epoch == after.scene_epoch:
         distance = round(math.dist(start.player.position, after.player.position), 2)

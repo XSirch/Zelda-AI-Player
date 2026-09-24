@@ -183,6 +183,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         result = await app.state.runtime.input_diagnostic(body.action)
         return {"result": result, "snapshot": app.state.runtime.snapshot()}
 
+    @app.post("/api/diagnostics/release")
+    async def release_input_diagnostic():
+        result = app.state.runtime.release_diagnostic_control()
+        return {"result": result, "snapshot": app.state.runtime.snapshot()}
+
     @app.post("/api/model")
     async def switch_model(config: SwitchConfig):
         await app.state.runtime.switch(config)
