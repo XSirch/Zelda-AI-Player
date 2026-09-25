@@ -107,7 +107,8 @@ def test_semantic_traversal_failure_does_not_increase_stuck_score(store, state):
             stop_distance=None, item_id=None),
         memory_note=None)
     runtime._update_stuck(decision, {"status": "failed", "reason": "traversal_timeout"})
-    assert runtime.stuck_score == 4
+    assert runtime.stuck_score == 3
+    assert not any(row["kind"] == "stuck_detected" for row in runtime.recent)
 
 
 @pytest.mark.asyncio
