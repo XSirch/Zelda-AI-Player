@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.5
+# Implementation status — realtime-input foundation v2.6 + Navigation V2
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -7,7 +7,7 @@ The historical pre-v2 status is preserved as `STATUS_V1.md`.
 
 ## Implemented
 
-Independent zero/unlimited budgets and UI labels; nonblocking stop/model validation with stale-result fencing; global run deadline; input-owner generations; versioned fast/full snapshots; consumed receipts; native discrete sequences with wall-clock watchdog and deduplication; stable actor lifetime IDs and a recoverable bounded event journal; local feedback-based steering and generic combat; conservative probed RT retreat and time-based stuck windows; skill-module extraction; versioned learning and removal of unsolicited replay; native installer migration/backup manifest; live transport/input telemetry.
+Independent zero/unlimited budgets and UI labels; nonblocking stop/model validation with stale-result fencing; global run deadline; input-owner generations; versioned fast/full snapshots; consumed receipts; native discrete sequences with wall-clock watchdog and deduplication; stable actor lifetime IDs and a recoverable bounded event journal; collision-derived moving local NavMesh with reciprocal A* links; realtime probe veto before movement; conservative RT retreat and time-based stuck windows; skill-module extraction; versioned learning and removal of unsolicited replay; native installer migration/backup manifest; live transport/input telemetry.
 
 Deployment/contracts: [REALTIME_V2.md](REALTIME_V2.md).
 
@@ -36,7 +36,7 @@ That run also emitted a Starlette/httpx deprecation warning and Pydantic seriali
 - `cd web && npm run build` with resolved dependencies.
 - Windows SoH reconfigure/build and in-game input/animation/targeting tests.
 - Actual p50/p95/p99 latency under load.
-- Robust combat across enemies/bosses, global navmesh navigation, goal-bound route replay and process-level isolation of the fast motor.
+- Robust combat across enemies/bosses, cross-room/global route planning and special navigation links, goal-bound route replay and process-level isolation of the fast motor.\n- Windows SoH build + in-game validation of the v2.6 NavMesh collision sampling, frame cost and wall/ledge avoidance.
 
 The local controller still contains heuristic skills and bounded fallbacks. This is not an autonomous completion claim.
 
