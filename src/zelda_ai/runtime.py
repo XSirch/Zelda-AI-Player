@@ -82,7 +82,8 @@ def _sanitize_transition_actor(actor: dict | None) -> dict | None:
     row = dict(actor)
     category = str(row.get("category_name") or "").lower()
     metadata = f"{row.get('name') or ''} {row.get('description') or ''}".lower()
-    transition_words = ("warp", "scene change", "scene exit", "loading zone", "entrance", "exit portal")
+    transition_words = ("warp", "scene change", "scene_change", "scene exit",
+                        "loading zone", "entrance", "exit", "portal", "teleport")
     if category == "door":
         row["name"] = "Door"
         row["description"] = ""
