@@ -62,6 +62,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
   const nav = bridge?.navigation;
   const navCapable = capabilities.includes('local_navmesh');
   const probeYawV2 = capabilities.includes('probe_yaw_v2');
+  const exitSurfaces = capabilities.includes('scene_exit_surfaces');
   const meshActive = navCapable && !!mesh?.step && (mesh?.cells?.length ?? 0) > 0;
   const expectedBridge = game.source === 'simulator' || (
     game.bridge_build.startsWith('rt-input-v2.') && navCapable && probeYawV2
@@ -75,6 +76,10 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
       {!navCapable ? ' capability local_navmesh ausente.' : ''}{!probeYawV2 ? ' capability probe_yaw_v2 ausente.' : ''}
       {' '}Se o código já foi atualizado, reinstale a bridge, recompile o Shipwright e abra o novo soh.exe.
     </div>}
+    {navCapable && !exitSurfaces && bridge?.connected && <div className="notice">
+      SCENE EXIT SURFACES INDISPONÍVEIS — para detectar warps/thresholds sem ator de porta,
+      use <code>rt-input-v2.7</code> ou superior e recompile o SoH.
+    </div>}
     <section className="panel">
       <div className="section-head"><span>NAVIGATION V2 / A*</span><span className="muted">{navState}</span></div>
       <div className="telemetry">
@@ -85,6 +90,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>STEP</span><strong>{meshActive ? `${number(mesh.step)} u` : '—'}</strong></div>
         <div><span>RAIO LOCAL</span><strong>{meshActive ? `${number(mesh.step * mesh.half_extent)} u` : '—'}</strong></div>
         <div><span>PROBE YAW</span><strong>{probeYawV2 ? 'v2' : 'legacy / ausente'}</strong></div>
+        <div><span>EXIT SURFACES</span><strong>{exitSurfaces ? 'v2.7+' : 'indisponível'}</strong></div>
         <div><span>SCENE EXITS</span><strong>{sceneExits.length ? `${sceneExits.length} observada(s)` : 'nenhuma'}</strong></div>
         <div><span>A*</span><strong>{nav?.status ? nav.status.toUpperCase().replaceAll('_', ' ') : (navCapable ? 'IDLE' : 'OFF')}</strong></div>
         <div><span>SKILL</span><strong>{nav?.skill ?? '—'}</strong></div>
