@@ -38,11 +38,13 @@ def _best_climb_surface_probe(game: GameState, direction: str):
     return min(climbable, key=lambda p: (p.wall_distance, p.distance)) if climbable else None
 
 
-def _local_traversal_evidence(game: GameState, direction: str) -> bool:
-    """Fast evidence that Link is already at a traversable vertical feature."""
+def _local_traversal_evidence(game: GameState, direction: str,
+                              *, kind: str | None = None) -> bool:
+    """Fast evidence that Link is already at the requested vertical feature."""
     if not game.player:
         return False
     player = game.player
+    climb_kind = bool(kind and (kind.startswith("ladder_") or kind.startswith("climbable_wall")))
     if direction == "down":
         if (player.climbing_ladder or player.hanging_ledge or player.can_down or
                 game.context_action.label == "down" or (player.wall_flags & 0x06)):
@@ -51,8 +53,14 @@ def _local_traversal_evidence(game: GameState, direction: str) -> bool:
         if (player.climbing_ladder or player.climbing_ledge or player.can_climb or
                 game.context_action.label == "climb" or (player.wall_flags & 0x0A)):
             return True
-    return (_best_climb_surface_probe(game, direction) is not None or
-            _best_traversal_probe(game, direction) is not None)
+
+    if _best_climb_surface_probe(game, direction) is not None:
+        return True
+    # A ladder/climb-wall affordance cannot be replaced by an arbitrary floor
+    # delta after the slow scan recenters.
+    if climb_kind:
+        return False
+    return _best_traversal_probe(game, direction) is not None
 
 
 def _refresh_traversal_affordance(game: GameState, original):
@@ -146,7 +154,8 @@ async def _traverse_to_affordance(bridge: Bridge, decision: Decision,
     if not current or not current.player:
         return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
     refreshed = _refresh_traversal_affordance(current, affordance)
-    local_evidence = _local_traversal_evidence(current, decision.args.direction)
+    local_evidence = _local_traversal_evidence(
+        current, decision.args.direction, kind=affordance.kind)
     if refreshed is None and not local_evidence:
         return {"status": "failed", "reason": "traversal_affordance_lost",
             "affordance_kind": affordance.kind, "direction": decision.args.direction,
