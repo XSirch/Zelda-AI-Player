@@ -50,21 +50,60 @@ function DialoguePanel({ game }: { game: GameState | null }) {
   </section>;
 }
 
-function TerrainPanel({ game }: { game: GameState | null }) {
-  if (!game?.navigation_probes?.length && !game?.player) return null;
-  const probes = (game?.navigation_probes ?? []).filter(p => p.floor_found && p.delta_y != null);
-  const traversal = game?.player?.climbing_ladder ? 'LADDER' : game?.player?.hanging_ledge ? 'HANGING' :
-    game?.player?.climbing_ledge ? 'LEDGE CLIMB' : game?.player?.can_climb ? 'CLIMB AVAILABLE' :
-    game?.player?.can_down ? 'DOWN AVAILABLE' : 'NORMAL';
-  return <section className="panel actors-panel">
-    <div className="section-head"><span>TERRENO / TRAVESSIA</span><span className="muted">{traversal}</span></div>
-    <div className="actors-grid">{probes.map((probe, index) =>
-      <div className="actor-item" key={`${probe.direction}-${probe.distance}-${index}`}>
-        <span>{probe.direction.replaceAll('_', ' ')} · {number(probe.distance)} u</span>
-        <strong>ΔY {number(probe.delta_y)} · FLOOR {probe.floor_type ?? '—'}{probe.wall_hit ? ` · WALL ${number(probe.wall_distance)}u · FLAGS 0x${probe.wall_flags.toString(16).toUpperCase()}` : ''}</strong>
-      </div>)}
-    </div>
-  </section>;
+function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapshot['bridge'] | undefined }) {
+  if (!game) return null;
+  const probes = (game.navigation_probes ?? []).filter(p => p.floor_found && p.delta_y != null);
+  const traversal = game.player?.climbing_ladder ? 'LADDER' : game.player?.hanging_ledge ? 'HANGING' :
+    game.player?.climbing_ledge ? 'LEDGE CLIMB' : game.player?.can_climb ? 'CLIMB AVAILABLE' :
+    game.player?.can_down ? 'DOWN AVAILABLE' : 'NORMAL';
+  const capabilities = game.capabilities ?? [];
+  const mesh = game.navmesh;
+  const nav = bridge?.navigation;
+  const navCapable = capabilities.includes('local_navmesh');
+  const probeYawV2 = capabilities.includes('probe_yaw_v2');
+  const meshActive = navCapable && !!mesh?.step && (mesh?.cells?.length ?? 0) > 0;
+  const expectedBridge = game.source === 'simulator' || (
+    game.bridge_build === 'rt-input-v2.6' && navCapable && probeYawV2
+  );
+  const vector = (value?: number[] | null) => value?.length === 3 ? value.map(v => number(v)).join(' / ') : '—';
+  const navState = !navCapable ? 'INDISPONÍVEL' : meshActive ? 'ATIVO' :
+    (game.paused || game.cutscene_active || game.dialogue?.active || game.game_over_state ? 'SUSPENSO PELO JOGO' : 'SEM MALHA');
+  return <div className="terrain-stack">
+    {!expectedBridge && bridge?.connected && <div className="notice">
+      NAVIGATION V2 NÃO CONFIRMADO — bridge recebida: <code>{game.bridge_build || 'desconhecida'}</code>.
+      {!navCapable ? ' capability local_navmesh ausente.' : ''}{!probeYawV2 ? ' capability probe_yaw_v2 ausente.' : ''}
+      {' '}Se o código já foi atualizado, reinstale a bridge, recompile o Shipwright e abra o novo soh.exe.
+    </div>}
+    <section className="panel">
+      <div className="section-head"><span>NAVIGATION V2 / A*</span><span className="muted">{navState}</span></div>
+      <div className="telemetry">
+        <div><span>BRIDGE BUILD</span><strong>{game.bridge_build || '—'}</strong></div>
+        <div><span>PROTOCOLO</span><strong>v{game.protocol ?? '—'}</strong></div>
+        <div><span>NAVMESH</span><strong>{navState}</strong></div>
+        <div><span>CELLS</span><strong>{meshActive ? `${mesh.cells.length} / 81` : '—'}</strong></div>
+        <div><span>STEP</span><strong>{meshActive ? `${number(mesh.step)} u` : '—'}</strong></div>
+        <div><span>RAIO LOCAL</span><strong>{meshActive ? `${number(mesh.step * mesh.half_extent)} u` : '—'}</strong></div>
+        <div><span>PROBE YAW</span><strong>{probeYawV2 ? 'v2' : 'legacy / ausente'}</strong></div>
+        <div><span>A*</span><strong>{nav?.status ? nav.status.toUpperCase().replaceAll('_', ' ') : (navCapable ? 'IDLE' : 'OFF')}</strong></div>
+        <div><span>SKILL</span><strong>{nav?.skill ?? '—'}</strong></div>
+        <div><span>PATH</span><strong>{nav?.path_cells ? `${nav.path_cells} cells` : '—'}</strong></div>
+        <div><span>TARGET</span><strong>{vector(nav?.target_position)}</strong></div>
+        <div><span>WAYPOINT</span><strong>{vector(nav?.waypoint)}</strong></div>
+        <div><span>PROBE</span><strong>{nav?.probe_safe == null ? '—' : nav.probe_safe ? 'SAFE' : 'BLOCKED'}</strong></div>
+        <div><span>CUSTO A*</span><strong>{nav?.plan_cost == null ? '—' : number(nav.plan_cost)}</strong></div>
+      </div>
+    </section>
+    <section className="panel actors-panel">
+      <div className="section-head"><span>TERRENO / TRAVESSIA</span><span className="muted">{traversal}</span></div>
+      <div className="actors-grid">{probes.map((probe, index) =>
+        <div className="actor-item" key={`${probe.direction}-${probe.distance}-${index}`}>
+          <span>{probe.direction.replaceAll('_', ' ')} · {number(probe.distance)} u</span>
+          <strong>ΔY {number(probe.delta_y)} · FLOOR {probe.floor_type ?? '—'}{probe.wall_hit ? ` · WALL ${number(probe.wall_distance)}u · FLAGS 0x${probe.wall_flags.toString(16).toUpperCase()}` : ''}</strong>
+        </div>)}
+        {!probes.length && <p className="empty">Nenhum probe de piso utilizável neste snapshot.</p>}
+      </div>
+    </section>
+  </div>;
 }
 
 function ActorsPanel({ game }: { game: GameState | null }) {
@@ -230,14 +269,14 @@ function App() {
         <div className="live-tab-stage">
           {liveTab === 'CONTROLE' && <><RealtimePanel bridge={snap?.bridge} runtimeStatus={snap?.status} busy={diagnosticBusy || !!snap?.diagnostic_active} result={diagnosticResult ?? snap?.diagnostic ?? null} onDiagnostic={action => void diagnosticInput(action)} onRelease={() => void releaseDiagnostic()}/><DialoguePanel game={game}/></>}
           {liveTab === 'COMBATE' && <CombatLearningPanel profiles={snap?.combat_profiles ?? []} game={game}/>}
-          {liveTab === 'TERRENO' && <TerrainPanel game={game}/>}
+          {liveTab === 'TERRENO' && <TerrainPanel game={game} bridge={snap?.bridge}/>}
           {liveTab === 'ATORES' && <ActorsPanel game={game}/>}
           {liveTab === 'PROGRESSO' && <><ProgressPanel game={game}/><InventoryPanel game={game}/></>}
           {liveTab === 'ESTADO' && <div className="telemetry panel">
             <div><span>VIDA</span><strong>{player ? number(player.health / 16) + ' / ' + number(player.max_health / 16) + ' corações' : '—'}</strong></div>
             <div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div>
             <div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div>
-            <div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div>
+            <div><span>BRIDGE</span><strong>{snap?.bridge.connected ? `Conectado · ${game?.bridge_build ?? 'build desconhecida'} · P${game?.protocol ?? '—'}` : 'Desconectado'}</strong></div>
             <div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div>
             <div><span>ATOR CONTEXTUAL</span><strong>{game?.context_actor ? (game.context_actor.description || game.context_actor.name || 'ID ' + game.context_actor.actor_id) : '—'}</strong></div>
             <div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div>
