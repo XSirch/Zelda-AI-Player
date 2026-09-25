@@ -68,6 +68,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
     game.bridge_build.startsWith('rt-input-v2.') && navCapable && probeYawV2
   );
   const vector = (value?: number[] | null) => value?.length === 3 ? value.map(v => number(v)).join(' / ') : '—';
+  const hex16 = (value: number) => (value & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
   const navState = !navCapable ? 'INDISPONÍVEL' : meshActive ? 'ATIVO' :
     (game.paused || game.cutscene_active || game.dialogue?.active || game.game_over_state ? 'SUSPENSO PELO JOGO' : 'SEM MALHA');
   return <div className="terrain-stack">
@@ -99,14 +100,14 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>WAYPOINT</span><strong>{vector(nav?.waypoint)}</strong></div>
         <div><span>PROBE</span><strong>{nav?.probe_safe == null ? '—' : nav.probe_safe ? 'SAFE' : 'BLOCKED'}</strong></div>
         <div><span>CUSTO A*</span><strong>{nav?.plan_cost == null ? '—' : number(nav.plan_cost)}</strong></div>
-        <div><span>EXIT ATUAL</span><strong>{nav?.exit_index == null ? '—' : `EXIT ${nav.exit_index} · ENTRANCE 0x${(nav.entrance_index ?? -1).toString(16).toUpperCase()}`}</strong></div>
+        <div><span>EXIT ATUAL</span><strong>{nav?.exit_index == null ? '—' : `EXIT ${nav.exit_index} · ENTRANCE 0x${hex16(nav.entrance_index ?? -1)}`}</strong></div>
       </div>
     </section>
     {sceneExits.length > 0 && <section className="panel actors-panel">
       <div className="section-head"><span>SAÍDAS DE CENA OBSERVADAS</span><span className="muted">COLLISION SURFACE</span></div>
       <div className="actors-grid">{sceneExits.map(exit =>
         <div className="actor-item" key={exit.exit_index}>
-          <span>EXIT {exit.exit_index} · ENTRANCE 0x{exit.entrance_index.toString(16).toUpperCase()}</span>
+          <span>EXIT {exit.exit_index} · ENTRANCE 0x{hex16(exit.entrance_index)}</span>
           <strong>POS {vector(exit.position)} · {exit.samples} amostras · use traverse_exit</strong>
         </div>)}
       </div>
