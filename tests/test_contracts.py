@@ -246,3 +246,33 @@ def test_manipulate_object_rejects_sideways_direction(decision):
         Decision.model_validate({**decision.model_dump(), "skill": "manipulate_object",
             "args": {**decision.args.model_dump(), "target_actor_id": 10,
                 "direction": "left", "duration_ms": 5000}})
+
+
+def test_scene_exit_observation_and_traverse_exit_contract(decision, state):
+    enriched = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "scene_exit_surfaces"],
+        "scene_exits": [{
+            "exit_index": 1,
+            "entrance_index": 0x211,
+            "position": [70.0, 0.0, 116.0],
+            "samples": 4,
+        }],
+    })
+    assert enriched.scene_exits[0].entrance_index == 0x211
+    traverse = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "traverse_exit",
+        "args": {
+            **decision.args.model_dump(),
+            "duration_ms": 8000,
+            "target_position": [70.0, 0.0, 116.0],
+        },
+    })
+    assert traverse.skill == "traverse_exit"
+    with pytest.raises(ValidationError):
+        Decision.model_validate({
+            **decision.model_dump(),
+            "skill": "traverse_exit",
+            "args": {**decision.args.model_dump(), "duration_ms": 8000, "target_position": None},
+        })
