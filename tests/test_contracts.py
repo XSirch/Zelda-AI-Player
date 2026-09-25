@@ -604,3 +604,10 @@ def test_model_omits_traversal_affordance_with_unreachable_approach(state):
         }],
     })
     assert _model_state_payload(game)["traversal_affordances"] == []
+
+
+def test_traverse_is_documented_as_automatic_vertical_navpath():
+    assert "HIGH-LEVEL automatic vertical navigation" in SYSTEM_PROMPT
+    assert "You do NOT need to manually walk" in SYSTEM_PROMPT
+    assert "Use traverse(down/up) as the default high-level action" in SYSTEM_PROMPT
+    assert "Use traverse_to only when multiple observed vertical routes exist" in SYSTEM_PROMPT

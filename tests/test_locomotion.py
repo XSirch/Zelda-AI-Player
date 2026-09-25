@@ -3,7 +3,12 @@ from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 from zelda_ai.skills.navigation import _resolve_scene_exit
-from zelda_ai.skills.traversal import _resolve_traversal_affordance, _refresh_traversal_affordance, _local_traversal_evidence, _fast_revalidation_matches_original
+from zelda_ai.skills.traversal import (
+    _resolve_traversal_affordance, _refresh_traversal_affordance,
+    _local_traversal_evidence, _fast_revalidation_matches_original,
+    _immediate_traversal_evidence, _best_auto_traversal_affordance,
+    _traverse_auto,
+)
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -646,3 +651,260 @@ def test_fast_revalidation_rejects_unrelated_ladder_far_from_original_target(sta
     })
     assert _local_traversal_evidence(current, "down", kind="ladder_down")
     assert not _fast_revalidation_matches_original(current, original)
+
+
+def test_immediate_traversal_evidence_does_not_treat_far_drop_as_under_link(state):
+    far = {
+        "direction": "forward", "distance": 140, "floor_found": True,
+        "floor_y": -40, "delta_y": -40, "floor_type": 0,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_probes": [far],
+    })
+    assert not _immediate_traversal_evidence(game, "down")
+    near = {**far, "distance": 70}
+    near_game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_probes": [near],
+    })
+    assert _immediate_traversal_evidence(near_game, "down")
+
+
+def test_auto_traversal_chooses_reachable_affordance_and_ignores_disconnected_one(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [
+                [0, 0, 0, 4],
+                [1, 0, 0, 68],
+                [2, 0, 0, 64],
+            ],
+        },
+        "traversal_affordances": [
+            {
+                "kind": "ladder_down", "direction": "down",
+                "approach_position": [0, 0, 210],
+                "target_position": [0, -40, 240],
+                "distance": 210, "height_delta": 0, "wall_flags": 4,
+            },
+            {
+                "kind": "stairs_or_slope_down", "direction": "down",
+                "approach_position": [140, 0, 0],
+                "target_position": [210, -40, 0],
+                "distance": 140, "height_delta": -40, "wall_flags": 0,
+            },
+        ],
+    })
+    chosen = _best_auto_traversal_affordance(game, "down")
+    assert chosen is not None
+    assert chosen.kind == "stairs_or_slope_down"
+    assert chosen.approach_position == (140.0, 0.0, 0.0)
+
+
+def test_traverse_auto_promotes_plain_traverse_to_internal_navpath(state, monkeypatch):
+    import asyncio
+    import zelda_ai.skills.traversal as traversal
+
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down", "direction": "down",
+            "approach_position": [120, 0, 0],
+            "target_position": [160, -30, 0],
+            "distance": 120, "height_delta": 0, "wall_flags": 4,
+        }],
+    })
+    affordance = game.traversal_affordances[0]
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    captured = {}
+    async def fake_traverse_to(_bridge, internal, _observation):
+        captured["skill"] = internal.skill
+        captured["target"] = internal.args.target_position
+        captured["duration"] = internal.args.duration_ms
+        return {"status": "completed", "reason": "descended", "skill": internal.skill}
+
+    monkeypatch.setattr(traversal, "_immediate_traversal_evidence", lambda *_: False)
+    monkeypatch.setattr(traversal, "_best_auto_traversal_affordance", lambda *_: affordance)
+    monkeypatch.setattr(traversal, "_traverse_to_affordance", fake_traverse_to)
+
+    requested = decision("traverse", "down", duration=3000)
+    result = asyncio.run(_traverse_auto(FakeBridge(game), requested, game))
+    assert captured["skill"] == "traverse_to"
+    assert captured["target"] == (120.0, 0.0, 0.0) or captured["target"] == [120.0, 0.0, 0.0]
+    assert captured["duration"] >= 8000
+    assert result["auto_navpath"] is True
+    assert result["requested_skill"] == "traverse"
+    assert result["controller_skill"] == "traverse_to"
+    assert result["skill"] == "traverse"
+
+
+def test_auto_traversal_does_not_treat_same_xz_other_floor_as_reached(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 0, "half_extent": 0, "cells": [],
+        },
+        "traversal_affordances": [{
+            "kind": "stairs_or_slope_down", "direction": "down",
+            "approach_position": [10, -100, 0],
+            "target_position": [70, -140, 0],
+            "distance": 10, "height_delta": -100, "wall_flags": 0,
+        }],
+    })
+    assert _best_auto_traversal_affordance(game, "down") is None
+
+
+def test_large_drop_is_not_immediate_without_explicit_ledge_affordance(state):
+    drop = {
+        "direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": -100, "delta_y": -100, "floor_type": 0,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_probes": [drop],
+    })
+    assert not _immediate_traversal_evidence(game, "down")
+    explicit = type(state).model_validate({
+        **game.model_dump(),
+        "player": {**game.player.model_dump(), "can_down": True},
+    })
+    assert _immediate_traversal_evidence(explicit, "down")
+
+
+def test_auto_traversal_prefers_far_ladder_over_near_ledge(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [
+                [0, 0, 0, 4],
+                [1, 0, 0, 68],
+                [2, 0, 0, 68],
+                [3, 0, 0, 64],
+            ],
+        },
+        "traversal_affordances": [
+            {
+                "kind": "ledge_down", "direction": "down",
+                "approach_position": [70, 0, 0],
+                "target_position": [140, -100, 0],
+                "distance": 70, "height_delta": -100, "wall_flags": 0,
+            },
+            {
+                "kind": "ladder_down", "direction": "down",
+                "approach_position": [210, 0, 0],
+                "target_position": [250, -40, 0],
+                "distance": 210, "height_delta": 0, "wall_flags": 4,
+            },
+        ],
+    })
+    chosen = _best_auto_traversal_affordance(game, "down")
+    assert chosen is not None
+    assert chosen.kind == "ladder_down"
+
+
+def test_traverse_auto_prefers_navpath_over_near_probe_when_affordance_exists(state, monkeypatch):
+    import asyncio
+    import zelda_ai.skills.traversal as traversal
+
+    probe = {
+        "direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": -40, "delta_y": -40, "floor_type": 0,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_probes": [probe],
+        "traversal_affordances": [{
+            "kind": "ladder_down", "direction": "down",
+            "approach_position": [120, 0, 0],
+            "target_position": [160, -30, 0],
+            "distance": 120, "height_delta": 0, "wall_flags": 4,
+        }],
+    })
+    affordance = game.traversal_affordances[0]
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    async def should_not_run(*_args, **_kwargs):
+        raise AssertionError("local traversal should not win over a reachable affordance")
+
+    async def fake_traverse_to(_bridge, internal, _observation):
+        return {"status": "completed", "reason": "descended", "skill": internal.skill}
+
+    monkeypatch.setattr(traversal, "_best_auto_traversal_affordance", lambda *_: affordance)
+    monkeypatch.setattr(traversal, "_traverse_to_affordance", fake_traverse_to)
+    monkeypatch.setattr(traversal, "_traverse_local", should_not_run)
+
+    requested = decision("traverse", "down", duration=3000)
+    result = asyncio.run(_traverse_auto(FakeBridge(game), requested, game))
+    assert result["auto_navpath"] is True
+    assert result["controller_skill"] == "traverse_to"
+
+
+def test_traverse_auto_uses_native_attached_state_before_navpath(state, monkeypatch):
+    import asyncio
+    import zelda_ai.skills.traversal as traversal
+
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(), "climbing_ladder": True},
+        "traversal_affordances": [{
+            "kind": "ladder_down", "direction": "down",
+            "approach_position": [120, 0, 0],
+            "target_position": [160, -30, 0],
+            "distance": 120, "height_delta": 0, "wall_flags": 4,
+        }],
+    })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    async def fake_local(_bridge, _decision, _observation, _direction):
+        return {"status": "completed", "reason": "descended", "skill": "traverse"}
+
+    monkeypatch.setattr(traversal, "_traverse_local", fake_local)
+    monkeypatch.setattr(
+        traversal, "_best_auto_traversal_affordance",
+        lambda *_: (_ for _ in ()).throw(AssertionError("attached ladder must skip NavPath")),
+    )
+
+    requested = decision("traverse", "down", duration=3000)
+    result = asyncio.run(_traverse_auto(FakeBridge(game), requested, game))
+    assert result["auto_navpath"] is False
+    assert result["navpath_mode"] == "native_state"
+
+
+def test_traverse_auto_preserves_legacy_local_behavior_without_affordance_capability(state, monkeypatch):
+    import asyncio
+    import zelda_ai.skills.traversal as traversal
+
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [],
+    })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    async def fake_local(_bridge, _decision, _observation, _direction):
+        return {"status": "completed", "reason": "legacy_local", "skill": "traverse"}
+
+    monkeypatch.setattr(traversal, "_traverse_local", fake_local)
+    requested = decision("traverse", "down", duration=3000)
+    result = asyncio.run(_traverse_auto(FakeBridge(game), requested, game))
+    assert result["status"] == "completed"
+    assert result["auto_navpath"] is False
+    assert result["navpath_mode"] == "legacy_local"

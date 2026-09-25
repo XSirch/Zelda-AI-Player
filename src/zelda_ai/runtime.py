@@ -73,9 +73,20 @@ from .skills.executor import execute_skill as execute_skill
 from .skills.executor import _execute_skill as _execute_skill
 from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
+from .skills.traversal import _traverse_auto as _traverse_auto
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v9/skills-v10/trajectory-v3/prompt-v13"
+CONTRACT_VERSION = "state-v9/skills-v11/trajectory-v3/prompt-v14"
+
+TRAVERSAL_REPLAN_REASONS = frozenset({
+    "no_traversal_affordance_observed",
+    "no_reachable_traversal_affordance",
+    "traversal_affordance_lost",
+    "traversal_approach_failed",
+    "traversal_approach_timeout",
+    "traversal_timeout",
+})
+
 
 def _sanitize_transition_actor(actor: dict | None) -> dict | None:
     if actor is None:
@@ -258,11 +269,17 @@ class Runtime:
     def _update_stuck(self, decision: Decision, result: dict):
         status = result.get("status")
         reason = result.get("reason")
+        if status in {"failed", "stale"} and reason in TRAVERSAL_REPLAN_REASONS:
+            # This is a route-selection/revalidation failure, not proof that Link is
+            # physically wedged. Do not emit stuck_detected instructions that would
+            # back him away from a valid ladder approach.
+            self.stuck_score = max(0, self.stuck_score - 2)
+            return
         if status == "interrupted" and reason in {"world_changed", "dialogue_opened", "cutscene_started",
                                                   "pause_menu_opened", "pause_menu_closed"}:
             self.stuck_score = 0
         elif status in {"failed", "stale"} and decision.skill in NAVIGATION_SKILLS and reason not in {
-                "target_on_different_floor", "no_traversal_affordance_observed", "world_changed_during_inference",
+                "target_on_different_floor", "world_changed_during_inference",
                 "navigation_no_path", "navigation_path_blocked"}:
             self.stuck_score = min(20, self.stuck_score + 2)
         elif decision.skill == "move" and (result.get("distance") or 0) >= 20:
@@ -529,6 +546,11 @@ class Runtime:
             if (self.stuck_score < 6 or self.stuck_score <= self.unstick_attempted_at_score or
                     not game.player or game.paused or game.dialogue.active or game.cutscene_active or
                     game.game_over_state != 0):
+                return False
+            # Semantic traversal failures should replan/select another vertical
+            # route; backing away here can undo a successful A* approach to a ladder.
+            if (self.last_result or {}).get("reason") in TRAVERSAL_REPLAN_REASONS:
+                self.stuck_score = max(0, self.stuck_score - 2)
                 return False
             # If the game already exposes an actionable A prompt, let the planner interact instead of backing away.
             if game.context_action.label != "none":
