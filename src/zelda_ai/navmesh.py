@@ -151,9 +151,11 @@ def _reachable_frontier(mesh: NavigationMeshSnapshot,
         ),
     )
     best_distance = _target_score(_cell_world(mesh, best_key, cells[best_key]), target)
-    # Do not leave a safe cell merely to wander sideways when the connected
-    # component cannot make meaningful progress toward the requested target.
-    if best_distance >= start_distance - max(10.0, mesh.step * 0.20):
+    # A wall may force a short lateral move before target distance can improve.
+    # Permit a bounded regression so the moving mesh can follow the wall until
+    # its endpoint becomes visible, while refusing large detours into unrelated
+    # connected space.
+    if best_distance > start_distance + max(12.0, mesh.step * 0.35):
         return None
     return _reconstruct(came_from, best_key), best_cost[best_key]
 
