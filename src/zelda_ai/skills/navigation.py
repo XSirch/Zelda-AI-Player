@@ -662,7 +662,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
         (row.kind, row.direction,
          round(row.approach_position[0] / 35.0),
          round(row.approach_position[2] / 35.0))
-        for row in before.traversal_affordances
+        for row in _reachable_traversal_affordances(before)
     }
     baseline_context = before.context_action.label
     start_health = before.player.health
