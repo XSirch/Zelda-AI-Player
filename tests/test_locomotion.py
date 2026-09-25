@@ -743,3 +743,19 @@ def test_traverse_auto_promotes_plain_traverse_to_internal_navpath(state, monkey
     assert result["requested_skill"] == "traverse"
     assert result["controller_skill"] == "traverse_to"
     assert result["skill"] == "traverse"
+
+
+def test_auto_traversal_does_not_treat_same_xz_other_floor_as_reached(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 0, "half_extent": 0, "cells": [],
+        },
+        "traversal_affordances": [{
+            "kind": "stairs_or_slope_down", "direction": "down",
+            "approach_position": [10, -100, 0],
+            "target_position": [70, -140, 0],
+            "distance": 10, "height_delta": -100, "wall_flags": 0,
+        }],
+    })
+    assert _best_auto_traversal_affordance(game, "down") is None
