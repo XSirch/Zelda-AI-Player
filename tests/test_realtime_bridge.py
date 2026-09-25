@@ -20,7 +20,7 @@ class Transport:
 def full(state, **changes):
     values = state.model_dump()
     values.update(protocol=2, kind='full', seq=10, full_seq=10, context_epoch=1,
-                  bridge_build='rt-input-v2.1', capabilities=['fast_state', 'input_sequence', 'consumed_receipts'],
+                  bridge_build='rt-input-v2.2', capabilities=['fast_state', 'input_sequence', 'consumed_receipts'],
                   event_floor=1, event_seq=0)
     values.update(changes)
     return values
@@ -46,7 +46,7 @@ def ready(state):
 
 def receipt(seq, **changes):
     value = dict(seq=seq, owner_epoch=1, status='accepted', first_tick=0, last_tick=0,
-                 pressed=0, released=0, apply_latency_ms=None, reason='')
+                 pressed=0, released=0, apply_latency_ms=None, client_to_consume_ms=None, reason='')
     value.update(changes)
     return value
 
@@ -232,3 +232,31 @@ async def test_pulse_receipt_exposes_exact_native_edges(state):
     status = bridge.status()['realtime']
     assert status['native_apply_p99_ms'] == 7
     assert status['last_receipt']['seq'] == seq
+
+
+def test_status_separates_client_latency_from_native_queue(state):
+    bridge = ready(state)
+    feed(bridge, fast(state, input_receipts=[receipt(150, status='completed', first_tick=2, last_tick=3,
+        pressed=0x8000, released=0x8000, apply_latency_ms=.18, client_to_consume_ms=17.25)]))
+    rt = bridge.status()['realtime']
+    assert rt['native_apply_p95_ms'] == .18
+    assert rt['client_to_consume_p95_ms'] == 17.25
+
+
+@pytest.mark.asyncio
+async def test_sequence_receipt_preserves_priming_step(state):
+    bridge = ready(state)
+    task = asyncio.create_task(bridge.sequence_receipt([
+        {'buttons': 0x2000, 'stick_x': 0, 'stick_y': -60, 'ticks': 1},
+        {'buttons': 0xA000, 'stick_x': 0, 'stick_y': -60, 'ticks': 1},
+        {'buttons': 0x2000, 'stick_x': 0, 'stick_y': -60, 'ticks': 2},
+    ], baseline_buttons=0x2000, edge_buttons=0x8000, timeout=.3))
+    await asyncio.sleep(0)
+    packet = next(p for p in bridge.transport.sent if p.get('kind') == 'sequence')
+    assert packet['steps'][0]['buttons'] == 0x2000
+    assert packet['steps'][1]['buttons'] == 0xA000
+    seq = packet['seq']
+    feed(bridge, fast(state, input_receipts=[receipt(seq, status='completed', first_tick=2, last_tick=5,
+        pressed=0xA000, released=0x8000, apply_latency_ms=.11, client_to_consume_ms=14.7)]))
+    row = await task
+    assert row and row.client_to_consume_ms == 14.7

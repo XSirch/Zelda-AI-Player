@@ -26,6 +26,14 @@ void button_width() {
     assert(pad.buttons == A);
     assert(pad.stickX == -80 && pad.stickY == 80);
 }
+void end_to_end_latency() {
+    auto s = ready(); auto c = tap();
+    c.clientSentUs = 1000000;
+    assert(s.Accept(c, 1005, 1005000));
+    assert(s.Consume(1012, {}, 1012750).pressed & A);
+    assert(s.Receipt(1)->applyLatencyMs == 7.75);
+    assert(s.Receipt(1)->clientToConsumeMs == 12.75);
+}
 void one_tap() {
     auto s = ready(); auto c = tap();
     assert(s.Accept(c, 0)); assert(s.Receipt(1)->firstTick == 0);
@@ -137,7 +145,7 @@ void renewed_sequence_deadline() {
 int main(int argc, char** argv) {
     assert(argc == 2); std::string name = argv[1];
     #define CASE(n) if (name == #n) { n(); std::cout << #n << " OK\n"; return 0; }
-    CASE(button_width) CASE(one_tap) CASE(repeated_press) CASE(release_before_consume) CASE(latest_setpoint)
+    CASE(button_width) CASE(end_to_end_latency) CASE(one_tap) CASE(repeated_press) CASE(release_before_consume) CASE(latest_setpoint)
     CASE(duplicate_once) CASE(duplicate_does_not_renew) CASE(stale_owner) CASE(scene_change)
     CASE(context_change) CASE(watchdog_not_frames) CASE(old_sample) CASE(emergency_stale_state)
     CASE(bad_values) CASE(busy_does_not_drop_action) CASE(bounded_receipts) CASE(renewed_sequence_deadline)

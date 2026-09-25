@@ -4,7 +4,7 @@ Harness local para agentes jogarem **The Legend of Zelda: Ocarina of Time** no *
 
 ## Status atual
 
-**Realtime Input Foundation v2.1 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
+**Realtime Input Foundation v2.2 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
 
 O próximo trabalho principal continua sendo Navigation V2 (geometria/navmesh/A*) e Combat V2 por inimigo/boss. O combate atual é genérico e a navegação global ainda não possui navmesh completo.
 
@@ -35,7 +35,7 @@ C:\Projetos\Shipwright-AI
 - **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
 - **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu, músicas e combate genérico.
 - **Parada independente do provider:** stop/take-control revoga o input antes de aguardar cleanup de inferência ou validação de modelo.
-- **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem P50/P95/P99 e edges observados. Movimento recusa quando o probe não comprova piso seguro.
+- **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem latência Python→consumo P50/P95/P99, fila nativa e edges observados. Backflip/sidestep recebem um tick de direção antes do A e o efeito é confirmado por HOPPING/deslocamento. Movimento recusa quando o probe não comprova piso seguro.
 - **Aprendizado versionado:** dados anteriores são preservados; traces falhos/intervenções não são promovidos como experiência autônoma.
 
 > `consumed` significa que o input chegou ao consumidor do jogo. Não significa automaticamente que um golpe acertou, uma esquiva teve efeito ou uma animação terminou.
@@ -234,7 +234,7 @@ npm run build
 - política de combate robusta contra todo o jogo;
 - replay de trajetória certificado e vinculado ao objetivo atual;
 - isolamento do motor realtime em processo separado de SQLite/UI;
-- medição real p50/p95/p99 no SoH/Windows;
+- validação repetida da medição Python→consumo p50/p95/p99 no SoH/Windows;
 - certificação de uma run completa até o Ganon.
 
 Documentação:

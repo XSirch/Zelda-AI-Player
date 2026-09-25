@@ -50,7 +50,7 @@ def install(root: Path) -> Path:
     # Read and validate every source before writing anything to the checkout.
     planned = {padmgr: patched_padmgr(padmgr.read_bytes())}
     planned.update({destination / name: (source / name).read_bytes() for name in NATIVE_FILES})
-    manifest = {"bridge_build": "rt-input-v2.1", "protocol": 2, "upstream_revision": REVISION,
+    manifest = {"bridge_build": "rt-input-v2.2", "protocol": 2, "upstream_revision": REVISION,
                 "files": {p.name: hashlib.sha256(data).hexdigest() for p, data in planned.items()}}
     planned[destination / "installed-manifest.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     # Backups live OUTSIDE the source glob, so CMake cannot compile duplicate adapters.

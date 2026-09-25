@@ -36,14 +36,18 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.1";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.2";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
 
-int64_t NowMs() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
+int64_t NowUs() {
+    return std::chrono::duration_cast<std::chrono::microseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
+int64_t NowMs() {
+    return NowUs() / 1000;
 }
 
 const char* DoActionName(uint16_t action) {
@@ -180,6 +184,7 @@ struct BridgeData {
                 };
                 command.pad = pad(data);
                 command.leaseMs = data.at("lease_ms").get<int>();
+                command.clientSentUs = data.value("client_sent_us", int64_t{-1});
                 if (command.kind == zelda_ai::InputKind::Sequence) {
                     const auto& steps = data.at("steps");
                     if (!steps.is_array() || steps.size() > 8) continue;
@@ -189,7 +194,8 @@ struct BridgeData {
                     for (const auto& row : steps) command.steps.push_back({pad(row), row.at("ticks").get<int>()});
                 }
                 if (!playable && command.kind != zelda_ai::InputKind::Release) continue;
-                scheduler.Accept(command, NowMs());
+                const auto nowUs = NowUs();
+                scheduler.Accept(command, nowUs / 1000, nowUs);
             } catch (const std::exception&) {
                 // Malformed, unauthorized or out-of-context packets never drive the controller.
             }
@@ -666,6 +672,7 @@ void Snapshot() {
             {"status", zelda_ai::ReceiptStatusName(r.status)}, {"first_tick", r.firstTick},
             {"last_tick", r.lastTick}, {"pressed", r.pressed}, {"released", r.released},
             {"apply_latency_ms", r.applyLatencyMs < 0 ? json(nullptr) : json(r.applyLatencyMs)},
+            {"client_to_consume_ms", r.clientToConsumeMs < 0 ? json(nullptr) : json(r.clientToConsumeMs)},
             {"reason", r.reason}});
     }
     json pendingEvents = json::array();
@@ -690,7 +697,8 @@ void Snapshot() {
         {"event_floor", eventFloor},
         {"event_seq", bridge.eventSeq},
         {"bridge_build", BRIDGE_BUILD},
-        {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "actor_uid", "event_cursor"}},
+        {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
+                          "actor_uid", "event_cursor"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -974,7 +982,8 @@ extern "C" void ZeldaAiBridge_ConsumeInput(int32_t controller, void* rawInput, i
     bridge.Poll();
     const auto humanInput = zelda_ai::ToN64PadState(
         static_cast<uint32_t>(input->cur.button), input->cur.stick_x, input->cur.stick_y);
-    const auto delivery = bridge.scheduler.Consume(NowMs(), humanInput);
+    const auto nowUs = NowUs();
+    const auto delivery = bridge.scheduler.Consume(nowUs / 1000, humanInput, nowUs);
     if (delivery.owned || bridge.wasOwned) {
         input->prev = bridge.lastDelivered;
         if (delivery.owned) {
