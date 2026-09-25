@@ -67,6 +67,9 @@ def test_dashboard_types_include_navigation_debug_contract():
     assert 'navigation?: NavigationDebugTelemetry | null' in text
     assert 'SceneExitObservation' in text
     assert 'scene_exits: SceneExitObservation[]' in text
+    assert 'TraversalAffordanceObservation' in text
+    assert 'traversal_affordances: TraversalAffordanceObservation[]' in text
+
 
 
 
@@ -83,3 +86,13 @@ def test_terrain_panel_exposes_scene_exit_surfaces():
     assert "(value & 0xFFFF).toString(16)" in text
     assert "hex16(exit.entrance_index)" in text
 
+
+
+def test_terrain_panel_exposes_vertical_route_candidates():
+    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    assert 'ROTAS VERTICAIS OBSERVADAS' in text
+    assert 'TRAVERSAL AFFORDANCES' in text
+    assert 'TRAVERSAL SCAN' in text
+    assert 'use traverse_to' in text
+    assert "capabilities.includes('traversal_affordances_v1')" in text
+    assert 'rt-input-v2.9' in text
