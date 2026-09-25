@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _model_memory_note_persistent, _model_last_decision
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _model_memory_note_persistent, _model_last_decision, _model_recent_events
 
 
 def test_token_subsets_are_not_double_counted():
@@ -447,4 +447,21 @@ def test_model_does_not_receive_previous_decision_guessed_prose():
         "skill": "traverse_exit",
         "args": {"target_position": [70, 0, 116]},
     }
+    assert "Kokiri Forest" not in json.dumps(visible)
+
+
+def test_model_facing_decision_events_drop_model_authored_summary():
+    visible = _model_recent_events([{
+        "kind": "decision",
+        "data": {
+            "skill": "traverse_exit",
+            "summary": "This warp probably leads to Kokiri Forest",
+        },
+        "at": 1.0,
+    }])
+    assert visible == [{
+        "kind": "decision",
+        "data": {"skill": "traverse_exit"},
+        "at": 1.0,
+    }]
     assert "Kokiri Forest" not in json.dumps(visible)
