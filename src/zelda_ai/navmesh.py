@@ -18,9 +18,13 @@ _DIRECTIONS: tuple[tuple[int, int], ...] = (
     (0, 1), (1, 1), (1, 0), (1, -1),
     (0, -1), (-1, -1), (-1, 0), (-1, 1),
 )
-_PROBE_NAMES = (
+_PROBE_NAMES_V2 = (
     "forward", "forward_left", "left", "back_left",
     "back", "back_right", "right", "forward_right",
+)
+_PROBE_NAMES_LEGACY = (
+    "forward", "forward_right", "right", "back_right",
+    "back", "back_left", "left", "forward_left",
 )
 
 
@@ -234,7 +238,8 @@ def _probe_direction(game: GameState, waypoint: tuple[float, float, float]) -> s
     desired_yaw = math.atan2(dx, dz) * 32768.0 / math.pi
     relative = ((desired_yaw - game.player.yaw + 32768.0) % 65536.0) - 32768.0
     index = int(math.floor((relative + 4096.0) / 8192.0)) % 8
-    return _PROBE_NAMES[index]
+    names = _PROBE_NAMES_V2 if "probe_yaw_v2" in game.capabilities else _PROBE_NAMES_LEGACY
+    return names[index]
 
 
 def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
