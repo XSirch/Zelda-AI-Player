@@ -3,6 +3,7 @@ from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 from zelda_ai.skills.navigation import _resolve_scene_exit
+from zelda_ai.skills.traversal import _resolve_traversal_affordance
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -449,3 +450,43 @@ def test_scene_exit_resolution_uses_current_observation_only(state):
         "scene_exits": [],
     })
     assert _resolve_scene_exit(refreshed, [70, 0, 116]) is None
+
+
+def test_traversal_affordance_resolves_by_direction_and_approach(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "traversal_affordances": [
+            {"kind": "stairs_or_slope_down", "direction": "down",
+             "approach_position": [70, 0, 0], "target_position": [140, -40, 0],
+             "distance": 70, "height_delta": -40, "wall_flags": 0},
+            {"kind": "ladder_up", "direction": "up",
+             "approach_position": [-70, 0, 0], "target_position": [-100, 30, 0],
+             "distance": 70, "height_delta": 0, "wall_flags": 2},
+        ],
+    })
+    down = _resolve_traversal_affordance(game, "down", [75, 0, 4])
+    assert down is not None and down.kind == "stairs_or_slope_down"
+    assert _resolve_traversal_affordance(game, "up", [75, 0, 4]) is None
+
+
+def test_traversal_affordance_refresh_requires_same_kind(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "traversal_affordances": [
+            {"kind": "ledge_down", "direction": "down",
+             "approach_position": [70, 0, 0], "target_position": [140, -100, 0],
+             "distance": 70, "height_delta": -100, "wall_flags": 0},
+        ],
+    })
+    assert _resolve_traversal_affordance(
+        game, "down", [70, 0, 0], kind="ledge_down") is not None
+    assert _resolve_traversal_affordance(
+        game, "down", [70, 0, 0], kind="ladder_down") is None
