@@ -29,13 +29,13 @@ def _probe_stick(direction: str, game: GameState | None = None) -> tuple[int, in
     if game is not None and game.player is not None:
         offsets = {
             "forward": 0x0000,
-            "forward_right": 0x2000,
-            "right": 0x4000,
-            "back_right": 0x6000,
+            "forward_left": 0x2000,
+            "left": 0x4000,
+            "back_left": 0x6000,
             "back": 0x8000,
-            "back_left": 0xA000,
-            "left": 0xC000,
-            "forward_left": 0xE000,
+            "back_right": -0x6000,
+            "right": -0x4000,
+            "forward_right": -0x2000,
         }
         return _world_yaw_stick(game, game.player.yaw + offsets[direction], 48)
 
@@ -44,13 +44,13 @@ def _probe_stick(direction: str, game: GameState | None = None) -> tuple[int, in
     diagonal = 34
     return {
         "forward": (0, scale),
-        "forward_right": (-diagonal, diagonal),
-        "right": (-scale, 0),
-        "back_right": (-diagonal, -diagonal),
+        "forward_left": (-diagonal, diagonal),
+        "left": (-scale, 0),
+        "back_left": (-diagonal, -diagonal),
         "back": (0, -scale),
-        "back_left": (diagonal, -diagonal),
-        "left": (scale, 0),
-        "forward_left": (diagonal, diagonal),
+        "back_right": (diagonal, -diagonal),
+        "right": (scale, 0),
+        "forward_right": (diagonal, diagonal),
     }[direction]
 
 
