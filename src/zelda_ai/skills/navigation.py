@@ -118,8 +118,6 @@ def _resolve_scene_exit(game: GameState, target_position: list[float] | tuple[fl
     """Match a model-selected coordinate back to an exit surface observed by the engine."""
     if not game.scene_exits or target_position is None:
         return None
-    if len(game.scene_exits) == 1:
-        return game.scene_exits[0]
     target = tuple(float(v) for v in target_position)
     nearest = min(game.scene_exits, key=lambda row: math.dist(row.position, target))
     tolerance = max(120.0, (game.navmesh.step * 2.0) if game.navmesh.available else 120.0)
