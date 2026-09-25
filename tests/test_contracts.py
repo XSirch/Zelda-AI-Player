@@ -329,3 +329,36 @@ def test_model_world_edges_expose_only_empirically_observed_topology():
     assert visible[0]["from_position"] == [70.0, 0.0, 116.0]
     assert "entrance_index" not in visible[0]
     assert "id" not in visible[0]
+
+
+def test_model_neutralizes_transition_actor_destination_labels(state):
+    warp_actor = {
+        "actor_uid": "warp-1",
+        "actor_id": 123,
+        "name": "Door_Warp1",
+        "description": "Warp to Kokiri Forest",
+        "category": 7,
+        "category_name": "item_action",
+        "room": 0,
+        "params": 44,
+        "position": [20, 0, 30],
+        "focus_position": [20, 20, 30],
+        "distance": 35.0,
+        "targeted": False,
+        "drawn": True,
+        "text_id": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "room_actors": [warp_actor],
+        "room_actor_count": 1,
+    })
+    payload = _model_state_payload(game)
+    actor = payload["room_actors"][0]
+    assert actor["name"] == "Transition Object"
+    assert actor["description"] == ""
+    serialized = json.dumps(actor)
+    assert "Kokiri Forest" not in serialized
+    # Targeting identity remains available; only semantic destination clues are removed.
+    assert actor["actor_id"] == 123
+    assert actor["actor_uid"] == "warp-1"
