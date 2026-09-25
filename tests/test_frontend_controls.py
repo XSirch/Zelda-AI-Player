@@ -96,3 +96,12 @@ def test_terrain_panel_exposes_vertical_route_candidates():
     assert 'use traverse_to' in text
     assert "capabilities.includes('traversal_affordances_v1')" in text
     assert 'rt-input-v2.9' in text
+
+
+def test_decision_panel_shows_automatic_vertical_navpath():
+    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    types = Path('web/src/types.ts').read_text(encoding='utf-8')
+    assert 'AUTO NAVPATH' in main
+    assert 'selected_affordance?.kind' in main
+    assert 'auto_navpath?: boolean' in types
+    assert 'controller_skill?: string' in types
