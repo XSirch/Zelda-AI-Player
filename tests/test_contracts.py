@@ -362,3 +362,13 @@ def test_model_neutralizes_transition_actor_destination_labels(state):
     # Targeting identity remains available; only semantic destination clues are removed.
     assert actor["actor_id"] == 123
     assert actor["actor_uid"] == "warp-1"
+
+    exit_actor = {**warp_actor, "actor_uid": "exit-1", "name": "Kokiri Forest Exit",
+                  "description": "Loads the exterior"}
+    exit_game = type(state).model_validate({
+        **state.model_dump(), "room_actors": [exit_actor], "room_actor_count": 1,
+    })
+    exit_visible = _model_state_payload(exit_game)["room_actors"][0]
+    assert exit_visible["name"] == "Transition Object"
+    assert "Kokiri Forest" not in json.dumps(exit_visible)
+
