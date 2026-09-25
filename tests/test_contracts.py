@@ -284,6 +284,9 @@ def test_planner_prompt_understands_actorless_scene_exits():
     assert 'scene_exits' in SYSTEM_PROMPT
     assert "Link's House" in SYSTEM_PROMPT
     assert 'no door actor' in SYSTEM_PROMPT
+    assert 'destination is unknown' in SYSTEM_PROMPT
+    assert 'MUST NOT be used to infer where it leads' in SYSTEM_PROMPT
+    assert 'Do not write a memory_note claiming where an untraversed transition leads' in SYSTEM_PROMPT
 
 
 def test_model_sees_scene_exit_as_opaque_position_only(state):
