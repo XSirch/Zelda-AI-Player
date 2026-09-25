@@ -343,9 +343,11 @@ const char* ActorCategoryName(uint8_t category) {
 }
 
 json NavigationProbes(Player* player) {
+    // Positive relative yaw is LEFT in Player_ProcessControlStick:
+    // 0=forward, 1=left, 2=backward, 3=right.
     static const char* names[] = {
-        "forward", "forward_right", "right", "back_right",
-        "back", "back_left", "left", "forward_left",
+        "forward", "forward_left", "left", "back_left",
+        "back", "back_right", "right", "forward_right",
     };
     static const int16_t offsets[] = {
         0x0000, 0x2000, 0x4000, 0x6000,
