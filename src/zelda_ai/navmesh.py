@@ -280,44 +280,41 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
 def primitive_move_safe(game: GameState, direction: str, *,
                         probe_distance: float = 75.0,
                         wall_clearance: float = 42.0) -> bool:
-    """Validate the world heading produced by a raw camera-relative move."""
+    """Probe the world heading that OoT will actually derive from a raw move stick."""
     if not game.player:
-        return False
+        return True
     if not game.navigation_probes:
         return "local_navmesh" not in game.capabilities
 
-    offsets = {
-        "forward": 0,
-        "back": 0x8000,
-        # SoH computes stick angle from Math_Atan2S(relY, -relX):
-        # raw negative X is +90 degrees, raw positive X is -90 degrees.
-        "left": 0x4000,
-        "right": -0x4000,
-    }
-    offset = offsets.get(direction)
-    if offset is None:
+    raw = {
+        "forward": (0.0, 1.0),
+        "back": (0.0, -1.0),
+        "right": (1.0, 0.0),
+        "left": (-1.0, 0.0),
+    }.get(direction)
+    if raw is None:
         return True
-    if game.mirrored_world and direction in {"left", "right"}:
-        offset = -offset
+    raw_x, raw_y = raw
+    effective_x = -raw_x if game.mirrored_world else raw_x
+    stick_angle = math.atan2(-effective_x, raw_y)
 
     if game.camera_input_yaw is not None:
-        world_yaw = game.camera_input_yaw + offset
+        camera_yaw = game.camera_input_yaw * math.pi / 32768.0
     elif game.camera_eye is not None and game.camera_at is not None:
         fx = game.camera_at[0] - game.camera_eye[0]
         fz = game.camera_at[2] - game.camera_eye[2]
-        if math.hypot(fx, fz) >= 1e-4:
-            world_yaw = math.atan2(fx, fz) * 32768.0 / math.pi + offset
-        else:
-            world_yaw = game.player.yaw + offset
+        camera_yaw = (math.atan2(fx, fz) if math.hypot(fx, fz) >= 1e-4
+                      else game.player.yaw * math.pi / 32768.0)
     else:
-        world_yaw = game.player.yaw + offset
+        camera_yaw = game.player.yaw * math.pi / 32768.0
 
-    angle = world_yaw * math.pi / 32768.0
-    distance = 140.0 if probe_distance > 100.0 else 70.0
+    world_yaw = camera_yaw + stick_angle
+    vx, vz = math.sin(world_yaw), math.cos(world_yaw)
     x, y, z = game.player.position
+    distance = 140.0 if probe_distance > 100.0 else 70.0
     return waypoint_probe_safe(
         game,
-        (x + math.sin(angle) * distance, y, z + math.cos(angle) * distance),
+        (x + vx * distance, y, z + vz * distance),
         probe_distance=probe_distance,
         wall_clearance=wall_clearance,
     )
