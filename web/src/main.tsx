@@ -93,6 +93,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>WAYPOINT</span><strong>{vector(nav?.waypoint)}</strong></div>
         <div><span>PROBE</span><strong>{nav?.probe_safe == null ? '—' : nav.probe_safe ? 'SAFE' : 'BLOCKED'}</strong></div>
         <div><span>CUSTO A*</span><strong>{nav?.plan_cost == null ? '—' : number(nav.plan_cost)}</strong></div>
+        <div><span>EXIT ATUAL</span><strong>{nav?.exit_index == null ? '—' : `EXIT ${nav.exit_index} · ENTRANCE 0x${(nav.entrance_index ?? -1).toString(16).toUpperCase()}`}</strong></div>
       </div>
     </section>
     {sceneExits.length > 0 && <section className="panel actors-panel">
@@ -100,7 +101,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
       <div className="actors-grid">{sceneExits.map(exit =>
         <div className="actor-item" key={exit.exit_index}>
           <span>EXIT {exit.exit_index} · ENTRANCE 0x{exit.entrance_index.toString(16).toUpperCase()}</span>
-          <strong>POS {vector(exit.position)} · ${exit.samples} amostras · use traverse_exit</strong>
+          <strong>POS {vector(exit.position)} · {exit.samples} amostras · use traverse_exit</strong>
         </div>)}
       </div>
     </section>}
