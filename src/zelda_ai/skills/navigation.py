@@ -449,8 +449,28 @@ async def _follow_actor(bridge: Bridge, decision: Decision, observation: GameSta
                 stick_x, stick_y, _ = _steer_to(current, steer_target, max(0.55, decision.args.strength))
                 command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=240)
             elif actor.distance < max(45.0, desired - 50):
-                stick_x, stick_y, _ = _steer_to(current, actor.position, max(0.4, decision.args.strength))
-                command_id = bridge.send(stick_x=-stick_x, stick_y=-max(20, stick_y), lease_ms=180)
+                if "local_navmesh" in current.capabilities:
+                    dx = current.player.position[0] - actor.position[0]
+                    dz = current.player.position[2] - actor.position[2]
+                    length = math.hypot(dx, dz)
+                    if length < 1e-4:
+                        command_id = bridge.send(lease_ms=160)
+                    else:
+                        away_target = (
+                            current.player.position[0] + dx / length * 120.0,
+                            current.player.position[1],
+                            current.player.position[2] + dz / length * 120.0,
+                        )
+                        plan = plan_navmesh(current, away_target)
+                        if plan is None or not waypoint_probe_safe(current, plan.waypoint):
+                            command_id = bridge.send(lease_ms=160)
+                        else:
+                            stick_x, stick_y, _ = _steer_to(
+                                current, plan.waypoint, max(0.4, decision.args.strength))
+                            command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=180)
+                else:
+                    stick_x, stick_y, _ = _steer_to(current, actor.position, max(0.4, decision.args.strength))
+                    command_id = bridge.send(stick_x=-stick_x, stick_y=-max(20, stick_y), lease_ms=180)
             else:
                 command_id = bridge.send(lease_ms=160)
 
@@ -571,11 +591,14 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                 last_progress_at = time.monotonic()
                 turn_side *= -1
 
-            if turn_ticks > 0:
-                buttons, stick_x, stick_y = 0, 58 * turn_side, 8
-                turn_ticks -= 1
-            elif "local_navmesh" in current.capabilities:
-                angle = current.player.yaw * math.pi / 32768.0
+            if "local_navmesh" in current.capabilities:
+                base_angle = current.player.yaw * math.pi / 32768.0
+                angle = base_angle
+                if turn_ticks > 0:
+                    # Choose a connected side frontier instead of rotating with
+                    # forward bias, which can still scrape a nearby wall.
+                    angle += turn_side * math.pi / 2.0
+                    turn_ticks -= 1
                 explore_target = (
                     current.player.position[0] + math.sin(angle) * 350.0,
                     current.player.position[1],
@@ -583,13 +606,18 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                 )
                 plan = plan_navmesh(current, explore_target)
                 if plan is None or not waypoint_probe_safe(current, plan.waypoint):
-                    # Rotate in place and let the next full mesh expose a different connected frontier.
-                    buttons, stick_x, stick_y = 0, 58 * turn_side, 8
-                    turn_ticks = 3
+                    # Stay neutral; try the opposite connected side on the next
+                    # sample rather than issuing any unvalidated movement.
+                    buttons, stick_x, stick_y = 0, 0, 0
                     turn_side *= -1
+                    turn_ticks = max(turn_ticks, 2)
                 else:
                     buttons = 0
-                    stick_x, stick_y, _ = _steer_to(current, plan.waypoint, max(.55, decision.args.strength))
+                    stick_x, stick_y, _ = _steer_to(
+                        current, plan.waypoint, max(.55, decision.args.strength))
+            elif turn_ticks > 0:
+                buttons, stick_x, stick_y = 0, 58 * turn_side, 8
+                turn_ticks -= 1
             else:
                 buttons, stick_x, stick_y = 0, 0, 58
 
