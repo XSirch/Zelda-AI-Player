@@ -3,6 +3,7 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from zelda_ai.providers.base import SYSTEM_PROMPT
 from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
@@ -276,3 +277,10 @@ def test_scene_exit_observation_and_traverse_exit_contract(decision, state):
             "skill": "traverse_exit",
             "args": {**decision.args.model_dump(), "duration_ms": 8000, "target_position": None},
         })
+
+
+def test_planner_prompt_understands_actorless_scene_exits():
+    assert 'traverse_exit(target_position)' in SYSTEM_PROMPT
+    assert 'scene_exits' in SYSTEM_PROMPT
+    assert "Link's House" in SYSTEM_PROMPT
+    assert 'no door actor' in SYSTEM_PROMPT
