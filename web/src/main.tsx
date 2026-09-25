@@ -86,7 +86,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
     {navCapable && !traversalScan && bridge?.connected && <div className="notice">
       TRAVERSAL SCAN INDISPONÍVEL — para descobrir escadas, descidas, ladders e paredes escaláveis
       fora das sondas imediatas, use <code>rt-input-v2.9</code> ou superior e recompile o SoH.
-    </div>
+    </div>}
     <section className="panel">
       <div className="section-head"><span>NAVIGATION V2 / A*</span><span className="muted">{navState}</span></div>
       <div className="telemetry">
