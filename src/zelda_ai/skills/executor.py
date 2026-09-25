@@ -48,6 +48,8 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
         return await _equip_gear(bridge, decision, observation)
     if decision.skill == "navigate_to":
         return await _navigate_local(bridge, decision, observation, actor_mode=False)
+    if decision.skill == "traverse_exit":
+        return await _navigate_local(bridge, decision, observation, actor_mode=False, exit_mode=True)
     if decision.skill == "approach_actor":
         return await _navigate_local(bridge, decision, observation, actor_mode=True)
     if decision.skill == "follow_actor":
