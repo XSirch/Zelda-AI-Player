@@ -56,3 +56,8 @@ HTTP aceita apenas hosts locais. Mutação exige nonce de sessão, e origens web
 - [OpenRouter usage](https://openrouter.ai/docs/cookbook/administration/usage-accounting).
 - [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
 - [Shipwright fixado](https://github.com/HarbourMasters/Shipwright/tree/d30fc192f2eb01ceea45bd1e12de61636cafbf86): GameInteractor_HookTable.h, ShipInit.hpp, padmgr.c e CMakeLists.txt.
+
+
+### Integridade do aprendizado de transições
+
+Saídas de cena são opacas ao modelo até serem atravessadas. IDs nativos permanecem apenas em controle/UI. O runtime confirma o `SceneExitIndex` do floor poly sob Link no último estado anterior à mudança de cena antes de associar uma surface selecionada ao destino. Se outra porta/warp/script causar a transição, a aresta usa a posição real observada e não a surface planejada. `memory_note` livre do modelo não é persistido; topologia persistente vem exclusivamente de evidência estruturada (`known_world_edges`, trajetórias confirmadas e eventos nativos).
