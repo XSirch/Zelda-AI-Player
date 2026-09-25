@@ -132,6 +132,7 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
     expected_distance = 0.0
     stick_x = None
     stick_y = None
+    control_stick_direction = None
 
     try:
         with bridge.input_scope(f"diagnostic:{action}"):
@@ -169,6 +170,7 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
                     expected_distance = dodge["expected_distance"]
                     stick_x = dodge["stick_x"]
                     stick_y = dodge["stick_y"]
+                    control_stick_direction = dodge.get("control_stick_direction")
                     reason = dodge["reason"]
     except ControlRevoked:
         reason = "control_revoked"
@@ -195,6 +197,7 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
         "hop_direction": hop_direction, "expected_hop_direction": expected_hop_direction,
         "max_distance": max_distance, "expected_distance": expected_distance, "distance": distance,
         "stick_x": stick_x, "stick_y": stick_y,
+        "control_stick_direction": control_stick_direction,
         "start_position": list(start.player.position) if start and start.player else None,
         "end_position": list(after.player.position) if after and after.player else None,
     }

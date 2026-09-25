@@ -97,6 +97,7 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
                 "hop_direction": dodge["hop_direction"],
                 "expected_hop_direction": dodge["expected_hop_direction"],
                 "stick_x": dodge["stick_x"], "stick_y": dodge["stick_y"],
+                "control_stick_direction": dodge.get("control_stick_direction"),
                 "acknowledged": delivered, "ack_stage": "consumed",
                 "effect_confirmed": dodge["confirmed"], "skill": decision.skill}
         delivered = await bridge.pulse(buttons=buttons, stick_x=x, stick_y=y,
