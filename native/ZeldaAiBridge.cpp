@@ -446,6 +446,7 @@ json NavigationMesh(Player* player) {
     };
     struct ExitSamples {
         int count = 0;
+        float nearestDistSq = 1.0e30f;
         float x = 0.0f;
         float y = 0.0f;
         float z = 0.0f;
@@ -466,9 +467,15 @@ json NavigationMesh(Player* player) {
             if (exitIndex > 0 && exitIndex < ARRAY_COUNT(exits)) {
                 auto& sample = exits[exitIndex];
                 sample.count++;
-                sample.x += x;
-                sample.y += floorY;
-                sample.z += z;
+                const float dx = x - origin.x;
+                const float dz = z - origin.z;
+                const float distSq = dx * dx + dz * dz;
+                if (distSq < sample.nearestDistSq) {
+                    sample.nearestDistSq = distSq;
+                    sample.x = x;
+                    sample.y = floorY;
+                    sample.z = z;
+                }
             }
         }
         return found;
@@ -600,11 +607,7 @@ json NavigationMesh(Player* player) {
         result["scene_exits"].push_back({
             {"exit_index", exitIndex},
             {"entrance_index", entranceIndex},
-            {"position", {
-                sample.x / sample.count,
-                sample.y / sample.count,
-                sample.z / sample.count,
-            }},
+            {"position", {sample.x, sample.y, sample.z}},
             {"samples", sample.count},
         });
     }
