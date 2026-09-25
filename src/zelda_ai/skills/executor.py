@@ -16,7 +16,7 @@ from .navigation import _explore_area, _face_target, _follow_actor, _navigate_lo
 from .interactions import _interact_with_door, _manipulate_object
 from .aim import _aim_at
 from .combat import _fight_enemy
-from .traversal import _traverse_local, _traverse_to_affordance
+from .traversal import _traverse_auto, _traverse_local, _traverse_to_affordance
 
 async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState,
                         combat_profile: dict | None = None) -> dict:
@@ -40,7 +40,7 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
         return {"status": "stale", "reason": "game_not_ready", "skill": decision.skill}
 
     if decision.skill == "traverse":
-        return await _traverse_local(bridge, decision, observation, decision.args.direction)
+        return await _traverse_auto(bridge, decision, observation)
     if decision.skill == "traverse_to":
         return await _traverse_to_affordance(bridge, decision, observation)
 
