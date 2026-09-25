@@ -25,7 +25,7 @@ export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnosti
   const blocked = !rt?.enabled || ['starting', 'running', 'paused'].includes(runtimeStatus ?? '') || busy;
   const last = rt?.last_receipt;
   return <section className="panel realtime-panel">
-    <div className="section-head"><span>CONTROLE / LATÊNCIA</span><span>{rt?.enabled ? 'BRIDGE V2' : 'LEGADO / SEM RT'}</span></div>
+    <div className="section-head"><span>CONTROLE / LATÊNCIA</span><span>{bridge?.state?.bridge_build ?? (rt?.enabled ? 'BRIDGE V2' : 'LEGADO / SEM RT')}</span></div>
     <div className="telemetry">
       <div><span>ESTADO RECEBIDO</span><strong>{rt?.state_hz == null ? '—' : `${rt.state_hz.toFixed(1)} Hz`}</strong></div>
       <div><span>INTERVALO P95</span><strong>{ms(rt?.state_interval_p95_ms)}</strong></div>

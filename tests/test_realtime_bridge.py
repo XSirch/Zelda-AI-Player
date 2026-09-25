@@ -58,6 +58,22 @@ def actor(uid, distance):
                 position=[0, 0, distance], targeted=False)
 
 
+
+
+def test_bridge_status_exposes_navigation_debug(state):
+    bridge = Bridge(TOKEN)
+    bridge.state = state
+    bridge.set_navigation_debug(
+        skill='navigate_to', status='active', target_position=[100, 0, 0],
+        waypoint=[70, 0, 0], path_cells=3, probe_safe=True, navmesh_used=True,
+        target_distance=100,
+    )
+    nav = bridge.status()['navigation']
+    assert nav['skill'] == 'navigate_to'
+    assert nav['status'] == 'active'
+    assert nav['waypoint'] == [70, 0, 0]
+    assert nav['probe_safe'] is True
+
 def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
     bridge = Bridge(TOKEN)
     bridge.transport = Transport()

@@ -175,6 +175,10 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 return {"status": "failed", "reason": "target_on_different_floor",
                     "target_distance": target_distance, "skill": decision.skill}
             if target_distance <= stop_distance:
+                bridge.set_navigation_debug(
+                    skill=decision.skill, status="reached", target_position=list(target),
+                    waypoint=None, path_cells=last_path_cells, probe_safe=True,
+                    navmesh_used=navmesh_used, target_distance=target_distance)
                 if not interaction_mode:
                     return {"status": "completed", "reason": "target_reached",
                         "target_distance": target_distance,
@@ -220,6 +224,10 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
             if "local_navmesh" in current.capabilities:
                 plan = plan_navmesh(current, target)
                 if plan is None:
+                    bridge.set_navigation_debug(
+                        skill=decision.skill, status="no_path", target_position=list(target),
+                        waypoint=None, path_cells=0, probe_safe=False, navmesh_used=True,
+                        target_distance=target_distance)
                     navmesh_blocked_samples += 1
                     if navmesh_blocked_samples >= 5:
                         return {"status": "failed", "reason": "navigation_no_path",
@@ -233,7 +241,14 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 navmesh_used = True
                 last_path_cells = len(plan.path)
                 steer_target = plan.waypoint
-                if not waypoint_probe_safe(current, steer_target):
+                probe_safe = waypoint_probe_safe(current, steer_target)
+                bridge.set_navigation_debug(
+                    skill=decision.skill, status="active" if probe_safe else "blocked",
+                    target_position=list(target), waypoint=list(plan.waypoint),
+                    path_cells=last_path_cells, probe_safe=probe_safe, navmesh_used=True,
+                    target_distance=target_distance, plan_target_distance=plan.target_distance,
+                    plan_cost=round(plan.cost, 2), exact_goal_reachable=plan.exact_goal_reachable)
+                if not probe_safe:
                     navmesh_blocked_samples += 1
                     if navmesh_blocked_samples >= 5:
                         return {"status": "failed", "reason": "navigation_path_blocked",
@@ -246,6 +261,11 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     continue
                 navmesh_blocked_samples = 0
 
+            if "local_navmesh" not in current.capabilities:
+                bridge.set_navigation_debug(
+                    skill=decision.skill, status="legacy_steering", target_position=list(target),
+                    waypoint=list(steer_target), path_cells=0, probe_safe=None,
+                    navmesh_used=False, target_distance=target_distance)
             stick_x, stick_y, _ = _steer_to(current, steer_target, decision.args.strength)
 
             if current.seq != last_progress_seq:
@@ -305,6 +325,13 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     after = bridge.state
     if after and first_command is not None:
         acknowledged |= consumed(bridge, first_command)
+    bridge.set_navigation_debug(
+        skill=decision.skill, status="timeout",
+        target_position=list(last_actor.position) if last_actor else (
+            list(decision.args.target_position) if decision.args.target_position else None),
+        waypoint=None, path_cells=last_path_cells, probe_safe=None,
+        navmesh_used=navmesh_used,
+        target_distance=(last_actor.distance if last_actor else None))
     return {"status": "failed", "reason": "navigation_timeout",
         "target_distance": (last_actor.distance if last_actor else None),
         "distance": math.dist(start_position, after.player.position) if after and after.player else None,
@@ -443,7 +470,16 @@ async def _follow_actor(bridge: Bridge, decision: Decision, observation: GameSta
                 steer_target = actor.position
                 if "local_navmesh" in current.capabilities:
                     plan = plan_navmesh(current, actor.position)
-                    if plan is None or not waypoint_probe_safe(current, plan.waypoint):
+                    probe_safe = bool(plan and waypoint_probe_safe(current, plan.waypoint))
+                    bridge.set_navigation_debug(
+                        skill=decision.skill, status="active" if probe_safe else ("blocked" if plan else "no_path"),
+                        target_position=list(actor.position),
+                        waypoint=list(plan.waypoint) if plan else None,
+                        path_cells=len(plan.path) if plan else 0, probe_safe=probe_safe,
+                        navmesh_used=True, target_distance=actor.distance,
+                        plan_cost=round(plan.cost, 2) if plan else None,
+                        exact_goal_reachable=plan.exact_goal_reachable if plan else False)
+                    if plan is None or not probe_safe:
                         bridge.release()
                         await feedback(bridge, current, .10)
                         continue
@@ -607,7 +643,16 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                     current.player.position[2] + math.cos(angle) * 350.0,
                 )
                 plan = plan_navmesh(current, explore_target)
-                if plan is None or not waypoint_probe_safe(current, plan.waypoint):
+                probe_safe = bool(plan and waypoint_probe_safe(current, plan.waypoint))
+                bridge.set_navigation_debug(
+                    skill=decision.skill, status="active" if probe_safe else ("blocked" if plan else "no_path"),
+                    target_position=list(explore_target),
+                    waypoint=list(plan.waypoint) if plan else None,
+                    path_cells=len(plan.path) if plan else 0, probe_safe=probe_safe,
+                    navmesh_used=True, target_distance=None,
+                    plan_cost=round(plan.cost, 2) if plan else None,
+                    exact_goal_reachable=plan.exact_goal_reachable if plan else False)
+                if plan is None or not probe_safe:
                     # Stay neutral; try the opposite connected side on the next
                     # sample rather than issuing any unvalidated movement.
                     buttons, stick_x, stick_y = 0, 0, 0
