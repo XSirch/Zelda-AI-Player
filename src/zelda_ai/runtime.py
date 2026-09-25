@@ -125,6 +125,18 @@ def _model_world_edges(rows: list[dict]) -> list[dict]:
     return [{key: row.get(key) for key in allowed} for row in rows]
 
 
+def _model_last_decision(row: dict | None) -> dict | None:
+    if not row:
+        return None
+    # Do not echo model-authored goal/summary/memory_note back into inference.
+    # They may contain an unsupported transition guess. The executable action
+    # itself is enough context for interpreting last_result.
+    return _strip_transition_ids({
+        "skill": row.get("skill"),
+        "args": row.get("args") or {},
+    })
+
+
 def _decision_targets_transition(game: GameState, decision: Decision) -> bool:
     """Transition topology is learned only by Runtime._learn_transition, never free-form memory."""
     if decision.skill == "traverse_exit":
@@ -877,7 +889,7 @@ class Runtime:
                 state_payload = _model_state_payload(game)
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": state_payload,
-                    "last_decision": self.last_decision,
+                    "last_decision": _model_last_decision(self.last_decision),
                     "last_result": _strip_transition_ids(self.last_result),
                     "events": _strip_transition_ids(list(self.recent)[-5:]),
                     "dialogue_transcript": _strip_transition_ids(list(self.dialogue_transcript)),
