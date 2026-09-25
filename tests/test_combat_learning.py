@@ -95,3 +95,13 @@ def test_snapshot_contains_compact_combat_profiles(store, state):
     snap = runtime.snapshot()
     assert snap["combat_profiles"][0]["enemy_name"] == "Deku Baba"
     assert "policy" not in snap["combat_profiles"][0]
+
+
+def test_human_hint_taints_combat_learning_for_run(store, state):
+    runtime = Runtime(Bridge("x" * 32, True), store, {})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo", memory_mode="adaptive")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.state = "running"
+    runtime.hint("block before attacking")
+    assert runtime.combat_learning_tainted

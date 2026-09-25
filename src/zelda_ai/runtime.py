@@ -120,6 +120,7 @@ class Runtime:
         self.diagnostic_active = False
         self.combat_profiles_cache: list[dict] | None = None
         self.combat_profiles_at = 0.0
+        self.combat_learning_tainted = False
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -552,6 +553,7 @@ class Runtime:
             self.metrics_cache = None
             self.config, self.selected_model = config, info
             self.combat_profiles_cache = None
+            self.combat_learning_tainted = False
             fingerprint = hashlib.sha256(json.dumps({"contract": CONTRACT_VERSION,
                 "revision": game.upstream_revision, "initial": game.model_dump(exclude={"seq", "events", "last_command_seq"}),
                 "checkpoint_label": config.checkpoint_label}, sort_keys=True).encode()).hexdigest()
@@ -604,8 +606,11 @@ class Runtime:
             if not self.run_id or self.state not in {"running", "paused"}:
                 raise ValueError("No active run")
             if action in {"pause", "stop", "take_control"}:
-                # Human input during any pause must not become autonomous experience.
+                # Human input during a pause can alter subsequent combat context. Do not
+                # promote later combat as autonomous learning in this run.
                 self._reset_trajectory_trace(self.bridge.state, tainted=True)
+                if action in {"pause", "take_control"}:
+                    self.combat_learning_tainted = True
                 if action == "take_control":
                     self.store.update_run(self.run_id, assisted=True)
                     self.log("take_control")
@@ -684,6 +689,7 @@ class Runtime:
             return
         self.config, self.selected_model = self.pending_switch
         self.pending_switch = None
+        self.combat_learning_tainted = True
         self.namespace = self.new_namespace(self.config)
         self.combat_profiles_cache = None
         self.segment_id = self.store.segment(self.run_id, self.config.model_dump(), self.namespace)
@@ -697,6 +703,7 @@ class Runtime:
         if not self.run_id or self.state not in {"running", "paused"}:
             raise ValueError("No active run")
         self.hints.append(text)
+        self.combat_learning_tainted = True
         self.store.update_run(self.run_id, assisted=True)
         self._reset_trajectory_trace(self.bridge.state, tainted=True)
         self.log("human_hint", {"text": text})
@@ -838,6 +845,7 @@ class Runtime:
                 self.last_result = await execute_skill(self.bridge, decision, game,
                     combat_profile=combat_profile)
                 if (combat_enemy and self.config.memory_mode == "adaptive" and self.namespace
+                        and not self.combat_learning_tainted
                         and isinstance(self.last_result.get("learning_trace"), list)
                         and self.last_result["learning_trace"]):
                     updated_profile = self.store.record_combat_encounter(
@@ -845,6 +853,11 @@ class Runtime:
                     if updated_profile:
                         self.combat_profiles_cache = None
                         self.log("combat_profile_updated", compact_profile(updated_profile) or {})
+                elif (combat_enemy and self.combat_learning_tainted
+                        and isinstance(self.last_result.get("learning_trace"), list)
+                        and self.last_result["learning_trace"]):
+                    self.log("combat_learning_skipped_assisted", {
+                        "enemy_key": combat_enemy["enemy_key"], "reason": "human_intervention_in_run"})
                 if self.last_result["status"] not in {"completed"}:
                     self._discard_failed_trajectory_action(decision)
                 event_kind = {
@@ -884,6 +897,7 @@ class Runtime:
             "elapsed_s": round(time.monotonic() - self.started) if self.run_id else 0,
             "last_decision": self.last_decision, "last_result": self.last_result,
             "diagnostic": self.last_diagnostic, "diagnostic_active": self.diagnostic_active,
+            "combat_learning_tainted": self.combat_learning_tainted,
             "events": list(self.recent), "dialogue_transcript": list(self.dialogue_transcript),
             "bridge": self.bridge.status(), "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
             "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],

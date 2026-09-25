@@ -117,13 +117,13 @@ function CombatLearningPanel({ profiles, game }: { profiles: CombatProfile[]; ga
       <div key={actor.actor_uid || String(actor.actor_id) + '-' + String(actor.params)}>
         <span>SEM EXPERIÊNCIA</span>
         <strong>{actor.description || actor.name || 'Actor ' + actor.actor_id}</strong>
-        <small>ID {actor.actor_id} · o primeiro encontro ainda não gerou política persistida</small>
+        <small>ID {actor.actor_id} · o primeiro episódio ainda não gerou política persistida</small>
       </div>)}</div>}
     <div className="combat-profile-grid">{profiles.map(profile => {
       const best = Object.entries(profile.best_by_state ?? {}).slice(0, 8);
       return <article key={profile.id} className={visibleIds.has(profile.actor_id) ? 'combat-profile visible' : 'combat-profile'}>
         <div className="combat-profile-head"><div><span>{visibleIds.has(profile.actor_id) ? 'PRESENTE NA SALA' : 'MEMÓRIA'}</span><h3>{profile.enemy_name || 'Actor ' + profile.actor_id}</h3></div><strong>{profile.wins}V / {profile.losses}D</strong></div>
-        <div className="combat-stats"><span>ENCONTROS <b>{profile.encounters}</b></span><span>INCOMPLETOS <b>{profile.incomplete}</b></span><span>DANO RECEBIDO <b>{number(profile.damage_taken / 16)} ♥</b></span></div>
+        <div className="combat-stats"><span>EPISÓDIOS <b>{profile.encounters}</b></span><span>INCOMPLETOS <b>{profile.incomplete}</b></span><span>DANO RECEBIDO <b>{number(profile.damage_taken / 16)} ♥</b></span></div>
         {best.length ? <div className="learned-actions">{best.map(([stateName, entry]) =>
           <div key={stateName}><code>{stateName}</code><span>{entry.action}</span><small>reward {entry.mean.toFixed(2)} · n={entry.samples}</small></div>)}</div>
           : <p className="muted">Sem ações consolidadas. O próximo encontro explora apenas opções seguras e atualiza este perfil.</p>}

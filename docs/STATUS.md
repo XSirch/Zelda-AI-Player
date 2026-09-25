@@ -81,3 +81,6 @@ Adaptive combat memory is now separated by model + effort + contract namespace a
 Rewards use observable outcomes: player damage is strongly negative, collision-health/color-filter changes are positive hints rather than authoritative HP, confirmed dodges and safe defense receive small credit, and native enemy/boss defeat events provide the terminal win reward. Player death provides a terminal negative reward. The model prompt receives compact learned profiles for visible enemies so high-level reasoning can use prior encounters without putting the LLM in the 20 Hz motor loop.
 
 Combat profiles are not shared between benchmark models/efforts. Isolated/zero-shot mode does not persist them.
+
+
+Combat-learning benchmark integrity: a human hint or a pause/take-control opportunity taints combat learning for the remainder of that run. Existing opponent profiles may still be used, but new combat traces from the assisted run are not persisted into the adaptive namespace.
