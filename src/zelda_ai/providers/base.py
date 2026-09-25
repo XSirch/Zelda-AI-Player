@@ -31,7 +31,7 @@ Implemented skills:
 - traverse(up/down): local terrain traversal for stairs, drops, ladders and climbable surfaces. It uses player ladder/ledge state plus navigation_probes and monitors real vertical progress
 - traverse_exit(target_position): walk through an observed collision scene-exit surface. Use only a target_position copied from scene_exits. It deliberately does NOT stop short; success is the engine starting/changing the scene transition
 
-The state contract includes scene + scene_name, room, entrance_index, day_time/is_night, player pose/collision state, camera,
+The state contract includes scene + scene_name, room, day_time/is_night, player pose/collision state, camera,
 raw inventory/equipment plus inventory_named entries (name/item_id/ammo when applicable) for items Link owns, pause-menu cursor state,
 game-over state, ocarina state, decoded dialogue, a pause-visible progress block (quest items/songs,
 owned equipment, upgrades, current dungeon map/compass/boss key/small keys), context-sensitive A action
