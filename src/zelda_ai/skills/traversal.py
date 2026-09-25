@@ -204,6 +204,11 @@ async def _traverse_auto(bridge: Bridge, decision: Decision, observation: GameSt
         result["auto_navpath"] = False
         result["navpath_mode"] = "native_state"
         return result
+    if "traversal_affordances_v1" not in before.capabilities:
+        result = await _traverse_local(bridge, decision, observation, direction)
+        result["auto_navpath"] = False
+        result["navpath_mode"] = "legacy_local"
+        return result
 
     affordance = _best_auto_traversal_affordance(before, direction)
     if affordance is None:
