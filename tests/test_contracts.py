@@ -394,3 +394,18 @@ def test_native_transition_ids_are_removed_from_model_results_and_events():
     assert "entrance_index" not in serialized
     assert visible["nested"]["detail"] == "kept"
     assert visible["rows"][0]["value"] == 7
+
+    nested_actor = {
+        "actor_id": 77, "actor_uid": "warp-result", "category": 7,
+        "category_name": "item_action", "name": "Warp Portal",
+        "description": "Exit to a hidden destination", "params": 2,
+    }
+    actor_visible = _strip_transition_ids({
+        "actor": nested_actor,
+        "dialogue": {"speaker": nested_actor},
+    })
+    assert actor_visible["actor"]["name"] == "Transition Object"
+    assert actor_visible["actor"]["description"] == ""
+    assert actor_visible["dialogue"]["speaker"]["name"] == "Transition Object"
+    assert "hidden destination" not in json.dumps(actor_visible)
+
