@@ -39,6 +39,42 @@ def _probe_stick(direction: str) -> tuple[int, int]:
     }[direction]
 
 
+def _world_yaw_stick(game: GameState, desired_world_yaw: float,
+                     magnitude: int) -> tuple[int, int]:
+    """Invert SoH Player_ProcessControlStick for an exact desired world yaw."""
+    magnitude = max(0, min(80, int(magnitude)))
+    if game.camera_input_yaw is not None:
+        stick_angle = ((desired_world_yaw - game.camera_input_yaw + 32768.0) % 65536.0) - 32768.0
+        angle = stick_angle * math.pi / 32768.0
+        # func_80077D10 computes Math_Atan2S(relY, -relX).
+        x = round(-math.sin(angle) * magnitude)
+        y = round(math.cos(angle) * magnitude)
+        if game.mirrored_world:
+            x = -x
+        return max(-80, min(80, x)), max(-80, min(80, y))
+
+    # Legacy fallback: infer the camera input yaw from its look vector. This
+    # path is only for bridges that do not expose Camera_GetInputDirYaw.
+    if game.camera_eye is not None and game.camera_at is not None:
+        fx = game.camera_at[0] - game.camera_eye[0]
+        fz = game.camera_at[2] - game.camera_eye[2]
+        if math.hypot(fx, fz) >= 1e-4:
+            camera_yaw = math.atan2(fx, fz) * 32768.0 / math.pi
+            stick_angle = ((desired_world_yaw - camera_yaw + 32768.0) % 65536.0) - 32768.0
+            angle = stick_angle * math.pi / 32768.0
+            x = round(-math.sin(angle) * magnitude)
+            y = round(math.cos(angle) * magnitude)
+            return max(-80, min(80, x)), max(-80, min(80, y))
+
+    # Last-resort Link-relative fallback if camera orientation is unavailable.
+    stick_angle = ((desired_world_yaw - game.player.yaw + 32768.0) % 65536.0) - 32768.0 if game.player else 0.0
+    angle = stick_angle * math.pi / 32768.0
+    return (
+        max(-80, min(80, round(-math.sin(angle) * magnitude))),
+        max(-80, min(80, round(math.cos(angle) * magnitude))),
+    )
+
+
 def _steer_to(game: GameState, target: tuple[float, float, float], strength: float) -> tuple[int, int, float]:
     if not game.player:
         return 0, 0, float("inf")
@@ -48,29 +84,10 @@ def _steer_to(game: GameState, target: tuple[float, float, float], strength: flo
     if distance < 1e-6:
         return 0, 0, 0.0
 
-    if game.camera_eye is not None and game.camera_at is not None:
-        fx = game.camera_at[0] - game.camera_eye[0]
-        fz = game.camera_at[2] - game.camera_eye[2]
-        flen = math.hypot(fx, fz)
-    else:
-        flen = 0.0
-    if flen < 1e-4:
-        angle = game.player.yaw * math.pi / 32768.0
-        fx, fz = math.sin(angle), math.cos(angle)
-    else:
-        fx, fz = fx / flen, fz / flen
-
-    # Camera-relative right vector. N64 stick X is right, Y is forward.
-    rx, rz = fz, -fx
-    ux, uz = dx / distance, dz / distance
-    local_x = ux * rx + uz * rz
-    local_y = ux * fx + uz * fz
+    desired_yaw = math.atan2(dx, dz) * 32768.0 / math.pi
     scale = max(28, min(80, round(80 * max(0.35, strength))))
-    return (
-        max(-80, min(80, round(local_x * scale))),
-        max(-80, min(80, round(local_y * scale))),
-        distance,
-    )
+    stick_x, stick_y = _world_yaw_stick(game, desired_yaw, scale)
+    return stick_x, stick_y, distance
 
 
 
@@ -85,13 +102,7 @@ def _player_relative_stick(game: GameState, direction: str, magnitude: int = 70)
     offsets = {"forward": 0x0000, "left": 0x4000, "back": 0x8000, "right": -0x4000}
     desired_world_yaw = game.player.yaw + offsets[direction]
     if game.camera_input_yaw is not None:
-        stick_angle = ((desired_world_yaw - game.camera_input_yaw + 32768) % 65536) - 32768
-        angle = stick_angle * math.pi / 32768.0
-        x = round(-math.sin(angle) * magnitude)
-        y = round(math.cos(angle) * magnitude)
-        if game.mirrored_world:
-            x = -x
-        return max(-80, min(80, x)), max(-80, min(80, y))
+        return _world_yaw_stick(game, desired_world_yaw, magnitude)
 
     if game.camera_eye is not None and game.camera_at is not None:
         cfx = game.camera_at[0] - game.camera_eye[0]
