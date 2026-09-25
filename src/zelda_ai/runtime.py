@@ -73,9 +73,10 @@ from .skills.executor import execute_skill as execute_skill
 from .skills.executor import _execute_skill as _execute_skill
 from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
+from .skills.traversal import _traverse_auto as _traverse_auto
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v9/skills-v10/trajectory-v3/prompt-v13"
+CONTRACT_VERSION = "state-v9/skills-v11/trajectory-v3/prompt-v14"
 
 def _sanitize_transition_actor(actor: dict | None) -> dict | None:
     if actor is None:
