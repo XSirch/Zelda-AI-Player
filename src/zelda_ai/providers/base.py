@@ -28,8 +28,8 @@ Implemented skills:
 - fight_enemy(target_actor_id, optional target_actor_params): opponent-specific learned combat controller, 4000-12000 ms. Motor actions run locally at bridge feedback speed; success requires a native defeat event
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
 - explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger; wall recovery backs away before turning
-- traverse(up/down): local terrain traversal for stairs, drops, ladders and climbable surfaces. It uses player ladder/ledge state plus navigation_probes and monitors real vertical progress
-- traverse_to(up/down, target_position): composite local controller for an observed traversal_affordance. Copy target_position from that affordance's approach_position; it uses NavMesh/A* to reach the approach, revalidates the affordance, then executes traverse locally
+- traverse(up/down): HIGH-LEVEL automatic vertical navigation. If Link is already at a ladder/ledge/stairs it traverses locally; otherwise the controller automatically chooses the best reachable traversal_affordance, A* NavPaths to its approach_position, revalidates collision, then traverses. Prefer this for ordinary "go up/down" intent
+- traverse_to(up/down, target_position): explicit route selection override. Use only when you intentionally need one particular observed traversal_affordance among several; copy that affordance's approach_position
 - traverse_exit(target_position): walk through an observed collision scene-exit surface. Use only a target_position copied from scene_exits. It deliberately does NOT stop short; success is the engine starting/changing the scene transition
 
 The state contract includes scene + scene_name, room, day_time/is_night, player pose/collision state, camera,
@@ -83,13 +83,13 @@ If no scene-exit surface is observed but a door actor is present, call interact_
 Do not invent a door actor, do not press A on a scene-exit surface, and do not use free turn/move probes before
 traverse_exit/interact_with_actor. Replan only if the appropriate local controller returns a real failure.
 For vertical movement, do not search for a ladder actor first: ladders/stairs are often collision geometry.
-If Link is already at/attached to the vertical route, use traverse(down/up). If traversal_affordances contains a
-candidate in the needed direction that is not immediately under Link, use traverse_to and copy that candidate's
-approach_position exactly. Prefer an observed stairs_or_slope_down / ladder_down / ledge_down over wandering with
-free move/turn when the objective requires descending; similarly prefer stairs_or_slope_up / ladder_up /
-climbable_wall_up for ascent. The composite controller handles A* approach and local traversal. If Link is already
-climbing a ladder, down/up stick is handled continuously without another model call. Do not press A repeatedly on
-a ladder; in OoT A may dismount/drop rather than climb.
+Use traverse(down/up) as the default high-level action. You do NOT need to manually walk to a visible
+traversal_affordance first: the controller will select the best reachable route in that direction and perform
+NavMesh/A* approach automatically. Use traverse_to only when multiple observed vertical routes exist and you need
+to force a specific approach_position for semantic reasons. Prefer traverse(down) over free move/turn when the
+objective requires reaching a lower level, and traverse(up) for a higher level. If Link is already climbing a ladder,
+vertical stick is handled continuously without another model call. Do not press A repeatedly on a ladder; in OoT A
+may dismount/drop rather than climb.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 For any actor associated with a door, warp, loading zone or transition, actor name/description/category/id/params describe
