@@ -80,3 +80,6 @@ def test_terrain_panel_exposes_scene_exit_surfaces():
     assert "capabilities.includes('scene_exit_surfaces')" in text
     assert 'SCENE EXIT SURFACES INDISPONÍVEIS' in text
     assert 'rt-input-v2.7' in text
+    assert "(value & 0xFFFF).toString(16)" in text
+    assert "hex16(exit.entrance_index)" in text
+
