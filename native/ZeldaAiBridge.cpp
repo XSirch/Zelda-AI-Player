@@ -1080,6 +1080,10 @@ void Snapshot() {
                 {"yaw", player->actor.shape.rot.y},
                 {"speed_xz", player->actor.speedXZ},
                 {"floor_height", player->actor.floorHeight},
+                {"floor_exit_index", player->actor.floorPoly
+                    ? SurfaceType_GetSceneExitIndex(
+                        &gPlayState->colCtx, player->actor.floorPoly, player->actor.floorBgId)
+                    : 0},
                 {"wall_yaw", player->actor.wallYaw},
                 {"bg_check_flags", player->actor.bgCheckFlags},
                 {"wall_flags", player->actor.wallPoly
