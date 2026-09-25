@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _rotate_stick_quadrants, _world_yaw_stick
+from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _probe_stick, _rotate_stick_quadrants, _world_yaw_stick
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
@@ -251,6 +251,15 @@ def test_aim_error_and_stick_point_toward_right_and_up(state):
     assert _aim_stick(yaw, 1) > 0
     assert _aim_stick(pitch, 1) > 0
     assert _aim_stick(yaw, -1) < 0
+
+
+def test_probe_stick_targets_link_relative_world_direction_with_rotated_camera(state):
+    game = state.model_copy(update={"camera_input_yaw": 16384, "mirrored_world": False})
+    game.player.yaw = 0
+    # Link-forward world yaw 0 is camera-left when camera input yaw is +90.
+    assert _probe_stick("forward", game) == (48, 0)
+    # Link-right probe is +90 world yaw and therefore raw camera-forward here.
+    assert _probe_stick("right", game) == (0, 48)
 
 
 def test_player_relative_dodge_stick_uses_exact_camera_input_yaw(state):
