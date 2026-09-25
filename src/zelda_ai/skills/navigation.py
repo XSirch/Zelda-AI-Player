@@ -200,7 +200,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 target = actor.position
             elif exit_mode:
                 exit_row = next((row for row in current.scene_exits
-                    if row.exit_index == selected_exit_index), selected_exit)
+                    if row.exit_index == selected_exit_index), None)
                 if exit_row is None:
                     return {"status": "failed", "reason": "scene_exit_lost",
                         "exit_index": selected_exit_index, "skill": decision.skill}
