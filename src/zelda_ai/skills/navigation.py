@@ -282,7 +282,9 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     bridge.set_navigation_debug(
                         skill=decision.skill, status="no_path", target_position=list(target),
                         waypoint=None, path_cells=0, probe_safe=False, navmesh_used=True,
-                        target_distance=target_distance)
+                        target_distance=target_distance,
+                        exit_index=selected_exit_index if exit_mode else None,
+                        entrance_index=selected_entrance_index if exit_mode else None)
                     navmesh_blocked_samples += 1
                     if navmesh_blocked_samples >= 5:
                         return {"status": "failed", "reason": "navigation_no_path",
@@ -302,7 +304,9 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     target_position=list(target), waypoint=list(plan.waypoint),
                     path_cells=last_path_cells, probe_safe=probe_safe, navmesh_used=True,
                     target_distance=target_distance, plan_target_distance=plan.target_distance,
-                    plan_cost=round(plan.cost, 2), exact_goal_reachable=plan.exact_goal_reachable)
+                    plan_cost=round(plan.cost, 2), exact_goal_reachable=plan.exact_goal_reachable,
+                    exit_index=selected_exit_index if exit_mode else None,
+                    entrance_index=selected_entrance_index if exit_mode else None)
                 if not probe_safe:
                     navmesh_blocked_samples += 1
                     if navmesh_blocked_samples >= 5:
