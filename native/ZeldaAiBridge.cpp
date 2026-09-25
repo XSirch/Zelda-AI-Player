@@ -541,7 +541,7 @@ json TraversalAffordances(Player* player) {
                 addCandidate(candidate);
                 foundUp = true;
             }
-            if (!foundDown && delta <= -8.0f && delta >= -240.0f) {
+            if (!foundDown && delta <= -8.0f && delta >= -120.0f) {
                 Candidate candidate;
                 candidate.kind = delta >= -70.0f ? "stairs_or_slope_down" : "ledge_down";
                 candidate.direction = "down";
