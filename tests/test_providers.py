@@ -119,3 +119,10 @@ def test_parse_codex_version_for_astra_era():
     assert parse_codex_version("codex-cli 0.154.0") == ("0.154.0", (0, 154, 0))
     assert parse_codex_version("zelda_ai_player/0.155.0-alpha.16 (Windows)") == ("0.155.0", (0, 155, 0))
     assert parse_codex_version("unknown") == (None, None)
+
+
+def test_system_prompt_explains_enemy_learning_as_fallible_experience():
+    from zelda_ai.providers.base import SYSTEM_PROMPT
+    assert "enemy_learning" in SYSTEM_PROMPT
+    assert "fallible learned experience" in SYSTEM_PROMPT
+    assert "fight_enemy learns a separate local policy" in SYSTEM_PROMPT

@@ -356,29 +356,67 @@ class Store:
                     "detail": str(step.get("detail") or "")[:120]})
 
             outcome = str(result.get("outcome") or "incomplete")
-            wins = (row.get("wins") or 0) + int(outcome == "win")
-            losses = (row.get("losses") or 0) + int(outcome == "loss")
-            incomplete = (row.get("incomplete") or 0) + int(outcome not in {"win", "loss"})
-            damage_taken = (row.get("damage_taken") or 0) + max(0, int(result.get("health_lost") or 0))
-            encounters = (row.get("encounters") or 0) + 1
+            actor_uid = str(enemy.get("actor_uid") or "")
+            previous_encounter = None
+            if run_id and actor_uid:
+                recent = conn.execute(select(combat_encounters).where(
+                    combat_encounters.c.profile_id == row["id"],
+                    combat_encounters.c.run_id == run_id).order_by(
+                    combat_encounters.c.created_at.desc()).limit(8)).mappings()
+                previous_encounter = next((dict(item) for item in recent
+                    if str((item.get("data") or {}).get("actor_uid") or "") == actor_uid), None)
+
+            is_same_life = bool(previous_encounter and previous_encounter.get("outcome") == "incomplete")
+            wins = row.get("wins") or 0
+            losses = row.get("losses") or 0
+            incomplete = row.get("incomplete") or 0
+            encounters = row.get("encounters") or 0
+            if not is_same_life:
+                encounters += 1
+                wins += int(outcome == "win")
+                losses += int(outcome == "loss")
+                incomplete += int(outcome not in {"win", "loss"})
+            elif outcome == "win":
+                wins += 1
+                incomplete = max(0, incomplete - 1)
+            elif outcome == "loss":
+                losses += 1
+                incomplete = max(0, incomplete - 1)
+
+            damage_delta = max(0, int(result.get("health_lost") or 0))
+            damage_taken = (row.get("damage_taken") or 0) + damage_delta
             conn.execute(combat_profiles.update().where(combat_profiles.c.id == row["id"]).values(
                 enemy_name=(enemy.get("enemy_name") or row.get("enemy_name") or "")[:96],
                 encounters=encounters, wins=wins, losses=losses, incomplete=incomplete,
                 damage_taken=damage_taken, policy=policy, updated_at=now))
-            encounter_data = {
-                "actor_id": enemy.get("actor_id"), "params": enemy.get("params"),
+
+            current_data = {
+                "actor_uid": actor_uid, "actor_id": enemy.get("actor_id"), "params": enemy.get("params"),
                 "scene": enemy.get("scene"), "room": enemy.get("room"),
-                "health_lost": max(0, int(result.get("health_lost") or 0)),
-                "confirmed_hits": int(result.get("confirmed_hits") or 0),
-                "attacks": int(result.get("attacks") or 0),
-                "dodges": int(result.get("dodges") or 0),
-                "guards": int(result.get("guards") or 0),
-                "duration_ms": result.get("duration_ms"),
+                "health_lost": damage_delta, "confirmed_hits": int(result.get("confirmed_hits") or 0),
+                "attacks": int(result.get("attacks") or 0), "dodges": int(result.get("dodges") or 0),
+                "guards": int(result.get("guards") or 0), "duration_ms": result.get("duration_ms"),
                 "trace": safe_trace[-48:],
             }
-            conn.execute(combat_encounters.insert().values(id=uid(), profile_id=row["id"],
-                namespace=namespace, run_id=run_id, created_at=now, outcome=outcome,
-                data=encounter_data))
+            if is_same_life:
+                prior = previous_encounter.get("data") or {}
+                merged = {**current_data,
+                    "health_lost": int(prior.get("health_lost") or 0) + current_data["health_lost"],
+                    "confirmed_hits": int(prior.get("confirmed_hits") or 0) + current_data["confirmed_hits"],
+                    "attacks": int(prior.get("attacks") or 0) + current_data["attacks"],
+                    "dodges": int(prior.get("dodges") or 0) + current_data["dodges"],
+                    "guards": int(prior.get("guards") or 0) + current_data["guards"],
+                    "duration_ms": round(float(prior.get("duration_ms") or 0) +
+                                         float(current_data.get("duration_ms") or 0), 2),
+                    "trace": (list(prior.get("trace") or []) + safe_trace)[-48:],
+                }
+                conn.execute(combat_encounters.update().where(
+                    combat_encounters.c.id == previous_encounter["id"]).values(
+                    outcome=outcome, data=merged))
+            else:
+                conn.execute(combat_encounters.insert().values(id=uid(), profile_id=row["id"],
+                    namespace=namespace, run_id=run_id, created_at=now, outcome=outcome,
+                    data=current_data))
         return self.combat_profile(namespace, enemy_key)
 
     def list_combat_profiles(self, namespace: str, limit: int = 40) -> list[dict]:

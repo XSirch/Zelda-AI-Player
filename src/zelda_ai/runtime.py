@@ -463,12 +463,12 @@ class Runtime:
                 continue
             seen.add(key)
             profile = self.store.combat_profile(self.namespace, key, actor_id=actor.actor_id,
-                category=actor.category, enemy_name=actor.name or actor.description, create=False)
+                category=actor.category, enemy_name=actor.description or actor.name, create=False)
             if profile:
                 actors.append(compact_profile(profile))
             else:
                 actors.append({"enemy_key": key, "actor_id": actor.actor_id,
-                    "enemy_name": actor.name or actor.description or f"Actor {actor.actor_id}",
+                    "enemy_name": actor.description or actor.name or f"Actor {actor.actor_id}",
                     "category": actor.category, "encounters": 0, "wins": 0, "losses": 0,
                     "incomplete": 0, "damage_taken": 0, "best_by_state": {}})
             if len(actors) >= limit:
@@ -483,8 +483,8 @@ class Runtime:
         if actor is None or actor.category not in {5, 9}:
             return None, None
         key = enemy_key(game, actor)
-        enemy = {"enemy_key": key, "actor_id": actor.actor_id, "params": actor.params,
-            "category": actor.category, "enemy_name": actor.name or actor.description or f"Actor {actor.actor_id}",
+        enemy = {"enemy_key": key, "actor_id": actor.actor_id, "actor_uid": actor.actor_uid, "params": actor.params,
+            "category": actor.category, "enemy_name": actor.description or actor.name or f"Actor {actor.actor_id}",
             "scene": game.scene, "room": game.room}
         if not self.config or self.config.memory_mode != "adaptive" or not self.namespace:
             return None, enemy
