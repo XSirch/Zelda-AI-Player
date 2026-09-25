@@ -279,46 +279,62 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
             if "local_navmesh" in current.capabilities:
                 plan = plan_navmesh(current, target)
                 if plan is None:
+                    final_exit_direct = bool(exit_mode and target_distance <= 70.0 and
+                        waypoint_probe_safe(current, target, wall_clearance=30.0))
+                    if final_exit_direct:
+                        navmesh_used = True
+                        last_path_cells = 1
+                        steer_target = target
+                        navmesh_blocked_samples = 0
+                        bridge.set_navigation_debug(
+                            skill=decision.skill, status="entering_exit_surface",
+                            target_position=list(target), waypoint=list(target),
+                            path_cells=1, probe_safe=True, navmesh_used=True,
+                            target_distance=target_distance,
+                            exit_index=selected_exit_index,
+                            entrance_index=selected_entrance_index)
+                    else:
+                        bridge.set_navigation_debug(
+                            skill=decision.skill, status="no_path", target_position=list(target),
+                            waypoint=None, path_cells=0, probe_safe=False, navmesh_used=True,
+                            target_distance=target_distance,
+                            exit_index=selected_exit_index if exit_mode else None,
+                            entrance_index=selected_entrance_index if exit_mode else None)
+                        navmesh_blocked_samples += 1
+                        if navmesh_blocked_samples >= 5:
+                            return {"status": "failed", "reason": "navigation_no_path",
+                                "target_distance": target_distance,
+                                "distance": math.dist(start_position, current.player.position),
+                                "navmesh_used": True, "acknowledged": acknowledged,
+                                "skill": decision.skill}
+                        bridge.release()
+                        await feedback(bridge, current, .10)
+                        continue
+                else:
+                    navmesh_used = True
+                    last_path_cells = len(plan.path)
+                    steer_target = plan.waypoint
+                    probe_safe = waypoint_probe_safe(current, steer_target)
                     bridge.set_navigation_debug(
-                        skill=decision.skill, status="no_path", target_position=list(target),
-                        waypoint=None, path_cells=0, probe_safe=False, navmesh_used=True,
-                        target_distance=target_distance,
+                        skill=decision.skill, status="active" if probe_safe else "blocked",
+                        target_position=list(target), waypoint=list(plan.waypoint),
+                        path_cells=last_path_cells, probe_safe=probe_safe, navmesh_used=True,
+                        target_distance=target_distance, plan_target_distance=plan.target_distance,
+                        plan_cost=round(plan.cost, 2), exact_goal_reachable=plan.exact_goal_reachable,
                         exit_index=selected_exit_index if exit_mode else None,
                         entrance_index=selected_entrance_index if exit_mode else None)
-                    navmesh_blocked_samples += 1
-                    if navmesh_blocked_samples >= 5:
-                        return {"status": "failed", "reason": "navigation_no_path",
-                            "target_distance": target_distance,
-                            "distance": math.dist(start_position, current.player.position),
-                            "navmesh_used": True, "acknowledged": acknowledged,
-                            "skill": decision.skill}
-                    bridge.release()
-                    await feedback(bridge, current, .10)
-                    continue
-                navmesh_used = True
-                last_path_cells = len(plan.path)
-                steer_target = plan.waypoint
-                probe_safe = waypoint_probe_safe(current, steer_target)
-                bridge.set_navigation_debug(
-                    skill=decision.skill, status="active" if probe_safe else "blocked",
-                    target_position=list(target), waypoint=list(plan.waypoint),
-                    path_cells=last_path_cells, probe_safe=probe_safe, navmesh_used=True,
-                    target_distance=target_distance, plan_target_distance=plan.target_distance,
-                    plan_cost=round(plan.cost, 2), exact_goal_reachable=plan.exact_goal_reachable,
-                    exit_index=selected_exit_index if exit_mode else None,
-                    entrance_index=selected_entrance_index if exit_mode else None)
-                if not probe_safe:
-                    navmesh_blocked_samples += 1
-                    if navmesh_blocked_samples >= 5:
-                        return {"status": "failed", "reason": "navigation_path_blocked",
-                            "target_distance": target_distance,
-                            "distance": math.dist(start_position, current.player.position),
-                            "path_cells": last_path_cells, "navmesh_used": True,
-                            "acknowledged": acknowledged, "skill": decision.skill}
-                    bridge.release()
-                    await feedback(bridge, current, .10)
-                    continue
-                navmesh_blocked_samples = 0
+                    if not probe_safe:
+                        navmesh_blocked_samples += 1
+                        if navmesh_blocked_samples >= 5:
+                            return {"status": "failed", "reason": "navigation_path_blocked",
+                                "target_distance": target_distance,
+                                "distance": math.dist(start_position, current.player.position),
+                                "path_cells": last_path_cells, "navmesh_used": True,
+                                "acknowledged": acknowledged, "skill": decision.skill}
+                        bridge.release()
+                        await feedback(bridge, current, .10)
+                        continue
+                    navmesh_blocked_samples = 0
 
             if "local_navmesh" not in current.capabilities:
                 bridge.set_navigation_debug(
