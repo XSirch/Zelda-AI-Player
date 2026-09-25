@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.4";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.5";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -429,7 +429,7 @@ json ActorJson(Actor* actor, Player* player, bool metadata = true) {
     const float dy = a.y - p.y;
     const float dz = a.z - p.z;
     const float distance = std::sqrt(dx * dx + dy * dy + dz * dz);
-    return {
+    json result = {
         {"actor_id", actor->id},
         {"actor_uid", Data().actors.Get(actor)},
         {"yaw", actor->shape.rot.y},
@@ -446,6 +446,16 @@ json ActorJson(Actor* actor, Player* player, bool metadata = true) {
         {"drawn", actor->isDrawn != 0},
         {"text_id", actor->textId},
     };
+    if (actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_BOSS) {
+        result["velocity"] = {actor->velocity.x, actor->velocity.y, actor->velocity.z};
+        result["speed_xz"] = actor->speedXZ;
+        result["xz_distance"] = std::max<float>(actor->xzDistToPlayer, 0.0f);
+        result["collision_health_hint"] = actor->colChkInfo.health;
+        result["freeze_timer"] = actor->freezeTimer;
+        result["color_filter_timer"] = actor->colorFilterTimer;
+        result["actor_flags"] = actor->flags;
+    }
+    return result;
 }
 
 Actor* ContextActor(Player* player, uint16_t doAction) {
@@ -700,7 +710,8 @@ void Snapshot() {
         {"event_seq", bridge.eventSeq},
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
-                          "player_relative_dodge_state", "control_stick_direction", "actor_uid", "event_cursor"}},
+                          "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
+                          "actor_uid", "event_cursor"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -801,6 +812,10 @@ void Snapshot() {
                     ? SurfaceType_GetWallFlags(&gPlayState->colCtx, player->actor.wallPoly, player->actor.wallBgId) : 0},
                 {"state_flags_1", player->stateFlags1},
                 {"state_flags_2", player->stateFlags2},
+                {"z_target_active_timer", std::max<s32>(player->zTargetActiveTimer, 0)},
+                {"melee_weapon_animation", player->meleeWeaponAnimation},
+                {"melee_weapon_state", player->meleeWeaponState},
+                {"invincibility_timer", player->invincibilityTimer},
                 {"control_stick_direction", player->controlStickDirections[player->controlStickDataIndex]},
                 {"hop_direction", (player->stateFlags2 & PLAYER_STATE2_HOPPING)
                     ? json(player->av1.actionVar1) : json(nullptr)},

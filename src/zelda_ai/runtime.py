@@ -14,11 +14,12 @@ from .control.authority import owned
 from .control.feedback import feedback
 from .control.diagnostics import run_input_diagnostic
 from .models import Decision, GameState, ModelInfo, RunConfig, SwitchConfig
+from .combat_learning import compact_profile, enemy_key
 from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
 from .skills.catalog import BUTTONS, NAVIGATION_SKILLS
-from .skills.common import _pulse
+from .skills.common import _matching_actor, _pulse
 from .skills.navigation import _backtrack_recovery
 from .skills.executor import execute_skill
 
@@ -72,7 +73,7 @@ from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v5/skills-v5/trajectory-v3/prompt-v9"
+CONTRACT_VERSION = "state-v6/skills-v7/trajectory-v3/prompt-v10"
 
 
 class Runtime:
@@ -117,6 +118,9 @@ class Runtime:
         self.unstick_attempts = 0
         self.last_diagnostic: dict | None = None
         self.diagnostic_active = False
+        self.combat_profiles_cache: list[dict] | None = None
+        self.combat_profiles_at = 0.0
+        self.combat_learning_tainted = False
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -443,6 +447,51 @@ class Runtime:
                 # Retrieve possible exceptions when caller cancellation races with completion.
                 inference.exception()
     
+    def _enemy_learning_context(self, game: GameState, limit: int = 8) -> list[dict]:
+        if not self.config or self.config.memory_mode != "adaptive" or not self.namespace or not game.player:
+            return []
+        actors = []
+        seen: set[str] = set()
+        ordered = list(game.room_actors)
+        if game.target_actor is not None:
+            ordered.insert(0, game.target_actor)
+        for actor in ordered:
+            if actor.category not in {5, 9}:
+                continue
+            key = enemy_key(game, actor)
+            if key in seen:
+                continue
+            seen.add(key)
+            profile = self.store.combat_profile(self.namespace, key, actor_id=actor.actor_id,
+                category=actor.category, enemy_name=actor.name or actor.description, create=False)
+            if profile:
+                actors.append(compact_profile(profile))
+            else:
+                actors.append({"enemy_key": key, "actor_id": actor.actor_id,
+                    "enemy_name": actor.name or actor.description or f"Actor {actor.actor_id}",
+                    "category": actor.category, "encounters": 0, "wins": 0, "losses": 0,
+                    "incomplete": 0, "damage_taken": 0, "best_by_state": {}})
+            if len(actors) >= limit:
+                break
+        return actors
+
+    def _combat_profile_for_decision(self, game: GameState, decision: Decision) -> tuple[dict | None, dict | None]:
+        if decision.skill != "fight_enemy" or decision.args.target_actor_id is None or not game.player:
+            return None, None
+        actor = _matching_actor(game, decision.args.target_actor_id,
+            decision.args.target_actor_params, decision.args.target_actor_uid)
+        if actor is None or actor.category not in {5, 9}:
+            return None, None
+        key = enemy_key(game, actor)
+        enemy = {"enemy_key": key, "actor_id": actor.actor_id, "params": actor.params,
+            "category": actor.category, "enemy_name": actor.name or actor.description or f"Actor {actor.actor_id}",
+            "scene": game.scene, "room": game.room}
+        if not self.config or self.config.memory_mode != "adaptive" or not self.namespace:
+            return None, enemy
+        profile = self.store.combat_profile(self.namespace, key, actor_id=actor.actor_id,
+            category=actor.category, enemy_name=enemy["enemy_name"], create=True)
+        return profile, enemy
+
     async def validate_model(self, config: RunConfig) -> ModelInfo:
         if config.provider not in self.providers:
             raise ValueError("Provider not available")
@@ -503,6 +552,8 @@ class Runtime:
             self.pending_switch = None
             self.metrics_cache = None
             self.config, self.selected_model = config, info
+            self.combat_profiles_cache = None
+            self.combat_learning_tainted = False
             fingerprint = hashlib.sha256(json.dumps({"contract": CONTRACT_VERSION,
                 "revision": game.upstream_revision, "initial": game.model_dump(exclude={"seq", "events", "last_command_seq"}),
                 "checkpoint_label": config.checkpoint_label}, sort_keys=True).encode()).hexdigest()
@@ -555,8 +606,11 @@ class Runtime:
             if not self.run_id or self.state not in {"running", "paused"}:
                 raise ValueError("No active run")
             if action in {"pause", "stop", "take_control"}:
-                # Human input during any pause must not become autonomous experience.
+                # Human input during a pause can alter subsequent combat context. Do not
+                # promote later combat as autonomous learning in this run.
                 self._reset_trajectory_trace(self.bridge.state, tainted=True)
+                if action in {"pause", "take_control"}:
+                    self.combat_learning_tainted = True
                 if action == "take_control":
                     self.store.update_run(self.run_id, assisted=True)
                     self.log("take_control")
@@ -635,7 +689,9 @@ class Runtime:
             return
         self.config, self.selected_model = self.pending_switch
         self.pending_switch = None
+        self.combat_learning_tainted = True
         self.namespace = self.new_namespace(self.config)
+        self.combat_profiles_cache = None
         self.segment_id = self.store.segment(self.run_id, self.config.model_dump(), self.namespace)
         self.replay_attempts.clear()
         self._reset_trajectory_trace(self.bridge.state)
@@ -647,6 +703,7 @@ class Runtime:
         if not self.run_id or self.state not in {"running", "paused"}:
             raise ValueError("No active run")
         self.hints.append(text)
+        self.combat_learning_tainted = True
         self.store.update_run(self.run_id, assisted=True)
         self._reset_trajectory_trace(self.bridge.state, tainted=True)
         self.log("human_hint", {"text": text})
@@ -741,6 +798,7 @@ class Runtime:
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
                     "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
+                    "enemy_learning": self._enemy_learning_context(game),
                     "stuck_score": self.stuck_score,
                     "human_hints": list(self.hints)}
                 prompt = json.dumps(observation, separators=(",", ":"), ensure_ascii=False)
@@ -783,7 +841,23 @@ class Runtime:
                     self.store.remember(self.namespace, game.scene, decision.memory_note)
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
                 self._record_trajectory_action(decision, game)
-                self.last_result = await execute_skill(self.bridge, decision, game)
+                combat_profile, combat_enemy = self._combat_profile_for_decision(game, decision)
+                self.last_result = await execute_skill(self.bridge, decision, game,
+                    combat_profile=combat_profile)
+                if (combat_enemy and self.config.memory_mode == "adaptive" and self.namespace
+                        and not self.combat_learning_tainted
+                        and isinstance(self.last_result.get("learning_trace"), list)
+                        and self.last_result["learning_trace"]):
+                    updated_profile = self.store.record_combat_encounter(
+                        self.namespace, self.run_id, combat_enemy, self.last_result)
+                    if updated_profile:
+                        self.combat_profiles_cache = None
+                        self.log("combat_profile_updated", compact_profile(updated_profile) or {})
+                elif (combat_enemy and self.combat_learning_tainted
+                        and isinstance(self.last_result.get("learning_trace"), list)
+                        and self.last_result["learning_trace"]):
+                    self.log("combat_learning_skipped_assisted", {
+                        "enemy_key": combat_enemy["enemy_key"], "reason": "human_intervention_in_run"})
                 if self.last_result["status"] not in {"completed"}:
                     self._discard_failed_trajectory_action(decision)
                 event_kind = {
@@ -811,6 +885,11 @@ class Runtime:
         if self.run_id and (self.metrics_cache is None or time.monotonic() - self.metrics_at >= 1):
             self.metrics_cache = self.store.metrics(self.run_id)
             self.metrics_at = time.monotonic()
+        if self.namespace and (self.combat_profiles_cache is None or
+                time.monotonic() - self.combat_profiles_at >= 1):
+            self.combat_profiles_cache = [compact_profile(row) for row in
+                self.store.list_combat_profiles(self.namespace, limit=40)]
+            self.combat_profiles_at = time.monotonic()
         return {"control_generation": self.lifecycle, "status": self.state, "reason": self.reason, "run_id": self.run_id,
             "config": self.config.model_dump() if self.config else None,
             "metrics": self.metrics_cache if self.run_id else None,
@@ -818,7 +897,9 @@ class Runtime:
             "elapsed_s": round(time.monotonic() - self.started) if self.run_id else 0,
             "last_decision": self.last_decision, "last_result": self.last_result,
             "diagnostic": self.last_diagnostic, "diagnostic_active": self.diagnostic_active,
+            "combat_learning_tainted": self.combat_learning_tainted,
             "events": list(self.recent), "dialogue_transcript": list(self.dialogue_transcript),
             "bridge": self.bridge.status(), "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
             "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],
-            "world_edges": self.store.list_world_edges(self.namespace, limit=100) if self.namespace else []}
+            "world_edges": self.store.list_world_edges(self.namespace, limit=100) if self.namespace else [],
+            "combat_profiles": self.combat_profiles_cache or []}

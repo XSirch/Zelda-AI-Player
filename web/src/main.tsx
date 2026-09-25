@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, bootstrap, saveJson } from './api';
-import type { GameState, InputDiagnosticAction, InputDiagnosticResult, Metrics, ModelInfo, ProviderInfo, RunConfig, RunRow, Skill, Snapshot } from './types';
+import type { CombatProfile, GameState, InputDiagnosticAction, InputDiagnosticResult, Metrics, ModelInfo, ProviderInfo, RunConfig, RunRow, Skill, Snapshot } from './types';
 import './style.css';
 import { BudgetSummary, RunBudgetFields } from './RunBudgetFields';
 import { RealtimePanel } from './RealtimePanel';
 
 const tabs = ['AO VIVO', 'BENCHMARKS', 'EXECUÇÕES', 'SKILLS', 'MEMÓRIA', 'CONEXÕES'];
+const liveTabs = ['CONTROLE', 'COMBATE', 'TERRENO', 'ATORES', 'PROGRESSO', 'ESTADO', 'DECISÃO'] as const;
+type LiveTab = typeof liveTabs[number];
 const defaults: RunConfig = { provider: 'codex', model: 'gpt-6-astra', effort: null, goal: 'Complete Ocarina of Time autonomously and defeat final Ganon.', memory_mode: 'adaptive', max_calls: 5000, max_tokens: 5000000, max_cost_usd: 2, max_output_tokens: 2048, max_runtime_s: 43200, checkpoint_label: 'save-manual' };
 const number = (n?: number | null) => n == null ? '—' : new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(n);
 const dollars = (n?: number | null) => n == null ? 'Não faturado por API / desconhecido' : `$${n.toFixed(4)}`;
@@ -105,6 +107,32 @@ function InventoryPanel({ game }: { game: GameState | null }) {
   </section>;
 }
 
+function CombatLearningPanel({ profiles, game }: { profiles: CombatProfile[]; game: GameState | null }) {
+  const enemies = (game?.room_actors ?? []).filter(actor => actor.category === 5 || actor.category === 9);
+  const visibleIds = new Set(enemies.map(actor => actor.actor_id));
+  const unknown = enemies.filter(actor => !profiles.some(profile => profile.actor_id === actor.actor_id));
+  return <section className="panel combat-learning-panel">
+    <div className="section-head"><span>APRENDIZADO POR INIMIGO</span><span className="muted">{profiles.length} PERFIS · MODELO + EFFORT ATUAL</span></div>
+    {unknown.length > 0 && <div className="combat-unknown">{unknown.map(actor =>
+      <div key={actor.actor_uid || String(actor.actor_id) + '-' + String(actor.params)}>
+        <span>SEM EXPERIÊNCIA</span>
+        <strong>{actor.description || actor.name || 'Actor ' + actor.actor_id}</strong>
+        <small>ID {actor.actor_id} · o primeiro episódio ainda não gerou política persistida</small>
+      </div>)}</div>}
+    <div className="combat-profile-grid">{profiles.map(profile => {
+      const best = Object.entries(profile.best_by_state ?? {}).slice(0, 8);
+      return <article key={profile.id} className={visibleIds.has(profile.actor_id) ? 'combat-profile visible' : 'combat-profile'}>
+        <div className="combat-profile-head"><div><span>{visibleIds.has(profile.actor_id) ? 'PRESENTE NA SALA' : 'MEMÓRIA'}</span><h3>{profile.enemy_name || 'Actor ' + profile.actor_id}</h3></div><strong>{profile.wins}V / {profile.losses}D</strong></div>
+        <div className="combat-stats"><span>EPISÓDIOS <b>{profile.encounters}</b></span><span>INCOMPLETOS <b>{profile.incomplete}</b></span><span>DANO RECEBIDO <b>{number(profile.damage_taken / 16)} ♥</b></span></div>
+        {best.length ? <div className="learned-actions">{best.map(([stateName, entry]) =>
+          <div key={stateName}><code>{stateName}</code><span>{entry.action}</span><small>reward {entry.mean.toFixed(2)} · n={entry.samples}</small></div>)}</div>
+          : <p className="muted">Sem ações consolidadas. O próximo encontro explora apenas opções seguras e atualiza este perfil.</p>}
+      </article>;
+    })}</div>
+    {!profiles.length && !unknown.length && <p className="empty">Nenhum inimigo observado e nenhum perfil aprendido neste namespace.</p>}
+  </section>;
+}
+
 function MetricStrip({ metrics }: { metrics: Metrics | null }) {
   const items = [['CHAMADAS', number(metrics?.calls)], ['TOKENS TOTAIS', number(metrics?.total_tokens)], ['CUSTO REGISTRADO', dollars(metrics?.cost_usd)], ['MORTES', number(metrics?.deaths)], ['LATÊNCIA MÉDIA', metrics?.mean_latency_ms == null ? '—' : `${number(metrics.mean_latency_ms / 1000)} s`]];
   return <div className="metrics">{items.map(([label, value]) => <div className="metric" key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>;
@@ -112,6 +140,7 @@ function MetricStrip({ metrics }: { metrics: Metrics | null }) {
 
 function App() {
   const [tab, setTab] = useState('AO VIVO');
+  const [liveTab, setLiveTab] = useState<LiveTab>('CONTROLE');
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [connected, setConnected] = useState(false);
   const [ready, setReady] = useState(false);
@@ -194,8 +223,40 @@ function App() {
       {game?.source === 'simulator' && <div className="notice">MODO SIMULADO — não é gameplay real e não pertence ao benchmark de Zelda.</div>}
       {error && <div role="alert" className="error-banner"><span>{error}</span><button aria-label="Fechar erro" onClick={() => setError('')}>×</button></div>}
       {snap?.reason && <div className="notice">Execução: {snap.reason}</div>}
-      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div><Monitor game={game}/><RealtimePanel bridge={snap?.bridge} runtimeStatus={snap?.status} busy={diagnosticBusy || !!snap?.diagnostic_active} result={diagnosticResult ?? snap?.diagnostic ?? null} onDiagnostic={action => void diagnosticInput(action)} onRelease={() => void releaseDiagnostic()}/><DialoguePanel game={game}/><ProgressPanel game={game}/><InventoryPanel game={game}/><TerrainPanel game={game}/><ActorsPanel game={game}/><div className="telemetry panel"><div><span>VIDA</span><strong>{player ? `${number(player.health / 16)} / ${number(player.max_health / 16)} corações` : '—'}</strong></div><div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div><div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div><div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div><div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div><div><span>ATOR CONTEXTUAL</span><strong>{game?.context_actor ? (game.context_actor.description || game.context_actor.name || `ID ${game.context_actor.actor_id}`) : '—'}</strong></div><div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div><div><span>HORÁRIO</span><strong>{game ? `${game.is_night ? 'Noite' : 'Dia'} · 0x${game.day_time.toString(16).padStart(4, '0').toUpperCase()}` : '—'}</strong></div><div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div><div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div><div><span>PAUSE</span><strong>{game?.pause_menu?.active ? `Página ${game.pause_menu.page_index} · ${game.pause_menu.ready ? 'pronto' : `transição ${game.pause_menu.transition_state}`} · cursor ${game.pause_menu.cursor_slot?.[game.pause_menu.page_index] ?? '—'}` : 'Fechado'}</strong></div><div><span>GAME OVER</span><strong>{game?.game_over_state ? `Estado ${game.game_over_state}` : 'Não'}</strong></div><div><span>OCARINA</span><strong>{game?.ocarina_mode ? `Modo ${game.ocarina_mode} · última ${game.last_played_song}` : 'Inativa'}</strong></div></div>
-      <section className="panel"><div className="section-head">03 / DECISÃO E RESULTADO</div><div className="decision"><span className="eyebrow">{snap?.last_decision?.skill ?? 'SEM AÇÃO'}</span><h3>{snap?.last_decision?.goal ?? 'Pronto para uma nova execução'}</h3><p>{snap?.last_decision?.summary ?? 'O modelo recebe um estado compacto e devolve uma decisão estruturada.'}</p>{snap?.last_result && <code>{snap.last_result.status} / {snap.last_result.reason}</code>}</div></section></div>
+      {tab === 'AO VIVO' && <><MetricStrip metrics={snap?.metrics ?? null}/><div className="cockpit"><div className="live-column">
+        <Monitor game={game}/>
+        <div className="live-tabs" role="tablist" aria-label="Painéis do jogo">{liveTabs.map(name =>
+          <button type="button" role="tab" aria-selected={liveTab === name} className={liveTab === name ? 'active' : ''} key={name} onClick={() => setLiveTab(name)}>{name}</button>)}</div>
+        <div className="live-tab-stage">
+          {liveTab === 'CONTROLE' && <><RealtimePanel bridge={snap?.bridge} runtimeStatus={snap?.status} busy={diagnosticBusy || !!snap?.diagnostic_active} result={diagnosticResult ?? snap?.diagnostic ?? null} onDiagnostic={action => void diagnosticInput(action)} onRelease={() => void releaseDiagnostic()}/><DialoguePanel game={game}/></>}
+          {liveTab === 'COMBATE' && <CombatLearningPanel profiles={snap?.combat_profiles ?? []} game={game}/>}
+          {liveTab === 'TERRENO' && <TerrainPanel game={game}/>}
+          {liveTab === 'ATORES' && <ActorsPanel game={game}/>}
+          {liveTab === 'PROGRESSO' && <><ProgressPanel game={game}/><InventoryPanel game={game}/></>}
+          {liveTab === 'ESTADO' && <div className="telemetry panel">
+            <div><span>VIDA</span><strong>{player ? number(player.health / 16) + ' / ' + number(player.max_health / 16) + ' corações' : '—'}</strong></div>
+            <div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div>
+            <div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div>
+            <div><span>BRIDGE</span><strong>{snap?.bridge.connected ? 'Conectado' : 'Desconectado'}</strong></div>
+            <div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div>
+            <div><span>ATOR CONTEXTUAL</span><strong>{game?.context_actor ? (game.context_actor.description || game.context_actor.name || 'ID ' + game.context_actor.actor_id) : '—'}</strong></div>
+            <div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div>
+            <div><span>HORÁRIO</span><strong>{game ? (game.is_night ? 'Noite' : 'Dia') + ' · 0x' + game.day_time.toString(16).padStart(4, '0').toUpperCase() : '—'}</strong></div>
+            <div><span>ATORES DESENHADOS</span><strong>{game?.nearby_actors?.length ?? 0}</strong></div>
+            <div><span>CUTSCENE</span><strong>{game?.cutscene_active ? 'Ativa' : 'Não'}</strong></div>
+            <div><span>PAUSE</span><strong>{game?.pause_menu?.active ? 'Página ' + game.pause_menu.page_index + ' · ' + (game.pause_menu.ready ? 'pronto' : 'transição ' + game.pause_menu.transition_state) + ' · cursor ' + (game.pause_menu.cursor_slot?.[game.pause_menu.page_index] ?? '—') : 'Fechado'}</strong></div>
+            <div><span>GAME OVER</span><strong>{game?.game_over_state ? 'Estado ' + game.game_over_state : 'Não'}</strong></div>
+            <div><span>OCARINA</span><strong>{game?.ocarina_mode ? 'Modo ' + game.ocarina_mode + ' · última ' + game.last_played_song : 'Inativa'}</strong></div>
+          </div>}
+          {liveTab === 'DECISÃO' && <>
+            <section className="panel"><div className="section-head">DECISÃO E RESULTADO</div><div className="decision"><span className="eyebrow">{snap?.last_decision?.skill ?? 'SEM AÇÃO'}</span><h3>{snap?.last_decision?.goal ?? 'Pronto para uma nova execução'}</h3><p>{snap?.last_decision?.summary ?? 'O modelo recebe estado estruturado, memória de mundo e perfis aprendidos de inimigos.'}</p>{snap?.last_result && <code>{snap.last_result.status} / {snap.last_result.reason}</code>}</div></section>
+            <div className="decision-grid">
+              <section className="panel"><div className="section-head">EVENTOS RECENTES</div><div className="event-list">{snap?.events.slice().reverse().map((event, index) => <div className="event" key={String(event.at) + '-' + String(index)}><time>{new Date(event.at * 1000).toLocaleTimeString('pt-BR')}</time><b>{event.kind}</b><span>{JSON.stringify(event.data)}</span></div>)}{!snap?.events.length && <p className="muted">Nenhum evento registrado.</p>}</div></section>
+              <section className="panel"><div className="section-head">INTERVENÇÃO HUMANA</div><form className="hint-form" onSubmit={e => {e.preventDefault(); void action(async () => {await api('/hints', {text: hint}); setHint('');});}}><label>Instrução para a próxima decisão<textarea rows={3} maxLength={400} value={hint} onChange={e => setHint(e.target.value)} placeholder="Ex.: tente outra direção antes de atacar."/></label><button disabled={!active || !hint.trim() || busy}>Enviar instrução</button><p className="muted">Fica no log e marca esta run como assistida.</p></form></section>
+            </div>
+          </>}
+        </div>
+      </div>
       <section className="panel controls"><div className="section-head">02 / AGENTE</div><form onSubmit={event => { event.preventDefault(); void action(start); }}>
         <label>Provider<select value={config.provider} onChange={e => update('provider', e.target.value)}><option value="codex">Codex · ChatGPT</option><option value="openrouter">OpenRouter · API</option>{providers.some(p => p.id === 'demo') && <option value="demo">Simulador determinístico</option>}</select></label>
         <label>Modelo<select value={config.model} onChange={e => { const model = models.find(m => m.id === e.target.value); setConfig(c => ({...c, model: e.target.value, effort: model?.default_effort ?? null})); }}><option value="">{models.length ? 'Selecione' : 'Catálogo indisponível'}</option>{models.map(m => <option value={m.id} key={m.id} disabled={!m.structured_output}>{m.name}{!m.structured_output ? ' · sem JSON estruturado' : ''}</option>)}</select></label>
@@ -211,7 +272,7 @@ function App() {
           <button className="danger" onClick={() => void control('stop')}>Encerrar</button>
         </div>}
         <p className="muted">“Assumir controle” marca a execução como assistida. Pausar a IA não pausa o jogo.</p></section></div>
-      <div className="bottom-grid"><section className="panel"><div className="section-head">04 / EVENTOS RECENTES</div><div className="event-list">{snap?.events.slice().reverse().map((event, index) => <div className="event" key={`${event.at}-${index}`}><time>{new Date(event.at * 1000).toLocaleTimeString('pt-BR')}</time><b>{event.kind}</b><span>{JSON.stringify(event.data)}</span></div>)}{!snap?.events.length && <p className="muted">Nenhum evento registrado.</p>}</div></section><section className="panel"><div className="section-head">05 / INTERVENÇÃO HUMANA</div><form className="hint-form" onSubmit={e => {e.preventDefault(); void action(async () => {await api('/hints', {text: hint}); setHint('');});}}><label>Instrução para a próxima decisão<textarea rows={3} maxLength={400} value={hint} onChange={e => setHint(e.target.value)} placeholder="Ex.: tente outra direção antes de atacar."/></label><button disabled={!active || !hint.trim() || busy}>Enviar instrução</button><p className="muted">Fica no log e marca esta run como assistida. Não expõe raciocínio interno.</p></form></section></div></>}
+      </>}
       {(tab === 'BENCHMARKS' || tab === 'EXECUÇÕES') && <><div className="notice">Comparação exploratória. Sem save/RNG certificados e sem critério de conclusão validado, não atribuímos percentual de jogo nem ranking de quem zerou.</div><div className="toolbar"><button onClick={() => void action(async () => setRows(await api<RunRow[]>('/runs')))}>Atualizar registros</button><span>{rows.length} execuções recentes</span></div><section className="panel table-wrap"><table><thead><tr><th>Execução / modelo</th><th>Effort</th><th>Tipo</th><th>Calls</th><th>Tokens</th><th>Custo</th><th>Mortes</th><th>Estado</th><th/></tr></thead><tbody>{rows.map(r => <tr key={r.id}><td><strong>{r.config.model}</strong><small>{r.id.slice(0, 8)} · {new Date(r.created_at * 1000).toLocaleString('pt-BR')}</small></td><td>{r.config.effort ?? 'padrão'}</td><td>{r.source === 'simulator' ? 'SIMULADA' : r.mixed ? 'MISTA' : r.assisted ? 'ASSISTIDA' : 'AUTÔNOMA'}</td><td>{number(r.metrics.calls)}</td><td>{number(r.metrics.total_tokens)}</td><td>{dollars(r.metrics.cost_usd)}{r.metrics.unknown_cost_calls > 0 && <small>Custo incompleto</small>}</td><td>{r.metrics.deaths}</td><td>{r.status}</td><td><button onClick={() => void action(async () => setDetail(await api(`/runs/${r.id}`)))}>Inspecionar</button></td></tr>)}</tbody></table>{!rows.length && <p className="empty">Nenhuma execução. Inicie pelo painel ao vivo.</p>}</section>{detail !== null && <section className="panel"><div className="section-head">REGISTRO · ÚLTIMAS 200 ENTRADAS POR TIPO<button onClick={() => saveJson('zelda-run-detail.json', detail)}>Exportar recorte JSON</button></div><pre>{JSON.stringify(detail, null, 2)}</pre></section>}</>}
       {tab === 'SKILLS' && <><p className="intro">O modelo decide. O executor local usa feedback e sequências por consumo do input quando o bridge V2 está disponível. As rotinas abaixo não são um bot de combate completo.</p><section className="panel"><table><thead><tr><th>Skill</th><th>Função</th><th>Estado</th><th>Versão</th></tr></thead><tbody>{skills.map(s => <tr key={s.id}><td><code>{s.id}</code></td><td>{s.name}</td><td><span className={`pill ${s.status}`}>{s.status === 'implemented' ? 'Implementada' : 'Planejada'}</span></td><td>{s.version ?? '—'}</td></tr>)}</tbody></table></section></>}
       {tab === 'MEMÓRIA' && <><p className="intro">No modo Adaptive, notas, transições observadas e trajetórias bem-sucedidas persistem por modelo + effort + versão do contrato. Rotas legadas são preservadas, mas não são executadas sem um destino escolhido. Dicas, pausas e controle humano não promovem trajetórias autônomas.</p><section className="panel"><div className="section-head">GRAFO DE MUNDO OBSERVADO</div><table><thead><tr><th>Origem</th><th>Saída observada</th><th>Destino</th><th>Spawn</th><th>Travessias</th></tr></thead><tbody>{snap?.world_edges?.map(edge => <tr key={edge.id}><td><strong>{edge.from_scene_name || `SCENE ${edge.from_scene}`}</strong><small>ROOM {edge.from_room}</small></td><td>{edge.from_position?.length === 3 ? edge.from_position.map(v => number(v)).join(' / ') : '—'}</td><td><strong>{edge.to_scene_name || `SCENE ${edge.to_scene}`}</strong><small>ROOM {edge.to_room} · ENTRANCE {edge.entrance_index}</small></td><td>{edge.to_position?.length === 3 ? edge.to_position.map(v => number(v)).join(' / ') : '—'}</td><td>{edge.traversals}</td></tr>)}</tbody></table>{!snap?.world_edges?.length && <p className="empty">Nenhuma transição autônoma observada ainda.</p>}</section><section className="panel"><div className="section-head">ROTAS APRENDIDAS</div><table><thead><tr><th>Origem</th><th>Destino</th><th>Passos</th><th>Sucessos</th><th>Falhas</th></tr></thead><tbody>{snap?.trajectories?.map(t => <tr key={t.id}><td>SCENE {t.from_scene} / ROOM {t.from_room}</td><td>SCENE {t.to_scene} / ROOM {t.to_room}</td><td>{t.actions.length}</td><td>{t.successes}</td><td>{t.failures}</td></tr>)}</tbody></table>{!snap?.trajectories?.length && <p className="empty">Nenhuma rota aprendida ainda. Uma mudança de sala/cena autônoma promove a sequência de navegação que funcionou.</p>}</section><section className="panel memory-list">{snap?.memory.map(m => <article key={m.id}><span className="eyebrow">SCENE {m.scene}</span><p>{m.note}</p><small>{new Date(m.created_at * 1000).toLocaleString('pt-BR')}</small></article>)}{!snap?.memory.length && <p className="empty">Nenhuma nota de memória nesta execução.</p>}</section></>}

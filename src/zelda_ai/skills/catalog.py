@@ -71,7 +71,7 @@ SKILL_CATALOG = [
     {"id": "aim_at", "name": "Mira fechada e disparo com item C equipado", "status": "implemented", "version": "2.0"},
     {"id": "face_target", "name": "Orientar Link para ator/posição", "status": "implemented", "version": "2.0"},
     {"id": "shield_face", "name": "Orientar e sustentar escudo para alvo", "status": "implemented", "version": "2.0"},
-    {"id": "fight_enemy", "name": "Combate genérico contra inimigo observado", "status": "implemented", "version": "2.0"},
+    {"id": "fight_enemy", "name": "Combate aprendido por tipo de inimigo", "status": "implemented", "version": "4.0"},
     {"id": "manipulate_object", "name": "Agarrar/empurrar/puxar objeto observado", "status": "implemented", "version": "2.0"},
     {"id": "explore_area", "name": "Exploração local com colisão e descoberta", "status": "implemented", "version": "2.0"},
     {"id": "traverse", "name": "Subir/descer escadas, ladders e superfícies escaláveis", "status": "implemented", "version": "3.0"},

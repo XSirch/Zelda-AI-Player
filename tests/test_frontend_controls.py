@@ -33,3 +33,15 @@ def test_diagnostic_panel_has_emergency_handoff():
     main = Path('web/src/main.tsx').read_text(encoding='utf-8')
     assert '/diagnostics/release' in main
     assert 'diagnostic_active' in main
+
+
+def test_live_dashboard_uses_tabs_instead_of_stacked_panels():
+    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    for label in ['CONTROLE', 'COMBATE', 'TERRENO', 'ATORES', 'PROGRESSO', 'ESTADO', 'DECISÃO']:
+        assert label in text
+    assert 'className="live-tabs"' in text
+    assert 'CombatLearningPanel' in text
+    # Events and human intervention moved into the decision tab; the old always-visible bottom grid is gone.
+    live_start = text.index("{tab === 'AO VIVO'")
+    live_end = text.index("{(tab === 'BENCHMARKS'", live_start)
+    assert 'bottom-grid' not in text[live_start:live_end]

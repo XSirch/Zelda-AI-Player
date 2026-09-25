@@ -97,3 +97,16 @@ def test_native_traversal_state_and_terrain_probes_are_exposed():
     assert "70.0f, 140.0f" in source
     assert "BgCheck_EntityLineTest1" in source
     assert '{"wall_flags", wallFlags}' in source
+
+
+def test_native_combat_learning_state_is_exposed():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
+    for marker in [
+        '"combat_learning_state"',
+        'result["velocity"]',
+        'result["collision_health_hint"]',
+        '{"melee_weapon_state", player->meleeWeaponState}',
+        '{"invincibility_timer", player->invincibilityTimer}',
+    ]:
+        assert marker in source
