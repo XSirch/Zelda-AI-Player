@@ -27,7 +27,7 @@ def _safe_escape_target(game: GameState, attempt: int) -> tuple[float, float, fl
     if not game.player:
         return None
     preferred = ["back", "back_right", "back_left"] if attempt % 2 == 0 else ["back", "back_left", "back_right"]
-    offsets = {"back": 32768, "back_right": 24576, "back_left": -24576}
+    offsets = {"back": 32768, "back_right": -24576, "back_left": 24576}
     for direction in preferred:
         probes = [p for p in game.navigation_probes if p.direction == direction and p.distance <= 75]
         probe = min(probes, key=lambda p: p.distance, default=None)
