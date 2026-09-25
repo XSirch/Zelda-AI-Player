@@ -75,6 +75,27 @@ from .skills.traversal import _traverse_local as _traverse_local
 
 CONTRACT_VERSION = "state-v8/skills-v9/trajectory-v3/prompt-v12"
 
+def _model_state_payload(game: GameState) -> dict:
+    """Model-facing state: transition surfaces are physical but destination-opaque."""
+    payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
+        "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
+        "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
+        "scene_exits"})
+    payload["scene_exits"] = [{"position": list(row.position)} for row in game.scene_exits]
+    if game.room_actors:
+        payload.pop("nearby_actors", None)
+    return payload
+
+
+def _model_world_edges(rows: list[dict]) -> list[dict]:
+    """Only empirically observed topology is model-visible; native entrance IDs remain local."""
+    allowed = ("from_scene", "from_scene_name", "from_room", "from_position",
+               "to_scene", "to_scene_name", "to_room", "to_position", "traversals")
+    return [{key: row.get(key) for key in allowed} for row in rows]
+
+
+
+
 
 class Runtime:
     def __init__(self, bridge: Bridge, store: Store, providers: dict):
@@ -186,6 +207,19 @@ class Runtime:
         # A failed command may have moved Link; removing it creates a fictional trajectory.
 
 
+    def _transition_origin_position(self, old: GameState):
+        decision = self.last_decision or {}
+        args = decision.get("args") or {}
+        if decision.get("skill") == "traverse_exit":
+            target = args.get("target_position")
+            if isinstance(target, list) and len(target) == 3:
+                return tuple(float(v) for v in target)
+        if old.player and old.scene_exits:
+            nearest = min(old.scene_exits, key=lambda row: math.dist(row.position, old.player.position))
+            if math.dist(nearest.position, old.player.position) <= 140.0:
+                return nearest.position
+        return old.player.position if old.player else None
+
     def _learn_transition(self, state: GameState, old: GameState | None):
         if self.state != "running" or self.trajectory_tainted:
             return
@@ -197,9 +231,10 @@ class Runtime:
             return
         if (old.scene, old.room) == (state.scene, state.room):
             return
+        transition_origin = self._transition_origin_position(old)
         edge_id = self.store.learn_world_edge(self.namespace,
             {"scene": old.scene, "scene_name": old.scene_name, "room": old.room,
-             "position": old.player.position if old.player else None},
+             "position": transition_origin},
             {"scene": state.scene, "scene_name": state.scene_name, "room": state.room,
              "position": state.player.position if state.player else None,
              "entrance_index": state.entrance_index})
@@ -786,27 +821,15 @@ class Runtime:
                 if await self._auto_unstick(game):
                     await asyncio.sleep(0.08)
                     game = self.bridge.state or game
-                state_payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
-                    "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
-                    "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
-                    "scene_exits"})
-                # Transition surfaces are intentionally opaque to the model. Native
-                # exit/entrance indices stay local for diagnostics only; exposing them
-                # could let pretrained game knowledge shortcut empirical exploration.
-                state_payload["scene_exits"] = [
-                    {"position": list(row.position)}
-                    for row in game.scene_exits
-                ]
-                if game.room_actors:
-                    # Avoid sending the rendered subset twice once the room-wide observer is available.
-                    state_payload.pop("nearby_actors", None)
+                state_payload = _model_state_payload(game)
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": state_payload,
                     "last_decision": self.last_decision, "last_result": self.last_result,
                     "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
-                    "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
+                    "known_world_edges": _model_world_edges(
+                        self.store.world_neighbors(self.namespace, game.scene, game.room)),
                     "enemy_learning": self._enemy_learning_context(game),
                     "navigation_mesh": {
                         "available": game.navmesh.available,
