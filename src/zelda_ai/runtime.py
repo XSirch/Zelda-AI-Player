@@ -93,12 +93,21 @@ def _sanitize_transition_actor(actor: dict | None) -> dict | None:
     return row
 
 
+def _strip_transition_ids(value):
+    if isinstance(value, dict):
+        return {key: _strip_transition_ids(item) for key, item in value.items()
+                if key not in {"exit_index", "entrance_index"}}
+    if isinstance(value, list):
+        return [_strip_transition_ids(item) for item in value]
+    return value
+
+
 def _model_state_payload(game: GameState) -> dict:
     """Model-facing state: transition surfaces are physical but destination-opaque."""
     payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
         "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
         "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
-        "scene_exits"})
+        "scene_exits", "entrance_index"})
     payload["scene_exits"] = [{"position": list(row.position)} for row in game.scene_exits]
     for field in ("target_actor", "target_candidate", "context_actor"):
         payload[field] = _sanitize_transition_actor(payload.get(field))
@@ -850,8 +859,10 @@ class Runtime:
                 state_payload = _model_state_payload(game)
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": state_payload,
-                    "last_decision": self.last_decision, "last_result": self.last_result,
-                    "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
+                    "last_decision": self.last_decision,
+                    "last_result": _strip_transition_ids(self.last_result),
+                    "events": _strip_transition_ids(list(self.recent)[-5:]),
+                    "dialogue_transcript": list(self.dialogue_transcript),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
                     "known_world_edges": _model_world_edges(
