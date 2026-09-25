@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.3";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.4";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -700,7 +700,7 @@ void Snapshot() {
         {"event_seq", bridge.eventSeq},
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
-                          "player_relative_dodge_state", "actor_uid", "event_cursor"}},
+                          "player_relative_dodge_state", "control_stick_direction", "actor_uid", "event_cursor"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -801,6 +801,7 @@ void Snapshot() {
                     ? SurfaceType_GetWallFlags(&gPlayState->colCtx, player->actor.wallPoly, player->actor.wallBgId) : 0},
                 {"state_flags_1", player->stateFlags1},
                 {"state_flags_2", player->stateFlags2},
+                {"control_stick_direction", player->controlStickDirections[player->controlStickDataIndex]},
                 {"hop_direction", (player->stateFlags2 & PLAYER_STATE2_HOPPING)
                     ? json(player->av1.actionVar1) : json(nullptr)},
                 {"climbing_ladder", (player->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) != 0},

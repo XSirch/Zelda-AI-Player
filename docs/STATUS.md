@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.3
+# Implementation status — realtime-input foundation v2.4
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -67,3 +67,8 @@ Live validation showed that the previous backflip diagnostic produced a forward 
 
 
 The same player-relative controller is used by runtime backflip and sidestep skills. Local terrain probes are checked in the requested Link-relative direction before issuing the dodge, so the model cannot bypass the diagnostic safety guard during normal combat execution.
+
+
+## Engine-direction priming correction v2.4
+
+Live validation of v2.3 showed no action at all. Reviewing Player_ActionHandler_10 showed the decisive condition is the A press while player->controlStickDirections[player->controlStickDataIndex] is 1/2/3; waiting for a Z-target/parallel flag can block before A is emitted. V2.4 exports the exact current control-stick classification, holds Z plus the calculated raw stick until Player_ProcessControlStick reports the intended direction, and only then emits the A edge. For backflip the required precondition is direction 2.

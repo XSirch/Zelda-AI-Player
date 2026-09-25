@@ -1,5 +1,5 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _z_targeting_active
+from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _rotate_stick_quadrants
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
@@ -265,11 +265,6 @@ def test_player_relative_dodge_respects_mirrored_world(state):
     assert _player_relative_stick(game, "back", 70) == (70, 0)
 
 
-def test_z_target_state_uses_parallel_or_hostile_flags(state):
-    assert not _z_targeting_active(state)
-    state.player.state_flags_1 |= (1 << 17)
-    assert _z_targeting_active(state)
-
 
 def test_generated_stick_classifies_as_link_backward_for_arbitrary_camera(state):
     import math
@@ -293,3 +288,14 @@ def test_dodge_safety_uses_link_relative_probe(state):
     unsafe = {**safe, "delta_y": -80}
     game = type(state).model_validate({**state.model_dump(), "navigation_probes": [unsafe]})
     assert not _dodge_direction_safe(game, "back")
+
+
+def test_control_stick_direction_accepts_engine_backflip_bin(state):
+    state.player.control_stick_direction = 2
+    assert state.player.control_stick_direction == 2
+
+
+def test_stick_quadrant_feedback_correction():
+    assert _rotate_stick_quadrants(0, 70, 1) == (-70, 0)
+    assert _rotate_stick_quadrants(0, 70, 2) == (0, -70)
+    assert _rotate_stick_quadrants(0, 70, 3) == (70, 0)

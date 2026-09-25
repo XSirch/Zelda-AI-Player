@@ -20,7 +20,8 @@ class Transport:
 def full(state, **changes):
     values = state.model_dump()
     values.update(protocol=2, kind='full', seq=10, full_seq=10, context_epoch=1,
-                  bridge_build='rt-input-v2.2', capabilities=['fast_state', 'input_sequence', 'consumed_receipts'],
+                  bridge_build='rt-input-v2.4', capabilities=['fast_state', 'input_sequence', 'consumed_receipts',
+                  'player_relative_dodge_state', 'control_stick_direction'],
                   event_floor=1, event_seq=0)
     values.update(changes)
     return values
@@ -28,7 +29,8 @@ def full(state, **changes):
 
 def fast(state, **changes):
     values = full(state)
-    values.update(seq=11, kind='fast', camera_input_yaw=0, mirrored_world=False)
+    values.update(seq=11, kind='fast', camera_input_yaw=0, mirrored_world=False,
+                  player={**values['player'], 'control_stick_direction': values['player'].get('control_stick_direction', -1)})
     values.update(changes)
     return {name: values[name] for name in RealtimeState.model_fields}
 

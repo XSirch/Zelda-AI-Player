@@ -34,6 +34,7 @@ class PlayerState(StrictModel):
     wall_flags: int = Field(default=0, ge=0, le=65535)
     state_flags_1: int = Field(default=0, ge=0, le=4294967295)
     state_flags_2: int = Field(default=0, ge=0, le=4294967295)
+    control_stick_direction: int = Field(default=-1, ge=-1, le=3)
     hop_direction: int | None = Field(default=None, ge=0, le=3)
     climbing_ladder: bool = False
     hanging_ledge: bool = False

@@ -4,7 +4,7 @@ Harness local para agentes jogarem **The Legend of Zelda: Ocarina of Time** no *
 
 ## Status atual
 
-**Realtime Input Foundation v2.3 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
+**Realtime Input Foundation v2.4 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
 
 O próximo trabalho principal continua sendo Navigation V2 (geometria/navmesh/A*) e Combat V2 por inimigo/boss. O combate atual é genérico e a navegação global ainda não possui navmesh completo.
 
@@ -35,7 +35,7 @@ C:\Projetos\Shipwright-AI
 - **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
 - **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu, músicas e combate genérico.
 - **Parada independente do provider:** stop/take-control revoga o input antes de aguardar cleanup de inferência ou validação de modelo.
-- **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem latência Python→consumo P50/P95/P99, fila nativa e edges observados. Backflip/sidestep usam o camera input yaw nativo do OoT para converter direção relativa ao Link em analógico relativo à câmera, aguardam Z-target/parallel antes do A, verificam piso na direção Link-relative e só confirmam sucesso quando o engine reporta HOPPING com a direção esperada (backflip = 2, left = 1, right = 3). Movimento recusa quando o probe não comprova piso seguro.
+- **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem latência Python→consumo P50/P95/P99, fila nativa e edges observados. Backflip/sidestep usam o camera input yaw nativo do OoT para converter direção relativa ao Link em analógico relativo à câmera, seguram Z + direção até o próprio Player_ProcessControlStick reportar a direção esperada, então geram o edge de A; verificam piso na direção Link-relative e só confirmam sucesso quando o engine reporta HOPPING com a direção esperada (backflip = 2, left = 1, right = 3). Movimento recusa quando o probe não comprova piso seguro.
 - **Aprendizado versionado:** dados anteriores são preservados; traces falhos/intervenções não são promovidos como experiência autônoma.
 
 > `consumed` significa que o input chegou ao consumidor do jogo. Não significa automaticamente que um golpe acertou, uma esquiva teve efeito ou uma animação terminou.

@@ -73,18 +73,8 @@ def _steer_to(game: GameState, target: tuple[float, float, float], strength: flo
 
 
 
-PLAYER_STATE1_HOSTILE_LOCK_ON = 1 << 4
-PLAYER_STATE1_Z_TARGETING = 1 << 15
-PLAYER_STATE1_PARALLEL = 1 << 17
 PLAYER_STATE2_HOPPING = 1 << 19
 _DODGE_DIRECTION = {"left": 1, "back": 2, "right": 3}
-
-
-def _z_targeting_active(game: GameState | None) -> bool:
-    if not game or not game.player:
-        return False
-    return bool(game.player.state_flags_1 & (
-        PLAYER_STATE1_HOSTILE_LOCK_ON | PLAYER_STATE1_Z_TARGETING | PLAYER_STATE1_PARALLEL))
 
 
 def _player_relative_stick(game: GameState, direction: str, magnitude: int = 70) -> tuple[int, int]:
@@ -121,18 +111,39 @@ def _player_relative_stick(game: GameState, direction: str, magnitude: int = 70)
     return max(-80, min(80, x)), max(-80, min(80, y))
 
 
-async def _prime_z_target(bridge: Bridge, observation: GameState, timeout: float = .35) -> GameState | None:
+def _rotate_stick_quadrants(stick_x: int, stick_y: int, steps: int) -> tuple[int, int]:
+    """Rotate raw stick in OoT's positive direction: forward -> left -> back -> right."""
+    x, y = stick_x, stick_y
+    for _ in range(steps % 4):
+        x, y = -y, x
+    return x, y
+
+
+async def _prime_dodge_direction(bridge: Bridge, observation: GameState, direction: str,
+                                 magnitude: int = 70, timeout: float = .5) -> tuple[GameState | None, int, int]:
+    """Hold Z + stick until Player_ProcessControlStick reports the requested direction."""
+    expected = _DODGE_DIRECTION[direction]
     current = bridge.state or observation
+    stick_x, stick_y = _player_relative_stick(current, direction, magnitude)
     deadline = time.monotonic() + timeout
     while current and time.monotonic() < deadline:
-        if _z_targeting_active(current):
-            return current
-        bridge.send(buttons=0x2000, lease_ms=260)
+        actual = current.player.control_stick_direction if current.player else -1
+        if actual == expected:
+            return current, stick_x, stick_y
+        if actual in {0, 1, 2, 3}:
+            # Close the loop on OoT's own classification instead of trusting camera math blindly.
+            stick_x, stick_y = _rotate_stick_quadrants(
+                stick_x, stick_y, (expected - actual) % 4)
+        else:
+            stick_x, stick_y = _player_relative_stick(current, direction, magnitude)
+        bridge.send(buttons=0x2000, stick_x=stick_x, stick_y=stick_y, lease_ms=260)
         try:
             current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
         except RuntimeError:
-            return None
-    return current if _z_targeting_active(current) else None
+            return None, stick_x, stick_y
+    if current and current.player and current.player.control_stick_direction == expected:
+        return current, stick_x, stick_y
+    return None, stick_x, stick_y
 
 
 async def _observe_dodge_effect(bridge: Bridge, start: GameState, expected_direction: int,
@@ -195,17 +206,20 @@ async def _perform_dodge(bridge: Bridge, observation: GameState, direction: str,
                 "confirmed": False, "hopping_seen": False, "hop_direction": None,
                 "expected_hop_direction": expected, "max_distance": 0.0, "expected_distance": 0.0,
                 "stick_x": 0, "stick_y": 0}
-    if "player_relative_dodge_state" not in observation.capabilities:
+    if ("player_relative_dodge_state" not in observation.capabilities or
+            "control_stick_direction" not in observation.capabilities):
         return {"reason": "bridge_upgrade_required_for_dodge_confirmation", "receipt": None,
                 "confirmed": False, "hopping_seen": False, "hop_direction": None,
                 "expected_hop_direction": expected, "max_distance": 0.0, "expected_distance": 0.0,
                 "stick_x": 0, "stick_y": 0}
-    primed = await _prime_z_target(bridge, observation)
+    primed, stick_x, stick_y = await _prime_dodge_direction(bridge, observation, direction, magnitude)
     if primed is None:
-        return {"reason": "z_target_not_established", "receipt": None, "confirmed": False,
+        actual = bridge.state.player.control_stick_direction if bridge.state and bridge.state.player else None
+        return {"reason": "dodge_direction_not_established", "receipt": None, "confirmed": False,
                 "hopping_seen": False, "hop_direction": None, "expected_hop_direction": expected,
-                "max_distance": 0.0, "expected_distance": 0.0, "stick_x": 0, "stick_y": 0}
-    stick_x, stick_y = _player_relative_stick(primed, direction, magnitude)
+                "control_stick_direction": actual,
+                "max_distance": 0.0, "expected_distance": 0.0,
+                "stick_x": stick_x, "stick_y": stick_y}
     receipt = await bridge.sequence_receipt([
         {"buttons": 0x2000, "stick_x": stick_x, "stick_y": stick_y, "ticks": 1},
         {"buttons": 0xA000, "stick_x": stick_x, "stick_y": stick_y, "ticks": 1},
@@ -221,6 +235,7 @@ async def _perform_dodge(bridge: Bridge, observation: GameState, direction: str,
               ("wrong_dodge_direction" if effect["hopping_seen"] and effect["hop_direction"] is not None else
                ("dodge_effect_not_observed" if delivered else "input_not_consumed")))
     return {"reason": reason, "receipt": receipt, "expected_hop_direction": expected,
+            "control_stick_direction": primed.player.control_stick_direction if primed.player else None,
             "stick_x": stick_x, "stick_y": stick_y, **effect}
 
 
