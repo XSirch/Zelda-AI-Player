@@ -277,7 +277,7 @@ def primitive_move_safe(game: GameState, direction: str, *,
                         wall_clearance: float = 42.0) -> bool:
     """Validate the world heading produced by a raw camera-relative move."""
     if not game.player:
-        return True
+        return False
     if not game.navigation_probes:
         return "local_navmesh" not in game.capabilities
 
