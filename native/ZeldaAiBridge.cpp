@@ -420,7 +420,7 @@ json NavigationMesh(Player* player) {
     constexpr float STEP = 70.0f;
     constexpr float MAX_HEIGHT_DELTA = 24.0f;
     constexpr float BODY_CLEARANCE = 18.0f;
-    constexpr float MIDPOINT_TOLERANCE = 36.0f;
+    constexpr float MIDPOINT_TOLERANCE = 24.0f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
     static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
 
@@ -1004,7 +1004,10 @@ void Snapshot() {
             state["room_actor_count"] = roomActors["count"];
             state["room_actors_truncated"] = roomActors["truncated"];
             state["navigation_probes"] = NavigationProbes(player);
-            if (full) state["navmesh"] = NavigationMesh(player);
+            if (full && !state["paused"].get<bool>() && !state["cutscene_active"].get<bool>() &&
+                state["game_over_state"].get<int>() == 0 && !state["dialogue"]["active"].get<bool>()) {
+                state["navmesh"] = NavigationMesh(player);
+            }
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
             state["equipped"] = json::array();
