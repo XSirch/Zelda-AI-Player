@@ -268,10 +268,9 @@ class Runtime:
                 nearest = min(old.scene_exits, key=lambda row: math.dist(row.position, requested))
                 if math.dist(nearest.position, requested) <= 140.0:
                     return nearest.position
-        if old.player and old.scene_exits:
-            nearest = min(old.scene_exits, key=lambda row: math.dist(row.position, old.player.position))
-            if math.dist(nearest.position, old.player.position) <= 140.0:
-                return nearest.position
+        # Door/scripted/accidental transitions are not evidence that a nearby
+        # SceneExitIndex surface caused them. Preserve the actually observed
+        # player position instead of inventing a warp association.
         return old.player.position if old.player else None
 
     def _learn_transition(self, state: GameState, old: GameState | None):
