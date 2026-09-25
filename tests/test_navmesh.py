@@ -48,6 +48,24 @@ def test_astar_routes_around_blocked_direct_corridor(state):
     assert plan.waypoint == pytest.approx((70, 0, 0))
 
 
+def test_same_cell_micro_approach_keeps_probe_guard(state):
+    game = with_mesh(state, [[0, 0, 0, 0]])
+    plan = plan_navmesh(game, (25, 0, 0))
+    assert plan is not None
+    assert plan.waypoint == pytest.approx((25, 0, 0))
+    assert plan.path == ((0, 0),)
+
+
+def test_v26_fails_closed_if_realtime_probes_disappear(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh"],
+        "navigation_probes": [],
+    })
+    assert not waypoint_probe_safe(game, (0, 0, 70))
+    assert not primitive_move_safe(game, "forward")
+
+
 def test_astar_never_invents_connection_to_disconnected_target(state):
     game = with_mesh(state, [
         [0, 0, 0, 0x00],
