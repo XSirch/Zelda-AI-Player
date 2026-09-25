@@ -136,6 +136,16 @@ def test_traverse_exit_learns_destination_only_after_transition(store, state):
     # No transition yet => there is no learned destination.
     assert store.world_neighbors(runtime.namespace, origin.scene, origin.room) == []
 
+    # Latest fast/full evidence shows Link actually standing on the selected
+    # exit surface immediately before the scene change.
+    bridge.previous_state = origin.model_copy(update={
+        "seq": origin.seq + 1,
+        "player": origin.player.model_copy(update={
+            "position": tuple(exit_position),
+            "floor_exit_index": 1,
+        }),
+    })
+
     destination = origin.model_copy(update={
         "seq": origin.seq + 1,
         "scene_epoch": origin.scene_epoch + 1,
@@ -192,8 +202,15 @@ def test_non_exit_transition_keeps_player_origin_even_near_scene_exit(store, sta
         },
         "memory_note": None,
     }
+    bridge.previous_state = origin.model_copy(update={
+        "seq": origin.seq + 1,
+        "player": origin.player.model_copy(update={
+            "position": tuple(player_position),
+            "floor_exit_index": 0,
+        }),
+    })
     destination = origin.model_copy(update={
-        "seq": origin.seq + 1, "scene_epoch": origin.scene_epoch + 1,
+        "seq": origin.seq + 2, "scene_epoch": origin.scene_epoch + 1,
         "scene": 84, "scene_name": "Observed Destination", "room": 0,
         "scene_exits": [],
     })
@@ -203,3 +220,52 @@ def test_non_exit_transition_keeps_player_origin_even_near_scene_exit(store, sta
     assert len(edges) == 1
     assert edges[0]["from_position"] == player_position
     assert edges[0]["from_position"] != unrelated_exit
+
+
+def test_traverse_exit_does_not_anchor_planned_surface_if_different_exit_triggered(store, state):
+    bridge = Bridge("x" * 32, True)
+    runtime = Runtime(bridge, store, {})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo", memory_mode="adaptive")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.state = "running"
+
+    surface_a = [70.0, 0.0, 116.0]
+    surface_b = [35.0, 0.0, 40.0]
+    origin = type(state).model_validate({
+        **state.model_dump(),
+        "scene": 52, "scene_name": "Interior", "room": 0,
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211,
+             "position": surface_a, "samples": 5, "direct_reachable": True},
+            {"exit_index": 2, "entrance_index": 0x212,
+             "position": surface_b, "samples": 5, "direct_reachable": True},
+        ],
+    })
+    runtime.last_decision = {
+        "goal": "Use chosen exit", "summary": "Traverse A",
+        "skill": "traverse_exit",
+        "args": {
+            "direction": None, "duration_ms": 8000, "strength": 0.7, "slot": None,
+            "choice_index": None, "song": None, "target_actor_id": None,
+            "target_actor_uid": None, "target_actor_params": None,
+            "target_position": surface_a, "stop_distance": None, "item_id": None,
+        },
+        "memory_note": None,
+    }
+    bridge.previous_state = origin.model_copy(update={
+        "seq": origin.seq + 1,
+        "player": origin.player.model_copy(update={
+            "position": tuple(surface_b),
+            "floor_exit_index": 2,
+        }),
+    })
+    destination = origin.model_copy(update={
+        "seq": origin.seq + 2, "scene_epoch": origin.scene_epoch + 1,
+        "scene": 84, "scene_name": "Observed Destination", "room": 0,
+        "scene_exits": [],
+    })
+    runtime.on_state(destination, origin)
+    edge = store.world_neighbors(runtime.namespace, origin.scene, origin.room)[0]
+    assert edge["from_position"] == surface_b
+    assert edge["from_position"] != surface_a
