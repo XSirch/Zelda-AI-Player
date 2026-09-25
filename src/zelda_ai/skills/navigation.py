@@ -280,7 +280,8 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 plan = plan_navmesh(current, target)
                 if plan is None:
                     final_exit_direct = bool(exit_mode and target_distance <= 70.0 and
-                        waypoint_probe_safe(current, target, wall_clearance=30.0))
+                        waypoint_probe_safe(current, target, wall_clearance=30.0,
+                            known_floor_target=True))
                     if final_exit_direct:
                         navmesh_used = True
                         last_path_cells = 1
@@ -314,7 +315,11 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     navmesh_used = True
                     last_path_cells = len(plan.path)
                     steer_target = plan.waypoint
-                    probe_safe = waypoint_probe_safe(current, steer_target)
+                    final_exit_waypoint = bool(
+                        exit_mode and math.dist(tuple(steer_target), tuple(target)) <= 1e-3)
+                    probe_safe = waypoint_probe_safe(
+                        current, steer_target,
+                        known_floor_target=final_exit_waypoint)
                     bridge.set_navigation_debug(
                         skill=decision.skill, status="active" if probe_safe else "blocked",
                         target_position=list(target), waypoint=list(plan.waypoint),
