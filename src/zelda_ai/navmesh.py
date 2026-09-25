@@ -182,6 +182,20 @@ def plan_navmesh(game: GameState, target: tuple[float, float, float] | list[floa
         return None
     path, cost = route
     if len(path) < 2:
+        # The target can be inside the same 70-unit cell while still outside a
+        # small requested stop_distance. Keep that final micro-approach local;
+        # waypoint_probe_safe() will still veto walls/cliffs before input.
+        player = game.player.position
+        horizontal = math.hypot(target3[0] - player[0], target3[2] - player[2])
+        if horizontal <= mesh.step * 0.75 and abs(target3[1] - player[1]) <= 24.0:
+            return NavMeshPlan(
+                waypoint=target3,
+                path=path,
+                goal_cell=start,
+                target_distance=0.0,
+                cost=0.0,
+                exact_goal_reachable=True,
+            )
         return None
 
     # Look through only collinear, already-connected edges. This smooths the
@@ -227,8 +241,10 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
                         *, wall_clearance: float = 42.0) -> bool:
     """Validate the next NavMesh heading against the fast, Link-relative probes."""
     direction = _probe_direction(game, waypoint)
-    if direction is None or not game.navigation_probes:
+    if direction is None:
         return True
+    if not game.navigation_probes:
+        return "local_navmesh" not in game.capabilities
     probes = [p for p in game.navigation_probes
               if p.direction == direction and p.distance <= 75.0]
     if not probes:
@@ -245,8 +261,10 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
 
 def primitive_move_safe(game: GameState, direction: str) -> bool:
     """Map a camera-relative primitive move into world space and probe its heading."""
-    if not game.player or not game.navigation_probes:
+    if not game.player:
         return True
+    if not game.navigation_probes:
+        return "local_navmesh" not in game.capabilities
     if game.camera_eye is not None and game.camera_at is not None:
         fx = game.camera_at[0] - game.camera_eye[0]
         fz = game.camera_at[2] - game.camera_eye[2]
