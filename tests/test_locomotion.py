@@ -258,8 +258,8 @@ def test_probe_stick_targets_link_relative_world_direction_with_rotated_camera(s
     game.player.yaw = 0
     # Link-forward world yaw 0 is camera-left when camera input yaw is +90.
     assert _probe_stick("forward", game) == (48, 0)
-    # Link-right probe is +90 world yaw and therefore raw camera-forward here.
-    assert _probe_stick("right", game) == (0, 48)
+    # OoT enum: +90 relative yaw is LEFT, and here that equals camera-forward.
+    assert _probe_stick("left", game) == (0, 48)
 
 
 def test_player_relative_dodge_stick_uses_exact_camera_input_yaw(state):
