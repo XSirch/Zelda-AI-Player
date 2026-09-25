@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _decision_targets_transition, _model_last_decision
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _model_memory_note_persistent, _model_last_decision
 
 
 def test_token_subsets_are_not_double_counted():
@@ -394,6 +394,9 @@ def test_native_transition_ids_are_removed_from_model_results_and_events():
     assert "entrance_index" not in serialized
     assert visible["nested"]["detail"] == "kept"
     assert visible["rows"][0]["value"] == 7
+    floor = _strip_transition_ids({"floor_exit_index": 7, "value": 1})
+    assert floor == {"value": 1}
+
 
     nested_actor = {
         "actor_id": 77, "actor_uid": "warp-result", "category": 7,
@@ -411,16 +414,8 @@ def test_native_transition_ids_are_removed_from_model_results_and_events():
 
 
 
-def test_transition_decisions_cannot_own_freeform_topology_memory(decision, state):
-    game = type(state).model_validate({
-        **state.model_dump(),
-        "scene_exits": [{
-            "exit_index": 1, "entrance_index": 0x211,
-            "position": [70, 0, 116], "samples": 5,
-            "direct_reachable": True,
-        }],
-    })
-    exit_decision = Decision.model_validate({
+def test_freeform_model_memory_is_never_persistent(decision):
+    transition = Decision.model_validate({
         **decision.model_dump(),
         "skill": "traverse_exit",
         "args": {
@@ -430,25 +425,14 @@ def test_transition_decisions_cannot_own_freeform_topology_memory(decision, stat
         },
         "memory_note": "This warp leads somewhere I am guessing.",
     })
-    assert _decision_targets_transition(game, exit_decision)
-
-    nearby_exit_guess = Decision.model_validate({
-        **decision.model_dump(),
-        "skill": "navigate_to",
-        "args": {
-            **decision.args.model_dump(),
-            "target_position": [75, 0, 110],
-            "duration_ms": 5000,
-        },
-    })
-    assert _decision_targets_transition(game, nearby_exit_guess)
-
     ordinary = Decision.model_validate({
         **decision.model_dump(),
         "skill": "wait",
         "args": {**decision.args.model_dump(), "duration_ms": 500},
+        "memory_note": "A guessed world topology note hidden on wait.",
     })
-    assert not _decision_targets_transition(game, ordinary)
+    assert not _model_memory_note_persistent(transition)
+    assert not _model_memory_note_persistent(ordinary)
 
 
 def test_model_does_not_receive_previous_decision_guessed_prose():
