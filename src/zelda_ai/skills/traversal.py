@@ -108,6 +108,22 @@ def _refresh_traversal_affordance(game: GameState, original):
     return None
 
 
+def _player_traversal_state_evidence(game: GameState, direction: str) -> bool:
+    """Native player/context state proving Link is already on the vertical feature."""
+    if not game.player:
+        return False
+    player = game.player
+    if direction == "down":
+        return bool(
+            player.climbing_ladder or player.hanging_ledge or player.can_down or
+            game.context_action.label == "down" or (player.wall_flags & 0x06)
+        )
+    return bool(
+        player.climbing_ladder or player.climbing_ledge or player.can_climb or
+        game.context_action.label == "climb" or (player.wall_flags & 0x0A)
+    )
+
+
 def _immediate_traversal_evidence(game: GameState, direction: str) -> bool:
     """Only evidence close enough to justify immediate local traversal."""
     if not game.player:
@@ -183,14 +199,22 @@ async def _traverse_auto(bridge: Bridge, decision: Decision, observation: GameSt
     if not before or not before.player:
         return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
     direction = decision.args.direction
-    if _immediate_traversal_evidence(before, direction):
+    if _player_traversal_state_evidence(before, direction):
         result = await _traverse_local(bridge, decision, observation, direction)
         result["auto_navpath"] = False
-        result["navpath_mode"] = "local"
+        result["navpath_mode"] = "native_state"
         return result
 
     affordance = _best_auto_traversal_affordance(before, direction)
     if affordance is None:
+        # No slow-scan route is currently reachable. A nearby fast probe can
+        # still support immediate local traversal (e.g. stairs just entering
+        # the 70u safety window) without another model call.
+        if _immediate_traversal_evidence(before, direction):
+            result = await _traverse_local(bridge, decision, observation, direction)
+            result["auto_navpath"] = False
+            result["navpath_mode"] = "fast_probe_fallback"
+            return result
         return {"status": "failed", "reason": "no_reachable_traversal_affordance",
             "direction": direction, "auto_navpath": True, "skill": decision.skill}
 
