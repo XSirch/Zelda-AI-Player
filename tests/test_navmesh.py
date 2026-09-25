@@ -101,6 +101,26 @@ def test_realtime_probe_can_veto_stale_navmesh_waypoint(state):
     assert not waypoint_probe_safe(game, (0, 0, 70))
 
 
+def test_probe_blocks_wall_before_full_navmesh_waypoint(state):
+    wall = {
+        "direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": 0, "delta_y": 0, "floor_type": 0,
+        "wall_hit": True, "wall_distance": 60, "wall_flags": 0,
+    }
+    game = with_mesh(state, [[0, 0, 0, 0]], probes=[wall])
+    assert not waypoint_probe_safe(game, (0, 0, 70))
+
+
+def test_micro_waypoint_allows_wall_safely_beyond_body_margin(state):
+    wall = {
+        "direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": 0, "delta_y": 0, "floor_type": 0,
+        "wall_hit": True, "wall_distance": 48, "wall_flags": 0,
+    }
+    game = with_mesh(state, [[0, 0, 0, 0]], probes=[wall])
+    assert waypoint_probe_safe(game, (0, 0, 25))
+
+
 def test_long_probe_blocks_roll_before_distant_wall(state):
     safe70 = {
         "direction": "forward", "distance": 70, "floor_found": True,
