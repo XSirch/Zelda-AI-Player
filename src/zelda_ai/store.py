@@ -201,7 +201,7 @@ class Store:
             args = action.get("args")
             if skill not in {"move", "turn", "interact", "wait", "camera_center",
                               "roll", "backflip", "sidestep", "navigate_to", "approach_actor",
-                              "interact_with_actor"} or not isinstance(args, dict):
+                              "interact_with_actor", "traverse_exit"} or not isinstance(args, dict):
                 return None
             safe_actions.append({"skill": skill, "args": {
                 "direction": args.get("direction"), "duration_ms": args.get("duration_ms"),
@@ -211,7 +211,8 @@ class Store:
                 "target_actor_params": args.get("target_actor_params"),
                 "target_position": args.get("target_position"),
                 "stop_distance": args.get("stop_distance"), "item_id": args.get("item_id")}})
-        if not safe_actions or not any(a["skill"] in {"move", "turn"} for a in safe_actions):
+        if not safe_actions or not any(a["skill"] in {"move", "turn", "navigate_to", "traverse_exit"}
+                                       for a in safe_actions):
             return None
         signature_payload = {"from": [origin["scene"], origin["room"]],
             "to": [destination["scene"], destination["room"]], "actions": safe_actions}
