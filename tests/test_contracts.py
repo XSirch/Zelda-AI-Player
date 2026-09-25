@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _decision_targets_transition
 
 
 def test_token_subsets_are_not_double_counted():
@@ -409,3 +409,43 @@ def test_native_transition_ids_are_removed_from_model_results_and_events():
     assert actor_visible["dialogue"]["speaker"]["name"] == "Transition Object"
     assert "hidden destination" not in json.dumps(actor_visible)
 
+
+
+def test_transition_decisions_cannot_own_freeform_topology_memory(decision, state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "scene_exits": [{
+            "exit_index": 1, "entrance_index": 0x211,
+            "position": [70, 0, 116], "samples": 5,
+            "direct_reachable": True,
+        }],
+    })
+    exit_decision = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "traverse_exit",
+        "args": {
+            **decision.args.model_dump(),
+            "target_position": [70, 0, 116],
+            "duration_ms": 8000,
+        },
+        "memory_note": "This warp leads somewhere I am guessing.",
+    })
+    assert _decision_targets_transition(game, exit_decision)
+
+    nearby_exit_guess = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "navigate_to",
+        "args": {
+            **decision.args.model_dump(),
+            "target_position": [75, 0, 110],
+            "duration_ms": 5000,
+        },
+    })
+    assert _decision_targets_transition(game, nearby_exit_guess)
+
+    ordinary = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "wait",
+        "args": {**decision.args.model_dump(), "duration_ms": 500},
+    })
+    assert not _decision_targets_transition(game, ordinary)
