@@ -3,7 +3,7 @@ from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 from zelda_ai.skills.navigation import _resolve_scene_exit
-from zelda_ai.skills.traversal import _resolve_traversal_affordance
+from zelda_ai.skills.traversal import _resolve_traversal_affordance, _refresh_traversal_affordance, _local_traversal_evidence, _fast_revalidation_matches_original
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -490,3 +490,159 @@ def test_traversal_affordance_refresh_requires_same_kind(state):
         game, "down", [70, 0, 0], kind="ledge_down") is not None
     assert _resolve_traversal_affordance(
         game, "down", [70, 0, 0], kind="ladder_down") is None
+
+
+def test_recentered_ladder_can_revalidate_from_fast_collision(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down",
+            "direction": "down",
+            "approach_position": [70, 0, 0],
+            "target_position": [110, -20, 0],
+            "distance": 70,
+            "height_delta": 0,
+            "wall_flags": 4,
+        }],
+    })
+    original = original_game.traversal_affordances[0]
+    current = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(), "position": [70, 0, 0], "wall_flags": 4},
+        "traversal_affordances": [],
+    })
+    assert _refresh_traversal_affordance(current, original) is None
+    assert _local_traversal_evidence(current, "down", kind="ladder_down")
+
+
+def test_ladder_fast_revalidation_does_not_accept_unrelated_floor_drop(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down",
+            "direction": "down",
+            "approach_position": [70, 0, 0],
+            "target_position": [110, -20, 0],
+            "distance": 70,
+            "height_delta": 0,
+            "wall_flags": 4,
+        }],
+    })
+    probe = {
+        "direction": "forward",
+        "distance": 70,
+        "floor_found": True,
+        "floor_y": -40,
+        "delta_y": -40,
+        "floor_type": 0,
+        "wall_hit": False,
+        "wall_distance": None,
+        "wall_flags": 0,
+    }
+    current = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(), "position": [70, 0, 0], "wall_flags": 0},
+        "navigation_probes": [probe],
+        "traversal_affordances": [],
+    })
+    assert not _local_traversal_evidence(current, "down", kind="ladder_down")
+    assert _local_traversal_evidence(current, "down", kind="stairs_or_slope_down")
+
+
+def test_recentered_affordance_can_be_reclassified_near_same_geometry(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down",
+            "direction": "down",
+            "approach_position": [70, 0, 0],
+            "target_position": [110, -20, 0],
+            "distance": 70,
+            "height_delta": 0,
+            "wall_flags": 4,
+        }],
+    })
+    original = original_game.traversal_affordances[0]
+    current = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(), "position": [68, 0, 2]},
+        "navmesh": {
+            "origin": [68, 0, 2],
+            "step": 70,
+            "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "traversal_affordances": [{
+            "kind": "ledge_down",
+            "direction": "down",
+            "approach_position": [72, 0, 3],
+            "target_position": [116, -30, 4],
+            "distance": 4,
+            "height_delta": -30,
+            "wall_flags": 0,
+        }],
+    })
+    refreshed = _refresh_traversal_affordance(current, original)
+    assert refreshed is not None
+    assert refreshed.kind == "ledge_down"
+
+
+def test_recentered_affordance_rejects_distant_same_direction_route(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down",
+            "direction": "down",
+            "approach_position": [70, 0, 0],
+            "target_position": [110, -20, 0],
+            "distance": 70,
+            "height_delta": 0,
+            "wall_flags": 4,
+        }],
+    })
+    original = original_game.traversal_affordances[0]
+    current = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(), "position": [70, 0, 0]},
+        "navmesh": {
+            "origin": [70, 0, 0],
+            "step": 70,
+            "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "traversal_affordances": [{
+            "kind": "ledge_down",
+            "direction": "down",
+            "approach_position": [250, 0, 0],
+            "target_position": [300, -100, 0],
+            "distance": 180,
+            "height_delta": -100,
+            "wall_flags": 0,
+        }],
+    })
+    assert _refresh_traversal_affordance(current, original) is None
+
+
+def test_fast_revalidation_rejects_unrelated_ladder_far_from_original_target(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down",
+            "direction": "down",
+            "approach_position": [70, 0, 0],
+            "target_position": [110, -20, 0],
+            "distance": 70,
+            "height_delta": 0,
+            "wall_flags": 4,
+        }],
+    })
+    original = original_game.traversal_affordances[0]
+    current = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(),
+                   "position": [400, 0, 0],
+                   "wall_flags": 4},
+        "traversal_affordances": [],
+    })
+    assert _local_traversal_evidence(current, "down", kind="ladder_down")
+    assert not _fast_revalidation_matches_original(current, original)

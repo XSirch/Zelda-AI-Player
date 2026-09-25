@@ -38,6 +38,75 @@ def _best_climb_surface_probe(game: GameState, direction: str):
     return min(climbable, key=lambda p: (p.wall_distance, p.distance)) if climbable else None
 
 
+def _local_traversal_evidence(game: GameState, direction: str,
+                              *, kind: str | None = None) -> bool:
+    """Fast evidence that Link is already at the requested vertical feature."""
+    if not game.player:
+        return False
+    player = game.player
+    climb_kind = bool(kind and (kind.startswith("ladder_") or kind.startswith("climbable_wall")))
+    if direction == "down":
+        if (player.climbing_ladder or player.hanging_ledge or player.can_down or
+                game.context_action.label == "down" or (player.wall_flags & 0x06)):
+            return True
+    else:
+        if (player.climbing_ladder or player.climbing_ledge or player.can_climb or
+                game.context_action.label == "climb" or (player.wall_flags & 0x0A)):
+            return True
+
+    if _best_climb_surface_probe(game, direction) is not None:
+        return True
+    # A ladder/climb-wall affordance cannot be replaced by an arbitrary floor
+    # delta after the slow scan recenters.
+    if climb_kind:
+        return False
+    return _best_traversal_probe(game, direction) is not None
+
+
+def _fast_revalidation_matches_original(game: GameState, original) -> bool:
+    """Require fast traversal evidence to be physically near the original target."""
+    if not game.player:
+        return False
+    step = game.navmesh.step if game.navmesh.available else 70.0
+    max_distance = max(150.0, step * 2.25)
+    if math.dist(game.player.position, original.target_position) > max_distance:
+        return False
+    return _local_traversal_evidence(
+        game, original.direction, kind=original.kind)
+
+
+def _refresh_traversal_affordance(game: GameState, original):
+    """Re-identify a moving/recentered affordance by nearby physical geometry."""
+    if not game.player:
+        return None
+    candidates = [row for row in game.traversal_affordances
+                  if row.direction == original.direction]
+    if not candidates:
+        return None
+
+    player_pos = game.player.position
+    step = game.navmesh.step if game.navmesh.available else 70.0
+    same_kind = [row for row in candidates if row.kind == original.kind]
+    if same_kind:
+        best = min(same_kind, key=lambda row: (
+            math.dist(row.target_position, original.target_position),
+            math.dist(row.approach_position, player_pos)))
+        if (math.dist(best.target_position, original.target_position) <= max(160.0, step * 2.5) and
+                math.dist(best.approach_position, player_pos) <= max(120.0, step * 1.75)):
+            return best
+
+    # The same ladder/ledge can be reclassified after Link reaches its top/base.
+    # Only accept a same-direction replacement if it is both physically near Link
+    # and near the original target geometry.
+    best = min(candidates, key=lambda row: (
+        math.dist(row.approach_position, player_pos),
+        math.dist(row.target_position, original.target_position)))
+    if (math.dist(best.approach_position, player_pos) <= max(80.0, step * 1.25) and
+            math.dist(best.target_position, original.target_position) <= max(140.0, step * 2.0)):
+        return best
+    return None
+
+
 def _resolve_traversal_affordance(game: GameState, direction: str,
                                   target_position: list[float] | tuple[float, float, float] | None,
                                   *, kind: str | None = None):
@@ -96,19 +165,21 @@ async def _traverse_to_affordance(bridge: Bridge, decision: Decision,
     current = bridge.state
     if not current or not current.player:
         return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
-    refreshed = _resolve_traversal_affordance(
-        current, decision.args.direction, list(affordance.approach_position),
-        kind=affordance.kind)
-    if refreshed is None:
+    refreshed = _refresh_traversal_affordance(current, affordance)
+    local_evidence = _fast_revalidation_matches_original(current, affordance)
+    if refreshed is None and not local_evidence:
         return {"status": "failed", "reason": "traversal_affordance_lost",
             "affordance_kind": affordance.kind, "direction": decision.args.direction,
             "skill": decision.skill}
+    # Once fast collision evidence confirms the ladder/ledge under Link, do not
+    # require the slow recentered scan to preserve an identical label.
+    active_affordance = refreshed or affordance
 
     elapsed_ms = int((time.monotonic() - started) * 1000)
     remaining_ms = total_budget_ms - elapsed_ms
     if remaining_ms < 1000:
         return {"status": "failed", "reason": "traversal_approach_timeout",
-            "affordance_kind": refreshed.kind, "direction": decision.args.direction,
+            "affordance_kind": active_affordance.kind, "direction": decision.args.direction,
             "skill": decision.skill}
     local_args = decision.args.model_copy(update={
         "duration_ms": remaining_ms,
@@ -117,8 +188,9 @@ async def _traverse_to_affordance(bridge: Bridge, decision: Decision,
     local_decision = decision.model_copy(update={"args": local_args})
     result = await _traverse_local(
         bridge, local_decision, current, decision.args.direction)
-    result["affordance_kind"] = refreshed.kind
-    result["approach_position"] = list(refreshed.approach_position)
+    result["affordance_kind"] = active_affordance.kind
+    result["approach_position"] = list(active_affordance.approach_position)
+    result["revalidated_by"] = "slow_scan" if refreshed is not None else "fast_collision"
     return result
 
 
