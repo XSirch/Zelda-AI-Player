@@ -46,6 +46,31 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
     start_position = before.player.position
     deadline = time.monotonic() + min(8.0, max(2.0, decision.args.duration_ms / 1000))
     acknowledged = False
+
+    # A room-global door can be observed even when walls stand between Link and
+    # it. Use the collision-aware NavMesh for the long approach, then hand over
+    # to the precise face/center/straight door servo only for the final meters.
+    if actor.distance > 150.0 and "local_navmesh" in before.capabilities:
+        approach_ms = min(3500, max(800, decision.args.duration_ms // 2))
+        approach_args = decision.args.model_copy(update={
+            "duration_ms": approach_ms,
+            "stop_distance": 135.0,
+        })
+        approach_decision = decision.model_copy(update={"skill": "approach_actor", "args": approach_args})
+        approach = await _navigate_local(bridge, approach_decision, observation, actor_mode=True)
+        current = bridge.state
+        actor = (_matching_actor(current, decision.args.target_actor_id,
+                    decision.args.target_actor_params, decision.args.target_actor_uid)
+                 if current else None)
+        if approach.get("status") != "completed" and (actor is None or actor.distance > 180.0):
+            return {"status": approach.get("status", "failed"),
+                "reason": f"door_approach_failed:{approach.get('reason', 'unknown')}",
+                "distance": math.dist(start_position, current.player.position)
+                    if current and current.player else None,
+                "acknowledged": bool(approach.get("acknowledged")), "skill": decision.skill}
+        before = current or before
+
+
     attempts = 0
     best_distance = actor.distance
     turn_sign = 1
