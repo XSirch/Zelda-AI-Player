@@ -56,6 +56,11 @@ def test_same_cell_micro_approach_keeps_probe_guard(state):
     assert plan.path == ((0, 0),)
 
 
+def test_primitive_move_fails_closed_without_player_telemetry(state):
+    game = state.model_copy(update={"player": None, "capabilities": ["local_navmesh"]})
+    assert not primitive_move_safe(game, "forward")
+
+
 def test_v26_fails_closed_if_realtime_probes_disappear(state):
     game = type(state).model_validate({
         **state.model_dump(),
