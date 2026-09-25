@@ -125,6 +125,26 @@ def _model_world_edges(rows: list[dict]) -> list[dict]:
     return [{key: row.get(key) for key in allowed} for row in rows]
 
 
+def _decision_targets_transition(game: GameState, decision: Decision) -> bool:
+    """Transition topology is learned only by Runtime._learn_transition, never free-form memory."""
+    if decision.skill == "traverse_exit":
+        return True
+    if decision.args.target_position is not None and game.scene_exits:
+        target = tuple(float(v) for v in decision.args.target_position)
+        if min(math.dist(row.position, target) for row in game.scene_exits) <= 140.0:
+            return True
+    if decision.args.target_actor_id is not None:
+        actor = _matching_actor(game, decision.args.target_actor_id,
+            decision.args.target_actor_params, decision.args.target_actor_uid)
+        if actor is not None:
+            raw = actor.model_dump()
+            safe = _sanitize_transition_actor(raw) or {}
+            if (safe.get("name") != raw.get("name") or
+                    safe.get("description") != raw.get("description")):
+                return True
+    return False
+
+
 
 
 
@@ -911,13 +931,20 @@ class Runtime:
                 self.last_decision = decision.model_dump()
                 if not game.dialogue.active and self.dialogue_transcript:
                     self.dialogue_transcript.clear()
-                if decision.memory_note:
-                    self.store.remember(self.namespace, game.scene, decision.memory_note)
+                transition_memory_owned_by_graph = _decision_targets_transition(game, decision)
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
                 self._record_trajectory_action(decision, game)
                 combat_profile, combat_enemy = self._combat_profile_for_decision(game, decision)
                 self.last_result = await execute_skill(self.bridge, decision, game,
                     combat_profile=combat_profile)
+                if decision.memory_note:
+                    if transition_memory_owned_by_graph:
+                        self.log("memory_note_skipped_transition", {
+                            "skill": decision.skill,
+                            "reason": "transition_topology_requires_observed_world_change",
+                        })
+                    else:
+                        self.store.remember(self.namespace, game.scene, decision.memory_note)
                 if (combat_enemy and self.config.memory_mode == "adaptive" and self.namespace
                         and not self.combat_learning_tainted
                         and isinstance(self.last_result.get("learning_trace"), list)
