@@ -108,7 +108,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
       <div className="actors-grid">{sceneExits.map(exit =>
         <div className="actor-item" key={exit.exit_index}>
           <span>EXIT {exit.exit_index} · ENTRANCE 0x{hex16(exit.entrance_index)}</span>
-          <strong>POS {vector(exit.position)} · {exit.samples} amostras · use traverse_exit</strong>
+          <strong>POS {vector(exit.position)} · {exit.samples} amostras · DIRECT {exit.direct_reachable ? 'SAFE' : 'WAIT'} · use traverse_exit</strong>
         </div>)}
       </div>
     </section>}
