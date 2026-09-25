@@ -7,6 +7,7 @@ import time
 from ..bridge import Bridge
 from ..control.feedback import consumed
 from ..models import Decision, GameState
+from ..navmesh import plan_navmesh
 from .catalog import BUTTONS
 from .common import _probe_stick, _pulse
 
@@ -105,6 +106,114 @@ def _refresh_traversal_affordance(game: GameState, original):
             math.dist(best.target_position, original.target_position) <= max(140.0, step * 2.0)):
         return best
     return None
+
+
+def _immediate_traversal_evidence(game: GameState, direction: str) -> bool:
+    """Only evidence close enough to justify immediate local traversal."""
+    if not game.player:
+        return False
+    player = game.player
+    if direction == "down":
+        if (player.climbing_ladder or player.hanging_ledge or player.can_down or
+                game.context_action.label == "down" or (player.wall_flags & 0x06)):
+            return True
+        if any(p.wall_hit and p.wall_distance is not None and p.wall_distance <= 80.0 and
+               (p.wall_flags & 0x06) for p in game.navigation_probes):
+            return True
+        return any(p.distance <= 75.0 and p.floor_found and p.delta_y is not None and
+                   -120.0 <= p.delta_y <= -8.0 for p in game.navigation_probes)
+
+    if (player.climbing_ladder or player.climbing_ledge or player.can_climb or
+            game.context_action.label == "climb" or (player.wall_flags & 0x0A)):
+        return True
+    if any(p.wall_hit and p.wall_distance is not None and p.wall_distance <= 80.0 and
+           (p.wall_flags & (0x02 | 0x08)) for p in game.navigation_probes):
+        return True
+    return any(p.distance <= 75.0 and p.floor_found and p.delta_y is not None and
+               8.0 <= p.delta_y <= 120.0 for p in game.navigation_probes)
+
+
+def _best_auto_traversal_affordance(game: GameState, direction: str):
+    """Choose the best currently reachable vertical route without another model call."""
+    if not game.player:
+        return None
+    candidates = [row for row in game.traversal_affordances if row.direction == direction]
+    if not candidates:
+        return None
+
+    penalties = {
+        "ladder_down": 0.0,
+        "ladder_up": 0.0,
+        "climbable_wall_up": 10.0,
+        "stairs_or_slope_down": 20.0,
+        "stairs_or_slope_up": 20.0,
+        "ledge_down": 90.0,
+    }
+    scored = []
+    step = game.navmesh.step if game.navmesh.available else 70.0
+    for row in candidates:
+        horizontal = math.hypot(
+            row.approach_position[0] - game.player.position[0],
+            row.approach_position[2] - game.player.position[2],
+        )
+        if horizontal <= 30.0:
+            route_cost = 0.0
+        elif game.navmesh.available:
+            plan = plan_navmesh(game, row.approach_position)
+            if not plan or not plan.exact_goal_reachable:
+                continue
+            if plan.target_distance > max(85.0, step * 1.25):
+                continue
+            route_cost = plan.cost + plan.target_distance
+        else:
+            continue
+        scored.append((
+            route_cost + penalties.get(row.kind, 50.0),
+            horizontal,
+            abs(row.height_delta),
+            row,
+        ))
+    return min(scored, key=lambda item: item[:3])[3] if scored else None
+
+
+async def _traverse_auto(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+    """High-level vertical navigation: local traverse or automatic A* to a discovered route."""
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    direction = decision.args.direction
+    if _immediate_traversal_evidence(before, direction):
+        result = await _traverse_local(bridge, decision, observation, direction)
+        result["auto_navpath"] = False
+        result["navpath_mode"] = "local"
+        return result
+
+    affordance = _best_auto_traversal_affordance(before, direction)
+    if affordance is None:
+        return {"status": "failed", "reason": "no_reachable_traversal_affordance",
+            "direction": direction, "auto_navpath": True, "skill": decision.skill}
+
+    internal_args = decision.args.model_copy(update={
+        "target_position": list(affordance.approach_position),
+        "duration_ms": max(8000, decision.args.duration_ms),
+    })
+    internal = decision.model_copy(update={
+        "skill": "traverse_to",
+        "summary": "Automatic NavPath to the best reachable vertical route.",
+        "args": internal_args,
+    })
+    result = await _traverse_to_affordance(bridge, internal, observation)
+    result["requested_skill"] = decision.skill
+    result["controller_skill"] = "traverse_to"
+    result["auto_navpath"] = True
+    result["selected_affordance"] = {
+        "kind": affordance.kind,
+        "direction": affordance.direction,
+        "approach_position": list(affordance.approach_position),
+        "target_position": list(affordance.target_position),
+    }
+    result["skill"] = decision.skill
+    return result
 
 
 def _resolve_traversal_affordance(game: GameState, direction: str,
