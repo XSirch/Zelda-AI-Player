@@ -557,3 +557,21 @@ def test_planner_prompt_prefers_observed_vertical_routes():
     assert "ladder_down" in SYSTEM_PROMPT
     assert "climbable_wall_up" in SYSTEM_PROMPT
     assert "Prefer an observed" in SYSTEM_PROMPT
+
+
+def test_model_caps_traversal_affordances_to_twelve(state):
+    rows = [{
+        "kind": "stairs_or_slope_down",
+        "direction": "down",
+        "approach_position": [i * 10, 0, 0],
+        "target_position": [i * 10 + 70, -20, 0],
+        "distance": i * 10,
+        "height_delta": -20,
+        "wall_flags": 0,
+    } for i in range(20)]
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": rows,
+    })
+    visible = _model_state_payload(game)["traversal_affordances"]
+    assert len(visible) == 12
