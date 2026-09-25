@@ -92,6 +92,10 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
         return {"status": "failed", "reason": "unsafe_roll_probe",
             "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
 
+    if decision.skill == "jump_attack" and not primitive_move_safe(before, "forward"):
+        return {"status": "failed", "reason": "unsafe_jump_attack_probe",
+            "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
+
     buttons, x, y = controller_input(decision)
     if is_realtime(bridge) and decision.skill in {"attack", "interact", "advance_dialogue", "camera_center",
             "backflip", "sidestep", "jump_attack", "roll", "pause_toggle", "menu_confirm", "menu_cancel",
