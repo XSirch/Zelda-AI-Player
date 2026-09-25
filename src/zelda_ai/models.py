@@ -34,6 +34,10 @@ class PlayerState(StrictModel):
     wall_flags: int = Field(default=0, ge=0, le=65535)
     state_flags_1: int = Field(default=0, ge=0, le=4294967295)
     state_flags_2: int = Field(default=0, ge=0, le=4294967295)
+    z_target_active_timer: int = Field(default=0, ge=0, le=2147483647)
+    melee_weapon_animation: int = Field(default=0, ge=-128, le=127)
+    melee_weapon_state: int = Field(default=0, ge=-128, le=127)
+    invincibility_timer: int = Field(default=0, ge=-128, le=127)
     control_stick_direction: int = Field(default=-1, ge=-1, le=3)
     hop_direction: int | None = Field(default=None, ge=0, le=3)
     climbing_ladder: bool = False
@@ -80,12 +84,19 @@ class ActorObservation(StrictModel):
     params: int = Field(ge=-32768, le=32767)
     position: tuple[float, float, float]
     focus_position: tuple[float, float, float] | None = None
+    velocity: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    speed_xz: float = 0.0
+    xz_distance: float = Field(default=0.0, ge=0)
+    collision_health_hint: int | None = Field(default=None, ge=0, le=255)
+    freeze_timer: int = Field(default=0, ge=0, le=65535)
+    color_filter_timer: int = Field(default=0, ge=0, le=255)
+    actor_flags: int = Field(default=0, ge=0, le=4294967295)
     distance: float = Field(ge=0)
     targeted: bool = False
     drawn: bool = False
     text_id: int | None = Field(default=None, ge=0, le=65535)
 
-    @field_validator("position", "focus_position")
+    @field_validator("position", "focus_position", "velocity")
     @classmethod
     def finite_position(cls, value):
         if value is not None and not all(math.isfinite(v) for v in value):

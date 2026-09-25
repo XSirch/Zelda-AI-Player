@@ -17,17 +17,19 @@ from .aim import _aim_at
 from .combat import _fight_enemy
 from .traversal import _traverse_local
 
-async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState,
+                        combat_profile: dict | None = None) -> dict:
     if decision.args.target_actor_id is not None and decision.args.target_actor_uid is None:
         actor = _matching_actor(observation, decision.args.target_actor_id, decision.args.target_actor_params)
         if actor and actor.actor_uid:
             decision = decision.model_copy(update={"args": decision.args.model_copy(
                 update={"target_actor_uid": actor.actor_uid})})
     with owned(bridge, decision.skill):
-        return await _execute_skill(bridge, decision, observation)
+        return await _execute_skill(bridge, decision, observation, combat_profile=combat_profile)
 
 
-async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
+async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameState,
+                         combat_profile: dict | None = None) -> dict:
     before = bridge.state
     if not before or not bridge.connected:
         raise RuntimeError("bridge_disconnected")
@@ -63,7 +65,7 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
     if decision.skill == "shield_face":
         return await _face_target(bridge, decision, observation, shield=True)
     if decision.skill == "fight_enemy":
-        return await _fight_enemy(bridge, decision, observation)
+        return await _fight_enemy(bridge, decision, observation, profile=combat_profile)
     if decision.skill == "explore_area":
         return await _explore_area(bridge, decision, observation)
     if decision.skill == "manipulate_object":

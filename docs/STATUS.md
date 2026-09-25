@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.4
+# Implementation status — realtime-input foundation v2.5
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -72,3 +72,12 @@ The same player-relative controller is used by runtime backflip and sidestep ski
 ## Engine-direction priming correction v2.4
 
 Live validation of v2.3 showed no action at all. Reviewing Player_ActionHandler_10 showed the decisive condition is the A press while player->controlStickDirections[player->controlStickDataIndex] is 1/2/3; waiting for a Z-target/parallel flag can block before A is emitted. V2.4 exports the exact current control-stick classification, holds Z plus the calculated raw stick until Player_ProcessControlStick reports the intended direction, and only then emits the A edge. For backflip the required precondition is direction 2.
+
+
+## Per-enemy combat learning
+
+Adaptive combat memory is now separated by model + effort + contract namespace and enemy class (player age + actor category + actor ID). Each `fight_enemy` encounter keeps a local state-action policy and updates it during the encounter, then persists the learning trace when the skill window ends. States bucket distance, immediate threat, lock state and disabled/frozen observations. Available motor primitives are safety-filtered; the learned policy chooses among acquire, approach, attack, guard, hold and engine-confirmed Link-relative dodges.
+
+Rewards use observable outcomes: player damage is strongly negative, collision-health/color-filter changes are positive hints rather than authoritative HP, confirmed dodges and safe defense receive small credit, and native enemy/boss defeat events provide the terminal win reward. Player death provides a terminal negative reward. The model prompt receives compact learned profiles for visible enemies so high-level reasoning can use prior encounters without putting the LLM in the 20 Hz motor loop.
+
+Combat profiles are not shared between benchmark models/efforts. Isolated/zero-shot mode does not persist them.

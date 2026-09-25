@@ -1,4 +1,4 @@
-# Realtime input foundation (v2.4)
+# Realtime input foundation (v2.5)
 
 ## Delivered scope
 
@@ -26,7 +26,7 @@ This change implements the input/observation foundation of the reviewed rollout,
    The installer recognizes the verified original or the previous hook, validates the reconstructed upstream file, backs up files outside the CMake source glob, and installs every required header. It does not reset the checkout or touch game assets.
 4. Reconfigure and rebuild the pinned Shipwright C++ project. **An existing soh.exe does not change when adapter source changes.**
 5. Run `npm install` and `npm run build` in `web`, then restart `uv run zelda-ai serve` and the newly built game.
-6. The panel must report `rt-input-v2.4`, protocol 2 and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
+6. The panel must report `rt-input-v2.5`, protocol 2 and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
 
 A new backend is compatible with the old V1 bridge for rollback/testing, but V1 acknowledgment means acceptance only. The new V2 native bridge requires this backend. To fully roll back, restore both the previous backend and game binary/adapter from the preserved backup.
 
@@ -51,3 +51,10 @@ See STATUS.md for checks actually executed. The standalone C++ scheduler and syn
 Still pending: the actual Windows/SoH integration build, recorded input/animation tests, measured latency under load, full original project suite and production Vite build; a geometry-derived navmesh/A* corridor with dynamic obstacle updates; per-enemy/boss action adapters; goal-bound certified trajectory replay; full isolation of SQLite/UI work into another process. Full snapshots/events can still invoke synchronous persistence, so do not claim a hard real-time scheduling guarantee.
 
 Validate pause/unpause, scene transitions, human handoff with held buttons, repeated A/B edges, lost/reordered packets, two identical enemies crossing, provider timeouts, and a finite budget beside an unlimited budget before long autonomous runs.
+
+
+## Learned opponent policies
+
+In Adaptive mode the runtime maintains a separate combat policy per enemy class inside the model+effort namespace. The policy is a small interpretable state/action table, not a universal hard-coded fight script. State buckets combine range, immediate threat, target lock and disabled/frozen observations. Safe available actions are scored with accumulated reward plus bounded exploration, so repeated encounters can converge on different tactics for different enemies.
+
+The LLM sees compact summaries of visible learned enemy profiles at decision time. It chooses high-level intent such as whether to fight, equip or disengage; once `fight_enemy` begins, the opponent-specific local policy executes at the bridge feedback rate without per-hit model calls.

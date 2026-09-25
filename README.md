@@ -4,9 +4,9 @@ Harness local para agentes jogarem **The Legend of Zelda: Ocarina of Time** no *
 
 ## Status atual
 
-**Realtime Input Foundation v2.4 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
+**Realtime Input Foundation v2.5 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
 
-O próximo trabalho principal continua sendo Navigation V2 (geometria/navmesh/A*) e Combat V2 por inimigo/boss. O combate atual é genérico e a navegação global ainda não possui navmesh completo.
+O próximo trabalho principal continua sendo Navigation V2 (geometria/navmesh/A*). O combate agora aprende uma política separada para cada tipo de inimigo observado; adapters específicos de animação/boss continuam sendo refinamentos futuros.
 
 Revisão SoH fixada:
 
@@ -25,7 +25,7 @@ C:\Projetos\Shipwright-AI
 ## Implementado
 
 - **Backend:** Python/FastAPI, SQLite/SQLAlchemy, WebSocket e histórico de runs, segmentos, chamadas, eventos, memória, trajetórias e grafo de mundo.
-- **Painel React/TypeScript:** provider/modelo/effort, budgets, iniciar/pausar/retomar/encerrar, assumir controle, telemetria de bridge/input, skills, memória e benchmarks.
+- **Painel React/TypeScript:** provider/modelo/effort, budgets, iniciar/pausar/retomar/encerrar, assumir controle, skills, memória e benchmarks. O AO VIVO usa abas logo abaixo do vídeo para Controle, Combate, Terreno, Atores, Progresso, Estado e Decisão, evitando uma página vertical gigante.
 - **Providers:** Codex app-server com login ChatGPT isolado e OpenRouter por API. Não existe retry pago automático.
 - **Bridge V2:** UDP autenticado em localhost com snapshots rápidos para controle e snapshots completos aproximadamente a cada 200 ms para dados mais pesados.
 - **Input scheduler nativo:** setpoints contínuos separados de sequências discretas, deduplicação, owner epochs, watchdog monotônico e receipts de `accepted`, `consumed` e `completed`.
@@ -33,7 +33,8 @@ C:\Projetos\Shipwright-AI
 - **Percepção estruturada:** pose, yaw, câmera, scene/room, colisão, terreno, diálogo, inventário, equipamento, targeting, atores da sala inclusive off-camera, game-over, cutscene e ocarina.
 - **Actor UID:** inimigos iguais deixam de ser identificados apenas por `actor_id`; cada vida/spawn observado recebe identidade própria.
 - **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
-- **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu, músicas e combate genérico.
+- **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu e músicas.
+- **Aprendizado de combate por inimigo:** no modo Adaptive, cada modelo+effort mantém perfis isolados por classe de inimigo. O controlador aprende quais ações funcionam em estados como distância/ameaça/lock, atualiza a política por tentativa e erro durante a luta e persiste encontros, vitórias, derrotas, dano recebido e melhores ações. O LLM recebe esse resumo nas decisões seguintes; o loop motor continua local para não introduzir latência de inferência em cada golpe.
 - **Parada independente do provider:** stop/take-control revoga o input antes de aguardar cleanup de inferência ou validação de modelo.
 - **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem latência Python→consumo P50/P95/P99, fila nativa e edges observados. Backflip/sidestep usam o camera input yaw nativo do OoT para converter direção relativa ao Link em analógico relativo à câmera, seguram Z + direção até o próprio Player_ProcessControlStick reportar a direção esperada, então geram o edge de A; verificam piso na direção Link-relative e só confirmam sucesso quando o engine reporta HOPPING com a direção esperada (backflip = 2, left = 1, right = 3). Movimento recusa quando o probe não comprova piso seguro.
 - **Aprendizado versionado:** dados anteriores são preservados; traces falhos/intervenções não são promovidos como experiência autônoma.
@@ -230,8 +231,8 @@ npm run build
 
 - navmesh/A* global derivado da geometria do jogo;
 - plataformas/obstáculos dinâmicos;
-- adapters específicos de ação/animação para inimigos e bosses;
-- política de combate robusta contra todo o jogo;
+- adapters específicos de animação/abertura para inimigos e bosses;
+- validação de convergência dos perfis de combate ao longo de múltiplos encontros;
 - replay de trajetória certificado e vinculado ao objetivo atual;
 - isolamento do motor realtime em processo separado de SQLite/UI;
 - validação repetida da medição Python→consumo p50/p95/p99 no SoH/Windows;

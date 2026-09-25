@@ -46,6 +46,17 @@ trajectories = Table("trajectories", metadata,
     Column("to_scene", Integer), Column("to_room", Integer), Column("actions", JSON, nullable=False),
     Column("successes", Integer, default=1), Column("failures", Integer, default=0),
     Column("created_at", Float), Column("updated_at", Float))
+combat_profiles = Table("combat_profiles", metadata,
+    Column("id", String, primary_key=True), Column("namespace", String, index=True),
+    Column("enemy_key", String, index=True), Column("actor_id", Integer), Column("category", Integer),
+    Column("enemy_name", String), Column("encounters", Integer, default=0),
+    Column("wins", Integer, default=0), Column("losses", Integer, default=0),
+    Column("incomplete", Integer, default=0), Column("damage_taken", Integer, default=0),
+    Column("policy", JSON, nullable=False), Column("created_at", Float), Column("updated_at", Float))
+combat_encounters = Table("combat_encounters", metadata,
+    Column("id", String, primary_key=True), Column("profile_id", String, index=True),
+    Column("namespace", String, index=True), Column("run_id", String, index=True),
+    Column("created_at", Float), Column("outcome", String), Column("data", JSON, nullable=False))
 
 
 def uid() -> str:
@@ -275,6 +286,116 @@ class Store:
             return [dict(r) for r in conn.execute(select(trajectories).where(
                 trajectories.c.namespace == namespace).order_by(trajectories.c.updated_at.desc())
                 .limit(limit)).mappings()]
+
+    def combat_profile(self, namespace: str, enemy_key: str, *, actor_id: int | None = None,
+                       category: int | None = None, enemy_name: str = "", create: bool = False) -> dict | None:
+        if not namespace or not enemy_key:
+            return None
+        with self.engine.begin() as conn:
+            row = conn.execute(select(combat_profiles).where(
+                combat_profiles.c.namespace == namespace,
+                combat_profiles.c.enemy_key == enemy_key)).mappings().first()
+            if row:
+                if enemy_name and enemy_name != (row["enemy_name"] or ""):
+                    conn.execute(combat_profiles.update().where(combat_profiles.c.id == row["id"])
+                        .values(enemy_name=enemy_name, updated_at=time.time()))
+                    row = {**dict(row), "enemy_name": enemy_name}
+                return dict(row)
+            if not create:
+                return None
+            from .combat_learning import empty_policy
+            now = time.time()
+            profile_id = uid()
+            values = dict(id=profile_id, namespace=namespace, enemy_key=enemy_key,
+                actor_id=actor_id, category=category, enemy_name=(enemy_name or "")[:96],
+                encounters=0, wins=0, losses=0, incomplete=0, damage_taken=0,
+                policy=empty_policy(), created_at=now, updated_at=now)
+            conn.execute(combat_profiles.insert().values(**values))
+            return values
+
+    def record_combat_encounter(self, namespace: str, run_id: str | None, enemy: dict,
+                                result: dict) -> dict | None:
+        enemy_key = str(enemy.get("enemy_key") or "")
+        if not namespace or not enemy_key:
+            return None
+        from .combat_learning import empty_policy, update_policy
+        now = time.time()
+        with self.engine.begin() as conn:
+            row = conn.execute(select(combat_profiles).where(
+                combat_profiles.c.namespace == namespace,
+                combat_profiles.c.enemy_key == enemy_key)).mappings().first()
+            if not row:
+                profile_id = uid()
+                row = dict(id=profile_id, namespace=namespace, enemy_key=enemy_key,
+                    actor_id=enemy.get("actor_id"), category=enemy.get("category"),
+                    enemy_name=(enemy.get("enemy_name") or "")[:96], encounters=0, wins=0,
+                    losses=0, incomplete=0, damage_taken=0, policy=empty_policy(),
+                    created_at=now, updated_at=now)
+                conn.execute(combat_profiles.insert().values(**row))
+            else:
+                row = dict(row)
+
+            policy = row.get("policy") or empty_policy()
+            trace = result.get("learning_trace") if isinstance(result, dict) else []
+            if not isinstance(trace, list):
+                trace = []
+            safe_trace = []
+            for step in trace[:128]:
+                if not isinstance(step, dict):
+                    continue
+                state = str(step.get("state") or "")[:120]
+                action = str(step.get("action") or "")[:64]
+                if not state or not action:
+                    continue
+                try:
+                    reward = max(-10.0, min(10.0, float(step.get("reward") or 0.0)))
+                except (TypeError, ValueError):
+                    reward = 0.0
+                policy = update_policy(policy, state, action, reward)
+                safe_trace.append({"state": state, "action": action, "reward": round(reward, 4),
+                    "detail": str(step.get("detail") or "")[:120]})
+
+            outcome = str(result.get("outcome") or "incomplete")
+            wins = (row.get("wins") or 0) + int(outcome == "win")
+            losses = (row.get("losses") or 0) + int(outcome == "loss")
+            incomplete = (row.get("incomplete") or 0) + int(outcome not in {"win", "loss"})
+            damage_taken = (row.get("damage_taken") or 0) + max(0, int(result.get("health_lost") or 0))
+            encounters = (row.get("encounters") or 0) + 1
+            conn.execute(combat_profiles.update().where(combat_profiles.c.id == row["id"]).values(
+                enemy_name=(enemy.get("enemy_name") or row.get("enemy_name") or "")[:96],
+                encounters=encounters, wins=wins, losses=losses, incomplete=incomplete,
+                damage_taken=damage_taken, policy=policy, updated_at=now))
+            encounter_data = {
+                "actor_id": enemy.get("actor_id"), "params": enemy.get("params"),
+                "scene": enemy.get("scene"), "room": enemy.get("room"),
+                "health_lost": max(0, int(result.get("health_lost") or 0)),
+                "confirmed_hits": int(result.get("confirmed_hits") or 0),
+                "attacks": int(result.get("attacks") or 0),
+                "dodges": int(result.get("dodges") or 0),
+                "guards": int(result.get("guards") or 0),
+                "duration_ms": result.get("duration_ms"),
+                "trace": safe_trace[-48:],
+            }
+            conn.execute(combat_encounters.insert().values(id=uid(), profile_id=row["id"],
+                namespace=namespace, run_id=run_id, created_at=now, outcome=outcome,
+                data=encounter_data))
+        return self.combat_profile(namespace, enemy_key)
+
+    def list_combat_profiles(self, namespace: str, limit: int = 40) -> list[dict]:
+        if not namespace:
+            return []
+        with self.engine.connect() as conn:
+            return [dict(r) for r in conn.execute(select(combat_profiles).where(
+                combat_profiles.c.namespace == namespace).order_by(
+                    combat_profiles.c.updated_at.desc()).limit(limit)).mappings()]
+
+    def recent_combat_encounters(self, profile_id: str, limit: int = 12) -> list[dict]:
+        if not profile_id:
+            return []
+        with self.engine.connect() as conn:
+            return [dict(r) for r in conn.execute(select(combat_encounters).where(
+                combat_encounters.c.profile_id == profile_id).order_by(
+                    combat_encounters.c.created_at.desc()).limit(limit)).mappings()]
 
     def list_runs(self, limit: int = 50) -> list[dict]:
         with self.engine.connect() as conn:
