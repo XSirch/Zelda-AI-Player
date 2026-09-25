@@ -106,6 +106,52 @@ def test_realtime_probe_can_veto_stale_navmesh_waypoint(state):
     assert not waypoint_probe_safe(game, (0, 0, 70))
 
 
+def test_known_exit_target_does_not_require_floor_beyond_threshold(state):
+    beyond_exit = {
+        "direction": "forward", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"],
+        "navigation_probes": [beyond_exit],
+    })
+    target = (0.0, game.player.floor_height, 25.0)
+    assert not waypoint_probe_safe(game, target)
+    assert waypoint_probe_safe(game, target, known_floor_target=True)
+
+
+def test_known_exit_target_still_rejects_intervening_wall(state):
+    wall = {
+        "direction": "forward", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": True, "wall_distance": 20, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"],
+        "navigation_probes": [wall],
+    })
+    target = (0.0, game.player.floor_height, 25.0)
+    assert not waypoint_probe_safe(game, target, known_floor_target=True)
+
+
+def test_known_exit_target_rejects_unsafe_height_change(state):
+    safe_direction = {
+        "direction": "forward", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"],
+        "navigation_probes": [safe_direction],
+    })
+    target = (0.0, game.player.floor_height + 40.0, 25.0)
+    assert not waypoint_probe_safe(game, target, known_floor_target=True)
+
+
 def test_probe_blocks_wall_before_full_navmesh_waypoint(state):
     wall = {
         "direction": "forward", "distance": 70, "floor_found": True,
