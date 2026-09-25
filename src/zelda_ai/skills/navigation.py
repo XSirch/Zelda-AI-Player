@@ -630,6 +630,26 @@ async def _follow_actor(bridge: Bridge, decision: Decision, observation: GameSta
         "skill": decision.skill}
 
 
+def _reachable_traversal_affordances(game: GameState):
+    if not game.player:
+        return []
+    result = []
+    for row in game.traversal_affordances:
+        horizontal = math.hypot(
+            row.approach_position[0] - game.player.position[0],
+            row.approach_position[2] - game.player.position[2],
+        )
+        if horizontal <= 30.0:
+            result.append(row)
+            continue
+        if not game.navmesh.available:
+            continue
+        plan = plan_navmesh(game, row.approach_position)
+        if plan and plan.exact_goal_reachable:
+            result.append(row)
+    return result
+
+
 async def _explore_area(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     before = bridge.state
     if not before or not before.player:
@@ -638,6 +658,12 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
         return {"status": "stale", "reason": "gameplay_state_blocks_exploration", "skill": decision.skill}
 
     baseline_actors = {(actor.actor_id, actor.params) for actor in before.room_actors}
+    baseline_affordances = {
+        (row.kind, row.direction,
+         round(row.approach_position[0] / 35.0),
+         round(row.approach_position[2] / 35.0))
+        for row in _reachable_traversal_affordances(before)
+    }
     baseline_context = before.context_action.label
     start_health = before.player.health
     start_position = before.player.position
@@ -651,6 +677,8 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
     recovery_attempts = 0
     first_command = None
     acknowledged = False
+    affordance_full_seq = -1
+    reachable_affordances_cache = []
 
     try:
         while time.monotonic() < deadline:
@@ -672,12 +700,30 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
 
             if first_command is not None:
                 acknowledged |= consumed(bridge, first_command)
+            if current.full_seq != affordance_full_seq:
+                reachable_affordances_cache = _reachable_traversal_affordances(current)
+                affordance_full_seq = current.full_seq
             new_actors = [actor for actor in current.room_actors
                 if (actor.actor_id, actor.params) not in baseline_actors]
             if new_actors:
                 actor = min(new_actors, key=lambda row: row.distance)
                 return {"status": "completed", "reason": "actor_discovered",
                     "actor": actor.model_dump(), "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
+            new_affordances = [row for row in reachable_affordances_cache
+                if (row.kind, row.direction,
+                    round(row.approach_position[0] / 35.0),
+                    round(row.approach_position[2] / 35.0)) not in baseline_affordances]
+            if new_affordances:
+                affordance = min(new_affordances, key=lambda row: row.distance)
+                return {"status": "completed", "reason": "traversal_affordance_discovered",
+                    "affordance": {
+                        "kind": affordance.kind, "direction": affordance.direction,
+                        "approach_position": list(affordance.approach_position),
+                        "target_position": list(affordance.target_position),
+                        "height_delta": affordance.height_delta,
+                    },
+                    "distance": math.dist(start_position, current.player.position),
                     "acknowledged": acknowledged, "skill": decision.skill}
             if current.context_action.label != "none" and current.context_action.label != baseline_context:
                 return {"status": "completed", "reason": "context_action_discovered",
@@ -756,6 +802,17 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                     plan_cost=round(plan.cost, 2) if plan else None,
                     exact_goal_reachable=plan.exact_goal_reachable if plan else False)
                 if plan is None or not probe_safe:
+                    if reachable_affordances_cache:
+                        affordance = min(reachable_affordances_cache, key=lambda row: row.distance)
+                        return {"status": "completed", "reason": "traversal_affordance_available",
+                            "affordance": {
+                                "kind": affordance.kind, "direction": affordance.direction,
+                                "approach_position": list(affordance.approach_position),
+                                "target_position": list(affordance.target_position),
+                                "height_delta": affordance.height_delta,
+                            },
+                            "distance": math.dist(start_position, current.player.position),
+                            "acknowledged": acknowledged, "skill": decision.skill}
                     # Stay neutral; try the opposite connected side on the next
                     # sample rather than issuing any unvalidated movement.
                     buttons, stick_x, stick_y = 0, 0, 0

@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.8";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.9";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -410,6 +410,202 @@ json NavigationProbes(Player* player) {
                 {"wall_flags", wallFlags},
             });
         }
+    }
+    return result;
+}
+
+json TraversalAffordances(Player* player) {
+    constexpr int DIRECTION_COUNT = 16;
+    constexpr float MAX_RADIUS = 280.0f;
+    constexpr float APPROACH_OFFSET = 70.0f;
+    constexpr float WALL_APPROACH_OFFSET = 42.0f;
+    static const float radii[] = {70.0f, 140.0f, 210.0f, 280.0f};
+
+    json result = json::array();
+    if (!player) return result;
+
+    struct Candidate {
+        std::string kind;
+        std::string direction;
+        Vec3f approach{};
+        Vec3f target{};
+        float distance = 0.0f;
+        float heightDelta = 0.0f;
+        int wallFlags = 0;
+    };
+    std::vector<Candidate> candidates;
+    const Vec3f origin = player->actor.world.pos;
+    const float baseFloor = player->actor.floorHeight;
+
+    auto floorAt = [&](float x, float z, float startY, float& floorY) -> bool {
+        Vec3f pos{x, startY, z};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
+        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+    };
+    auto addCandidate = [&](const Candidate& candidate) {
+        // Multiple radial samples can hit the same stair/ladder. Keep the
+        // closest representative so the model receives a compact affordance list.
+        for (auto& existing : candidates) {
+            if (existing.kind != candidate.kind || existing.direction != candidate.direction) continue;
+            const float dx = existing.approach.x - candidate.approach.x;
+            const float dz = existing.approach.z - candidate.approach.z;
+            if (dx * dx + dz * dz <= 70.0f * 70.0f) {
+                if (candidate.distance < existing.distance) existing = candidate;
+                return;
+            }
+        }
+        candidates.push_back(candidate);
+    };
+
+    for (int directionIndex = 0; directionIndex < DIRECTION_COUNT; ++directionIndex) {
+        const float angle = static_cast<float>(directionIndex) *
+            (2.0f * 3.14159265358979323846f / static_cast<float>(DIRECTION_COUNT));
+        const float dirX = std::sin(angle);
+        const float dirZ = std::cos(angle);
+
+        // Chest-height wall is the occlusion barrier for floor sampling.
+        Vec3f blockingStart = origin;
+        blockingStart.y = baseFloor + 26.0f;
+        Vec3f blockingEnd = blockingStart;
+        blockingEnd.x += dirX * MAX_RADIUS;
+        blockingEnd.z += dirZ * MAX_RADIUS;
+        Vec3f blockingHitPos{};
+        CollisionPoly* blockingPoly = nullptr;
+        s32 blockingBgId = BGCHECK_SCENE;
+        const bool blockingWallHit = BgCheck_EntityLineTest1(
+            &gPlayState->colCtx, &blockingStart, &blockingEnd, &blockingHitPos, &blockingPoly,
+            true, false, false, true, &blockingBgId) != 0;
+        const float blockingWallDistance = blockingWallHit
+            ? std::hypot(blockingHitPos.x - blockingStart.x, blockingHitPos.z - blockingStart.z)
+            : MAX_RADIUS + 1.0f;
+
+        // Ladder tops can begin below Link's chest while climbable walls can extend
+        // higher. Probe three vertical bands and keep the nearest climbable surface.
+        static const float climbRayOffsets[] = {26.0f, -30.0f, 78.0f};
+        Vec3f climbHitPos{};
+        float climbWallDistance = MAX_RADIUS + 1.0f;
+        int climbWallFlags = 0;
+        bool climbWallHit = false;
+        for (float yOffset : climbRayOffsets) {
+            Vec3f start = origin;
+            start.y = baseFloor + yOffset;
+            Vec3f end = start;
+            end.x += dirX * MAX_RADIUS;
+            end.z += dirZ * MAX_RADIUS;
+            Vec3f hitPos{};
+            CollisionPoly* poly = nullptr;
+            s32 bgId = BGCHECK_SCENE;
+            const bool hit = BgCheck_EntityLineTest1(
+                &gPlayState->colCtx, &start, &end, &hitPos, &poly,
+                true, false, false, true, &bgId) != 0;
+            if (!hit || !poly) continue;
+            const int flags = SurfaceType_GetWallFlags(&gPlayState->colCtx, poly, bgId);
+            if (!(flags & (WALL_FLAG_LADDER | WALL_FLAG_LADDER_TOP | WALL_FLAG_CLIMBABLE))) continue;
+            const float distance = std::hypot(hitPos.x - start.x, hitPos.z - start.z);
+            if (distance < climbWallDistance) {
+                climbWallHit = true;
+                climbWallDistance = distance;
+                climbWallFlags = flags;
+                climbHitPos = hitPos;
+            }
+        }
+
+        if (climbWallHit) {
+            const float approachDistance = std::max(0.0f, climbWallDistance - WALL_APPROACH_OFFSET);
+            const float approachX = origin.x + dirX * approachDistance;
+            const float approachZ = origin.z + dirZ * approachDistance;
+            float approachY = 0.0f;
+            if (floorAt(approachX, approachZ, baseFloor + 180.0f, approachY) &&
+                std::abs(approachY - baseFloor) <= 140.0f) {
+                Candidate candidate;
+                if (climbWallFlags & WALL_FLAG_LADDER_TOP) {
+                    candidate.kind = "ladder_down";
+                    candidate.direction = "down";
+                } else if (climbWallFlags & WALL_FLAG_LADDER) {
+                    candidate.kind = "ladder_up";
+                    candidate.direction = "up";
+                } else {
+                    candidate.kind = "climbable_wall_up";
+                    candidate.direction = "up";
+                }
+                candidate.approach = {approachX, approachY, approachZ};
+                candidate.target = {climbHitPos.x, climbHitPos.y, climbHitPos.z};
+                candidate.distance = approachDistance;
+                candidate.heightDelta = approachY - baseFloor;
+                candidate.wallFlags = climbWallFlags;
+                addCandidate(candidate);
+            }
+        }
+
+        bool foundUp = false;
+        bool foundDown = false;
+        for (float radius : radii) {
+            // Do not advertise floor that lies behind the first blocking wall.
+            if (blockingWallHit && blockingWallDistance + 18.0f < radius) break;
+
+            const float targetX = origin.x + dirX * radius;
+            const float targetZ = origin.z + dirZ * radius;
+            float targetY = 0.0f;
+            if (!floorAt(targetX, targetZ, baseFloor + 220.0f, targetY)) continue;
+            const float delta = targetY - baseFloor;
+
+            const float approachDistance = std::max(0.0f, radius - APPROACH_OFFSET);
+            const float approachX = origin.x + dirX * approachDistance;
+            const float approachZ = origin.z + dirZ * approachDistance;
+            float approachY = baseFloor;
+            if (approachDistance > 1.0f &&
+                !floorAt(approachX, approachZ, baseFloor + 180.0f, approachY)) {
+                continue;
+            }
+
+            if (!foundUp && delta >= 8.0f && delta <= 120.0f) {
+                Candidate candidate;
+                candidate.kind = "stairs_or_slope_up";
+                candidate.direction = "up";
+                candidate.approach = {approachX, approachY, approachZ};
+                candidate.target = {targetX, targetY, targetZ};
+                candidate.distance = approachDistance;
+                candidate.heightDelta = delta;
+                addCandidate(candidate);
+                foundUp = true;
+            }
+            if (!foundDown && delta <= -8.0f && delta >= -120.0f) {
+                Candidate candidate;
+                candidate.kind = delta >= -70.0f ? "stairs_or_slope_down" : "ledge_down";
+                candidate.direction = "down";
+                candidate.approach = {approachX, approachY, approachZ};
+                candidate.target = {targetX, targetY, targetZ};
+                candidate.distance = approachDistance;
+                candidate.heightDelta = delta;
+                addCandidate(candidate);
+                foundDown = true;
+            }
+            if (foundUp && foundDown) break;
+        }
+    }
+
+    std::sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b) {
+        auto penalty = [](const std::string& kind) {
+            if (kind == "ledge_down") return 80.0f;
+            if (kind == "stairs_or_slope_up" || kind == "stairs_or_slope_down") return 20.0f;
+            return 0.0f; // Prefer explicit ladder/climb wall evidence at similar distance.
+        };
+        return a.distance + penalty(a.kind) < b.distance + penalty(b.kind);
+    });
+    constexpr size_t MAX_AFFORDANCES = 24;
+    for (size_t i = 0; i < candidates.size() && i < MAX_AFFORDANCES; ++i) {
+        const auto& candidate = candidates[i];
+        result.push_back({
+            {"kind", candidate.kind},
+            {"direction", candidate.direction},
+            {"approach_position", {candidate.approach.x, candidate.approach.y, candidate.approach.z}},
+            {"target_position", {candidate.target.x, candidate.target.y, candidate.target.z}},
+            {"distance", candidate.distance},
+            {"height_delta", candidate.heightDelta},
+            {"wall_flags", candidate.wallFlags},
+        });
     }
     return result;
 }
@@ -1000,7 +1196,8 @@ void Snapshot() {
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
-                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"}},
+                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces",
+                          "traversal_affordances_v1"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -1038,6 +1235,7 @@ void Snapshot() {
         {"room_actor_count", 0},
         {"room_actors_truncated", false},
         {"navigation_probes", json::array()},
+        {"traversal_affordances", json::array()},
         {"scene_exits", json::array()},
         {"navmesh", {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f}, {"half_extent", 0}, {"cells", json::array()}}},
         {"cutscene_active", false},
@@ -1149,6 +1347,7 @@ void Snapshot() {
             state["navigation_probes"] = NavigationProbes(player);
             if (full && !state["paused"].get<bool>() && !state["cutscene_active"].get<bool>() &&
                 state["game_over_state"].get<int>() == 0 && !state["dialogue"]["active"].get<bool>()) {
+                state["traversal_affordances"] = TraversalAffordances(player);
                 auto navigation = NavigationMesh(player);
                 state["scene_exits"] = navigation["scene_exits"];
                 navigation.erase("scene_exits");
@@ -1178,7 +1377,7 @@ void Snapshot() {
         static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
             "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
             "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
-            "nearby_actors", "scene_exits", "navmesh"};
+            "nearby_actors", "traversal_affordances", "scene_exits", "navmesh"};
         for (const char* field : slowFields) state.erase(field);
     }
     std::string serialized = state.dump();
@@ -1191,6 +1390,10 @@ void Snapshot() {
     if (full && serialized.size() > 59000) {
         state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f},
                             {"half_extent", 0}, {"cells", json::array()}};
+        serialized = state.dump();
+    }
+    if (full && serialized.size() > 59000) {
+        state["traversal_affordances"] = json::array();
         serialized = state.dump();
     }
     while (serialized.size() > 59000 && state["room_actors"].is_array() && !state["room_actors"].empty()) {

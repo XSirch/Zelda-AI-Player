@@ -38,6 +38,90 @@ def _best_climb_surface_probe(game: GameState, direction: str):
     return min(climbable, key=lambda p: (p.wall_distance, p.distance)) if climbable else None
 
 
+def _resolve_traversal_affordance(game: GameState, direction: str,
+                                  target_position: list[float] | tuple[float, float, float] | None,
+                                  *, kind: str | None = None):
+    if not game.traversal_affordances or target_position is None:
+        return None
+    target = tuple(float(v) for v in target_position)
+    candidates = [row for row in game.traversal_affordances
+                  if row.direction == direction and (kind is None or row.kind == kind)]
+    if not candidates:
+        return None
+    nearest = min(candidates, key=lambda row: math.dist(row.approach_position, target))
+    tolerance = max(100.0, (game.navmesh.step * 1.5) if game.navmesh.available else 100.0)
+    return nearest if math.dist(nearest.approach_position, target) <= tolerance else None
+
+
+async def _traverse_to_affordance(bridge: Bridge, decision: Decision,
+                                  observation: GameState) -> dict:
+    before = bridge.state
+    if not before or not before.player:
+        return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
+    if "traversal_affordances_v1" not in before.capabilities:
+        return {"status": "failed", "reason": "traversal_affordance_bridge_upgrade_required",
+            "skill": decision.skill}
+
+    affordance = _resolve_traversal_affordance(
+        before, decision.args.direction, decision.args.target_position)
+    if affordance is None:
+        return {"status": "failed", "reason": "traversal_affordance_not_observed",
+            "direction": decision.args.direction, "skill": decision.skill}
+
+    total_budget_ms = min(12000, max(2500, decision.args.duration_ms))
+    approach_budget_ms = min(5000, max(1800, total_budget_ms // 2))
+    approach_args = decision.args.model_copy(update={
+        "direction": None,
+        "duration_ms": approach_budget_ms,
+        "strength": max(0.55, decision.args.strength),
+        "target_position": list(affordance.approach_position),
+        "stop_distance": 20.0,
+    })
+    approach_decision = decision.model_copy(update={
+        "skill": "navigate_to",
+        "summary": "Approach observed traversal affordance.",
+        "args": approach_args,
+    })
+
+    # Import lazily to keep traversal/navigation modules acyclic.
+    from .navigation import _navigate_local
+    started = time.monotonic()
+    approach = await _navigate_local(
+        bridge, approach_decision, observation, actor_mode=False)
+    if approach.get("status") != "completed":
+        return {"status": "failed", "reason": "traversal_approach_failed",
+            "approach_reason": approach.get("reason"), "affordance_kind": affordance.kind,
+            "direction": decision.args.direction, "approach": approach, "skill": decision.skill}
+
+    current = bridge.state
+    if not current or not current.player:
+        return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
+    refreshed = _resolve_traversal_affordance(
+        current, decision.args.direction, list(affordance.approach_position),
+        kind=affordance.kind)
+    if refreshed is None:
+        return {"status": "failed", "reason": "traversal_affordance_lost",
+            "affordance_kind": affordance.kind, "direction": decision.args.direction,
+            "skill": decision.skill}
+
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    remaining_ms = total_budget_ms - elapsed_ms
+    if remaining_ms < 1000:
+        return {"status": "failed", "reason": "traversal_approach_timeout",
+            "affordance_kind": refreshed.kind, "direction": decision.args.direction,
+            "skill": decision.skill}
+    local_args = decision.args.model_copy(update={
+        "duration_ms": remaining_ms,
+        "target_position": None,
+    })
+    local_decision = decision.model_copy(update={"args": local_args})
+    result = await _traverse_local(
+        bridge, local_decision, current, decision.args.direction)
+    result["affordance_kind"] = refreshed.kind
+    result["approach_position"] = list(refreshed.approach_position)
+    return result
+
+
 async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameState,
                           direction: str) -> dict:
     before = bridge.state

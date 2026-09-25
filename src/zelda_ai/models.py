@@ -15,7 +15,7 @@ Skill = Literal[
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
     "navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
     "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-    "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_exit",
+    "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_to", "traverse_exit",
 ]
 
 
@@ -71,6 +71,25 @@ class NavigationProbe(StrictModel):
     wall_hit: bool = False
     wall_distance: float | None = Field(default=None, ge=0, le=500)
     wall_flags: int = Field(default=0, ge=0, le=65535)
+
+
+class TraversalAffordanceObservation(StrictModel):
+    """Local collision-derived vertical route candidate; not hidden map knowledge."""
+    kind: Literal["stairs_or_slope_up", "stairs_or_slope_down", "ledge_down",
+                  "ladder_up", "ladder_down", "climbable_wall_up"]
+    direction: Literal["up", "down"]
+    approach_position: tuple[float, float, float]
+    target_position: tuple[float, float, float]
+    distance: float = Field(ge=0, le=500)
+    height_delta: float = Field(ge=-500, le=500)
+    wall_flags: int = Field(default=0, ge=0, le=65535)
+
+    @field_validator("approach_position", "target_position")
+    @classmethod
+    def finite_positions(cls, value):
+        if not all(math.isfinite(v) for v in value):
+            raise ValueError("Non-finite traversal affordance position")
+        return value
 
 
 class SceneExitObservation(StrictModel):
@@ -288,6 +307,7 @@ class GameState(StrictModel):
     room_actor_count: int = Field(default=0, ge=0, le=4096)
     room_actors_truncated: bool = False
     navigation_probes: list[NavigationProbe] = Field(default_factory=list, max_length=16)
+    traversal_affordances: list[TraversalAffordanceObservation] = Field(default_factory=list, max_length=24)
     scene_exits: list[SceneExitObservation] = Field(default_factory=list, max_length=31)
     navmesh: NavigationMeshSnapshot = Field(default_factory=NavigationMeshSnapshot)
     cutscene_active: bool = False
@@ -391,12 +411,12 @@ class Decision(StrictModel):
 
     @model_validator(mode="after")
     def skill_arguments(self):
-        if self.skill in {"move", "turn", "sidestep", "menu_move", "traverse"} and self.args.direction is None:
+        if self.skill in {"move", "turn", "sidestep", "menu_move", "traverse", "traverse_to"} and self.args.direction is None:
             raise ValueError(f"{self.skill} requires direction")
         if self.skill == "move" and self.args.direction not in {"forward", "back", "left", "right"}:
             raise ValueError("move requires forward, back, left or right")
-        if self.skill == "traverse" and self.args.direction not in {"up", "down"}:
-            raise ValueError("traverse requires up or down")
+        if self.skill in {"traverse", "traverse_to"} and self.args.direction not in {"up", "down"}:
+            raise ValueError(f"{self.skill} requires up or down")
         if self.skill in {"turn", "sidestep"} and self.args.direction not in {"left", "right"}:
             raise ValueError(f"{self.skill} requires left or right")
         if self.skill == "menu_move" and self.args.direction not in {"up", "down", "left", "right"}:
@@ -409,12 +429,14 @@ class Decision(StrictModel):
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill not in {"navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
                               "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-                              "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_exit"} and self.args.duration_ms > 2000:
+                              "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_to", "traverse_exit"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
         if self.skill == "navigate_to" and self.args.target_position is None:
             raise ValueError("navigate_to requires target_position")
+        if self.skill == "traverse_to" and self.args.target_position is None:
+            raise ValueError("traverse_to requires traversal_affordance approach_position")
         if self.skill == "traverse_exit" and self.args.target_position is None:
             raise ValueError("traverse_exit requires an observed scene-exit target_position")
         if self.skill in {"approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor", "fight_enemy",

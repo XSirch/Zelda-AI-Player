@@ -15,7 +15,7 @@ MENU_SKILLS = {"pause_toggle", "menu_move", "menu_confirm", "menu_cancel", "menu
 
 
 NAVIGATION_SKILLS = {"move", "turn", "interact", "wait", "camera_center", "roll", "backflip", "sidestep",
-    "navigate_to", "approach_actor", "interact_with_actor", "traverse", "traverse_exit"}
+    "navigate_to", "approach_actor", "interact_with_actor", "traverse", "traverse_to", "traverse_exit"}
 
 
 SONG_IDS = {"minuet": 0, "bolero": 1, "serenade": 2, "requiem": 3, "nocturne": 4, "prelude": 5,
@@ -75,6 +75,7 @@ SKILL_CATALOG = [
     {"id": "manipulate_object", "name": "Agarrar/empurrar/puxar objeto observado", "status": "implemented", "version": "2.0"},
     {"id": "explore_area", "name": "Exploração local com NavMesh e descoberta", "status": "implemented", "version": "3.0"},
     {"id": "traverse", "name": "Subir/descer escadas, ladders e superfícies escaláveis", "status": "implemented", "version": "3.0"},
+    {"id": "traverse_to", "name": "Navegar até affordance vertical e atravessar", "status": "implemented", "version": "1.0"},
     {"id": "traverse_exit", "name": "Entrar em surface de saída de cena observada", "status": "implemented", "version": "1.0"},
     {"id": "gameover_recovery", "name": "Save/continue e respawn automáticos", "status": "implemented", "version": "2.0"},
     {"id": "vision_fallback", "name": "Visão sob demanda após falhas estruturadas", "status": "planned", "version": None},

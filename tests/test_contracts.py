@@ -489,3 +489,118 @@ def test_model_recent_events_strip_nested_decision_prose():
     assert "summary" not in serialized
     assert "memory_note" not in serialized
     assert visible[0]["data"]["last_skill"]["skill"] == "wait"
+
+
+def test_traversal_affordance_and_traverse_to_contract(decision, state):
+    affordance = {
+        "kind": "ladder_down",
+        "direction": "down",
+        "approach_position": [80.0, 40.0, 120.0],
+        "target_position": [100.0, 20.0, 120.0],
+        "distance": 150.0,
+        "height_delta": 0.0,
+        "wall_flags": 0x04,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "traversal_affordances_v1"],
+        "traversal_affordances": [affordance],
+    })
+    assert game.traversal_affordances[0].kind == "ladder_down"
+    parsed = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "traverse_to",
+        "args": {
+            **decision.args.model_dump(),
+            "direction": "down",
+            "target_position": affordance["approach_position"],
+            "duration_ms": 10000,
+        },
+    })
+    assert parsed.skill == "traverse_to"
+    with pytest.raises(ValidationError):
+        Decision.model_validate({
+            **decision.model_dump(),
+            "skill": "traverse_to",
+            "args": {
+                **decision.args.model_dump(),
+                "direction": "down",
+                "target_position": None,
+                "duration_ms": 10000,
+            },
+        })
+
+
+def test_model_gets_compact_traversal_affordance_without_raw_wall_flags(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "climbable_wall_up",
+            "direction": "up",
+            "approach_position": [20, 0, 0],
+            "target_position": [50, 30, 0],
+            "distance": 20,
+            "height_delta": 0,
+            "wall_flags": 0x08,
+        }],
+    })
+    visible = _model_state_payload(game)["traversal_affordances"][0]
+    assert visible["kind"] == "climbable_wall_up"
+    assert visible["approach_position"] == [20.0, 0.0, 0.0]
+    assert "wall_flags" not in visible
+
+
+def test_planner_prompt_prefers_observed_vertical_routes():
+    assert "traverse_to(up/down, target_position)" in SYSTEM_PROMPT
+    assert "traversal_affordances" in SYSTEM_PROMPT
+    assert "stairs_or_slope_down" in SYSTEM_PROMPT
+    assert "ladder_down" in SYSTEM_PROMPT
+    assert "climbable_wall_up" in SYSTEM_PROMPT
+    assert "Prefer an observed" in SYSTEM_PROMPT
+
+
+def test_model_caps_traversal_affordances_to_twelve(state):
+    rows = [{
+        "kind": "stairs_or_slope_down",
+        "direction": "down",
+        "approach_position": [i * 10, 0, 0],
+        "target_position": [i * 10 + 70, -20, 0],
+        "distance": i * 10,
+        "height_delta": -20,
+        "wall_flags": 0,
+    } for i in range(20)]
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [
+                [0, 0, 0, 4],
+                [1, 0, 0, 68],
+                [2, 0, 0, 68],
+                [3, 0, 0, 64],
+            ],
+        },
+        "traversal_affordances": rows,
+    })
+    visible = _model_state_payload(game)["traversal_affordances"]
+    assert len(visible) == 12
+
+
+def test_model_omits_traversal_affordance_with_unreachable_approach(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0], [3, 0, 0, 0]],
+        },
+        "traversal_affordances": [{
+            "kind": "ladder_up",
+            "direction": "up",
+            "approach_position": [210, 0, 0],
+            "target_position": [240, 60, 0],
+            "distance": 210,
+            "height_delta": 0,
+            "wall_flags": 2,
+        }],
+    })
+    assert _model_state_payload(game)["traversal_affordances"] == []
