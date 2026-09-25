@@ -137,10 +137,19 @@ def _model_last_decision(row: dict | None) -> dict | None:
     })
 
 
+def _strip_model_authored_prose(value):
+    if isinstance(value, dict):
+        return {key: _strip_model_authored_prose(item) for key, item in value.items()
+                if key not in {"goal", "summary", "memory_note"}}
+    if isinstance(value, list):
+        return [_strip_model_authored_prose(item) for item in value]
+    return value
+
+
 def _model_recent_events(rows: list[dict]) -> list[dict]:
     visible = []
     for raw in rows:
-        row = _strip_transition_ids(raw)
+        row = _strip_model_authored_prose(_strip_transition_ids(raw))
         if row.get("kind") == "decision":
             data = row.get("data") or {}
             row["data"] = {"skill": data.get("skill")}
@@ -441,7 +450,8 @@ class Runtime:
                         if self.task and self.task is not asyncio.current_task():
                             self.task.cancel()
             if old and old.player and state.player and old.player.health > 0 and state.player.health == 0:
-                self.log("player_died", {"scene": state.scene, "last_skill": self.last_decision})
+                self.log("player_died", {"scene": state.scene,
+                    "last_skill": (self.last_decision or {}).get("skill")})
                 self.store.remember(self.namespace, state.scene,
                     f"Death observed after skill: {(self.last_decision or {}).get('skill', 'unknown')}. "
                     "Causality is unconfirmed; reconsider the tactic.")
