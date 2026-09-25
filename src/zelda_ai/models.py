@@ -28,6 +28,7 @@ class PlayerState(StrictModel):
     yaw: int = Field(ge=-32768, le=32767)
     speed_xz: float = 0.0
     floor_height: float = 0.0
+    floor_exit_index: int = Field(default=0, ge=0, le=31)
     wall_yaw: int = Field(default=0, ge=-32768, le=32767)
     bg_check_flags: int = Field(default=0, ge=0, le=65535)
     y_dist_to_water: float = 0.0
