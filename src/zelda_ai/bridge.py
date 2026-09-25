@@ -26,6 +26,7 @@ class Bridge(asyncio.DatagramProtocol):
         self.allow_simulator = allow_simulator
         self.transport: asyncio.DatagramTransport | None = None
         self.state: GameState | None = None
+        self.previous_state: GameState | None = None
         self.peer: tuple[str, int] | None = None
         self.last_seen = 0.0
         self.command_seq = 0
@@ -215,6 +216,7 @@ class Bridge(asyncio.DatagramProtocol):
                         self._client_latencies.append(receipt.client_to_consume_ms)
             while len(self.receipts) > 512:
                 self.receipts.popitem(last=False)
+            self.previous_state = previous
             self.state, self.last_seen = state, now
             self.command_seq = max(self.command_seq, state.last_command_seq, state.last_received_seq)
             self.last_validation_error = None
