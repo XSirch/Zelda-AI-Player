@@ -39,11 +39,13 @@ def _best_climb_surface_probe(game: GameState, direction: str):
 
 
 def _resolve_traversal_affordance(game: GameState, direction: str,
-                                  target_position: list[float] | tuple[float, float, float] | None):
+                                  target_position: list[float] | tuple[float, float, float] | None,
+                                  *, kind: str | None = None):
     if not game.traversal_affordances or target_position is None:
         return None
     target = tuple(float(v) for v in target_position)
-    candidates = [row for row in game.traversal_affordances if row.direction == direction]
+    candidates = [row for row in game.traversal_affordances
+                  if row.direction == direction and (kind is None or row.kind == kind)]
     if not candidates:
         return None
     nearest = min(candidates, key=lambda row: math.dist(row.approach_position, target))
@@ -95,14 +97,19 @@ async def _traverse_to_affordance(bridge: Bridge, decision: Decision,
     if not current or not current.player:
         return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
     refreshed = _resolve_traversal_affordance(
-        current, decision.args.direction, list(affordance.approach_position))
+        current, decision.args.direction, list(affordance.approach_position),
+        kind=affordance.kind)
     if refreshed is None:
         return {"status": "failed", "reason": "traversal_affordance_lost",
             "affordance_kind": affordance.kind, "direction": decision.args.direction,
             "skill": decision.skill}
 
     elapsed_ms = int((time.monotonic() - started) * 1000)
-    remaining_ms = max(1500, total_budget_ms - elapsed_ms)
+    remaining_ms = total_budget_ms - elapsed_ms
+    if remaining_ms < 1000:
+        return {"status": "failed", "reason": "traversal_approach_timeout",
+            "affordance_kind": refreshed.kind, "direction": decision.args.direction,
+            "skill": decision.skill}
     local_args = decision.args.model_copy(update={
         "duration_ms": remaining_ms,
         "target_position": None,
