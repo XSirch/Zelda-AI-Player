@@ -465,35 +465,65 @@ json TraversalAffordances(Player* player) {
         const float dirX = std::sin(angle);
         const float dirZ = std::cos(angle);
 
-        Vec3f wallStart = origin;
-        wallStart.y = baseFloor + 26.0f;
-        Vec3f wallEnd = wallStart;
-        wallEnd.x += dirX * MAX_RADIUS;
-        wallEnd.z += dirZ * MAX_RADIUS;
-        Vec3f wallHitPos{};
-        CollisionPoly* wallPoly = nullptr;
-        s32 wallBgId = BGCHECK_SCENE;
-        const bool wallHit = BgCheck_EntityLineTest1(
-            &gPlayState->colCtx, &wallStart, &wallEnd, &wallHitPos, &wallPoly,
-            true, false, false, true, &wallBgId) != 0;
-        const float wallDistance = wallHit
-            ? std::hypot(wallHitPos.x - wallStart.x, wallHitPos.z - wallStart.z)
+        // Chest-height wall is the occlusion barrier for floor sampling.
+        Vec3f blockingStart = origin;
+        blockingStart.y = baseFloor + 26.0f;
+        Vec3f blockingEnd = blockingStart;
+        blockingEnd.x += dirX * MAX_RADIUS;
+        blockingEnd.z += dirZ * MAX_RADIUS;
+        Vec3f blockingHitPos{};
+        CollisionPoly* blockingPoly = nullptr;
+        s32 blockingBgId = BGCHECK_SCENE;
+        const bool blockingWallHit = BgCheck_EntityLineTest1(
+            &gPlayState->colCtx, &blockingStart, &blockingEnd, &blockingHitPos, &blockingPoly,
+            true, false, false, true, &blockingBgId) != 0;
+        const float blockingWallDistance = blockingWallHit
+            ? std::hypot(blockingHitPos.x - blockingStart.x, blockingHitPos.z - blockingStart.z)
             : MAX_RADIUS + 1.0f;
-        const int wallFlags = wallHit && wallPoly
-            ? SurfaceType_GetWallFlags(&gPlayState->colCtx, wallPoly, wallBgId) : 0;
 
-        if (wallHit && (wallFlags & (WALL_FLAG_LADDER | WALL_FLAG_LADDER_TOP | WALL_FLAG_CLIMBABLE))) {
-            const float approachDistance = std::max(0.0f, wallDistance - WALL_APPROACH_OFFSET);
+        // Ladder tops can begin below Link's chest while climbable walls can extend
+        // higher. Probe three vertical bands and keep the nearest climbable surface.
+        static const float climbRayOffsets[] = {26.0f, -30.0f, 78.0f};
+        Vec3f climbHitPos{};
+        float climbWallDistance = MAX_RADIUS + 1.0f;
+        int climbWallFlags = 0;
+        bool climbWallHit = false;
+        for (float yOffset : climbRayOffsets) {
+            Vec3f start = origin;
+            start.y = baseFloor + yOffset;
+            Vec3f end = start;
+            end.x += dirX * MAX_RADIUS;
+            end.z += dirZ * MAX_RADIUS;
+            Vec3f hitPos{};
+            CollisionPoly* poly = nullptr;
+            s32 bgId = BGCHECK_SCENE;
+            const bool hit = BgCheck_EntityLineTest1(
+                &gPlayState->colCtx, &start, &end, &hitPos, &poly,
+                true, false, false, true, &bgId) != 0;
+            if (!hit || !poly) continue;
+            const int flags = SurfaceType_GetWallFlags(&gPlayState->colCtx, poly, bgId);
+            if (!(flags & (WALL_FLAG_LADDER | WALL_FLAG_LADDER_TOP | WALL_FLAG_CLIMBABLE))) continue;
+            const float distance = std::hypot(hitPos.x - start.x, hitPos.z - start.z);
+            if (distance < climbWallDistance) {
+                climbWallHit = true;
+                climbWallDistance = distance;
+                climbWallFlags = flags;
+                climbHitPos = hitPos;
+            }
+        }
+
+        if (climbWallHit) {
+            const float approachDistance = std::max(0.0f, climbWallDistance - WALL_APPROACH_OFFSET);
             const float approachX = origin.x + dirX * approachDistance;
             const float approachZ = origin.z + dirZ * approachDistance;
             float approachY = 0.0f;
             if (floorAt(approachX, approachZ, baseFloor + 180.0f, approachY) &&
                 std::abs(approachY - baseFloor) <= 140.0f) {
                 Candidate candidate;
-                if (wallFlags & WALL_FLAG_LADDER_TOP) {
+                if (climbWallFlags & WALL_FLAG_LADDER_TOP) {
                     candidate.kind = "ladder_down";
                     candidate.direction = "down";
-                } else if (wallFlags & WALL_FLAG_LADDER) {
+                } else if (climbWallFlags & WALL_FLAG_LADDER) {
                     candidate.kind = "ladder_up";
                     candidate.direction = "up";
                 } else {
@@ -501,10 +531,10 @@ json TraversalAffordances(Player* player) {
                     candidate.direction = "up";
                 }
                 candidate.approach = {approachX, approachY, approachZ};
-                candidate.target = {wallHitPos.x, wallHitPos.y, wallHitPos.z};
+                candidate.target = {climbHitPos.x, climbHitPos.y, climbHitPos.z};
                 candidate.distance = approachDistance;
                 candidate.heightDelta = approachY - baseFloor;
-                candidate.wallFlags = wallFlags;
+                candidate.wallFlags = climbWallFlags;
                 addCandidate(candidate);
             }
         }
@@ -513,7 +543,7 @@ json TraversalAffordances(Player* player) {
         bool foundDown = false;
         for (float radius : radii) {
             // Do not advertise floor that lies behind the first blocking wall.
-            if (wallHit && wallDistance + 18.0f < radius) break;
+            if (blockingWallHit && blockingWallDistance + 18.0f < radius) break;
 
             const float targetX = origin.x + dirX * radius;
             const float targetZ = origin.z + dirZ * radius;
@@ -557,7 +587,12 @@ json TraversalAffordances(Player* player) {
     }
 
     std::sort(candidates.begin(), candidates.end(), [](const Candidate& a, const Candidate& b) {
-        return a.distance < b.distance;
+        auto penalty = [](const std::string& kind) {
+            if (kind == "ledge_down") return 80.0f;
+            if (kind == "stairs_or_slope_up" || kind == "stairs_or_slope_down") return 20.0f;
+            return 0.0f; // Prefer explicit ladder/climb wall evidence at similar distance.
+        };
+        return a.distance + penalty(a.kind) < b.distance + penalty(b.kind);
     });
     constexpr size_t MAX_AFFORDANCES = 24;
     for (size_t i = 0; i < candidates.size() && i < MAX_AFFORDANCES; ++i) {
