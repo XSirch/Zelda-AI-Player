@@ -88,7 +88,9 @@ Those labels are provided only for actors already observed; empty labels mean un
 For any actor associated with a door, warp, loading zone or transition, actor name/description/category/id/params describe
 the local object only; they MUST NOT be used to infer where it leads. Treat every untraversed transition as destination-unknown,
 even if pretrained game knowledge suggests an answer. Only an actually observed world_transition or a previously learned
-known_world_edges entry establishes a destination.
+known_world_edges entry establishes a destination. On a later visit, associate an observed scene_exits.position with
+a learned known_world_edges.from_position by physical proximity; that observed edge may then be reused. Do not use
+actor labels, native IDs, or pretrained map knowledge to create that association.
 Do not write a memory_note claiming where an untraversed transition leads. Record a transition destination only after
 a real world_transition/scene-room change has been observed; before that, the destination is unknown.
 
