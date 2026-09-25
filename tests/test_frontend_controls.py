@@ -52,7 +52,7 @@ def test_navigation_v2_dashboard_exposes_build_mesh_and_astar():
     for label in ['NAVIGATION V2 / A*', 'BRIDGE BUILD', 'NAVMESH', 'CELLS', 'RAIO LOCAL',
                   'PROBE YAW', 'WAYPOINT', 'CUSTO A*', 'NAVIGATION V2 NÃO CONFIRMADO']:
         assert label in text
-    assert "game.bridge_build === 'rt-input-v2.6'" in text
+    assert "game.bridge_build.startsWith('rt-input-v2.')" in text
     assert "capabilities.includes('local_navmesh')" in text
     assert "capabilities.includes('probe_yaw_v2')" in text
     assert "Conectado · ${game?.bridge_build" in text
