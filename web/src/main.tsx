@@ -63,7 +63,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
   const probeYawV2 = capabilities.includes('probe_yaw_v2');
   const meshActive = navCapable && !!mesh?.step && (mesh?.cells?.length ?? 0) > 0;
   const expectedBridge = game.source === 'simulator' || (
-    game.bridge_build === 'rt-input-v2.6' && navCapable && probeYawV2
+    game.bridge_build.startsWith('rt-input-v2.') && navCapable && probeYawV2
   );
   const vector = (value?: number[] | null) => value?.length === 3 ? value.map(v => number(v)).join(' / ') : '—';
   const navState = !navCapable ? 'INDISPONÍVEL' : meshActive ? 'ATIVO' :
