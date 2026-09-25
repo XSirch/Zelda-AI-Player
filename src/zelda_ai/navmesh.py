@@ -19,8 +19,8 @@ _DIRECTIONS: tuple[tuple[int, int], ...] = (
     (0, -1), (-1, -1), (-1, 0), (-1, 1),
 )
 _PROBE_NAMES = (
-    "forward", "forward_right", "right", "back_right",
-    "back", "back_left", "left", "forward_left",
+    "forward", "forward_left", "left", "back_left",
+    "back", "back_right", "right", "forward_right",
 )
 
 
