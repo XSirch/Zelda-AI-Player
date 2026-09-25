@@ -137,6 +137,17 @@ def _model_last_decision(row: dict | None) -> dict | None:
     })
 
 
+def _model_recent_events(rows: list[dict]) -> list[dict]:
+    visible = []
+    for raw in rows:
+        row = _strip_transition_ids(raw)
+        if row.get("kind") == "decision":
+            data = row.get("data") or {}
+            row["data"] = {"skill": data.get("skill")}
+        visible.append(row)
+    return visible
+
+
 def _model_memory_note_persistent(_: Decision) -> bool:
     """Free-form model notes are non-authoritative; persistent learning is runtime-owned."""
     return False
@@ -886,7 +897,7 @@ class Runtime:
                     "state": state_payload,
                     "last_decision": _model_last_decision(self.last_decision),
                     "last_result": _strip_transition_ids(self.last_result),
-                    "events": _strip_transition_ids(list(self.recent)[-5:]),
+                    "events": _model_recent_events(list(self.recent)[-5:]),
                     "dialogue_transcript": _strip_transition_ids(list(self.dialogue_transcript)),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
