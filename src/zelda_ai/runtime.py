@@ -74,7 +74,7 @@ from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v8/skills-v9/trajectory-v3/prompt-v12"
+CONTRACT_VERSION = "state-v9/skills-v10/trajectory-v3/prompt-v13"
 
 def _sanitize_transition_actor(actor: dict | None) -> dict | None:
     if actor is None:
@@ -112,6 +112,14 @@ def _model_state_payload(game: GameState) -> dict:
         "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
         "scene_exits", "entrance_index"})
     payload["scene_exits"] = [{"position": list(row.position)} for row in game.scene_exits]
+    payload["traversal_affordances"] = [{
+        "kind": row.kind,
+        "direction": row.direction,
+        "approach_position": list(row.approach_position),
+        "target_position": list(row.target_position),
+        "distance": row.distance,
+        "height_delta": row.height_delta,
+    } for row in game.traversal_affordances]
     payload = _strip_transition_ids(payload)
     if game.room_actors:
         payload.pop("nearby_actors", None)
