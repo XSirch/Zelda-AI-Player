@@ -34,6 +34,7 @@ class PlayerState(StrictModel):
     wall_flags: int = Field(default=0, ge=0, le=65535)
     state_flags_1: int = Field(default=0, ge=0, le=4294967295)
     state_flags_2: int = Field(default=0, ge=0, le=4294967295)
+    hop_direction: int | None = Field(default=None, ge=0, le=3)
     climbing_ladder: bool = False
     hanging_ledge: bool = False
     climbing_ledge: bool = False
@@ -197,6 +198,8 @@ class GameState(StrictModel):
     player: PlayerState | None
     camera_eye: tuple[float, float, float] | None = None
     camera_at: tuple[float, float, float] | None = None
+    camera_input_yaw: int | None = Field(default=None, ge=-32768, le=32767)
+    mirrored_world: bool = False
     inventory: list[int] = Field(default_factory=list, max_length=32)
     inventory_named: list[InventoryObservation] = Field(default_factory=list, max_length=24)
     # SoH ItemEquips.buttonItems[8]: B + 3 C-buttons + 4 D-pad slots.
@@ -249,6 +252,8 @@ class RealtimeState(StrictModel):
     player: PlayerState | None
     camera_eye: tuple[float, float, float] | None
     camera_at: tuple[float, float, float] | None
+    camera_input_yaw: int | None = Field(default=None, ge=-32768, le=32767)
+    mirrored_world: bool = False
     paused: bool
     cutscene_active: bool
     game_over_state: int = Field(ge=0, le=65535)

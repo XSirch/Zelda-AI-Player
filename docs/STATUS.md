@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.2
+# Implementation status — realtime-input foundation v2.3
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -59,3 +59,11 @@ Emergency diagnostic handoff is independent of the long-running diagnostic corou
 ## Realtime latency/effect correction v2.2
 
 The first live backflip diagnostic exposed two measurement issues: native accept→consume rounded to 0 ms because UDP polling happens inside the input-consumer hook, and a consumed Z+A edge was reported as success without observing the dodge effect. V2.2 keeps sub-millisecond native queue timing, adds Python-monotonic→native-consume latency (sanity-bounded to the shared system monotonic clock), primes backflip/sidestep direction one consumer tick before the A edge, and confirms dodge effect using PLAYER_STATE2_HOPPING or observed displacement. A rebuilt SoH adapter is required for the new end-to-end timing field.
+
+
+## Player-relative dodge correction v2.3
+
+Live validation showed that the previous backflip diagnostic produced a forward roll. Raw N64 stick coordinates are camera-relative, while OoT classifies dodge direction from Camera_GetInputDirYaw + stick angle relative to Link shape yaw. V2.3 exports the exact camera input yaw and engine hop direction, waits for Z-target/parallel before the A edge, transforms back/left/right into the raw camera-relative stick vector used by OoT, and only confirms a dodge when PLAYER_STATE2_HOPPING reports the expected engine direction. A forward roll can no longer satisfy backflip confirmation by displacement alone.
+
+
+The same player-relative controller is used by runtime backflip and sidestep skills. Local terrain probes are checked in the requested Link-relative direction before issuing the dodge, so the model cannot bypass the diagnostic safety guard during normal combat execution.

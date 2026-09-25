@@ -72,6 +72,158 @@ def _steer_to(game: GameState, target: tuple[float, float, float], strength: flo
     )
 
 
+
+PLAYER_STATE1_HOSTILE_LOCK_ON = 1 << 4
+PLAYER_STATE1_Z_TARGETING = 1 << 15
+PLAYER_STATE1_PARALLEL = 1 << 17
+PLAYER_STATE2_HOPPING = 1 << 19
+_DODGE_DIRECTION = {"left": 1, "back": 2, "right": 3}
+
+
+def _z_targeting_active(game: GameState | None) -> bool:
+    if not game or not game.player:
+        return False
+    return bool(game.player.state_flags_1 & (
+        PLAYER_STATE1_HOSTILE_LOCK_ON | PLAYER_STATE1_Z_TARGETING | PLAYER_STATE1_PARALLEL))
+
+
+def _player_relative_stick(game: GameState, direction: str, magnitude: int = 70) -> tuple[int, int]:
+    """Convert a Link-relative direction into the raw camera-relative N64 stick used by OoT."""
+    if not game.player or direction not in {"forward", "back", "left", "right"}:
+        return 0, 0
+    offsets = {"forward": 0x0000, "left": 0x4000, "back": 0x8000, "right": -0x4000}
+    desired_world_yaw = game.player.yaw + offsets[direction]
+    if game.camera_input_yaw is not None:
+        stick_angle = ((desired_world_yaw - game.camera_input_yaw + 32768) % 65536) - 32768
+        angle = stick_angle * math.pi / 32768.0
+        x = round(-math.sin(angle) * magnitude)
+        y = round(math.cos(angle) * magnitude)
+        if game.mirrored_world:
+            x = -x
+        return max(-80, min(80, x)), max(-80, min(80, y))
+
+    if game.camera_eye is not None and game.camera_at is not None:
+        cfx = game.camera_at[0] - game.camera_eye[0]
+        cfz = game.camera_at[2] - game.camera_eye[2]
+        length = math.hypot(cfx, cfz)
+    else:
+        length = 0.0
+    if length < 1e-4:
+        camera_angle = game.player.yaw * math.pi / 32768.0
+        cfx, cfz = math.sin(camera_angle), math.cos(camera_angle)
+    else:
+        cfx, cfz = cfx / length, cfz / length
+    crx, crz = cfz, -cfx
+    desired_angle = desired_world_yaw * math.pi / 32768.0
+    wx, wz = math.sin(desired_angle), math.cos(desired_angle)
+    x = round((wx * crx + wz * crz) * magnitude)
+    y = round((wx * cfx + wz * cfz) * magnitude)
+    return max(-80, min(80, x)), max(-80, min(80, y))
+
+
+async def _prime_z_target(bridge: Bridge, observation: GameState, timeout: float = .35) -> GameState | None:
+    current = bridge.state or observation
+    deadline = time.monotonic() + timeout
+    while current and time.monotonic() < deadline:
+        if _z_targeting_active(current):
+            return current
+        bridge.send(buttons=0x2000, lease_ms=260)
+        try:
+            current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
+        except RuntimeError:
+            return None
+    return current if _z_targeting_active(current) else None
+
+
+async def _observe_dodge_effect(bridge: Bridge, start: GameState, expected_direction: int,
+                                timeout: float = .8) -> dict:
+    current = bridge.state
+    hopping_seen = False
+    hop_direction = None
+    max_distance = 0.0
+    expected_distance = 0.0
+    if not start.player:
+        return {"confirmed": False, "hopping_seen": False, "hop_direction": None,
+                "max_distance": 0.0, "expected_distance": 0.0}
+    yaw = start.player.yaw * math.pi / 32768.0
+    forward = (math.sin(yaw), math.cos(yaw))
+    right = (math.cos(yaw), -math.sin(yaw))
+    start_x, _, start_z = start.player.position
+    deadline = time.monotonic() + timeout
+    while current and time.monotonic() < deadline:
+        if current.player and current.scene_epoch == start.scene_epoch:
+            dx = current.player.position[0] - start_x
+            dz = current.player.position[2] - start_z
+            max_distance = max(max_distance, math.hypot(dx, dz))
+            if expected_direction == 2:
+                projected = -(dx * forward[0] + dz * forward[1])
+            elif expected_direction == 1:
+                projected = -(dx * right[0] + dz * right[1])
+            else:
+                projected = dx * right[0] + dz * right[1]
+            expected_distance = max(expected_distance, projected)
+            if current.player.state_flags_2 & PLAYER_STATE2_HOPPING:
+                hopping_seen = True
+                if current.player.hop_direction is not None:
+                    hop_direction = current.player.hop_direction
+                    if hop_direction == expected_direction:
+                        break
+        try:
+            current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
+        except RuntimeError:
+            break
+    return {"confirmed": hopping_seen and hop_direction == expected_direction,
+            "hopping_seen": hopping_seen, "hop_direction": hop_direction,
+            "max_distance": round(max_distance, 2), "expected_distance": round(expected_distance, 2)}
+
+
+def _dodge_direction_safe(game: GameState, direction: str) -> bool:
+    probes = [p for p in game.navigation_probes
+              if p.direction == direction and p.distance <= 70.0 and p.floor_found and p.delta_y is not None]
+    if not probes:
+        return False
+    probe = min(probes, key=lambda p: p.distance)
+    return abs(probe.delta_y) <= 22.0 and not (
+        probe.wall_hit and probe.wall_distance is not None and probe.wall_distance < 32.0)
+
+
+async def _perform_dodge(bridge: Bridge, observation: GameState, direction: str,
+                         magnitude: int = 70) -> dict:
+    expected = _DODGE_DIRECTION[direction]
+    if not _dodge_direction_safe(observation, direction):
+        return {"reason": "dodge_terrain_not_safe", "receipt": None,
+                "confirmed": False, "hopping_seen": False, "hop_direction": None,
+                "expected_hop_direction": expected, "max_distance": 0.0, "expected_distance": 0.0,
+                "stick_x": 0, "stick_y": 0}
+    if "player_relative_dodge_state" not in observation.capabilities:
+        return {"reason": "bridge_upgrade_required_for_dodge_confirmation", "receipt": None,
+                "confirmed": False, "hopping_seen": False, "hop_direction": None,
+                "expected_hop_direction": expected, "max_distance": 0.0, "expected_distance": 0.0,
+                "stick_x": 0, "stick_y": 0}
+    primed = await _prime_z_target(bridge, observation)
+    if primed is None:
+        return {"reason": "z_target_not_established", "receipt": None, "confirmed": False,
+                "hopping_seen": False, "hop_direction": None, "expected_hop_direction": expected,
+                "max_distance": 0.0, "expected_distance": 0.0, "stick_x": 0, "stick_y": 0}
+    stick_x, stick_y = _player_relative_stick(primed, direction, magnitude)
+    receipt = await bridge.sequence_receipt([
+        {"buttons": 0x2000, "stick_x": stick_x, "stick_y": stick_y, "ticks": 1},
+        {"buttons": 0xA000, "stick_x": stick_x, "stick_y": stick_y, "ticks": 1},
+        {"buttons": 0x2000, "stick_x": stick_x, "stick_y": stick_y, "ticks": 2},
+        {"buttons": 0x2000, "stick_x": 0, "stick_y": 0, "ticks": 1},
+    ], baseline_buttons=0x2000, edge_buttons=0x8000)
+    delivered = bool(receipt and receipt.first_tick > 0 and
+                     receipt.status not in {"rejected", "cancelled", "superseded"})
+    effect = await _observe_dodge_effect(bridge, observation, expected) if delivered else {
+        "confirmed": False, "hopping_seen": False, "hop_direction": None,
+        "max_distance": 0.0, "expected_distance": 0.0}
+    reason = ("dodge_confirmed" if effect["confirmed"] else
+              ("wrong_dodge_direction" if effect["hopping_seen"] and effect["hop_direction"] is not None else
+               ("dodge_effect_not_observed" if delivered else "input_not_consumed")))
+    return {"reason": reason, "receipt": receipt, "expected_hop_direction": expected,
+            "stick_x": stick_x, "stick_y": stick_y, **effect}
+
+
 async def _pulse(bridge: Bridge, *, buttons: int = 0, stick_x: int = 0, stick_y: int = 0,
                  hold_ms: int = 100, settle_s: float = 0.12) -> bool:
     if is_realtime(bridge):
