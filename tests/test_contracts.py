@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids
 
 
 def test_token_subsets_are_not_double_counted():
@@ -306,6 +306,8 @@ def test_model_sees_scene_exit_as_opaque_position_only(state):
     assert "exit_index" not in serialized
     assert "entrance_index" not in serialized
     assert "samples" not in serialized
+    assert "entrance_index" not in payload
+
 
 
 def test_model_world_edges_expose_only_empirically_observed_topology():
@@ -372,3 +374,23 @@ def test_model_neutralizes_transition_actor_destination_labels(state):
     assert exit_visible["name"] == "Transition Object"
     assert "Kokiri Forest" not in json.dumps(exit_visible)
 
+
+
+def test_native_transition_ids_are_removed_from_model_results_and_events():
+    raw = {
+        "status": "completed",
+        "reason": "scene_exit_traversed",
+        "exit_index": 3,
+        "entrance_index": 0x211,
+        "nested": {
+            "exit_index": 4,
+            "detail": "kept",
+        },
+        "rows": [{"entrance_index": 0x222, "value": 7}],
+    }
+    visible = _strip_transition_ids(raw)
+    serialized = json.dumps(visible)
+    assert "exit_index" not in serialized
+    assert "entrance_index" not in serialized
+    assert visible["nested"]["detail"] == "kept"
+    assert visible["rows"][0]["value"] == 7
