@@ -75,7 +75,7 @@ class NavigationProbe(StrictModel):
 class SceneExitObservation(StrictModel):
     """Currently observed collision surface that triggers a scene/entrance transition."""
     exit_index: int = Field(ge=1, le=31)
-    entrance_index: int = Field(ge=-1, le=2147483647)
+    entrance_index: int = Field(ge=-32768, le=65535)
     position: tuple[float, float, float]
     samples: int = Field(ge=1, le=10000)
 
