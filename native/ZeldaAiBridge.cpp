@@ -1032,9 +1032,14 @@ void Snapshot() {
     }
     std::string serialized = state.dump();
     if (full && serialized.size() > 59000) {
-        // room_actors is the authoritative actor observation. nearby_actors is redundant,
-        // so drop that compact compatibility subset first under packet pressure.
+        // room_actors is authoritative and NavMesh is optional local acceleration.
+        // Shed redundant/derivable payload before truncating actor observations.
         state["nearby_actors"] = json::array();
+        serialized = state.dump();
+    }
+    if (full && serialized.size() > 59000) {
+        state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f},
+                            {"half_extent", 0}, {"cells", json::array()}};
         serialized = state.dump();
     }
     while (serialized.size() > 59000 && state["room_actors"].is_array() && !state["room_actors"].empty()) {
