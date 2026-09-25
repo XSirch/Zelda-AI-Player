@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from zelda_ai.models import GameState
+from zelda_ai.models import GameState, NavigationProbe
 from zelda_ai.navmesh import plan_navmesh, primitive_move_safe, waypoint_probe_safe
 
 
@@ -92,7 +92,7 @@ def test_camera_relative_primitive_move_uses_world_heading_probe(state):
     game = state.model_copy(update={
         "camera_eye": (0.0, 0.0, -10.0),
         "camera_at": (0.0, 0.0, 0.0),
-        "navigation_probes": [type(state).model_fields["navigation_probes"].annotation.__args__[0].model_validate(right)],
+        "navigation_probes": [NavigationProbe.model_validate(right)],
     })
     assert not primitive_move_safe(game, "right")
 
