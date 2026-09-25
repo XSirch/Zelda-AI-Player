@@ -1,5 +1,6 @@
 from zelda_ai.models import Decision, SkillArgs
 from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _probe_stick, _rotate_stick_quadrants, _world_yaw_stick
+import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
@@ -117,6 +118,38 @@ def test_world_yaw_stick_respects_exact_camera_yaw_and_mirroring(state):
     assert _world_yaw_stick(game, 0, 70) == (70, 0)
     mirrored = game.model_copy(update={"mirrored_world": True})
     assert _world_yaw_stick(mirrored, 0, 70) == (-70, 0)
+
+
+def test_door_does_not_bypass_failed_navmesh_approach(state, monkeypatch):
+    import asyncio
+
+    door = {"actor_id": 9, "actor_uid": "door-1", "name": "En_Door", "description": "Door",
+        "category": 10, "category_name": "door", "room": 0, "params": 2,
+        "position": [160, 0, 0], "focus_position": [160, 20, 0], "distance": 160.0,
+        "targeted": False, "drawn": False, "text_id": 0}
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh"],
+        "room_actors": [door],
+        "room_actor_count": 1,
+    })
+    nav = decision("interact_with_actor", None, duration=5000, target_actor_id=9,
+        target_actor_params=2).model_copy(update={
+            "args": decision("interact_with_actor", None, duration=5000, target_actor_id=9,
+                target_actor_params=2).args.model_copy(update={"target_actor_uid": "door-1"})
+        })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    async def no_path(_bridge, _decision, _observation, *, actor_mode, talk=False, interact=False):
+        return {"status": "failed", "reason": "navigation_no_path", "acknowledged": False}
+
+    monkeypatch.setattr(interactions, "_navigate_local", no_path)
+    result = asyncio.run(interactions._interact_with_door(FakeBridge(game), nav, game))
+    assert result["status"] == "failed"
+    assert result["reason"] == "door_approach_failed:navigation_no_path"
 
 
 def test_explicit_exit_intent_promotes_unique_room_door(state):
