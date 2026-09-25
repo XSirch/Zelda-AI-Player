@@ -36,7 +36,8 @@ That run also emitted a Starlette/httpx deprecation warning and Pydantic seriali
 - `cd web && npm run build` with resolved dependencies.
 - Windows SoH reconfigure/build and in-game input/animation/targeting tests.
 - Actual p50/p95/p99 latency under load.
-- Robust combat across enemies/bosses, cross-room/global route planning and special navigation links, goal-bound route replay and process-level isolation of the fast motor.\n- Windows SoH build + in-game validation of the v2.6 NavMesh collision sampling, frame cost and wall/ledge avoidance.
+- Robust combat across enemies/bosses, cross-room/global route planning and special navigation links, goal-bound route replay and process-level isolation of the fast motor.
+- Windows SoH build + in-game validation of the v2.6 NavMesh collision sampling, frame cost and wall/ledge avoidance.
 
 The local controller still contains heuristic skills and bounded fallbacks. This is not an autonomous completion claim.
 
