@@ -145,7 +145,8 @@ def test_long_probe_blocks_roll_before_distant_wall(state):
 
 
 def test_probe_direction_matches_player_stick_direction_enum(state):
-    game = state.model_copy(update={"player": state.player.model_copy(update={"yaw": 0})})
+    game = state.model_copy(update={"player": state.player.model_copy(update={"yaw": 0}),
+        "capabilities": ["probe_yaw_v2"]})
     assert _probe_direction(game, (70, 0, 0)) == "left"
     assert _probe_direction(game, (-70, 0, 0)) == "right"
 
@@ -164,6 +165,7 @@ def test_primitive_left_and_right_validate_the_matching_probe(state):
     game = type(state).model_validate({
         **state.model_dump(),
         "camera_input_yaw": 0,
+        "capabilities": ["probe_yaw_v2"],
         "navigation_probes": [left_unsafe, right_safe],
     })
     assert not primitive_move_safe(game, "left")
@@ -179,6 +181,7 @@ def test_camera_relative_primitive_move_uses_world_heading_probe(state):
     game = state.model_copy(update={
         "camera_eye": (0.0, 0.0, -10.0),
         "camera_at": (0.0, 0.0, 0.0),
+        "capabilities": ["probe_yaw_v2"],
         "navigation_probes": [NavigationProbe.model_validate(right)],
     })
     assert not primitive_move_safe(game, "right")
@@ -200,6 +203,7 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert '"forward", "forward_left", "left", "back_left"' in native
     assert '"back", "back_right", "right", "forward_right"' in native
     assert '"local_navmesh"' in native
+    assert '"probe_yaw_v2"' in native
     assert "json NavigationMesh(Player* player)" in native
     assert '"nearby_actors", "navmesh"' in native
     assert 'state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}' in native
