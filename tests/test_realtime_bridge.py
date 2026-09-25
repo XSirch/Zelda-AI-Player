@@ -81,15 +81,23 @@ def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
             "cells": [[0, 0, 0, 1], [0, 1, 0, 16]]}
     exits = [{"exit_index": 1, "entrance_index": 0x211,
               "position": [0, 0, 70], "samples": 4}]
+    affordances = [{
+        "kind": "stairs_or_slope_down", "direction": "down",
+        "approach_position": [0, 0, 70], "target_position": [0, -40, 140],
+        "distance": 70, "height_delta": -40, "wall_flags": 0,
+    }]
     feed(bridge, full(state, navmesh=mesh, scene_exits=exits,
+        traversal_affordances=affordances,
         capabilities=["fast_state", "input_sequence", "consumed_receipts",
-                      "local_navmesh", "scene_exit_surfaces"]))
+                      "local_navmesh", "scene_exit_surfaces", "traversal_affordances_v1"]))
     assert bridge.state.navmesh.available
     assert bridge.state.scene_exits[0].entrance_index == 0x211
+    assert bridge.state.traversal_affordances[0].kind == "stairs_or_slope_down"
     feed(bridge, fast(state, player={**state.player.model_dump(), "position": [0, 0, 8]}))
     assert bridge.state.player.position == (0, 0, 8)
     assert bridge.state.navmesh.cells == [(0, 0, 0.0, 1), (0, 1, 0.0, 16)]
     assert bridge.state.scene_exits[0].position == (0.0, 0.0, 70.0)
+    assert bridge.state.traversal_affordances[0].approach_position == (0.0, 0.0, 70.0)
 
 
 def test_fast_updates_pose_without_slow_callback(state):
