@@ -759,3 +759,53 @@ def test_auto_traversal_does_not_treat_same_xz_other_floor_as_reached(state):
         }],
     })
     assert _best_auto_traversal_affordance(game, "down") is None
+
+
+def test_large_drop_is_not_immediate_without_explicit_ledge_affordance(state):
+    drop = {
+        "direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": -100, "delta_y": -100, "floor_type": 0,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_probes": [drop],
+    })
+    assert not _immediate_traversal_evidence(game, "down")
+    explicit = type(state).model_validate({
+        **game.model_dump(),
+        "player": {**game.player.model_dump(), "can_down": True},
+    })
+    assert _immediate_traversal_evidence(explicit, "down")
+
+
+def test_auto_traversal_prefers_far_ladder_over_near_ledge(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [
+                [0, 0, 0, 4],
+                [1, 0, 0, 68],
+                [2, 0, 0, 68],
+                [3, 0, 0, 64],
+            ],
+        },
+        "traversal_affordances": [
+            {
+                "kind": "ledge_down", "direction": "down",
+                "approach_position": [70, 0, 0],
+                "target_position": [140, -100, 0],
+                "distance": 70, "height_delta": -100, "wall_flags": 0,
+            },
+            {
+                "kind": "ladder_down", "direction": "down",
+                "approach_position": [210, 0, 0],
+                "target_position": [250, -40, 0],
+                "distance": 210, "height_delta": 0, "wall_flags": 4,
+            },
+        ],
+    })
+    chosen = _best_auto_traversal_affordance(game, "down")
+    assert chosen is not None
+    assert chosen.kind == "ladder_down"
