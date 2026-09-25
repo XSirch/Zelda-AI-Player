@@ -422,7 +422,7 @@ json NavigationMesh(Player* player) {
     constexpr float BODY_CLEARANCE = 18.0f;
     constexpr float EDGE_FLOOR_TOLERANCE = 24.0f;
     constexpr int EDGE_FLOOR_SAMPLES = 4;
-    constexpr int EXIT_SCAN_HALF_EXTENT = 4;
+    constexpr int EXIT_SCAN_HALF_EXTENT = HALF_EXTENT * 2;
     constexpr float EXIT_SCAN_STEP = 35.0f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
     static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
