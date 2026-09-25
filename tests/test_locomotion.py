@@ -299,3 +299,8 @@ def test_stick_quadrant_feedback_correction():
     assert _rotate_stick_quadrants(0, 70, 1) == (-70, 0)
     assert _rotate_stick_quadrants(0, 70, 2) == (0, -70)
     assert _rotate_stick_quadrants(0, 70, 3) == (70, 0)
+
+
+def test_common_controller_imports_time_for_monotonic_deadlines():
+    import zelda_ai.skills.common as common
+    assert common.time.monotonic() > 0
