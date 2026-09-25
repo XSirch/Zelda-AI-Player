@@ -3,7 +3,7 @@ from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 from zelda_ai.skills.navigation import _resolve_scene_exit
-from zelda_ai.skills.traversal import _resolve_traversal_affordance, _refresh_traversal_affordance, _local_traversal_evidence
+from zelda_ai.skills.traversal import _resolve_traversal_affordance, _refresh_traversal_affordance, _local_traversal_evidence, _fast_revalidation_matches_original
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -621,3 +621,28 @@ def test_recentered_affordance_rejects_distant_same_direction_route(state):
         }],
     })
     assert _refresh_traversal_affordance(current, original) is None
+
+
+def test_fast_revalidation_rejects_unrelated_ladder_far_from_original_target(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "traversal_affordances": [{
+            "kind": "ladder_down",
+            "direction": "down",
+            "approach_position": [70, 0, 0],
+            "target_position": [110, -20, 0],
+            "distance": 70,
+            "height_delta": 0,
+            "wall_flags": 4,
+        }],
+    })
+    original = original_game.traversal_affordances[0]
+    current = type(state).model_validate({
+        **state.model_dump(),
+        "player": {**state.player.model_dump(),
+                   "position": [400, 0, 0],
+                   "wall_flags": 4},
+        "traversal_affordances": [],
+    })
+    assert _local_traversal_evidence(current, "down", kind="ladder_down")
+    assert not _fast_revalidation_matches_original(current, original)
