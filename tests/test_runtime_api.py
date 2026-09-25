@@ -94,3 +94,25 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
         assert client.post("/api/hints", json={"text": "Try right"}, headers=headers).status_code == 200
         assert client.get(f"/api/runs/{run_id}").json()["assisted"]
         assert client.post("/api/control/stop", json={}, headers=headers).status_code == 200
+
+
+def test_semantic_traversal_failure_does_not_increase_stuck_score(store, state):
+    from zelda_ai.models import Decision, SkillArgs
+    runtime = Runtime(Bridge("x" * 32, True), store, {})
+    runtime.stuck_score = 5
+    decision = Decision(goal="descend", summary="go down", skill="traverse",
+        args=SkillArgs(direction="down", duration_ms=8000, strength=.7),
+        memory_note=None)
+    runtime._update_stuck(decision, {"status": "failed", "reason": "traversal_timeout"})
+    assert runtime.stuck_score == 4
+
+
+@pytest.mark.asyncio
+async def test_auto_unstick_skips_semantic_traversal_failure(store, state):
+    bridge = Bridge("x" * 32, True)
+    runtime = Runtime(bridge, store, {})
+    runtime.stuck_score = 8
+    runtime.last_result = {"status": "failed", "reason": "traversal_affordance_lost"}
+    recovered = await runtime._auto_unstick(state)
+    assert recovered is False
+    assert runtime.stuck_score == 6
