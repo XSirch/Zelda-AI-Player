@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _model_memory_note_persistent, _model_last_decision, _model_recent_events
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _model_recent_events, _model_memory_note_persistent, _model_last_decision, _model_recent_events
 
 
 def test_token_subsets_are_not_double_counted():
@@ -465,3 +465,27 @@ def test_model_facing_decision_events_drop_model_authored_summary():
         "at": 1.0,
     }]
     assert "Kokiri Forest" not in json.dumps(visible)
+
+
+def test_model_recent_events_strip_nested_decision_prose():
+    rows = [{
+        "kind": "player_died",
+        "data": {
+            "scene": 52,
+            "last_skill": {
+                "skill": "wait",
+                "goal": "Go through the warp to Kokiri Forest",
+                "summary": "This must lead to Kokiri Forest",
+                "memory_note": "Warp leads to Kokiri Forest",
+                "args": {"duration_ms": 100},
+            },
+        },
+        "at": 1.0,
+    }]
+    visible = _model_recent_events(rows)
+    serialized = json.dumps(visible)
+    assert "Kokiri Forest" not in serialized
+    assert "goal" not in serialized
+    assert "summary" not in serialized
+    assert "memory_note" not in serialized
+    assert visible[0]["data"]["last_skill"]["skill"] == "wait"
