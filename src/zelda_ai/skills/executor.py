@@ -8,6 +8,7 @@ from ..bridge import Bridge
 from ..control.authority import owned
 from ..control.feedback import consumed, feedback, is_realtime
 from ..models import Decision, GameState
+from ..navmesh import primitive_move_safe
 from .catalog import BUTTONS, DIALOGUE_SKILLS, MENU_SKILLS, controller_input
 from .common import _is_door_actor, _matching_actor, _perform_dodge
 from .menus import _choose_dialogue, _equip_gear, _equip_item, _play_song
@@ -82,6 +83,10 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
         return await _choose_dialogue(bridge, decision, observation)
     if decision.skill == "play_song":
         return await _play_song(bridge, decision, observation)
+
+    if decision.skill == "move" and decision.args.direction and not primitive_move_safe(before, decision.args.direction):
+        return {"status": "failed", "reason": "unsafe_navigation_probe",
+            "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
 
     buttons, x, y = controller_input(decision)
     if is_realtime(bridge) and decision.skill in {"attack", "interact", "advance_dialogue", "camera_center",
