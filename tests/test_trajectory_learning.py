@@ -159,3 +159,47 @@ def test_traverse_exit_learns_destination_only_after_transition(store, state):
                                   tuple(origin.player.position), origin.player.yaw)
     assert route is not None
     assert route["actions"][0]["skill"] == "traverse_exit"
+
+
+def test_non_exit_transition_keeps_player_origin_even_near_scene_exit(store, state):
+    bridge = Bridge("x" * 32, True)
+    runtime = Runtime(bridge, store, {})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo", memory_mode="adaptive")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.state = "running"
+
+    player_position = [10.0, 0.0, 20.0]
+    unrelated_exit = [25.0, 0.0, 20.0]
+    origin = type(state).model_validate({
+        **state.model_dump(),
+        "scene": 52, "scene_name": "Interior", "room": 0,
+        "player": {**state.player.model_dump(), "position": player_position},
+        "scene_exits": [{
+            "exit_index": 1, "entrance_index": 0x211,
+            "position": unrelated_exit, "samples": 4,
+            "direct_reachable": True,
+        }],
+    })
+    runtime.last_decision = {
+        "goal": "Open observed door", "summary": "Use door",
+        "skill": "interact_with_actor",
+        "args": {
+            "direction": None, "duration_ms": 5000, "strength": 0.7, "slot": None,
+            "choice_index": None, "song": None, "target_actor_id": None,
+            "target_actor_uid": None, "target_actor_params": None,
+            "target_position": None, "stop_distance": None, "item_id": None,
+        },
+        "memory_note": None,
+    }
+    destination = origin.model_copy(update={
+        "seq": origin.seq + 1, "scene_epoch": origin.scene_epoch + 1,
+        "scene": 84, "scene_name": "Observed Destination", "room": 0,
+        "scene_exits": [],
+    })
+    runtime.on_state(destination, origin)
+
+    edges = store.world_neighbors(runtime.namespace, origin.scene, origin.room)
+    assert len(edges) == 1
+    assert edges[0]["from_position"] == player_position
+    assert edges[0]["from_position"] != unrelated_exit
