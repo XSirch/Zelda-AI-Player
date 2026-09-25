@@ -862,7 +862,7 @@ void Snapshot() {
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
-                          "actor_uid", "event_cursor", "local_navmesh"}},
+                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
