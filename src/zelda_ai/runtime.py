@@ -73,7 +73,7 @@ from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v7/skills-v8/trajectory-v3/prompt-v11"
+CONTRACT_VERSION = "state-v8/skills-v9/trajectory-v3/prompt-v12"
 
 
 class Runtime:
