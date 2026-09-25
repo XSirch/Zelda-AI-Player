@@ -1,4 +1,4 @@
-# Realtime input foundation (v2.6)
+# Realtime input foundation (v2.7)
 
 ## Delivered scope
 
@@ -15,8 +15,8 @@ This change implements the input/observation foundation plus the local Navigatio
 - Native actor lifetime IDs prevent selecting another enemy of the same type. Lock target and targeting candidate are distinct. A bounded event journal resends unacknowledged events and reports unrecoverable gaps.
 - Basic generic combat acquires a real lock, approaches and alternates attacks with guarded recovery locally. It does not infer enemy animation openings, guarantee boss victories or use hidden solution flags.
 - Movement uses new feedback rather than a fixed 100/140 ms sleep in the updated controllers. Stuck windows do not become shorter merely because sampling is faster. RT retreat uses observed short floor probes; missing floor stops that recovery instead of blindly reversing over a ledge.
-- Full snapshots also carry a compact 9×9 moving NavMesh generated from SoH floor/wall collision. Reciprocal links require walk-safe height, multiple floor-continuity samples along each edge, no corner cutting and a body-width corridor. Python A* chooses local waypoints; fast 70-unit probes can veto a stale waypoint immediately. The raw mesh is not sent to the model prompt.
-- Bridge v2.6 advertises `probe_yaw_v2`: navigation-probe labels now match OoT `PlayerStickDirection` exactly (positive relative yaw = left). The Python controller retains a legacy label mapping when connected to v2.5 so mixed-version startup fails safely instead of checking the wrong side.
+- Full snapshots also carry a compact 9×9 moving NavMesh generated from SoH floor/wall collision. Reciprocal links require walk-safe height, multiple floor-continuity samples along each edge, no corner cutting and a body-width corridor. Python A* chooses local waypoints; fast 70-unit probes can veto a stale waypoint immediately. The raw mesh is not sent to the model prompt. The same collision sampling now exposes currently loaded `scene_exits` when a floor polygon has non-zero `SceneExitIndex`; `traverse_exit` walks onto that exact observed surface so interiors such as Link's House can transition without a door actor.
+- Bridge v2.7 advertises `probe_yaw_v2`: navigation-probe labels now match OoT `PlayerStickDirection` exactly (positive relative yaw = left). The Python controller retains a legacy label mapping when connected to v2.5 so mixed-version startup fails safely instead of checking the wrong side.
 - Local skill implementations moved from the monolithic runtime into `skills/`. Compatibility exports remain. Natural-language summary/goal strings no longer change the selected executable skill.
 - The learning contract is versioned separately. Failed/intervened traces are not promoted as autonomous routes. Unsolicited replay before the planner is disabled; prior experience remains stored.
 
@@ -28,7 +28,7 @@ This change implements the input/observation foundation plus the local Navigatio
    The installer recognizes the verified original or the previous hook, validates the reconstructed upstream file, backs up files outside the CMake source glob, and installs every required header. It does not reset the checkout or touch game assets.
 4. Reconfigure and rebuild the pinned Shipwright C++ project. **An existing soh.exe does not change when adapter source changes.**
 5. Run `npm install` and `npm run build` in `web`, then restart `uv run zelda-ai serve` and the newly built game.
-6. The panel must report `rt-input-v2.6`, protocol 2, the `local_navmesh` capability and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
+6. The panel must report `rt-input-v2.7`, protocol 2, `local_navmesh`, `scene_exit_surfaces` and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
 
 A new backend is compatible with the old V1 bridge for rollback/testing, but V1 acknowledgment means acceptance only. The new V2 native bridge requires this backend. To fully roll back, restore both the previous backend and game binary/adapter from the preserved backup.
 
