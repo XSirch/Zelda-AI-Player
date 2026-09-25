@@ -68,9 +68,13 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
                 "reason": f"door_approach_failed:{approach.get('reason', 'unknown')}",
                 "distance": math.dist(start_position, current.player.position)
                     if current and current.player else None,
-                "acknowledged": bool(approach.get("acknowledged")), "skill": decision.skill}
+                "acknowledged": acknowledged, "skill": decision.skill}
+        if actor is None:
+            return {"status": "failed", "reason": "door_actor_lost_after_approach",
+                "distance": math.dist(start_position, current.player.position)
+                    if current and current.player else None,
+                "acknowledged": acknowledged, "skill": decision.skill}
         before = current or before
-
 
     attempts = 0
     best_distance = actor.distance
