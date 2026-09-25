@@ -245,7 +245,7 @@ def test_navmesh_contract_rejects_duplicate_cells(state):
 
 def test_native_bridge_exposes_navmesh_only_as_slow_state():
     native = (Path(__file__).parents[1] / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
-    assert 'BRIDGE_BUILD = "rt-input-v2.7"' in native
+    assert 'BRIDGE_BUILD = "rt-input-v2.8"' in native
     assert '"forward", "forward_left", "left", "back_left"' in native
     assert '"back", "back_right", "right", "forward_right"' in native
     assert '"local_navmesh"' in native
@@ -258,6 +258,10 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "sampleIndex <= EDGE_FLOOR_SAMPLES" in native
     assert "EXIT_SCAN_STEP = 35.0f" in native
     assert "EXIT_SCAN_HALF_EXTENT = HALF_EXTENT * 2" in native
+    assert "EXIT_INTERIOR_BLEND = 0.65f" in native
+    assert "CollisionPoly_GetVerticesByBgId" in native
+    assert "centroid" in native
+    assert "targetX = x + (centroid.x - x) * EXIT_INTERIOR_BLEND" in native
     assert "DIRECT_FLOOR_SAMPLES = 4" in native
     assert '"direct_reachable"' in native
 

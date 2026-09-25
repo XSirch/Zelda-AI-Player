@@ -192,6 +192,21 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     "exit_index": selected_exit_index, "entrance_index": selected_entrance_index,
                     "skill": decision.skill}
 
+            if exit_mode and current.player.floor_exit_index == selected_exit_index:
+                # The engine now reports the selected SceneExitIndex under Link's
+                # actual floor polygon. Stop steering and give
+                # Player_HandleExitsAndVoids a frame to start the transition.
+                bridge.set_navigation_debug(
+                    skill=decision.skill, status="exit_surface_contact",
+                    target_position=list(selected_exit.position) if selected_exit else None,
+                    waypoint=None, path_cells=last_path_cells, probe_safe=True,
+                    navmesh_used=navmesh_used, target_distance=0.0,
+                    exit_index=selected_exit_index,
+                    entrance_index=selected_entrance_index)
+                bridge.release()
+                await feedback(bridge, current, .12)
+                continue
+
             if actor_mode:
                 actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params, decision.args.target_actor_uid)
                 if actor is None:

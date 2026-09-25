@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.7 + Navigation V2
+# Implementation status — realtime-input foundation v2.8 + Navigation V2
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -37,7 +37,7 @@ That run also emitted a Starlette/httpx deprecation warning and Pydantic seriali
 - Windows SoH reconfigure/build and in-game input/animation/targeting tests.
 - Actual p50/p95/p99 latency under load.
 - Robust combat across enemies/bosses, cross-room/global route planning and special navigation links, goal-bound route replay and process-level isolation of the fast motor.
-- Windows SoH build + in-game validation of the v2.7 NavMesh/scene-exit collision sampling, frame cost and wall/ledge avoidance.
+- Windows SoH build + in-game validation of the v2.8 NavMesh/scene-exit interior-target sampling, frame cost and wall/ledge avoidance.
 
 The local controller still contains heuristic skills and bounded fallbacks. This is not an autonomous completion claim.
 
