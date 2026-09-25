@@ -58,6 +58,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
     game.player?.can_down ? 'DOWN AVAILABLE' : 'NORMAL';
   const capabilities = game.capabilities ?? [];
   const mesh = game.navmesh;
+  const sceneExits = game.scene_exits ?? [];
   const nav = bridge?.navigation;
   const navCapable = capabilities.includes('local_navmesh');
   const probeYawV2 = capabilities.includes('probe_yaw_v2');
@@ -84,6 +85,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>STEP</span><strong>{meshActive ? `${number(mesh.step)} u` : '—'}</strong></div>
         <div><span>RAIO LOCAL</span><strong>{meshActive ? `${number(mesh.step * mesh.half_extent)} u` : '—'}</strong></div>
         <div><span>PROBE YAW</span><strong>{probeYawV2 ? 'v2' : 'legacy / ausente'}</strong></div>
+        <div><span>SCENE EXITS</span><strong>{sceneExits.length ? `${sceneExits.length} observada(s)` : 'nenhuma'}</strong></div>
         <div><span>A*</span><strong>{nav?.status ? nav.status.toUpperCase().replaceAll('_', ' ') : (navCapable ? 'IDLE' : 'OFF')}</strong></div>
         <div><span>SKILL</span><strong>{nav?.skill ?? '—'}</strong></div>
         <div><span>PATH</span><strong>{nav?.path_cells ? `${nav.path_cells} cells` : '—'}</strong></div>
@@ -93,6 +95,15 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>CUSTO A*</span><strong>{nav?.plan_cost == null ? '—' : number(nav.plan_cost)}</strong></div>
       </div>
     </section>
+    {sceneExits.length > 0 && <section className="panel actors-panel">
+      <div className="section-head"><span>SAÍDAS DE CENA OBSERVADAS</span><span className="muted">COLLISION SURFACE</span></div>
+      <div className="actors-grid">{sceneExits.map(exit =>
+        <div className="actor-item" key={exit.exit_index}>
+          <span>EXIT {exit.exit_index} · ENTRANCE 0x{exit.entrance_index.toString(16).toUpperCase()}</span>
+          <strong>POS {vector(exit.position)} · ${exit.samples} amostras · use traverse_exit</strong>
+        </div>)}
+      </div>
+    </section>}
     <section className="panel actors-panel">
       <div className="section-head"><span>TERRENO / TRAVESSIA</span><span className="muted">{traversal}</span></div>
       <div className="actors-grid">{probes.map((probe, index) =>
