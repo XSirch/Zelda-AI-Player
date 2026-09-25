@@ -788,7 +788,15 @@ class Runtime:
                     game = self.bridge.state or game
                 state_payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
                     "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
-                    "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh"})
+                    "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
+                    "scene_exits"})
+                # Transition surfaces are intentionally opaque to the model. Native
+                # exit/entrance indices stay local for diagnostics only; exposing them
+                # could let pretrained game knowledge shortcut empirical exploration.
+                state_payload["scene_exits"] = [
+                    {"position": list(row.position)}
+                    for row in game.scene_exits
+                ]
                 if game.room_actors:
                     # Avoid sending the rendered subset twice once the room-wide observer is available.
                     state_payload.pop("nearby_actors", None)
