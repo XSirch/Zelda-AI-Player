@@ -114,15 +114,43 @@ async def _backtrack_recovery(bridge: Bridge, observation: GameState, attempt: i
         "world_changed": False}
 
 
+def _resolve_scene_exit(game: GameState, target_position: list[float] | tuple[float, float, float] | None):
+    """Match a model-selected coordinate back to an exit surface observed by the engine."""
+    if not game.scene_exits or target_position is None:
+        return None
+    if len(game.scene_exits) == 1:
+        return game.scene_exits[0]
+    target = tuple(float(v) for v in target_position)
+    nearest = min(game.scene_exits, key=lambda row: math.dist(row.position, target))
+    tolerance = max(120.0, (game.navmesh.step * 2.0) if game.navmesh.available else 120.0)
+    return nearest if math.dist(nearest.position, target) <= tolerance else None
+
+
 async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameState,
-                          *, actor_mode: bool, talk: bool = False, interact: bool = False) -> dict:
+                          *, actor_mode: bool, talk: bool = False, interact: bool = False,
+                          exit_mode: bool = False) -> dict:
     before = bridge.state
     if not before or not before.player:
         return {"status": "failed", "reason": "player_state_unavailable", "skill": decision.skill}
 
+    if exit_mode:
+        if "scene_exit_surfaces" not in before.capabilities or "local_navmesh" not in before.capabilities:
+            return {"status": "failed", "reason": "scene_exit_bridge_upgrade_required",
+                "skill": decision.skill}
+        selected_exit = _resolve_scene_exit(before, decision.args.target_position)
+        if selected_exit is None:
+            return {"status": "failed", "reason": "scene_exit_not_observed",
+                "skill": decision.skill}
+        selected_exit_index = selected_exit.exit_index
+        selected_entrance_index = selected_exit.entrance_index
+    else:
+        selected_exit = None
+        selected_exit_index = None
+        selected_entrance_index = None
+
     deadline = time.monotonic() + min(8.0, max(0.25, decision.args.duration_ms / 1000))
     start_position = before.player.position
-    stop_distance = decision.args.stop_distance
+    stop_distance = 4.0 if exit_mode else decision.args.stop_distance
     interaction_mode = talk or interact
     if stop_distance is None:
         stop_distance = 90.0 if interaction_mode else (70.0 if actor_mode else 35.0)
@@ -146,8 +174,10 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
             if not current or not bridge.connected:
                 raise RuntimeError("bridge_disconnected")
             if (current.instance_id, current.scene_epoch) != (observation.instance_id, observation.scene_epoch):
-                return {"status": "completed" if interaction_mode else "interrupted",
-                    "reason": "world_transition_after_interaction" if interaction_mode else "world_changed",
+                return {"status": "completed" if (interaction_mode or exit_mode) else "interrupted",
+                    "reason": ("scene_exit_traversed" if exit_mode else
+                        ("world_transition_after_interaction" if interaction_mode else "world_changed")),
+                    "exit_index": selected_exit_index, "entrance_index": selected_entrance_index,
                     "skill": decision.skill}
             if not current.in_game or not current.player:
                 return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
@@ -158,8 +188,11 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     "reason": "dialogue_opened", "skill": decision.skill,
                     "target_distance": last_actor.distance if last_actor else None}
             if current.cutscene_active:
-                return {"status": "completed" if interaction_mode else "interrupted",
-                    "reason": "interaction_started" if interaction_mode else "cutscene_started", "skill": decision.skill}
+                return {"status": "completed" if (interaction_mode or exit_mode) else "interrupted",
+                    "reason": ("scene_exit_transition_started" if exit_mode else
+                        ("interaction_started" if interaction_mode else "cutscene_started")),
+                    "exit_index": selected_exit_index, "entrance_index": selected_entrance_index,
+                    "skill": decision.skill}
 
             if actor_mode:
                 actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params, decision.args.target_actor_uid)
@@ -167,6 +200,14 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     return {"status": "failed", "reason": "target_actor_not_observed", "skill": decision.skill}
                 last_actor = actor
                 target = actor.position
+            elif exit_mode:
+                exit_row = next((row for row in current.scene_exits
+                    if row.exit_index == selected_exit_index), selected_exit)
+                if exit_row is None:
+                    return {"status": "failed", "reason": "scene_exit_lost",
+                        "exit_index": selected_exit_index, "skill": decision.skill}
+                selected_exit = exit_row
+                target = exit_row.position
             else:
                 target = decision.args.target_position
 
@@ -179,46 +220,60 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     skill=decision.skill, status="reached", target_position=list(target),
                     waypoint=None, path_cells=last_path_cells, probe_safe=True,
                     navmesh_used=navmesh_used, target_distance=target_distance)
-                if not interaction_mode:
+                if not interaction_mode and not exit_mode:
                     return {"status": "completed", "reason": "target_reached",
                         "target_distance": target_distance,
                         "distance": math.dist(start_position, current.player.position),
                         "navmesh_used": navmesh_used, "path_cells": last_path_cells,
                         "acknowledged": acknowledged, "skill": decision.skill}
+                if exit_mode:
+                    # The coordinate is guaranteed to lie on a collision polygon whose
+                    # SceneExitIndex is non-zero. Do not stop short: crossing onto that
+                    # floor polygon is what makes Player_HandleExitsAndVoids transition.
+                    bridge.set_navigation_debug(
+                        skill=decision.skill, status="entering_exit_surface",
+                        target_position=list(target), waypoint=list(target),
+                        path_cells=last_path_cells, probe_safe=True, navmesh_used=True,
+                        target_distance=target_distance, exit_index=selected_exit_index,
+                        entrance_index=selected_entrance_index)
 
-                before_event_ids = {event.id for event in current.events}
-                before_epoch = current.scene_epoch
-                acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.12)
-                interaction_deadline = time.monotonic() + 1.2
-                while time.monotonic() < interaction_deadline:
-                    sample = bridge.state
-                    if not sample:
-                        break
-                    if sample.scene_epoch != before_epoch:
-                        return {"status": "completed", "reason": "world_transition_after_interaction",
-                            "target_distance": target_distance, "acknowledged": acknowledged,
-                            "skill": decision.skill}
-                    if sample.dialogue.active:
-                        return {"status": "completed", "reason": "dialogue_opened",
-                            "target_distance": target_distance,
-                            "distance": math.dist(start_position, sample.player.position) if sample.player else None,
-                            "acknowledged": acknowledged, "skill": decision.skill}
-                    if sample.cutscene_active:
-                        return {"status": "completed", "reason": "interaction_started",
-                            "target_distance": target_distance, "acknowledged": acknowledged,
-                            "skill": decision.skill}
-                    outcome = next((event for event in sample.events
-                        if event.id not in before_event_ids and event.kind in {
-                            "item_received", "scene_flag_set", "scene_flag_unset"}), None)
-                    if outcome is not None:
-                        return {"status": "completed", "reason": outcome.kind,
-                            "detail": outcome.detail, "target_distance": target_distance,
-                            "acknowledged": acknowledged, "skill": decision.skill}
-                    await asyncio.sleep(0.08)
-                return {"status": "failed",
-                    "reason": "talk_interaction_not_started" if talk else "interaction_unconfirmed",
-                    "target_distance": target_distance, "acknowledged": acknowledged,
-                    "skill": decision.skill}
+                if not interaction_mode:
+                    # Exit mode continues through the normal NavMesh steering below.
+                    pass
+                else:
+                    before_event_ids = {event.id for event in current.events}
+                    before_epoch = current.scene_epoch
+                    acknowledged |= await _pulse(bridge, buttons=BUTTONS["A"], hold_ms=90, settle_s=0.12)
+                    interaction_deadline = time.monotonic() + 1.2
+                    while time.monotonic() < interaction_deadline:
+                        sample = bridge.state
+                        if not sample:
+                            break
+                        if sample.scene_epoch != before_epoch:
+                            return {"status": "completed", "reason": "world_transition_after_interaction",
+                                "target_distance": target_distance, "acknowledged": acknowledged,
+                                "skill": decision.skill}
+                        if sample.dialogue.active:
+                            return {"status": "completed", "reason": "dialogue_opened",
+                                "target_distance": target_distance,
+                                "distance": math.dist(start_position, sample.player.position) if sample.player else None,
+                                "acknowledged": acknowledged, "skill": decision.skill}
+                        if sample.cutscene_active:
+                            return {"status": "completed", "reason": "interaction_started",
+                                "target_distance": target_distance, "acknowledged": acknowledged,
+                                "skill": decision.skill}
+                        outcome = next((event for event in sample.events
+                            if event.id not in before_event_ids and event.kind in {
+                                "item_received", "scene_flag_set", "scene_flag_unset"}), None)
+                        if outcome is not None:
+                            return {"status": "completed", "reason": outcome.kind,
+                                "detail": outcome.detail, "target_distance": target_distance,
+                                "acknowledged": acknowledged, "skill": decision.skill}
+                        await asyncio.sleep(0.08)
+                    return {"status": "failed",
+                        "reason": "talk_interaction_not_started" if talk else "interaction_unconfirmed",
+                        "target_distance": target_distance, "acknowledged": acknowledged,
+                        "skill": decision.skill}
 
             steer_target = target
             if "local_navmesh" in current.capabilities:
@@ -332,7 +387,8 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
         waypoint=None, path_cells=last_path_cells, probe_safe=None,
         navmesh_used=navmesh_used,
         target_distance=(last_actor.distance if last_actor else None))
-    return {"status": "failed", "reason": "navigation_timeout",
+    return {"status": "failed", "reason": "scene_exit_not_triggered" if exit_mode else "navigation_timeout",
+        "exit_index": selected_exit_index, "entrance_index": selected_entrance_index,
         "target_distance": (last_actor.distance if last_actor else None),
         "distance": math.dist(start_position, after.player.position) if after and after.player else None,
         "navmesh_used": navmesh_used, "path_cells": last_path_cells,
