@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import math
 import time
 from collections import deque
 from pydantic import ValidationError
@@ -210,10 +211,13 @@ class Runtime:
     def _transition_origin_position(self, old: GameState):
         decision = self.last_decision or {}
         args = decision.get("args") or {}
-        if decision.get("skill") == "traverse_exit":
+        if decision.get("skill") == "traverse_exit" and old.scene_exits:
             target = args.get("target_position")
             if isinstance(target, list) and len(target) == 3:
-                return tuple(float(v) for v in target)
+                requested = tuple(float(v) for v in target)
+                nearest = min(old.scene_exits, key=lambda row: math.dist(row.position, requested))
+                if math.dist(nearest.position, requested) <= 140.0:
+                    return nearest.position
         if old.player and old.scene_exits:
             nearest = min(old.scene_exits, key=lambda row: math.dist(row.position, old.player.position))
             if math.dist(nearest.position, old.player.position) <= 140.0:
