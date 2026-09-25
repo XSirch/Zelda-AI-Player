@@ -1357,6 +1357,10 @@ void Snapshot() {
                             {"half_extent", 0}, {"cells", json::array()}};
         serialized = state.dump();
     }
+    if (full && serialized.size() > 59000) {
+        state["traversal_affordances"] = json::array();
+        serialized = state.dump();
+    }
     while (serialized.size() > 59000 && state["room_actors"].is_array() && !state["room_actors"].empty()) {
         state["room_actors"].erase(state["room_actors"].end() - 1);
         state["room_actors_truncated"] = true;
