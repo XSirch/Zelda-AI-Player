@@ -416,7 +416,7 @@ json NavigationMesh(Player* player) {
     constexpr int HALF_EXTENT = 4;
     constexpr int SIDE = HALF_EXTENT * 2 + 1;
     constexpr float STEP = 70.0f;
-    constexpr float MAX_HEIGHT_DELTA = 45.0f;
+    constexpr float MAX_HEIGHT_DELTA = 24.0f;
     constexpr float BODY_CLEARANCE = 18.0f;
     constexpr float MIDPOINT_TOLERANCE = 36.0f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
@@ -465,7 +465,7 @@ json NavigationMesh(Player* player) {
             Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
             const float x = origin.x + gx * STEP;
             const float z = origin.z + gz * STEP;
-            if (!sampleFloor(x, z, origin.y + 200.0f, cell.y)) continue;
+            if (!sampleFloor(x, z, player->actor.floorHeight + 64.0f, cell.y)) continue;
             cell.floor = true;
 
             // Approximate Link's body radius at each graph node. The current
@@ -523,7 +523,7 @@ json NavigationMesh(Player* player) {
                 float middleY = 0.0f;
                 if (!sampleFloor(
                         (x + nxWorld) * 0.5f, (z + nzWorld) * 0.5f,
-                        std::max(cell.y, neighbor.y) + 180.0f, middleY)) {
+                        std::max(cell.y, neighbor.y) + 32.0f, middleY)) {
                     continue;
                 }
                 const float expectedMiddle = (cell.y + neighbor.y) * 0.5f;
