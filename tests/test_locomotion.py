@@ -288,6 +288,9 @@ def test_dodge_safety_uses_link_relative_probe(state):
     unsafe = {**safe, "delta_y": -80}
     game = type(state).model_validate({**state.model_dump(), "navigation_probes": [unsafe]})
     assert not _dodge_direction_safe(game, "back")
+    wall = {**safe, "wall_hit": True, "wall_distance": 55}
+    game = type(state).model_validate({**state.model_dump(), "navigation_probes": [wall]})
+    assert not _dodge_direction_safe(game, "back")
 
 
 def test_control_stick_direction_accepts_engine_backflip_bin(state):
