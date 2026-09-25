@@ -20,7 +20,8 @@ def test_enemy_key_is_per_class_and_player_age(state):
 
 
 def test_policy_learning_changes_preference():
-    state_name = combat_state_key(distance=80, threat_score=1, locked=True)
+    state_name = combat_state_key(distance=80, threat_score=1, locked=True,
+        closing_rate=0, facing_player=False, recent_damage=False)
     profile = {"enemy_key": "child:5:7", "encounters": 3, "policy": {"states": {}, "best_by_state": {}}}
     policy = profile["policy"]
     for _ in range(6):
@@ -32,6 +33,7 @@ def test_policy_learning_changes_preference():
 
 
 def test_store_persists_enemy_learning_without_cross_model_leak(store, state):
+    state_name = combat_state_key(distance=80, threat_score=1, locked=True)
     actor = enemy(actor_id=7, name="Deku Baba")
     key = enemy_key(state, actor)
     p1 = store.combat_profile("adaptive:model-a", key, actor_id=7, category=5,
@@ -40,27 +42,29 @@ def test_store_persists_enemy_learning_without_cross_model_leak(store, state):
     result = {"outcome": "win", "health_lost": 0, "confirmed_hits": 1, "attacks": 2,
         "dodges": 0, "guards": 0, "duration_ms": 900,
         "learning_trace": [
-            {"state": "melee|low|locked|active", "action": "attack", "reward": 1.2, "detail": "hit"},
-            {"state": "melee|low|locked|active", "action": "attack", "reward": 3.0, "detail": "defeat"},
+            {"state": state_name, "action": "attack", "reward": 1.2, "detail": "hit"},
+            {"state": state_name, "action": "attack", "reward": 3.0, "detail": "defeat"},
         ]}
     updated = store.record_combat_encounter("adaptive:model-a", "run-x",
         {"enemy_key": key, "actor_id": 7, "category": 5, "enemy_name": "Deku Baba",
          "params": 0, "scene": 85, "room": 0}, result)
     assert updated["encounters"] == 1 and updated["wins"] == 1
-    assert updated["policy"]["best_by_state"]["melee|low|locked|active"]["action"] == "attack"
+    assert updated["policy"]["best_by_state"][state_name]["action"] == "attack"
     assert store.list_combat_profiles("adaptive:model-b") == []
     encounters = store.recent_combat_encounters(p1["id"])
     assert encounters[0]["outcome"] == "win"
 
 
 def test_losses_update_separate_profile_counters(store, state):
+    loss_state = combat_state_key(distance=30, threat_score=5, locked=True,
+        closing_rate=100, facing_player=True, recent_damage=True)
     actor = enemy(actor_id=9, name="Stalfos")
     key = enemy_key(state, actor)
     store.record_combat_encounter("adaptive:model-a", "run-y",
         {"enemy_key": key, "actor_id": 9, "category": 5, "enemy_name": "Stalfos",
          "params": 0, "scene": 5, "room": 2},
         {"outcome": "loss", "health_lost": 48, "learning_trace": [
-            {"state": "point_blank|high|locked|active", "action": "attack", "reward": -4,
+            {"state": loss_state, "action": "attack", "reward": -4,
              "detail": "player_defeated"}]})
     profile = store.combat_profile("adaptive:model-a", key)
     assert profile["losses"] == 1
@@ -105,3 +109,16 @@ def test_human_hint_taints_combat_learning_for_run(store, state):
     runtime.state = "running"
     runtime.hint("block before attacking")
     assert runtime.combat_learning_tainted
+
+
+def test_state_key_distinguishes_enemy_motion_and_orientation():
+    steady = combat_state_key(distance=80, threat_score=2, locked=True,
+        closing_rate=0, facing_player=False, recent_damage=False)
+    rush = combat_state_key(distance=80, threat_score=2, locked=True,
+        closing_rate=120, facing_player=True, recent_damage=False)
+    hurt = combat_state_key(distance=80, threat_score=5, locked=True,
+        closing_rate=120, facing_player=True, recent_damage=True)
+    assert steady != rush != hurt
+    assert "steady|away|clean" in steady
+    assert "rush|facing|clean" in rush
+    assert "hurt_recently" in hurt

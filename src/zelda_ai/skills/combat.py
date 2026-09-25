@@ -331,7 +331,9 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
             assessment = _assessment(current, actor, previous_distance,
                 max(.001, now-previous_at), now < recent_damage_until)
             state = combat_state_key(distance=actor.distance, threat_score=assessment.threat_score,
-                locked=assessment.locked, disabled=assessment.disabled)
+                locked=assessment.locked, disabled=assessment.disabled,
+                closing_rate=assessment.closing_rate, facing_player=assessment.facing_player,
+                recent_damage=assessment.recent_damage)
             shield = _shield_equipped(current)
             available = _available_actions(current, assessment, shield)
 

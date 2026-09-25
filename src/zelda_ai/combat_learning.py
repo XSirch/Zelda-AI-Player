@@ -21,7 +21,8 @@ def empty_policy() -> dict:
 
 
 def combat_state_key(*, distance: float, threat_score: int, locked: bool,
-                     disabled: bool = False) -> str:
+                     disabled: bool = False, closing_rate: float = 0.0,
+                     facing_player: bool = False, recent_damage: bool = False) -> str:
     if distance > 160:
         band = "far"
     elif distance > 105:
@@ -31,7 +32,17 @@ def combat_state_key(*, distance: float, threat_score: int, locked: bool,
     else:
         band = "point_blank"
     threat = "high" if threat_score >= 4 else ("medium" if threat_score >= 2 else "low")
-    return f"{band}|{threat}|{'locked' if locked else 'unlocked'}|{'disabled' if disabled else 'active'}"
+    if closing_rate >= 80:
+        motion = "rush"
+    elif closing_rate >= 25:
+        motion = "closing"
+    elif closing_rate <= -25:
+        motion = "retreating"
+    else:
+        motion = "steady"
+    facing = "facing" if facing_player else "away"
+    damage = "hurt_recently" if recent_damage else "clean"
+    return f"{band}|{threat}|{motion}|{facing}|{damage}|{'locked' if locked else 'unlocked'}|{'disabled' if disabled else 'active'}"
 
 
 def _stat(policy: dict, state: str, action: str) -> dict:
