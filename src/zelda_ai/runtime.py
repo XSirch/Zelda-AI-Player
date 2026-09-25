@@ -119,7 +119,7 @@ def _model_state_payload(game: GameState) -> dict:
         "target_position": list(row.target_position),
         "distance": row.distance,
         "height_delta": row.height_delta,
-    } for row in game.traversal_affordances]
+    } for row in game.traversal_affordances[:12]]
     payload = _strip_transition_ids(payload)
     if game.room_actors:
         payload.pop("nearby_actors", None)
