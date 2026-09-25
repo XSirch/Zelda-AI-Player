@@ -29,6 +29,7 @@ Implemented skills:
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
 - explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger; wall recovery backs away before turning
 - traverse(up/down): local terrain traversal for stairs, drops, ladders and climbable surfaces. It uses player ladder/ledge state plus navigation_probes and monitors real vertical progress
+- traverse_to(up/down, target_position): composite local controller for an observed traversal_affordance. Copy target_position from that affordance's approach_position; it uses NavMesh/A* to reach the approach, revalidates the affordance, then executes traverse locally
 - traverse_exit(target_position): walk through an observed collision scene-exit surface. Use only a target_position copied from scene_exits. It deliberately does NOT stop short; success is the engine starting/changing the scene transition
 
 The state contract includes scene + scene_name, room, day_time/is_night, player pose/collision state, camera,
@@ -40,8 +41,10 @@ nearby_actors (small rendered/proximity subset), and room_actors: the active act
 plus room-global actors, independent of camera rendering. room_actor_count reports the eligible active count and
 room_actors_truncated says whether the 64-entry safety cap was reached. player also exposes wall_flags and traversal
 state (climbing_ladder, hanging_ledge, climbing_ledge, can_climb, can_down). navigation_probes samples floor height
-around Link in eight directions at two radii; delta_y is relative to Link's current floor and lets you detect stairs,
-safe drops and changes in elevation that are not actors. The motor controller also receives a compact local NavMesh
+around Link in eight directions at two radii and remains the fast safety layer. traversal_affordances is a slower,
+collision-derived local search over 16 directions out to 280 game units. It may report stairs_or_slope_up/down,
+ledge_down, ladder_up/down or climbable_wall_up, each with an approach_position and physical target_position.
+These are currently loaded local geometry observations, not hidden route knowledge. The motor controller also receives a compact local NavMesh
 derived directly from SoH collision and replans with A*; the raw mesh is intentionally kept out of your prompt to avoid
 token waste. navigation_mesh only summarizes whether that local controller is available. scene_exits lists CURRENTLY
 OBSERVED floor collision surfaces whose SceneExitIndex is non-zero. In the model observation these are
@@ -79,10 +82,14 @@ including Link's House, leave through a floor/threshold transition polygon and h
 If no scene-exit surface is observed but a door actor is present, call interact_with_actor on that door DIRECTLY.
 Do not invent a door actor, do not press A on a scene-exit surface, and do not use free turn/move probes before
 traverse_exit/interact_with_actor. Replan only if the appropriate local controller returns a real failure.
-For vertical movement, do not search for a ladder actor first: ladders/stairs can be collision geometry. If the goal
-is to go lower or higher, use traverse(down/up) directly. The traversal controller consumes navigation_probes and
-ladder/ledge state locally. If Link is already climbing a ladder, down/up stick is handled continuously without
-another model call. Do not press A repeatedly on a ladder; in OoT A may dismount/drop rather than climb.
+For vertical movement, do not search for a ladder actor first: ladders/stairs are often collision geometry.
+If Link is already at/attached to the vertical route, use traverse(down/up). If traversal_affordances contains a
+candidate in the needed direction that is not immediately under Link, use traverse_to and copy that candidate's
+approach_position exactly. Prefer an observed stairs_or_slope_down / ladder_down / ledge_down over wandering with
+free move/turn when the objective requires descending; similarly prefer stairs_or_slope_up / ladder_up /
+climbable_wall_up for ascent. The composite controller handles A* approach and local traversal. If Link is already
+climbing a ladder, down/up stick is handled continuously without another model call. Do not press A repeatedly on
+a ladder; in OoT A may dismount/drop rather than climb.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
 For any actor associated with a door, warp, loading zone or transition, actor name/description/category/id/params describe
