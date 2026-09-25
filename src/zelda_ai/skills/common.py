@@ -27,16 +27,29 @@ def _is_door_actor(actor) -> bool:
 def _probe_stick(direction: str, game: GameState | None = None) -> tuple[int, int]:
     """Convert a Link-relative terrain-probe direction into SoH raw stick input."""
     if game is not None and game.player is not None:
-        offsets = {
-            "forward": 0x0000,
-            "forward_left": 0x2000,
-            "left": 0x4000,
-            "back_left": 0x6000,
-            "back": 0x8000,
-            "back_right": -0x6000,
-            "right": -0x4000,
-            "forward_right": -0x2000,
-        }
+        if "probe_yaw_v2" in game.capabilities:
+            offsets = {
+                "forward": 0x0000,
+                "forward_left": 0x2000,
+                "left": 0x4000,
+                "back_left": 0x6000,
+                "back": 0x8000,
+                "back_right": -0x6000,
+                "right": -0x4000,
+                "forward_right": -0x2000,
+            }
+        else:
+            # v2.5 and earlier mislabeled +yaw samples as "right".
+            offsets = {
+                "forward": 0x0000,
+                "forward_right": 0x2000,
+                "right": 0x4000,
+                "back_right": 0x6000,
+                "back": 0x8000,
+                "back_left": -0x6000,
+                "left": -0x4000,
+                "forward_left": -0x2000,
+            }
         return _world_yaw_stick(game, game.player.yaw + offsets[direction], 48)
 
     # Compatibility fallback for callers without a GameState.
