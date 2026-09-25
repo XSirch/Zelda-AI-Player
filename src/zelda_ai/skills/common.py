@@ -195,8 +195,7 @@ def _dodge_direction_safe(game: GameState, direction: str) -> bool:
     if not probes:
         return False
     probe = min(probes, key=lambda p: p.distance)
-    return abs(probe.delta_y) <= 22.0 and not (
-        probe.wall_hit and probe.wall_distance is not None and probe.wall_distance < 32.0)
+    return abs(probe.delta_y) <= 22.0 and not probe.wall_hit
 
 
 async def _perform_dodge(bridge: Bridge, observation: GameState, direction: str,
