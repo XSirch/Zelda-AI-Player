@@ -29,6 +29,7 @@ Implemented skills:
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
 - explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger; wall recovery backs away before turning
 - traverse(up/down): local terrain traversal for stairs, drops, ladders and climbable surfaces. It uses player ladder/ledge state plus navigation_probes and monitors real vertical progress
+- traverse_exit(target_position): walk through an observed collision scene-exit surface. Use only a target_position copied from scene_exits. It deliberately does NOT stop short; success is the engine starting/changing the scene transition
 
 The state contract includes scene + scene_name, room, entrance_index, day_time/is_night, player pose/collision state, camera,
 raw inventory/equipment plus inventory_named entries (name/item_id/ammo when applicable) for items Link owns, pause-menu cursor state,
@@ -42,8 +43,10 @@ state (climbing_ladder, hanging_ledge, climbing_ledge, can_climb, can_down). nav
 around Link in eight directions at two radii; delta_y is relative to Link's current floor and lets you detect stairs,
 safe drops and changes in elevation that are not actors. The motor controller also receives a compact local NavMesh
 derived directly from SoH collision and replans with A*; the raw mesh is intentionally kept out of your prompt to avoid
-token waste. navigation_mesh only summarizes whether that local controller is available. This is current engine state,
-not a hidden future-world list:
+token waste. navigation_mesh only summarizes whether that local controller is available. scene_exits lists CURRENTLY
+OBSERVED floor collision surfaces whose SceneExitIndex is non-zero, with a guaranteed point on the surface,
+exit_index, entrance_index and sample count. These are physical transition triggers already present in loaded geometry,
+not hidden future-world knowledge. This is current engine state, not a hidden future-world list:
 actors from unloaded rooms/scenes are not exposed.
 
 Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
@@ -68,10 +71,12 @@ Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is 
 and room_actors to ground interactions; use nearby_actors only as the compact rendered/proximity subset.
 Each actor now includes category_name and room as well as numeric category/id/params. Doors can therefore be
 identified directly with category_name="door" (numeric category 10), and chests with category_name="chest".
-In an interior where the objective requires leaving or continuing, inspect room_actors first. If a door
-is observed, call interact_with_actor on that door DIRECTLY. Do not use explore_area, navigate_to the door's
-position, approach_actor repeatedly, or free turn/move probes first: the door-specific controller owns facing,
-camera centering, straight-line approach and the A press. Replan only if that controller returns a real failure.
+In an interior where the objective requires leaving or continuing, inspect scene_exits AND room_actors.
+If scene_exits contains a reachable surface, use traverse_exit with that observed position: many OoT interiors,
+including Link's House, leave through a floor/threshold transition polygon and have no door actor at all.
+If no scene-exit surface is observed but a door actor is present, call interact_with_actor on that door DIRECTLY.
+Do not invent a door actor, do not press A on a scene-exit surface, and do not use free turn/move probes before
+traverse_exit/interact_with_actor. Replan only if the appropriate local controller returns a real failure.
 For vertical movement, do not search for a ladder actor first: ladders/stairs can be collision geometry. If the goal
 is to go lower or higher, use traverse(down/up) directly. The traversal controller consumes navigation_probes and
 ladder/ledge state locally. If Link is already climbing a ladder, down/up stick is handled continuously without
@@ -83,8 +88,9 @@ Game-over save/continue/respawn is handled automatically without a model call. T
 as completed when the final Ganon actor defeat emits game_completed. known_world_edges contains only transitions
 previously traversed by this same adaptive namespace. Use an edge's
 from_position as an observed exit coordinate when returning to a known destination; do not assume an unobserved
-edge exists. When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor/
-interact_with_actor over many one-step move calls. Use interact_with_actor rather than a blind interact when a
+edge exists. When a currently observed scene_exits coordinate is the intended transition, prefer traverse_exit.
+For other concrete observed coordinates or actors, prefer navigate_to/approach_actor/talk_to_actor/interact_with_actor
+over many one-step move calls. Use interact_with_actor rather than a blind interact when a
 specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. In an unknown area with no concrete target, use explore_area
 for several seconds; once a transition is discovered its exit/spawn coordinates become a known_world_edge.
 navigate_to/approach_actor/follow_actor/explore_area use a moving collision-derived local NavMesh plus A*. They can
