@@ -210,8 +210,11 @@ async def _observe_dodge_effect(bridge: Bridge, start: GameState, expected_direc
 
 
 def _dodge_direction_safe(game: GameState, direction: str) -> bool:
+    probe_direction = direction
+    if "probe_yaw_v2" not in game.capabilities:
+        probe_direction = {"left": "right", "right": "left"}.get(direction, direction)
     probes = [p for p in game.navigation_probes
-              if p.direction == direction and p.distance <= 70.0 and p.floor_found and p.delta_y is not None]
+              if p.direction == probe_direction and p.distance <= 70.0 and p.floor_found and p.delta_y is not None]
     if not probes:
         return False
     probe = min(probes, key=lambda p: p.distance)
