@@ -44,11 +44,11 @@ around Link in eight directions at two radii; delta_y is relative to Link's curr
 safe drops and changes in elevation that are not actors. The motor controller also receives a compact local NavMesh
 derived directly from SoH collision and replans with A*; the raw mesh is intentionally kept out of your prompt to avoid
 token waste. navigation_mesh only summarizes whether that local controller is available. scene_exits lists CURRENTLY
-OBSERVED floor collision surfaces whose SceneExitIndex is non-zero, with a guaranteed point on the surface,
-exit_index, raw entrance_index and sample count. These are physical transition triggers already present in loaded geometry,
-not hidden future-world knowledge. entrance_index identifies the loaded trigger but entrance randomizer may remap its
-destination, so never assume the destination until the transition is actually observed. This is current engine state,
-not a hidden future-world list:
+OBSERVED floor collision surfaces whose SceneExitIndex is non-zero. In the model observation these are
+intentionally reduced to an opaque physical target position only. Native exit/entrance identifiers are kept local to
+the harness for diagnostics and are NOT shown to you. A transition surface means only "walking here may transition";
+its destination is unknown until the game actually changes scene/room. This is current engine state, not a hidden
+future-world list:
 actors from unloaded rooms/scenes are not exposed.
 
 Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
@@ -85,10 +85,15 @@ ladder/ledge state locally. If Link is already climbing a ladder, down/up stick 
 another model call. Do not press A repeatedly on a ladder; in OoT A may dismount/drop rather than climb.
 Observed actors expose engine IDs/params/positions/focus_position and, when SoH ActorDB has metadata, name/description.
 Those labels are provided only for actors already observed; empty labels mean unknown. Never invent a label from an ID.
+For any actor associated with a door, warp, loading zone or transition, actor name/description/category/id/params describe
+the local object only; they MUST NOT be used to infer where it leads. Treat every untraversed transition as destination-unknown,
+even if pretrained game knowledge suggests an answer. Only an actually observed world_transition or a previously learned
+known_world_edges entry establishes a destination.
 
 Game-over save/continue/respawn is handled automatically without a model call. The runtime also ends the run
 as completed when the final Ganon actor defeat emits game_completed. known_world_edges contains only transitions
-previously traversed by this same adaptive namespace. Use an edge's
+previously traversed by this same adaptive namespace and is the only allowed source of learned transition destinations.
+Use an edge's
 from_position as an observed exit coordinate when returning to a known destination; do not assume an unobserved
 edge exists. When a currently observed scene_exits coordinate is the intended transition, prefer traverse_exit.
 For other concrete observed coordinates or actors, prefer navigate_to/approach_actor/talk_to_actor/interact_with_actor
