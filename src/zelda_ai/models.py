@@ -15,7 +15,7 @@ Skill = Literal[
     "menu_cancel", "menu_assign", "continue_gameover", "play_song",
     "navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
     "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-    "fight_enemy", "explore_area", "manipulate_object", "traverse",
+    "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_exit",
 ]
 
 
@@ -70,6 +70,21 @@ class NavigationProbe(StrictModel):
     wall_hit: bool = False
     wall_distance: float | None = Field(default=None, ge=0, le=500)
     wall_flags: int = Field(default=0, ge=0, le=65535)
+
+
+class SceneExitObservation(StrictModel):
+    """Currently observed collision surface that triggers a scene/entrance transition."""
+    exit_index: int = Field(ge=1, le=31)
+    entrance_index: int = Field(ge=-1, le=2147483647)
+    position: tuple[float, float, float]
+    samples: int = Field(ge=1, le=10000)
+
+    @field_validator("position")
+    @classmethod
+    def finite_position(cls, value):
+        if not all(math.isfinite(v) for v in value):
+            raise ValueError("Non-finite scene-exit position")
+        return value
 
 
 class NavigationMeshSnapshot(StrictModel):
@@ -271,6 +286,7 @@ class GameState(StrictModel):
     room_actor_count: int = Field(default=0, ge=0, le=4096)
     room_actors_truncated: bool = False
     navigation_probes: list[NavigationProbe] = Field(default_factory=list, max_length=16)
+    scene_exits: list[SceneExitObservation] = Field(default_factory=list, max_length=31)
     navmesh: NavigationMeshSnapshot = Field(default_factory=NavigationMeshSnapshot)
     cutscene_active: bool = False
     paused: bool = False
@@ -391,12 +407,14 @@ class Decision(StrictModel):
             raise ValueError("menu_assign requires a C-button slot")
         if self.skill not in {"navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
                               "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-                              "fight_enemy", "explore_area", "manipulate_object", "traverse"} and self.args.duration_ms > 2000:
+                              "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_exit"} and self.args.duration_ms > 2000:
             raise ValueError("primitive skills are limited to 2000 ms")
         if self.skill == "play_song" and self.args.song is None:
             raise ValueError("play_song requires song")
         if self.skill == "navigate_to" and self.args.target_position is None:
             raise ValueError("navigate_to requires target_position")
+        if self.skill == "traverse_exit" and self.args.target_position is None:
+            raise ValueError("traverse_exit requires an observed scene-exit target_position")
         if self.skill in {"approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor", "fight_enemy",
                            "manipulate_object"} and self.args.target_actor_id is None:
             raise ValueError(f"{self.skill} requires target_actor_id")
