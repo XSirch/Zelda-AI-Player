@@ -63,7 +63,7 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
         actor = (_matching_actor(current, decision.args.target_actor_id,
                     decision.args.target_actor_params, decision.args.target_actor_uid)
                  if current else None)
-        if approach.get("status") != "completed" and (actor is None or actor.distance > 180.0):
+        if approach.get("status") != "completed":
             return {"status": approach.get("status", "failed"),
                 "reason": f"door_approach_failed:{approach.get('reason', 'unknown')}",
                 "distance": math.dist(start_position, current.player.position)
