@@ -45,8 +45,10 @@ safe drops and changes in elevation that are not actors. The motor controller al
 derived directly from SoH collision and replans with A*; the raw mesh is intentionally kept out of your prompt to avoid
 token waste. navigation_mesh only summarizes whether that local controller is available. scene_exits lists CURRENTLY
 OBSERVED floor collision surfaces whose SceneExitIndex is non-zero, with a guaranteed point on the surface,
-exit_index, entrance_index and sample count. These are physical transition triggers already present in loaded geometry,
-not hidden future-world knowledge. This is current engine state, not a hidden future-world list:
+exit_index, raw entrance_index and sample count. These are physical transition triggers already present in loaded geometry,
+not hidden future-world knowledge. entrance_index identifies the loaded trigger but entrance randomizer may remap its
+destination, so never assume the destination until the transition is actually observed. This is current engine state,
+not a hidden future-world list:
 actors from unloaded rooms/scenes are not exposed.
 
 Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
