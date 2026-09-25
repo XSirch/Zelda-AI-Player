@@ -49,8 +49,9 @@ export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnosti
         <div><span>EDGES</span><strong>press {result.presses}/{result.expected_edges} · release {result.releases}/{result.expected_edges}</strong></div>
         <div><span>LATÊNCIA E2E</span><strong>P50 {ms(result.latency_ms.p50)} · P95 {ms(result.latency_ms.p95)} · P99 {ms(result.latency_ms.p99)}</strong></div>
         <div><span>FILA NATIVA</span><strong>P95 {ms(result.native_queue_ms.p95)}</strong></div>
-        <div><span>EFEITO</span><strong>{result.effect_confirmed == null ? 'não avaliado' : (result.effect_confirmed ? 'confirmado' : 'não observado')}{result.hopping_seen ? ' · HOPPING' : ''}</strong></div>
-        <div><span>DESLOCAMENTO</span><strong>final {result.distance == null ? '—' : `${result.distance.toFixed(1)} u`} · pico {result.max_distance.toFixed(1)} u</strong></div>
+        <div><span>EFEITO</span><strong>{result.effect_confirmed == null ? 'não avaliado' : (result.effect_confirmed ? 'confirmado' : 'não observado')}{result.hopping_seen ? ' · HOPPING' : ''}{result.hop_direction != null ? ` · DIR ${result.hop_direction}/${result.expected_hop_direction ?? '—'}` : ''}</strong></div>
+        <div><span>DESLOCAMENTO</span><strong>final {result.distance == null ? '—' : `${result.distance.toFixed(1)} u`} · pico {result.max_distance.toFixed(1)} u · esperado {result.expected_distance.toFixed(1)} u</strong></div>
+        {(result.stick_x != null || result.stick_y != null) && <div><span>STICK RAW</span><strong>X {result.stick_x ?? '—'} · Y {result.stick_y ?? '—'}</strong></div>}
       </div>}
     </div>
     <p className="muted content">{rt?.enabled

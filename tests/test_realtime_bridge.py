@@ -28,7 +28,7 @@ def full(state, **changes):
 
 def fast(state, **changes):
     values = full(state)
-    values.update(seq=11, kind='fast')
+    values.update(seq=11, kind='fast', camera_input_yaw=0, mirrored_world=False)
     values.update(changes)
     return {name: values[name] for name in RealtimeState.model_fields}
 

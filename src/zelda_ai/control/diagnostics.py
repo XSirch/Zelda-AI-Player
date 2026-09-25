@@ -8,9 +8,9 @@ from collections.abc import Iterable
 from ..bridge import Bridge
 from ..control.authority import ControlRevoked
 from ..models import GameState, InputReceipt
+from ..skills.common import _perform_dodge
 
 A, B, Z = 0x8000, 0x4000, 0x2000
-PLAYER_STATE2_HOPPING = 1 << 19
 ACTIONS = {"tap_a", "tap_b", "target", "forward", "back", "backflip", "stress_a", "stress_b"}
 
 
@@ -113,22 +113,6 @@ async def _motion(bridge: Bridge, direction: str, *, seconds: float = 1.0) -> tu
     return receipts, reason
 
 
-async def _observe_hop_effect(bridge: Bridge, start: GameState, timeout: float = .75) -> tuple[bool, float]:
-    current = bridge.state
-    max_distance = 0.0
-    hopping_seen = False
-    deadline = time.monotonic() + timeout
-    while current and time.monotonic() < deadline:
-        if current.player and start.player and current.scene_epoch == start.scene_epoch:
-            max_distance = max(max_distance, math.dist(start.player.position, current.player.position))
-            hopping_seen |= bool(current.player.state_flags_2 & PLAYER_STATE2_HOPPING)
-        try:
-            current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
-        except RuntimeError:
-            break
-    return hopping_seen, round(max_distance, 2)
-
-
 async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
     if action not in ACTIONS:
         raise ValueError("Unknown input diagnostic")
@@ -142,7 +126,12 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
     reason = "completed"
     effect_confirmed = None
     hopping_seen = False
+    hop_direction = None
+    expected_hop_direction = None
     max_distance = 0.0
+    expected_distance = 0.0
+    stick_x = None
+    stick_y = None
 
     try:
         with bridge.input_scope(f"diagnostic:{action}"):
@@ -170,16 +159,17 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
                 else:
                     edge_button = A
                     expected_edges = 1
-                    receipts.append(await bridge.sequence_receipt([
-                        {"buttons": Z, "stick_x": 0, "stick_y": -60, "ticks": 1},
-                        {"buttons": Z | A, "stick_x": 0, "stick_y": -60, "ticks": 1},
-                        {"buttons": Z, "stick_x": 0, "stick_y": -60, "ticks": 2},
-                        {"buttons": Z, "stick_x": 0, "stick_y": 0, "ticks": 1},
-                    ], baseline_buttons=Z, edge_buttons=A))
-                    hopping_seen, max_distance = await _observe_hop_effect(bridge, start)
-                    effect_confirmed = hopping_seen or max_distance >= 10.0
-                    if not effect_confirmed:
-                        reason = "backflip_effect_not_observed"
+                    dodge = await _perform_dodge(bridge, start, "back")
+                    receipts.append(dodge["receipt"])
+                    effect_confirmed = dodge["confirmed"]
+                    hopping_seen = dodge["hopping_seen"]
+                    hop_direction = dodge["hop_direction"]
+                    expected_hop_direction = dodge["expected_hop_direction"]
+                    max_distance = dodge["max_distance"]
+                    expected_distance = dodge["expected_distance"]
+                    stick_x = dodge["stick_x"]
+                    stick_y = dodge["stick_y"]
+                    reason = dodge["reason"]
     except ControlRevoked:
         reason = "control_revoked"
     except RuntimeError as exc:
@@ -192,7 +182,7 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
             reason = "input_not_consumed"
         elif expected_edges and (summary["presses"] != expected_edges or summary["releases"] != expected_edges):
             reason = "edge_mismatch"
-    status = "completed" if reason in {"completed", "motion_window_complete"} and summary["lost"] == 0 else (
+    status = "completed" if reason in {"completed", "motion_window_complete", "dodge_confirmed"} and summary["lost"] == 0 else (
         "interrupted" if reason in {"gameplay_state_changed", "state_feedback_timeout",
             "terrain_probe_not_safe", "bridge_disconnected", "state_feedback_stale", "control_revoked"} else "failed")
     distance = None
@@ -202,7 +192,9 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
         "action": action, "status": status, "reason": reason, **summary,
         "duration_ms": round((time.monotonic()-started)*1000, 2),
         "effect_confirmed": effect_confirmed, "hopping_seen": hopping_seen,
-        "max_distance": max_distance, "distance": distance,
+        "hop_direction": hop_direction, "expected_hop_direction": expected_hop_direction,
+        "max_distance": max_distance, "expected_distance": expected_distance, "distance": distance,
+        "stick_x": stick_x, "stick_y": stick_y,
         "start_position": list(start.player.position) if start and start.player else None,
         "end_position": list(after.player.position) if after and after.player else None,
     }

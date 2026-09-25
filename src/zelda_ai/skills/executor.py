@@ -9,30 +9,13 @@ from ..control.authority import owned
 from ..control.feedback import consumed, feedback, is_realtime
 from ..models import Decision, GameState
 from .catalog import BUTTONS, DIALOGUE_SKILLS, MENU_SKILLS, controller_input
-from .common import _is_door_actor, _matching_actor
+from .common import _is_door_actor, _matching_actor, _perform_dodge
 from .menus import _choose_dialogue, _equip_gear, _equip_item, _play_song
 from .navigation import _explore_area, _face_target, _follow_actor, _navigate_local
 from .interactions import _interact_with_door, _manipulate_object
 from .aim import _aim_at
 from .combat import _fight_enemy
 from .traversal import _traverse_local
-
-PLAYER_STATE2_HOPPING = 1 << 19
-
-async def _observe_hop(bridge: Bridge, before: GameState, timeout: float = .65) -> tuple[bool, float]:
-    current = bridge.state
-    hopping = False
-    max_distance = 0.0
-    deadline = time.monotonic() + timeout
-    while current and time.monotonic() < deadline:
-        if current.player and before.player and current.scene_epoch == before.scene_epoch:
-            hopping |= bool(current.player.state_flags_2 & PLAYER_STATE2_HOPPING)
-            max_distance = max(max_distance, math.dist(before.player.position, current.player.position))
-        try:
-            current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
-        except RuntimeError:
-            break
-    return hopping, max_distance
 
 async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     if decision.args.target_actor_id is not None and decision.args.target_actor_uid is None:
@@ -103,20 +86,19 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
             "backflip", "sidestep", "jump_attack", "roll", "pause_toggle", "menu_confirm", "menu_cancel",
             "menu_assign", "continue_gameover", "menu_move"}:
         if decision.skill in {"backflip", "sidestep"}:
-            row = await bridge.sequence_receipt([
-                {"buttons": BUTTONS["Z"], "stick_x": x, "stick_y": y, "ticks": 1},
-                {"buttons": buttons, "stick_x": x, "stick_y": y, "ticks": 1},
-                {"buttons": BUTTONS["Z"], "stick_x": x, "stick_y": y, "ticks": 2},
-                {"buttons": BUTTONS["Z"], "stick_x": 0, "stick_y": 0, "ticks": 1},
-            ], baseline_buttons=BUTTONS["Z"], edge_buttons=BUTTONS["A"])
-            delivered = bool(row and row.first_tick > 0 and row.status not in {"rejected", "cancelled", "superseded"})
-            hopping, moved = await _observe_hop(bridge, before) if delivered else (False, 0.0)
-            effect_confirmed = hopping or moved >= 10.0
-            return {"status": "completed" if effect_confirmed else "failed",
-                "reason": "dodge_confirmed" if effect_confirmed else
-                          ("input_consumed_effect_unconfirmed" if delivered else "input_not_consumed"),
-                "distance": moved, "hopping_seen": hopping, "acknowledged": delivered,
-                "ack_stage": "consumed", "effect_confirmed": effect_confirmed, "skill": decision.skill}
+            direction = "back" if decision.skill == "backflip" else decision.args.direction
+            dodge = await _perform_dodge(bridge, before, direction)
+            row = dodge["receipt"]
+            delivered = bool(row and row.first_tick > 0 and
+                             row.status not in {"rejected", "cancelled", "superseded"})
+            return {"status": "completed" if dodge["confirmed"] else "failed",
+                "reason": dodge["reason"], "distance": dodge["max_distance"],
+                "expected_distance": dodge["expected_distance"], "hopping_seen": dodge["hopping_seen"],
+                "hop_direction": dodge["hop_direction"],
+                "expected_hop_direction": dodge["expected_hop_direction"],
+                "stick_x": dodge["stick_x"], "stick_y": dodge["stick_y"],
+                "acknowledged": delivered, "ack_stage": "consumed",
+                "effect_confirmed": dodge["confirmed"], "skill": decision.skill}
         delivered = await bridge.pulse(buttons=buttons, stick_x=x, stick_y=y,
             hold_ticks=1, edge_buttons=buttons & ~BUTTONS["Z"] if decision.skill == "jump_attack" else buttons)
         return {"status": "completed" if delivered else "failed",

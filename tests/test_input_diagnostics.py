@@ -48,3 +48,8 @@ def test_receipt_summary_does_not_turn_missing_delivery_into_success():
     assert summary["consumed"] == 1
     assert summary["lost"] == 2
     assert summary["presses"] == summary["releases"] == 1
+
+
+def test_hop_direction_field_accepts_engine_backflip_classification(state):
+    state.player.hop_direction = 2
+    assert state.player.hop_direction == 2
