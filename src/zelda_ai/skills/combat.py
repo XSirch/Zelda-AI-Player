@@ -9,6 +9,7 @@ from ..bridge import Bridge
 from ..combat_learning import combat_state_key, choose_action, empty_policy, update_policy
 from ..control.feedback import consumed, feedback, is_realtime
 from ..models import ActorObservation, Decision, GameState
+from ..navmesh import plan_navmesh, waypoint_probe_safe
 from .catalog import BUTTONS
 from .common import (
     _dodge_direction_safe,
@@ -55,6 +56,16 @@ def _candidate_is(game: GameState, actor: ActorObservation) -> bool:
     if actor.actor_uid and candidate.actor_uid:
         return candidate.actor_uid == actor.actor_uid
     return candidate.actor_id == actor.actor_id and candidate.params == actor.params
+
+
+def _combat_nav_target(game: GameState, actor: ActorObservation) -> tuple[float, float, float] | None:
+    """Return a collision-safe motor waypoint toward an observed enemy."""
+    if "local_navmesh" not in game.capabilities:
+        return actor.position
+    plan = plan_navmesh(game, actor.position)
+    if plan is None or not waypoint_probe_safe(game, plan.waypoint):
+        return None
+    return plan.waypoint
 
 
 def _facing_player(game: GameState, actor: ActorObservation) -> bool:
@@ -153,16 +164,30 @@ async def _do_action(bridge: Bridge, action: str, game: GameState, actor: ActorO
     if action == "acquire":
         if _candidate_is(game, actor):
             command = bridge.send(buttons=BUTTONS["Z"], lease_ms=220)
+            detail = "lock_acquire"
         else:
-            x, y, _ = _steer_to(game, actor.position, .35)
-            command = bridge.send(stick_x=x, stick_y=y, lease_ms=180)
+            steer_target = _combat_nav_target(game, actor)
+            if steer_target is None:
+                command = bridge.send(lease_ms=140)
+                detail = "navmesh_blocked_acquire"
+            else:
+                x, y, _ = _steer_to(game, steer_target, .35)
+                command = bridge.send(stick_x=x, stick_y=y, lease_ms=180)
+                detail = "lock_acquire"
         await feedback(bridge, game, .1)
         after = bridge.state or game
-        return {"ok": consumed(bridge, command), "detail": "lock_acquire",
-                "locked": _locked_to(after, actor), "after": after}
+        return {"ok": consumed(bridge, command) and detail == "lock_acquire",
+                "detail": detail, "locked": _locked_to(after, actor), "after": after}
 
     if action == "approach":
-        x, y, _ = _steer_to(game, actor.position, min(.68, max(.34, strength)))
+        steer_target = _combat_nav_target(game, actor)
+        if steer_target is None:
+            command = bridge.send(buttons=BUTTONS["Z"] if _locked_to(game, actor) else 0,
+                                  lease_ms=140)
+            await feedback(bridge, game, .1)
+            return {"ok": False, "detail": "navmesh_blocked_approach",
+                    "after": bridge.state or game}
+        x, y, _ = _steer_to(game, steer_target, min(.68, max(.34, strength)))
         command = bridge.send(buttons=BUTTONS["Z"] if _locked_to(game, actor) else 0,
                               stick_x=x, stick_y=y, lease_ms=200)
         await feedback(bridge, game, .1)
