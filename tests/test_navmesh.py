@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from zelda_ai.models import GameState, NavigationProbe
-from zelda_ai.navmesh import plan_navmesh, primitive_move_safe, waypoint_probe_safe
+from zelda_ai.navmesh import _probe_direction, plan_navmesh, primitive_move_safe, waypoint_probe_safe
 
 
 def with_mesh(state, cells, *, origin=(0, 0, 0), step=70.0, half_extent=4, probes=None):
@@ -139,6 +139,32 @@ def test_long_probe_blocks_roll_before_distant_wall(state):
         game, "forward", probe_distance=145.0, wall_clearance=120.0)
 
 
+def test_probe_direction_matches_player_stick_direction_enum(state):
+    game = state.model_copy(update={"player": state.player.model_copy(update={"yaw": 0})})
+    assert _probe_direction(game, (70, 0, 0)) == "left"
+    assert _probe_direction(game, (-70, 0, 0)) == "right"
+
+
+def test_primitive_left_and_right_validate_the_matching_probe(state):
+    left_unsafe = {
+        "direction": "left", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    right_safe = {
+        "direction": "right", "distance": 70, "floor_found": True,
+        "floor_y": 0, "delta_y": 0, "floor_type": 0,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "camera_input_yaw": 0,
+        "navigation_probes": [left_unsafe, right_safe],
+    })
+    assert not primitive_move_safe(game, "left")
+    assert primitive_move_safe(game, "right")
+
+
 def test_camera_relative_primitive_move_uses_world_heading_probe(state):
     right = {
         "direction": "right", "distance": 70, "floor_found": False,
@@ -166,6 +192,8 @@ def test_navmesh_contract_rejects_duplicate_cells(state):
 def test_native_bridge_exposes_navmesh_only_as_slow_state():
     native = (Path(__file__).parents[1] / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
     assert 'BRIDGE_BUILD = "rt-input-v2.6"' in native
+    assert '"forward", "forward_left", "left", "back_left"' in native
+    assert '"back", "back_right", "right", "forward_right"' in native
     assert '"local_navmesh"' in native
     assert "json NavigationMesh(Player* player)" in native
     assert '"nearby_actors", "navmesh"' in native
