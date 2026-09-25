@@ -104,12 +104,7 @@ def _world_yaw_stick(game: GameState, desired_world_yaw: float,
 
 
 def _steer_to(game: GameState, target: tuple[float, float, float], strength: float) -> tuple[int, int, float]:
-    """Convert a world-space target into the raw N64 stick consumed by OoT.
-
-    Player_ProcessControlStick computes:
-        world_yaw = Camera_GetInputDirYaw() + Math_Atan2S(stick_y, -stick_x)
-    so the inverse transform must negate the sine term for raw stick X.
-    """
+    """Convert a world-space target into the exact raw stick expected by OoT."""
     if not game.player:
         return 0, 0, float("inf")
     px, _, pz = game.player.position
@@ -117,30 +112,10 @@ def _steer_to(game: GameState, target: tuple[float, float, float], strength: flo
     distance = math.hypot(dx, dz)
     if distance < 1e-6:
         return 0, 0, 0.0
-
-    desired_yaw = math.atan2(dx, dz)
-    if game.camera_input_yaw is not None:
-        camera_yaw = game.camera_input_yaw * math.pi / 32768.0
-    elif game.camera_eye is not None and game.camera_at is not None:
-        fx = game.camera_at[0] - game.camera_eye[0]
-        fz = game.camera_at[2] - game.camera_eye[2]
-        if math.hypot(fx, fz) >= 1e-4:
-            camera_yaw = math.atan2(fx, fz)
-        else:
-            camera_yaw = game.player.yaw * math.pi / 32768.0
-    else:
-        camera_yaw = game.player.yaw * math.pi / 32768.0
-
-    stick_angle = (desired_yaw - camera_yaw + math.pi) % (2 * math.pi) - math.pi
+    desired_yaw = math.atan2(dx, dz) * 32768.0 / math.pi
     scale = max(28, min(80, round(80 * max(0.35, strength))))
-    stick_x = round(-math.sin(stick_angle) * scale)
-    stick_y = round(math.cos(stick_angle) * scale)
-    # Shipwright mirrors relX before deriving stick angle, so pre-mirror here
-    # to preserve the same requested world-space target.
-    if game.mirrored_world:
-        stick_x = -stick_x
-    return max(-80, min(80, stick_x)), max(-80, min(80, stick_y)), distance
-
+    stick_x, stick_y = _world_yaw_stick(game, desired_yaw, scale)
+    return stick_x, stick_y, distance
 
 PLAYER_STATE2_HOPPING = 1 << 19
 _DODGE_DIRECTION = {"left": 1, "back": 2, "right": 3}
