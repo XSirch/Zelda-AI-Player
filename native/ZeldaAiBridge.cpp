@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.7";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.8";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -424,6 +424,7 @@ json NavigationMesh(Player* player) {
     constexpr int EDGE_FLOOR_SAMPLES = 4;
     constexpr int EXIT_SCAN_HALF_EXTENT = HALF_EXTENT * 2;
     constexpr float EXIT_SCAN_STEP = 35.0f;
+    constexpr float EXIT_INTERIOR_BLEND = 0.65f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
     static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
 
@@ -448,7 +449,7 @@ json NavigationMesh(Player* player) {
     };
     struct ExitSamples {
         int count = 0;
-        float nearestDistSq = 1.0e30f;
+        float targetDistSq = 1.0e30f;
         float x = 0.0f;
         float y = 0.0f;
         float z = 0.0f;
@@ -469,14 +470,30 @@ json NavigationMesh(Player* player) {
             if (exitIndex > 0 && exitIndex < ARRAY_COUNT(exits)) {
                 auto& sample = exits[exitIndex];
                 sample.count++;
-                const float dx = x - origin.x;
-                const float dz = z - origin.z;
+
+                // The raycast point can lie exactly on the near edge of a transition
+                // triangle. Steering to that edge lets Link stop immediately before
+                // Player_HandleExitsAndVoids sees the SceneExitIndex under his center.
+                // Move the target toward the triangle centroid. A convex combination
+                // of a point on/in a triangle and its centroid stays inside the triangle.
+                Vec3f vertices[3]{};
+                CollisionPoly_GetVerticesByBgId(poly, bgId, &gPlayState->colCtx, vertices);
+                const Vec3f centroid{
+                    (vertices[0].x + vertices[1].x + vertices[2].x) / 3.0f,
+                    (vertices[0].y + vertices[1].y + vertices[2].y) / 3.0f,
+                    (vertices[0].z + vertices[1].z + vertices[2].z) / 3.0f,
+                };
+                const float targetX = x + (centroid.x - x) * EXIT_INTERIOR_BLEND;
+                const float targetY = floorY + (centroid.y - floorY) * EXIT_INTERIOR_BLEND;
+                const float targetZ = z + (centroid.z - z) * EXIT_INTERIOR_BLEND;
+                const float dx = targetX - origin.x;
+                const float dz = targetZ - origin.z;
                 const float distSq = dx * dx + dz * dz;
-                if (distSq < sample.nearestDistSq) {
-                    sample.nearestDistSq = distSq;
-                    sample.x = x;
-                    sample.y = floorY;
-                    sample.z = z;
+                if (distSq < sample.targetDistSq) {
+                    sample.targetDistSq = distSq;
+                    sample.x = targetX;
+                    sample.y = targetY;
+                    sample.z = targetZ;
                 }
             }
         }
