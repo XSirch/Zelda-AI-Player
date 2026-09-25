@@ -490,6 +490,13 @@ json NavigationMesh(Player* player) {
             &gPlayState->colCtx, &start, &end, &hit, &poly,
             true, false, false, true, &bgId) != 0;
     };
+    auto floorAt = [&](float x, float z, float startY, float& floorY) -> bool {
+        Vec3f pos{x, startY, z};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
+        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+    };
 
     for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
         for (int gx = -HALF_EXTENT; gx <= HALF_EXTENT; ++gx) {
@@ -620,11 +627,58 @@ json NavigationMesh(Player* player) {
         if (sample.count <= 0) continue;
         const int entranceIndex = gPlayState->setupExitList
             ? gPlayState->setupExitList[exitIndex - 1] : -1;
+
+        bool directReachable = false;
+        const float vx = sample.x - origin.x;
+        const float vz = sample.z - origin.z;
+        const float directDistance = std::sqrt(vx * vx + vz * vz);
+        if (directDistance <= 80.0f &&
+            std::abs(sample.y - player->actor.floorHeight) <= MAX_HEIGHT_DELTA) {
+            directReachable = true;
+            constexpr int DIRECT_FLOOR_SAMPLES = 4;
+            for (int i = 1; i <= DIRECT_FLOOR_SAMPLES; ++i) {
+                const float t = static_cast<float>(i) /
+                                static_cast<float>(DIRECT_FLOOR_SAMPLES + 1);
+                float sampledY = 0.0f;
+                if (!floorAt(origin.x + vx * t, origin.z + vz * t,
+                        std::max(player->actor.floorHeight, sample.y) + 32.0f,
+                        sampledY)) {
+                    directReachable = false;
+                    break;
+                }
+                const float expectedY =
+                    player->actor.floorHeight + (sample.y - player->actor.floorHeight) * t;
+                if (std::abs(sampledY - expectedY) > EDGE_FLOOR_TOLERANCE) {
+                    directReachable = false;
+                    break;
+                }
+            }
+
+            if (directReachable && directDistance > 0.001f) {
+                Vec3f start{origin.x, player->actor.floorHeight + 26.0f, origin.z};
+                Vec3f end{sample.x, sample.y + 26.0f, sample.z};
+                if (lineBlocked(start, end)) {
+                    directReachable = false;
+                } else {
+                    const float px = -vz / directDistance * BODY_CLEARANCE;
+                    const float pz = vx / directDistance * BODY_CLEARANCE;
+                    Vec3f leftStart{start.x + px, start.y, start.z + pz};
+                    Vec3f leftEnd{end.x + px, end.y, end.z + pz};
+                    Vec3f rightStart{start.x - px, start.y, start.z - pz};
+                    Vec3f rightEnd{end.x - px, end.y, end.z - pz};
+                    if (lineBlocked(leftStart, leftEnd) || lineBlocked(rightStart, rightEnd)) {
+                        directReachable = false;
+                    }
+                }
+            }
+        }
+
         result["scene_exits"].push_back({
             {"exit_index", exitIndex},
             {"entrance_index", entranceIndex},
             {"position", {sample.x, sample.y, sample.z}},
             {"samples", sample.count},
+            {"direct_reachable", directReachable},
         });
     }
     return result;
