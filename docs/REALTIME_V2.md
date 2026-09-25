@@ -1,8 +1,8 @@
-# Realtime input foundation (v2.5)
+# Realtime input foundation (v2.6)
 
 ## Delivered scope
 
-This change implements the input/observation foundation of the reviewed rollout, not a complete navigation or combat system. Existing databases, saves and provider credentials are not deleted or migrated destructively. The model continues to return typed decisions; local skills own the controller.
+This change implements the input/observation foundation plus the local Navigation V2 collision mesh; it is still not a complete global navigation or combat system. Existing databases, saves and provider credentials are not deleted or migrated destructively. The model continues to return typed decisions; local skills own the controller.
 
 - Independent resource budgets: `max_calls`, `max_tokens`, `max_cost_usd` and `max_runtime_s` accept **0 = unlimited for that field only**. Usage/cost accounting continues. Unknown usage/cost stays unknown. A finite token/cost cap still requires reconcilable accounting.
 - `max_output_tokens` remains a per-response bound (256–16384 for the OpenRouter adapter), not an unlimited run budget. Disabling harness budgets does not remove provider quotas or billing.
@@ -14,7 +14,7 @@ This change implements the input/observation foundation of the reviewed rollout,
 - Fast snapshots carry dynamic observations. Full snapshots at approximately 200 ms carry slow metadata. Fast samples require an exact full snapshot and matching scene/context. Gaps trigger resynchronization instead of mixing maps.
 - Native actor lifetime IDs prevent selecting another enemy of the same type. Lock target and targeting candidate are distinct. A bounded event journal resends unacknowledged events and reports unrecoverable gaps.
 - Basic generic combat acquires a real lock, approaches and alternates attacks with guarded recovery locally. It does not infer enemy animation openings, guarantee boss victories or use hidden solution flags.
-- Movement uses new feedback rather than a fixed 100/140 ms sleep in the updated controllers. Stuck windows do not become shorter merely because sampling is faster. RT retreat uses observed short floor probes; missing floor stops that recovery instead of blindly reversing over a ledge.
+- Movement uses new feedback rather than a fixed 100/140 ms sleep in the updated controllers. Stuck windows do not become shorter merely because sampling is faster. RT retreat uses observed short floor probes; missing floor stops that recovery instead of blindly reversing over a ledge.\n- Full snapshots also carry a compact 9×9 moving NavMesh generated from SoH floor/wall collision. Reciprocal links require walk-safe height, continuous midpoint floor, no corner cutting and a body-width corridor. Python A* chooses local waypoints; fast 70-unit probes can veto a stale waypoint immediately. The raw mesh is not sent to the model prompt.
 - Local skill implementations moved from the monolithic runtime into `skills/`. Compatibility exports remain. Natural-language summary/goal strings no longer change the selected executable skill.
 - The learning contract is versioned separately. Failed/intervened traces are not promoted as autonomous routes. Unsolicited replay before the planner is disabled; prior experience remains stored.
 
@@ -26,7 +26,7 @@ This change implements the input/observation foundation of the reviewed rollout,
    The installer recognizes the verified original or the previous hook, validates the reconstructed upstream file, backs up files outside the CMake source glob, and installs every required header. It does not reset the checkout or touch game assets.
 4. Reconfigure and rebuild the pinned Shipwright C++ project. **An existing soh.exe does not change when adapter source changes.**
 5. Run `npm install` and `npm run build` in `web`, then restart `uv run zelda-ai serve` and the newly built game.
-6. The panel must report `rt-input-v2.5`, protocol 2 and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
+6. The panel must report `rt-input-v2.6`, protocol 2, the `local_navmesh` capability and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
 
 A new backend is compatible with the old V1 bridge for rollback/testing, but V1 acknowledgment means acceptance only. The new V2 native bridge requires this backend. To fully roll back, restore both the previous backend and game binary/adapter from the preserved backup.
 
@@ -48,7 +48,7 @@ Use zero only for the caps that should be disabled. There is no automatic retry 
 
 See STATUS.md for checks actually executed. The standalone C++ scheduler and synthetic UDP tests do not certify SoH gameplay. Acceptance-to-consumption latency is measured inside the native process; it is not video latency or time until Link completes an action.
 
-Still pending: the actual Windows/SoH integration build, recorded input/animation tests, measured latency under load, full original project suite and production Vite build; a geometry-derived navmesh/A* corridor with dynamic obstacle updates; per-enemy/boss action adapters; goal-bound certified trajectory replay; full isolation of SQLite/UI work into another process. Full snapshots/events can still invoke synchronous persistence, so do not claim a hard real-time scheduling guarantee.
+Still pending: the actual Windows/SoH integration build, recorded input/animation/navigation tests, measured latency and NavMesh sampling cost under load, full original project suite and production Vite build; global/cross-room route planning plus explicit special links and actor-obstacle avoidance; per-enemy/boss action adapters; goal-bound certified trajectory replay; full isolation of SQLite/UI work into another process. Full snapshots/events can still invoke synchronous persistence, so do not claim a hard real-time scheduling guarantee.
 
 Validate pause/unpause, scene transitions, human handoff with held buttons, repeated A/B edges, lost/reordered packets, two identical enemies crossing, provider timeouts, and a finite budget beside an unlimited budget before long autonomous runs.
 
