@@ -122,3 +122,26 @@ def test_state_key_distinguishes_enemy_motion_and_orientation():
     assert "steady|away|clean" in steady
     assert "rush|facing|clean" in rush
     assert "hurt_recently" in hurt
+
+
+def test_multiple_skill_windows_for_same_actor_uid_are_one_episode(store, state):
+    actor = enemy(actor_id=11, name="Wolfos")
+    key = enemy_key(state, actor)
+    enemy_data = {"enemy_key": key, "actor_id": 11, "actor_uid": "wolfos-life-1",
+        "category": 5, "enemy_name": "Wolfos", "params": 0, "scene": 1, "room": 1}
+    first = {"outcome": "incomplete", "health_lost": 16, "attacks": 1, "confirmed_hits": 0,
+        "dodges": 1, "guards": 0, "duration_ms": 12000, "learning_trace": [
+            {"state": "melee|high|rush|facing|clean|locked|active",
+             "action": "dodge_left", "reward": .4, "detail": "ok"}]}
+    second = {"outcome": "win", "health_lost": 0, "attacks": 2, "confirmed_hits": 1,
+        "dodges": 0, "guards": 0, "duration_ms": 5000, "learning_trace": [
+            {"state": "melee|low|steady|away|clean|locked|active",
+             "action": "attack", "reward": 3, "detail": "defeat"}]}
+    p1 = store.record_combat_encounter("adaptive:model-a", "run-w", enemy_data, first)
+    assert p1["encounters"] == 1 and p1["incomplete"] == 1 and p1["wins"] == 0
+    p2 = store.record_combat_encounter("adaptive:model-a", "run-w", enemy_data, second)
+    assert p2["encounters"] == 1 and p2["incomplete"] == 0 and p2["wins"] == 1
+    rows = store.recent_combat_encounters(p2["id"])
+    assert len(rows) == 1 and rows[0]["outcome"] == "win"
+    assert rows[0]["data"]["attacks"] == 3
+    assert rows[0]["data"]["duration_ms"] == 17000

@@ -25,7 +25,7 @@ Implemented skills:
 - aim_at(C slot, target_actor_id or target_position): holds an equipped ranged item, feedback-aligns camera yaw/pitch and releases a shot; alignment is success, a hit is NOT assumed
 - face_target(target_actor_id or target_position): orient Link using yaw feedback
 - shield_face(target_actor_id or target_position): orient Link then sustain R; useful for directional shield/reflection mechanics, but reflection success is NOT assumed
-- fight_enemy(target_actor_id, optional target_actor_params): generic Z-target/melee controller, 4000-10000 ms; success requires a defeat event
+- fight_enemy(target_actor_id, optional target_actor_params): opponent-specific learned combat controller, 4000-12000 ms. Motor actions run locally at bridge feedback speed; success requires a native defeat event
 - manipulate_object(target_actor_id, forward/back): approach, grab and push/pull; succeeds only on actor displacement/context/event evidence
 - explore_area(): bounded deterministic exploration; stops early on a new actor/context action/transition/danger; wall recovery backs away before turning
 - traverse(up/down): local terrain traversal for stairs, drops, ladders and climbable surfaces. It uses player ladder/ledge state plus navigation_probes and monitors real vertical progress
@@ -56,6 +56,7 @@ Boots and tunic changes. Manual menu skills remain available for unusual pages n
 prompt is actionable, use continue_gameover. play_song does not open/equip the ocarina; equip/use the ocarina first.
 
 memory is scene-local experience; recent_global_memory carries recent strategic facts learned in other scenes.
+enemy_learning contains compact experience for enemy classes visible in the current room, isolated to this model + effort + contract when memory_mode is Adaptive. encounters/wins/losses summarize prior fights and best_by_state maps observed combat states to actions that earned higher reward. Treat it as fallible learned experience, not hidden game knowledge: a low-sample tactic may be wrong, and unknown enemies should be explored through fight_enemy rather than assigned a made-up strategy.
 Use progress to avoid repeating already-completed acquisition goals and to recognize when a capability or
 dungeon requirement became available. progress is not a hidden quest-flag oracle: absence of a quest item does
 not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
@@ -91,9 +92,11 @@ The local navigate/explore controllers also perform reverse-arc recovery automat
 telemetry indicates they are stuck. The runtime may replay a previously successful adaptive trajectory before
 calling you; replay success/failure appears in events. Current skills do
 not yet solve global collision paths. aim_at provides local ranged alignment but does not infer line-of-sight, puzzle
-semantics or hit confirmation. fight_enemy is suitable for ordinary observed enemies;
-bosses with invulnerability phases or item-specific mechanics still require you to reason about the opening and use
-the appropriate item/interaction rather than repeatedly invoking generic melee.
+semantics or hit confirmation. fight_enemy learns a separate local policy for each observed enemy class from damage dealt/received, lock,
+movement, defense, confirmed dodge and native defeat outcomes. Reuse it across encounters instead of manually
+micromanaging attack/defend/backflip one action at a time. Bosses with invulnerability phases or item-specific
+mechanics still require you to reason about the prerequisite/opening and use the appropriate item/interaction;
+once melee combat is actually applicable, fight_enemy can learn the motor tactic for that opponent.
 If stuck_score rises or a stuck_detected event appears, change strategy. Prefer an explicit short move(back)
 when manual clearance is useful, then rotate/recenter and probe a genuinely different heading; abandon the local
 route if it still fails. An auto_unstick event means the runtime already performed a reverse escape, so reason from

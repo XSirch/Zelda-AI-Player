@@ -95,12 +95,10 @@ def _assessment(game: GameState, actor: ActorObservation, previous_distance: flo
 def _available_actions(game: GameState, assessment: CombatAssessment, shield: bool) -> list[str]:
     if not assessment.locked:
         return ["acquire"]
-    if assessment.distance > 160:
-        return ["approach"]
     actions = ["hold"]
-    if assessment.distance > 105:
+    if assessment.distance > 48:
         actions.append("approach")
-    else:
+    if assessment.distance <= 105:
         actions.append("attack")
     if shield:
         actions.append("guard")
