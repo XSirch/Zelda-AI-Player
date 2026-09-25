@@ -101,7 +101,10 @@ def test_semantic_traversal_failure_does_not_increase_stuck_score(store, state):
     runtime = Runtime(Bridge("x" * 32, True), store, {})
     runtime.stuck_score = 5
     decision = Decision(goal="descend", summary="go down", skill="traverse",
-        args=SkillArgs(direction="down", duration_ms=8000, strength=.7),
+        args=SkillArgs(direction="down", duration_ms=8000, strength=.7,
+            slot=None, choice_index=None, song=None, target_actor_id=None,
+            target_actor_uid=None, target_actor_params=None, target_position=None,
+            stop_distance=None, item_id=None),
         memory_note=None)
     runtime._update_stuck(decision, {"status": "failed", "reason": "traversal_timeout"})
     assert runtime.stuck_score == 4
