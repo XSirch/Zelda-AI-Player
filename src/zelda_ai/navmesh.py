@@ -256,8 +256,19 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
         return False
     if abs(probe.delta_y) > 24.0:
         return False
-    if probe.wall_hit and (probe.wall_distance is None or probe.wall_distance < wall_clearance):
-        return False
+    if probe.wall_hit:
+        if probe.wall_distance is None:
+            return False
+        if game.player:
+            waypoint_distance = math.hypot(
+                waypoint[0] - game.player.position[0],
+                waypoint[2] - game.player.position[2],
+            )
+        else:
+            waypoint_distance = probe.distance
+        required_clearance = min(probe.distance, waypoint_distance + 18.0)
+        if probe.wall_distance < max(wall_clearance, required_clearance):
+            return False
     return True
 
 
