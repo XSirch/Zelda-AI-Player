@@ -156,7 +156,8 @@ def _best_auto_traversal_affordance(game: GameState, direction: str):
             row.approach_position[0] - game.player.position[0],
             row.approach_position[2] - game.player.position[2],
         )
-        if horizontal <= 30.0:
+        approach_vertical = abs(row.approach_position[1] - game.player.position[1])
+        if horizontal <= 30.0 and approach_vertical <= 24.0:
             route_cost = 0.0
         elif game.navmesh.available:
             plan = plan_navmesh(game, row.approach_position)
