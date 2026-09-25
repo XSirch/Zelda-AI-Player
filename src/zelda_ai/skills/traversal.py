@@ -121,7 +121,7 @@ def _immediate_traversal_evidence(game: GameState, direction: str) -> bool:
                (p.wall_flags & 0x06) for p in game.navigation_probes):
             return True
         return any(p.distance <= 75.0 and p.floor_found and p.delta_y is not None and
-                   -120.0 <= p.delta_y <= -8.0 for p in game.navigation_probes)
+                   -70.0 <= p.delta_y <= -8.0 for p in game.navigation_probes)
 
     if (player.climbing_ladder or player.climbing_ledge or player.can_climb or
             game.context_action.label == "climb" or (player.wall_flags & 0x0A)):
@@ -147,7 +147,7 @@ def _best_auto_traversal_affordance(game: GameState, direction: str):
         "climbable_wall_up": 10.0,
         "stairs_or_slope_down": 20.0,
         "stairs_or_slope_up": 20.0,
-        "ledge_down": 90.0,
+        "ledge_down": 300.0,
     }
     scored = []
     step = game.navmesh.step if game.navmesh.available else 70.0
