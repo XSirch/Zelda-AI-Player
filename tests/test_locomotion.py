@@ -1,5 +1,6 @@
 from zelda_ai.models import Decision, SkillArgs
-from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _rotate_stick_quadrants
+from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _probe_stick, _rotate_stick_quadrants, _world_yaw_stick
+import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
 
 
@@ -103,12 +104,73 @@ def test_local_servo_steers_toward_camera_forward(state):
     assert distance == 100.0
 
 
-def test_local_servo_steers_right_when_target_is_camera_right(state):
-    game = state.model_copy(update={"camera_eye": (0.0, 0.0, -10.0),
-        "camera_at": (0.0, 0.0, 0.0)})
+def test_local_servo_matches_soh_raw_stick_sign_for_positive_world_yaw(state):
+    game = state.model_copy(update={"camera_input_yaw": 0, "mirrored_world": False})
     x, y, _ = _steer_to(game, (100.0, 0.0, 0.0), 0.8)
-    assert x > 0
+    # SoH uses Math_Atan2S(relY, -relX), so +90 world yaw requires raw X < 0.
+    assert x < 0
     assert abs(y) <= 1
+
+
+def test_world_yaw_stick_respects_exact_camera_yaw_and_mirroring(state):
+    game = state.model_copy(update={"camera_input_yaw": 16384, "mirrored_world": False})
+    assert _world_yaw_stick(game, 16384, 70) == (0, 70)
+    assert _world_yaw_stick(game, 0, 70) == (70, 0)
+    mirrored = game.model_copy(update={"mirrored_world": True})
+    assert _world_yaw_stick(mirrored, 0, 70) == (-70, 0)
+
+
+def test_door_final_micro_step_allows_door_wall_but_rejects_intervening_wall(state):
+    door = {"actor_id": 9, "actor_uid": "door-1", "name": "En_Door", "description": "Door",
+        "category": 10, "category_name": "door", "room": 0, "params": 2,
+        "position": [0, 0, 100], "focus_position": [0, 20, 100], "distance": 100.0,
+        "targeted": False, "drawn": False, "text_id": 0}
+    probe = {"direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": 0, "delta_y": 0, "floor_type": 0,
+        "wall_hit": True, "wall_distance": 100, "wall_flags": 0}
+    game = type(state).model_validate({
+        **state.model_dump(), "capabilities": ["local_navmesh"],
+        "room_actors": [door], "room_actor_count": 1, "navigation_probes": [probe],
+    })
+    actor = game.room_actors[0]
+    assert interactions._door_step_safe(game, actor)
+    blocked = type(state).model_validate({
+        **game.model_dump(),
+        "navigation_probes": [{**probe, "wall_distance": 30}],
+    })
+    assert not interactions._door_step_safe(blocked, blocked.room_actors[0])
+
+
+def test_door_does_not_bypass_failed_navmesh_approach(state, monkeypatch):
+    import asyncio
+
+    door = {"actor_id": 9, "actor_uid": "door-1", "name": "En_Door", "description": "Door",
+        "category": 10, "category_name": "door", "room": 0, "params": 2,
+        "position": [160, 0, 0], "focus_position": [160, 20, 0], "distance": 160.0,
+        "targeted": False, "drawn": False, "text_id": 0}
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh"],
+        "room_actors": [door],
+        "room_actor_count": 1,
+    })
+    nav = decision("interact_with_actor", None, duration=5000, target_actor_id=9,
+        target_actor_params=2).model_copy(update={
+            "args": decision("interact_with_actor", None, duration=5000, target_actor_id=9,
+                target_actor_params=2).args.model_copy(update={"target_actor_uid": "door-1"})
+        })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    async def no_path(_bridge, _decision, _observation, *, actor_mode, talk=False, interact=False):
+        return {"status": "failed", "reason": "navigation_no_path", "acknowledged": False}
+
+    monkeypatch.setattr(interactions, "_navigate_local", no_path)
+    result = asyncio.run(interactions._interact_with_door(FakeBridge(game), nav, game))
+    assert result["status"] == "failed"
+    assert result["reason"] == "door_approach_failed:navigation_no_path"
 
 
 def test_explicit_exit_intent_promotes_unique_room_door(state):
@@ -245,6 +307,23 @@ def test_aim_error_and_stick_point_toward_right_and_up(state):
     assert _aim_stick(yaw, -1) < 0
 
 
+def test_probe_stick_targets_link_relative_world_direction_with_rotated_camera(state):
+    game = state.model_copy(update={"camera_input_yaw": 16384, "mirrored_world": False,
+        "capabilities": ["probe_yaw_v2"]})
+    game.player.yaw = 0
+    # Link-forward world yaw 0 is camera-left when camera input yaw is +90.
+    assert _probe_stick("forward", game) == (48, 0)
+    # OoT enum: +90 relative yaw is LEFT, and here that equals camera-forward.
+    assert _probe_stick("left", game) == (0, 48)
+
+
+def test_legacy_probe_label_left_maps_to_old_negative_yaw_sample(state):
+    game = state.model_copy(update={"camera_input_yaw": 0, "capabilities": []})
+    game.player.yaw = 0
+    # v2.5 called the -90-degree sample "left"; preserve that interpretation.
+    assert _probe_stick("left", game) == (48, 0)
+
+
 def test_player_relative_dodge_stick_uses_exact_camera_input_yaw(state):
     game = state.model_copy(update={"camera_input_yaw": 0, "mirrored_world": False})
     game.player.yaw = 0
@@ -287,6 +366,9 @@ def test_dodge_safety_uses_link_relative_probe(state):
     assert _dodge_direction_safe(game, "back")
     unsafe = {**safe, "delta_y": -80}
     game = type(state).model_validate({**state.model_dump(), "navigation_probes": [unsafe]})
+    assert not _dodge_direction_safe(game, "back")
+    wall = {**safe, "wall_hit": True, "wall_distance": 55}
+    game = type(state).model_validate({**state.model_dump(), "navigation_probes": [wall]})
     assert not _dodge_direction_safe(game, "back")
 
 

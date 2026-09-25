@@ -72,6 +72,43 @@ class NavigationProbe(StrictModel):
     wall_flags: int = Field(default=0, ge=0, le=65535)
 
 
+class NavigationMeshSnapshot(StrictModel):
+    """Compact local walkable graph produced from SoH collision on full snapshots."""
+    origin: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    step: float = Field(default=0.0, ge=0.0, le=500.0)
+    half_extent: int = Field(default=0, ge=0, le=8)
+    cells: list[tuple[int, int, float, int]] = Field(default_factory=list, max_length=289)
+
+    @property
+    def available(self) -> bool:
+        return self.step > 0 and bool(self.cells)
+
+    @field_validator("origin")
+    @classmethod
+    def finite_origin(cls, value):
+        if not all(math.isfinite(v) for v in value):
+            raise ValueError("Non-finite navmesh origin")
+        return value
+
+    @model_validator(mode="after")
+    def valid_cells(self):
+        if self.cells and self.step <= 0:
+            raise ValueError("NavMesh cells require a positive step")
+        seen: set[tuple[int, int]] = set()
+        for gx, gz, floor_y, links in self.cells:
+            if abs(gx) > self.half_extent or abs(gz) > self.half_extent:
+                raise ValueError("NavMesh cell outside declared extent")
+            if not math.isfinite(floor_y):
+                raise ValueError("Non-finite navmesh floor")
+            if links < 0 or links > 255:
+                raise ValueError("Invalid navmesh link mask")
+            key = (gx, gz)
+            if key in seen:
+                raise ValueError("Duplicate navmesh cell")
+            seen.add(key)
+        return self
+
+
 class ActorObservation(StrictModel):
     actor_uid: str | None = Field(default=None, max_length=96)
     yaw: int | None = Field(default=None, ge=-32768, le=32767)
@@ -234,6 +271,7 @@ class GameState(StrictModel):
     room_actor_count: int = Field(default=0, ge=0, le=4096)
     room_actors_truncated: bool = False
     navigation_probes: list[NavigationProbe] = Field(default_factory=list, max_length=16)
+    navmesh: NavigationMeshSnapshot = Field(default_factory=NavigationMeshSnapshot)
     cutscene_active: bool = False
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=64)

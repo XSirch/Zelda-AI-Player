@@ -4,9 +4,9 @@ Harness local para agentes jogarem **The Legend of Zelda: Ocarina of Time** no *
 
 ## Status atual
 
-**Realtime Input Foundation v2.5 está na `main`.** O projeto já separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator e budgets independentes. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
+**Realtime Input Foundation v2.6 + Navigation V2 está na `main`.** O projeto separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator, budgets independentes e navegação local por NavMesh/A*. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
 
-O próximo trabalho principal continua sendo Navigation V2 (geometria/navmesh/A*). O combate agora aprende uma política separada para cada tipo de inimigo observado; adapters específicos de animação/boss continuam sendo refinamentos futuros.
+A navegação usa uma malha móvel derivada da colisão real do SoH e A* local para contornar paredes/quinas antes de aplicar input. Links globais entre salas descarregadas, travessias especiais de puzzle e obstáculos que existem apenas como actor collider continuam sendo refinamentos futuros. O combate aprende uma política separada para cada tipo de inimigo observado.
 
 Revisão SoH fixada:
 
@@ -31,6 +31,7 @@ C:\Projetos\Shipwright-AI
 - **Input scheduler nativo:** setpoints contínuos separados de sequências discretas, deduplicação, owner epochs, watchdog monotônico e receipts de `accepted`, `consumed` e `completed`.
 - **Hook no consumo do controle:** sequências avançam nas leituras que efetivamente consomem `Input`, não em timers do Python nem em frames de renderização.
 - **Percepção estruturada:** pose, yaw, câmera, scene/room, colisão, terreno, diálogo, inventário, equipamento, targeting, atores da sala inclusive off-camera, game-over, cutscene e ocarina.
+- **Navigation V2:** o bridge gera a cada snapshot completo uma grade walkable 9×9 centrada em Link a partir de `BgCheck`; cada aresta exige piso amostrado ao longo de toda a aresta, desnível caminhável, corredor sem parede e margem lateral para o corpo. O Python usa A* em links recíprocos, não corta quinas, recentra a malha conforme Link avança e valida o próximo heading novamente nas 16 sondas rápidas antes de enviar analógico. `navigate_to`, aproximação, follow e exploração usam a malha; `move` primitivo é recusado quando a sonda indica parede/vazio/desnível inseguro.
 - **Actor UID:** inimigos iguais deixam de ser identificados apenas por `actor_id`; cada vida/spawn observado recebe identidade própria.
 - **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
 - **Skills locais:** navegação curta, porta, traverse, follow, interação, exploração, manipulação, mira, equipamento/menu e músicas.
@@ -229,8 +230,8 @@ npm run build
 
 ## Ainda pendente
 
-- navmesh/A* global derivado da geometria do jogo;
-- plataformas/obstáculos dinâmicos;
+- grafo global/cross-room e special links explícitos para saltos, ladders e puzzles;
+- obstáculos que existem apenas como actor collider e validação adicional de plataformas móveis;
 - adapters específicos de animação/abertura para inimigos e bosses;
 - validação de convergência dos perfis de combate ao longo de múltiplos encontros;
 - replay de trajetória certificado e vinculado ao objetivo atual;

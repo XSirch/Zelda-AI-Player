@@ -8,6 +8,7 @@ from ..bridge import Bridge
 from ..control.authority import owned
 from ..control.feedback import consumed, feedback, is_realtime
 from ..models import Decision, GameState
+from ..navmesh import primitive_move_safe
 from .catalog import BUTTONS, DIALOGUE_SKILLS, MENU_SKILLS, controller_input
 from .common import _is_door_actor, _matching_actor, _perform_dodge
 from .menus import _choose_dialogue, _equip_gear, _equip_item, _play_song
@@ -83,6 +84,18 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
     if decision.skill == "play_song":
         return await _play_song(bridge, decision, observation)
 
+    if decision.skill == "move" and decision.args.direction and not primitive_move_safe(before, decision.args.direction):
+        return {"status": "failed", "reason": "unsafe_navigation_probe",
+            "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
+    if decision.skill == "roll" and not primitive_move_safe(
+            before, "forward", probe_distance=145.0, wall_clearance=120.0):
+        return {"status": "failed", "reason": "unsafe_roll_probe",
+            "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
+
+    if decision.skill == "jump_attack" and not primitive_move_safe(before, "forward"):
+        return {"status": "failed", "reason": "unsafe_jump_attack_probe",
+            "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
+
     buttons, x, y = controller_input(decision)
     if is_realtime(bridge) and decision.skill in {"attack", "interact", "advance_dialogue", "camera_center",
             "backflip", "sidestep", "jump_attack", "roll", "pause_toggle", "menu_confirm", "menu_cancel",
@@ -143,6 +156,10 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
             if (not before.cutscene_active and current.cutscene_active and
                     not current.dialogue.active and decision.skill != "wait"):
                 status, reason = "interrupted", "cutscene_started"
+                break
+            if decision.skill == "move" and decision.args.direction and not primitive_move_safe(
+                    current, decision.args.direction):
+                status, reason = "failed", "unsafe_navigation_probe"
                 break
             if target_turn_units is not None and current.player:
                 delta = ((current.player.yaw - start_yaw + 32768) % 65536) - 32768

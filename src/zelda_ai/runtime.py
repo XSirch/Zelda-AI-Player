@@ -73,7 +73,7 @@ from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v6/skills-v7/trajectory-v3/prompt-v10"
+CONTRACT_VERSION = "state-v7/skills-v8/trajectory-v3/prompt-v11"
 
 
 class Runtime:
@@ -144,7 +144,8 @@ class Runtime:
                                                   "pause_menu_opened", "pause_menu_closed"}:
             self.stuck_score = 0
         elif status in {"failed", "stale"} and decision.skill in NAVIGATION_SKILLS and reason not in {
-                "target_on_different_floor", "no_traversal_affordance_observed", "world_changed_during_inference"}:
+                "target_on_different_floor", "no_traversal_affordance_observed", "world_changed_during_inference",
+                "navigation_no_path", "navigation_path_blocked"}:
             self.stuck_score = min(20, self.stuck_score + 2)
         elif decision.skill == "move" and (result.get("distance") or 0) >= 20:
             self.stuck_score = max(0, self.stuck_score - 3)
@@ -787,7 +788,7 @@ class Runtime:
                     game = self.bridge.state or game
                 state_payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
                     "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
-                    "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq"})
+                    "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh"})
                 if game.room_actors:
                     # Avoid sending the rendered subset twice once the room-wide observer is available.
                     state_payload.pop("nearby_actors", None)
@@ -799,6 +800,12 @@ class Runtime:
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
                     "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
                     "enemy_learning": self._enemy_learning_context(game),
+                    "navigation_mesh": {
+                        "available": game.navmesh.available,
+                        "cells": len(game.navmesh.cells),
+                        "step": game.navmesh.step if game.navmesh.available else None,
+                        "radius": game.navmesh.step * game.navmesh.half_extent if game.navmesh.available else None,
+                    },
                     "stuck_score": self.stuck_score,
                     "human_hints": list(self.hints)}
                 prompt = json.dumps(observation, separators=(",", ":"), ensure_ascii=False)

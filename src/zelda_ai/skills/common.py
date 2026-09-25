@@ -24,22 +24,87 @@ def _is_door_actor(actor) -> bool:
     return actor is not None and (actor.category == 10 or actor.category_name == "door")
 
 
-def _probe_stick(direction: str) -> tuple[int, int]:
+def _probe_stick(direction: str, game: GameState | None = None) -> tuple[int, int]:
+    """Convert a Link-relative terrain-probe direction into SoH raw stick input."""
+    if game is not None and game.player is not None:
+        if "probe_yaw_v2" in game.capabilities:
+            offsets = {
+                "forward": 0x0000,
+                "forward_left": 0x2000,
+                "left": 0x4000,
+                "back_left": 0x6000,
+                "back": 0x8000,
+                "back_right": -0x6000,
+                "right": -0x4000,
+                "forward_right": -0x2000,
+            }
+        else:
+            # v2.5 and earlier mislabeled +yaw samples as "right".
+            offsets = {
+                "forward": 0x0000,
+                "forward_right": 0x2000,
+                "right": 0x4000,
+                "back_right": 0x6000,
+                "back": 0x8000,
+                "back_left": -0x6000,
+                "left": -0x4000,
+                "forward_left": -0x2000,
+            }
+        return _world_yaw_stick(game, game.player.yaw + offsets[direction], 48)
+
+    # Compatibility fallback for callers without a GameState.
     scale = 48
-    diagonal = 36
+    diagonal = 34
     return {
         "forward": (0, scale),
-        "forward_right": (diagonal, diagonal),
-        "right": (scale, 0),
-        "back_right": (diagonal, -diagonal),
-        "back": (0, -scale),
-        "back_left": (-diagonal, -diagonal),
-        "left": (-scale, 0),
         "forward_left": (-diagonal, diagonal),
+        "left": (-scale, 0),
+        "back_left": (-diagonal, -diagonal),
+        "back": (0, -scale),
+        "back_right": (diagonal, -diagonal),
+        "right": (scale, 0),
+        "forward_right": (diagonal, diagonal),
     }[direction]
 
 
+def _world_yaw_stick(game: GameState, desired_world_yaw: float,
+                     magnitude: int) -> tuple[int, int]:
+    """Invert SoH Player_ProcessControlStick for an exact desired world yaw."""
+    magnitude = max(0, min(80, int(magnitude)))
+    if game.camera_input_yaw is not None:
+        stick_angle = ((desired_world_yaw - game.camera_input_yaw + 32768.0) % 65536.0) - 32768.0
+        angle = stick_angle * math.pi / 32768.0
+        # func_80077D10 computes Math_Atan2S(relY, -relX).
+        x = round(-math.sin(angle) * magnitude)
+        y = round(math.cos(angle) * magnitude)
+        if game.mirrored_world:
+            x = -x
+        return max(-80, min(80, x)), max(-80, min(80, y))
+
+    # Legacy fallback: infer the camera input yaw from its look vector. This
+    # path is only for bridges that do not expose Camera_GetInputDirYaw.
+    if game.camera_eye is not None and game.camera_at is not None:
+        fx = game.camera_at[0] - game.camera_eye[0]
+        fz = game.camera_at[2] - game.camera_eye[2]
+        if math.hypot(fx, fz) >= 1e-4:
+            camera_yaw = math.atan2(fx, fz) * 32768.0 / math.pi
+            stick_angle = ((desired_world_yaw - camera_yaw + 32768.0) % 65536.0) - 32768.0
+            angle = stick_angle * math.pi / 32768.0
+            x = round(-math.sin(angle) * magnitude)
+            y = round(math.cos(angle) * magnitude)
+            return max(-80, min(80, x)), max(-80, min(80, y))
+
+    # Last-resort Link-relative fallback if camera orientation is unavailable.
+    stick_angle = ((desired_world_yaw - game.player.yaw + 32768.0) % 65536.0) - 32768.0 if game.player else 0.0
+    angle = stick_angle * math.pi / 32768.0
+    return (
+        max(-80, min(80, round(-math.sin(angle) * magnitude))),
+        max(-80, min(80, round(math.cos(angle) * magnitude))),
+    )
+
+
 def _steer_to(game: GameState, target: tuple[float, float, float], strength: float) -> tuple[int, int, float]:
+    """Convert a world-space target into the exact raw stick expected by OoT."""
     if not game.player:
         return 0, 0, float("inf")
     px, _, pz = game.player.position
@@ -47,32 +112,10 @@ def _steer_to(game: GameState, target: tuple[float, float, float], strength: flo
     distance = math.hypot(dx, dz)
     if distance < 1e-6:
         return 0, 0, 0.0
-
-    if game.camera_eye is not None and game.camera_at is not None:
-        fx = game.camera_at[0] - game.camera_eye[0]
-        fz = game.camera_at[2] - game.camera_eye[2]
-        flen = math.hypot(fx, fz)
-    else:
-        flen = 0.0
-    if flen < 1e-4:
-        angle = game.player.yaw * math.pi / 32768.0
-        fx, fz = math.sin(angle), math.cos(angle)
-    else:
-        fx, fz = fx / flen, fz / flen
-
-    # Camera-relative right vector. N64 stick X is right, Y is forward.
-    rx, rz = fz, -fx
-    ux, uz = dx / distance, dz / distance
-    local_x = ux * rx + uz * rz
-    local_y = ux * fx + uz * fz
+    desired_yaw = math.atan2(dx, dz) * 32768.0 / math.pi
     scale = max(28, min(80, round(80 * max(0.35, strength))))
-    return (
-        max(-80, min(80, round(local_x * scale))),
-        max(-80, min(80, round(local_y * scale))),
-        distance,
-    )
-
-
+    stick_x, stick_y = _world_yaw_stick(game, desired_yaw, scale)
+    return stick_x, stick_y, distance
 
 PLAYER_STATE2_HOPPING = 1 << 19
 _DODGE_DIRECTION = {"left": 1, "back": 2, "right": 3}
@@ -84,32 +127,7 @@ def _player_relative_stick(game: GameState, direction: str, magnitude: int = 70)
         return 0, 0
     offsets = {"forward": 0x0000, "left": 0x4000, "back": 0x8000, "right": -0x4000}
     desired_world_yaw = game.player.yaw + offsets[direction]
-    if game.camera_input_yaw is not None:
-        stick_angle = ((desired_world_yaw - game.camera_input_yaw + 32768) % 65536) - 32768
-        angle = stick_angle * math.pi / 32768.0
-        x = round(-math.sin(angle) * magnitude)
-        y = round(math.cos(angle) * magnitude)
-        if game.mirrored_world:
-            x = -x
-        return max(-80, min(80, x)), max(-80, min(80, y))
-
-    if game.camera_eye is not None and game.camera_at is not None:
-        cfx = game.camera_at[0] - game.camera_eye[0]
-        cfz = game.camera_at[2] - game.camera_eye[2]
-        length = math.hypot(cfx, cfz)
-    else:
-        length = 0.0
-    if length < 1e-4:
-        camera_angle = game.player.yaw * math.pi / 32768.0
-        cfx, cfz = math.sin(camera_angle), math.cos(camera_angle)
-    else:
-        cfx, cfz = cfx / length, cfz / length
-    crx, crz = cfz, -cfx
-    desired_angle = desired_world_yaw * math.pi / 32768.0
-    wx, wz = math.sin(desired_angle), math.cos(desired_angle)
-    x = round((wx * crx + wz * crz) * magnitude)
-    y = round((wx * cfx + wz * cfz) * magnitude)
-    return max(-80, min(80, x)), max(-80, min(80, y))
+    return _world_yaw_stick(game, desired_world_yaw, magnitude)
 
 
 def _rotate_stick_quadrants(stick_x: int, stick_y: int, steps: int) -> tuple[int, int]:
@@ -190,13 +208,15 @@ async def _observe_dodge_effect(bridge: Bridge, start: GameState, expected_direc
 
 
 def _dodge_direction_safe(game: GameState, direction: str) -> bool:
+    probe_direction = direction
+    if "probe_yaw_v2" not in game.capabilities:
+        probe_direction = {"left": "right", "right": "left"}.get(direction, direction)
     probes = [p for p in game.navigation_probes
-              if p.direction == direction and p.distance <= 70.0 and p.floor_found and p.delta_y is not None]
+              if p.direction == probe_direction and p.distance <= 70.0 and p.floor_found and p.delta_y is not None]
     if not probes:
         return False
     probe = min(probes, key=lambda p: p.distance)
-    return abs(probe.delta_y) <= 22.0 and not (
-        probe.wall_hit and probe.wall_distance is not None and probe.wall_distance < 32.0)
+    return abs(probe.delta_y) <= 22.0 and not probe.wall_hit
 
 
 async def _perform_dodge(bridge: Bridge, observation: GameState, direction: str,

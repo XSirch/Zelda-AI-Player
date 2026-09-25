@@ -50,7 +50,7 @@ def install(root: Path) -> Path:
     # Read and validate every source before writing anything to the checkout.
     planned = {padmgr: patched_padmgr(padmgr.read_bytes())}
     planned.update({destination / name: (source / name).read_bytes() for name in NATIVE_FILES})
-    manifest = {"bridge_build": "rt-input-v2.5", "protocol": 2, "upstream_revision": REVISION,
+    manifest = {"bridge_build": "rt-input-v2.6", "protocol": 2, "upstream_revision": REVISION,
                 "files": {p.name: hashlib.sha256(data).hexdigest() for p, data in planned.items()}}
     planned[destination / "installed-manifest.json"] = (json.dumps(manifest, indent=2) + "\n").encode()
     # Backups live OUTSIDE the source glob, so CMake cannot compile duplicate adapters.
@@ -83,7 +83,7 @@ def install(root: Path) -> Path:
     finally:
         for path in temporary:
             path.unlink(missing_ok=True)
-    print(f"Adapter v2 installed. Previous files preserved in {backup}")
+    print(f"Adapter v2.6 installed. Previous files preserved in {backup}")
     print("Reconfigure and rebuild Shipwright; replacing source does not update an existing soh.exe.")
     print("Validate gameplay on Windows. This installer does not certify latency, navigation or combat.")
     return backup

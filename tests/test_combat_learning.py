@@ -2,6 +2,7 @@ from zelda_ai.combat_learning import combat_state_key, choose_action, enemy_key,
 from zelda_ai.bridge import Bridge
 from zelda_ai.models import ActorObservation, RunConfig
 from zelda_ai.runtime import Runtime
+import zelda_ai.skills.combat as combat
 
 
 def enemy(actor_id=7, category=5, name="Enemy"):
@@ -17,6 +18,33 @@ def test_enemy_key_is_per_class_and_player_age(state):
     child_key = enemy_key(state, first)
     state.player.age = "adult"
     assert enemy_key(state, first) != child_key
+
+
+def test_navmesh_blocked_combat_action_is_marked_unexecuted(state, monkeypatch):
+    import asyncio
+
+    actor = enemy(actor_id=7, name="Deku Baba")
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh"],
+        "room_actors": [actor.model_dump()],
+        "room_actor_count": 1,
+    })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+        def release(self):
+            return None
+
+    async def same_state(_bridge, current, _timeout=.1):
+        return current
+
+    monkeypatch.setattr(combat, "feedback", same_state)
+    result = asyncio.run(combat._do_action(FakeBridge(game), "approach", game, actor, .6, False))
+    assert result["ok"] is False
+    assert result["executed"] is False
+    assert result["detail"] == "navmesh_blocked_approach"
 
 
 def test_policy_learning_changes_preference():

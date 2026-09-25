@@ -58,6 +58,19 @@ def actor(uid, distance):
                 position=[0, 0, distance], targeted=False)
 
 
+def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
+    bridge = Bridge(TOKEN)
+    bridge.transport = Transport()
+    mesh = {"origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 1], [0, 1, 0, 16]]}
+    feed(bridge, full(state, navmesh=mesh,
+        capabilities=["fast_state", "input_sequence", "consumed_receipts", "local_navmesh"]))
+    assert bridge.state.navmesh.available
+    feed(bridge, fast(state, player={**state.player.model_dump(), "position": [0, 0, 8]}))
+    assert bridge.state.player.position == (0, 0, 8)
+    assert bridge.state.navmesh.cells == [(0, 0, 0.0, 1), (0, 1, 0.0, 16)]
+
+
 def test_fast_updates_pose_without_slow_callback(state):
     bridge = ready(state)
     callbacks = []

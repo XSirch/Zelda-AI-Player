@@ -100,7 +100,7 @@ async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameS
                 # Unlike floor deltas, this is direct collision-surface evidence of a ladder/climb wall.
                 # Center behind Link, then move toward the probed surface until OoT latches the climb state.
                 acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=70, settle_s=0.04)
-                stick_x, stick_y = _probe_stick(surface_probe.direction)
+                stick_x, stick_y = _probe_stick(surface_probe.direction, current)
                 command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=220)
                 await asyncio.sleep(0.20)
                 bridge.release()
@@ -146,7 +146,7 @@ async def _traverse_local(bridge: Bridge, decision: Decision, observation: GameS
             last_probe = probe.direction
             # Z puts the camera behind Link so the relative terrain probe maps predictably to the stick.
             acknowledged |= await _pulse(bridge, buttons=BUTTONS["Z"], hold_ms=80, settle_s=0.06)
-            stick_x, stick_y = _probe_stick(probe.direction)
+            stick_x, stick_y = _probe_stick(probe.direction, current)
             # Approach drops cautiously; stairs can be traversed continuously but ledges should be probed.
             hold_ms = 260 if abs(probe.delta_y or 0) <= 70 else 180
             command_id = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=hold_ms)
