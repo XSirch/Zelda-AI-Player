@@ -420,7 +420,8 @@ json NavigationMesh(Player* player) {
     constexpr float STEP = 70.0f;
     constexpr float MAX_HEIGHT_DELTA = 24.0f;
     constexpr float BODY_CLEARANCE = 18.0f;
-    constexpr float MIDPOINT_TOLERANCE = 24.0f;
+    constexpr float EDGE_FLOOR_TOLERANCE = 24.0f;
+    constexpr int EDGE_FLOOR_SAMPLES = 4;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
     static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
 
@@ -522,14 +523,26 @@ json NavigationMesh(Player* player) {
 
                 const float nxWorld = origin.x + nx * STEP;
                 const float nzWorld = origin.z + nz * STEP;
-                float middleY = 0.0f;
-                if (!sampleFloor(
-                        (x + nxWorld) * 0.5f, (z + nzWorld) * 0.5f,
-                        std::max(cell.y, neighbor.y) + 32.0f, middleY)) {
-                    continue;
+                bool floorContinuous = true;
+                for (int sampleIndex = 1; sampleIndex <= EDGE_FLOOR_SAMPLES; ++sampleIndex) {
+                    const float t = static_cast<float>(sampleIndex) /
+                                    static_cast<float>(EDGE_FLOOR_SAMPLES + 1);
+                    float sampledY = 0.0f;
+                    if (!sampleFloor(
+                            x + (nxWorld - x) * t,
+                            z + (nzWorld - z) * t,
+                            std::max(cell.y, neighbor.y) + 32.0f,
+                            sampledY)) {
+                        floorContinuous = false;
+                        break;
+                    }
+                    const float expectedY = cell.y + (neighbor.y - cell.y) * t;
+                    if (std::abs(sampledY - expectedY) > EDGE_FLOOR_TOLERANCE) {
+                        floorContinuous = false;
+                        break;
+                    }
                 }
-                const float expectedMiddle = (cell.y + neighbor.y) * 0.5f;
-                if (std::abs(middleY - expectedMiddle) > MIDPOINT_TOLERANCE) continue;
+                if (!floorContinuous) continue;
 
                 Vec3f start{x, cell.y + 26.0f, z};
                 Vec3f end{nxWorld, neighbor.y + 26.0f, nzWorld};
