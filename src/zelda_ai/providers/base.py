@@ -15,9 +15,9 @@ Implemented skills:
 - pause_toggle(Start), menu_move(up/down/left/right), menu_confirm(A), menu_cancel(B), menu_assign(C slot)
 - continue_gameover(A) when the game-over flow is waiting for confirmation
 - play_song(song) after an ocarina has already been activated; the executor sends the complete learned note sequence
-- navigate_to(target_position, stop_distance): camera-relative local steering to an observed coordinate; use 4000-8000 ms for room-scale travel
-- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks an observed current-room actor; use 3000-8000 ms
-- follow_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a moving observed actor for a bounded window; useful for races/guides
+- navigate_to(target_position, stop_distance): collision-derived local NavMesh + A* to an observed coordinate; use 4000-8000 ms for room-scale travel
+- approach_actor(target_actor_id, optional target_actor_params, stop_distance): tracks an observed current-room actor through the local NavMesh; use 3000-8000 ms
+- follow_actor(target_actor_id, optional target_actor_params, stop_distance): tracks a moving observed actor through the local NavMesh for a bounded window; useful for races/guides
 - talk_to_actor(target_actor_id, optional target_actor_params): approaches and presses A, succeeding only when dialogue/cutscene starts
 - interact_with_actor(target_actor_id, optional target_actor_params): for doors/chests/switches/props; doors use a dedicated face → camera-center → straight approach → A controller to avoid orbiting; succeeds only on transition/dialogue/cutscene/item/scene-flag evidence
 - equip_item(item_id, C slot): opens the pause menu, reaches the owned inventory slot, assigns it and verifies equipped[]
@@ -40,7 +40,10 @@ plus room-global actors, independent of camera rendering. room_actor_count repor
 room_actors_truncated says whether the 64-entry safety cap was reached. player also exposes wall_flags and traversal
 state (climbing_ladder, hanging_ledge, climbing_ledge, can_climb, can_down). navigation_probes samples floor height
 around Link in eight directions at two radii; delta_y is relative to Link's current floor and lets you detect stairs,
-safe drops and changes in elevation that are not actors. This is current engine state, not a hidden future-world list:
+safe drops and changes in elevation that are not actors. The motor controller also receives a compact local NavMesh
+derived directly from SoH collision and replans with A*; the raw mesh is intentionally kept out of your prompt to avoid
+token waste. navigation_mesh only summarizes whether that local controller is available. This is current engine state,
+not a hidden future-world list:
 actors from unloaded rooms/scenes are not exposed.
 
 Dialogue is first-class state. Linear pages are read into dialogue_transcript and advanced locally without
@@ -83,15 +86,17 @@ from_position as an observed exit coordinate when returning to a known destinati
 edge exists. When a concrete observed coordinate or actor is the goal, prefer navigate_to/approach_actor/talk_to_actor/
 interact_with_actor over many one-step move calls. Use interact_with_actor rather than a blind interact when a
 specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. In an unknown area with no concrete target, use explore_area
-for several seconds; once a transition is discovered its exit/spawn coordinates become a known_world_edge. These are local steering controllers, NOT collision-aware global pathfinding:
-a wall, ledge or puzzle obstruction can make them return navigation_no_progress. Replan rather than repeating.
-For free exploration, turn(left/right) plus short move probes remain valid. move(back) is a first-class movement,
-not a last resort: when Link is close to a wall, corner, furniture, door frame or other obstruction, back up long
-enough to create clearance before choosing a new heading. Do not alternate forward/left/right probes while pinned.
-The local navigate/explore controllers also perform reverse-arc recovery automatically when collision/progress
-telemetry indicates they are stuck. The runtime may replay a previously successful adaptive trajectory before
-calling you; replay success/failure appears in events. Current skills do
-not yet solve global collision paths. aim_at provides local ranged alignment but does not infer line-of-sight, puzzle
+for several seconds; once a transition is discovered its exit/spawn coordinates become a known_world_edge.
+navigate_to/approach_actor/follow_actor/explore_area use a moving collision-derived local NavMesh plus A*. They can
+route around nearby map collision, avoid disconnected floor and reject corner-cutting, but they are not a global map:
+unloaded rooms/scenes, doors, ladders, intentional drops and puzzle/action links still require the appropriate
+interaction or traverse skill. If navigation returns navigation_no_path/navigation_path_blocked, replan semantically
+instead of repeating the same destination blindly.
+For free exploration, turn(left/right) plus short move probes remain valid. Primitive move is only for short
+repositioning and is rejected locally when the realtime terrain probe shows a wall, missing floor or unsafe height
+change. move(back) remains a first-class movement when its probe is safe. The NavMesh controller keeps reverse-arc
+recovery as a fallback for stale/dynamic collision. The runtime may replay a previously successful adaptive trajectory
+before calling you; replay success/failure appears in events. aim_at provides local ranged alignment but does not infer line-of-sight, puzzle
 semantics or hit confirmation. fight_enemy learns a separate local policy for each observed enemy class from damage dealt/received, lock,
 movement, defense, confirmed dodge and native defeat outcomes. Reuse it across encounters instead of manually
 micromanaging attack/defend/backflip one action at a time. Bosses with invulnerability phases or item-specific
