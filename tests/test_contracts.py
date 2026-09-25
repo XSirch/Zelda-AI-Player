@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _decision_targets_transition
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _decision_targets_transition, _model_last_decision
 
 
 def test_token_subsets_are_not_double_counted():
@@ -449,3 +449,18 @@ def test_transition_decisions_cannot_own_freeform_topology_memory(decision, stat
         "args": {**decision.args.model_dump(), "duration_ms": 500},
     })
     assert not _decision_targets_transition(game, ordinary)
+
+
+def test_model_does_not_receive_previous_decision_guessed_prose():
+    visible = _model_last_decision({
+        "goal": "Go to a guessed destination",
+        "summary": "I think this warp leads to Kokiri Forest",
+        "skill": "traverse_exit",
+        "args": {"target_position": [70, 0, 116], "entrance_index": 0x211},
+        "memory_note": "Warp leads to Kokiri Forest",
+    })
+    assert visible == {
+        "skill": "traverse_exit",
+        "args": {"target_position": [70, 0, 116]},
+    }
+    assert "Kokiri Forest" not in json.dumps(visible)
