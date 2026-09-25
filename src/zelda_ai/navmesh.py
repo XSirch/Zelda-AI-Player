@@ -238,7 +238,8 @@ def _probe_direction(game: GameState, waypoint: tuple[float, float, float]) -> s
 
 
 def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
-                        *, wall_clearance: float = 42.0) -> bool:
+                        *, probe_distance: float = 75.0,
+                        wall_clearance: float = 42.0) -> bool:
     """Validate the next NavMesh heading against the fast, Link-relative probes."""
     direction = _probe_direction(game, waypoint)
     if direction is None:
@@ -246,10 +247,11 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
     if not game.navigation_probes:
         return "local_navmesh" not in game.capabilities
     probes = [p for p in game.navigation_probes
-              if p.direction == direction and p.distance <= 75.0]
+              if p.direction == direction and p.distance <= probe_distance]
     if not probes:
         return False
-    probe = min(probes, key=lambda row: abs(row.distance - 70.0))
+    desired_sample = 140.0 if probe_distance > 100.0 else 70.0
+    probe = min(probes, key=lambda row: abs(row.distance - desired_sample))
     if not probe.floor_found or probe.delta_y is None:
         return False
     if abs(probe.delta_y) > 24.0:
@@ -259,7 +261,9 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
     return True
 
 
-def primitive_move_safe(game: GameState, direction: str) -> bool:
+def primitive_move_safe(game: GameState, direction: str, *,
+                        probe_distance: float = 75.0,
+                        wall_clearance: float = 42.0) -> bool:
     """Map a camera-relative primitive move into world space and probe its heading."""
     if not game.player:
         return True
@@ -287,4 +291,10 @@ def primitive_move_safe(game: GameState, direction: str) -> bool:
     if vector is None:
         return True
     x, y, z = game.player.position
-    return waypoint_probe_safe(game, (x + vector[0] * 70.0, y, z + vector[1] * 70.0))
+    distance = 140.0 if probe_distance > 100.0 else 70.0
+    return waypoint_probe_safe(
+        game,
+        (x + vector[0] * distance, y, z + vector[1] * distance),
+        probe_distance=probe_distance,
+        wall_clearance=wall_clearance,
+    )
