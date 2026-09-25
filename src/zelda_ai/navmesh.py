@@ -254,7 +254,7 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
     probe = min(probes, key=lambda row: abs(row.distance - desired_sample))
     if not probe.floor_found or probe.delta_y is None:
         return False
-    if probe.delta_y > 45.0 or probe.delta_y < -55.0:
+    if abs(probe.delta_y) > 24.0:
         return False
     if probe.wall_hit and (probe.wall_distance is None or probe.wall_distance < wall_clearance):
         return False
