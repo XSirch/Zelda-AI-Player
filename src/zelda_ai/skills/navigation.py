@@ -216,7 +216,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 ox, _, oz = current.navmesh.origin
                 proof_age_distance = math.hypot(px - ox, pz - oz)
                 direct_exit_proven = bool(
-                    selected_exit.direct_reachable and proof_age_distance <= 35.0)
+                    selected_exit.direct_reachable and proof_age_distance <= 18.0)
             if target_distance <= stop_distance and abs(current.player.position[1] - target[1]) > 45:
                 return {"status": "failed", "reason": "target_on_different_floor",
                     "target_distance": target_distance, "skill": decision.skill}
