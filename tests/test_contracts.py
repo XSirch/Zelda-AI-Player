@@ -3,11 +3,12 @@ import json
 import pytest
 from pydantic import ValidationError
 
+from zelda_ai.providers.base import SYSTEM_PROMPT
 from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges, _strip_transition_ids, _model_recent_events, _model_memory_note_persistent, _model_last_decision, _model_recent_events
 
 
 def test_token_subsets_are_not_double_counted():
@@ -246,3 +247,245 @@ def test_manipulate_object_rejects_sideways_direction(decision):
         Decision.model_validate({**decision.model_dump(), "skill": "manipulate_object",
             "args": {**decision.args.model_dump(), "target_actor_id": 10,
                 "direction": "left", "duration_ms": 5000}})
+
+
+def test_scene_exit_observation_and_traverse_exit_contract(decision, state):
+    enriched = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "scene_exit_surfaces"],
+        "scene_exits": [{
+            "exit_index": 1,
+            "entrance_index": 0x211,
+            "position": [70.0, 0.0, 116.0],
+            "samples": 4,
+        }],
+    })
+    assert enriched.scene_exits[0].entrance_index == 0x211
+    traverse = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "traverse_exit",
+        "args": {
+            **decision.args.model_dump(),
+            "duration_ms": 8000,
+            "target_position": [70.0, 0.0, 116.0],
+        },
+    })
+    assert traverse.skill == "traverse_exit"
+    with pytest.raises(ValidationError):
+        Decision.model_validate({
+            **decision.model_dump(),
+            "skill": "traverse_exit",
+            "args": {**decision.args.model_dump(), "duration_ms": 8000, "target_position": None},
+        })
+
+
+def test_planner_prompt_understands_actorless_scene_exits():
+    assert 'traverse_exit(target_position)' in SYSTEM_PROMPT
+    assert 'scene_exits' in SYSTEM_PROMPT
+    assert "Link's House" in SYSTEM_PROMPT
+    assert 'no door actor' in SYSTEM_PROMPT
+    assert 'destination is unknown' in SYSTEM_PROMPT
+    assert 'MUST NOT be used to infer where it leads' in SYSTEM_PROMPT
+    assert 'Do not write a memory_note claiming where an untraversed transition leads' in SYSTEM_PROMPT
+
+
+def test_model_sees_scene_exit_as_opaque_position_only(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "scene_exit_surfaces"],
+        "scene_exits": [{
+            "exit_index": 7,
+            "entrance_index": 0x211,
+            "position": [70.0, 0.0, 116.0],
+            "samples": 9,
+        }],
+    })
+    payload = _model_state_payload(game)
+    assert payload["scene_exits"] == [{"position": [70.0, 0.0, 116.0]}]
+    serialized = json.dumps(payload["scene_exits"])
+    assert "exit_index" not in serialized
+    assert "entrance_index" not in serialized
+    assert "samples" not in serialized
+    assert "entrance_index" not in payload
+
+
+
+def test_model_world_edges_expose_only_empirically_observed_topology():
+    rows = [{
+        "id": "edge-secret",
+        "from_scene": 1,
+        "from_scene_name": "Origin",
+        "from_room": 0,
+        "from_position": [70.0, 0.0, 116.0],
+        "to_scene": 2,
+        "to_scene_name": "Observed Destination",
+        "to_room": 0,
+        "to_position": [0.0, 0.0, 0.0],
+        "entrance_index": 0x211,
+        "traversals": 1,
+        "created_at": 1.0,
+        "updated_at": 2.0,
+    }]
+    visible = _model_world_edges(rows)
+    assert visible[0]["to_scene_name"] == "Observed Destination"
+    assert visible[0]["from_position"] == [70.0, 0.0, 116.0]
+    assert "entrance_index" not in visible[0]
+    assert "id" not in visible[0]
+
+
+def test_model_neutralizes_transition_actor_destination_labels(state):
+    warp_actor = {
+        "actor_uid": "warp-1",
+        "actor_id": 123,
+        "name": "Door_Warp1",
+        "description": "Warp to Kokiri Forest",
+        "category": 7,
+        "category_name": "item_action",
+        "room": 0,
+        "params": 44,
+        "position": [20, 0, 30],
+        "focus_position": [20, 20, 30],
+        "distance": 35.0,
+        "targeted": False,
+        "drawn": True,
+        "text_id": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "room_actors": [warp_actor],
+        "room_actor_count": 1,
+    })
+    payload = _model_state_payload(game)
+    actor = payload["room_actors"][0]
+    assert actor["name"] == "Transition Object"
+    assert actor["description"] == ""
+    serialized = json.dumps(actor)
+    assert "Kokiri Forest" not in serialized
+    # Targeting identity remains available; only semantic destination clues are removed.
+    assert actor["actor_id"] == 123
+    assert actor["actor_uid"] == "warp-1"
+
+    exit_actor = {**warp_actor, "actor_uid": "exit-1", "name": "Kokiri Forest Exit",
+                  "description": "Loads the exterior"}
+    exit_game = type(state).model_validate({
+        **state.model_dump(), "room_actors": [exit_actor], "room_actor_count": 1,
+    })
+    exit_visible = _model_state_payload(exit_game)["room_actors"][0]
+    assert exit_visible["name"] == "Transition Object"
+    assert "Kokiri Forest" not in json.dumps(exit_visible)
+
+
+
+def test_native_transition_ids_are_removed_from_model_results_and_events():
+    raw = {
+        "status": "completed",
+        "reason": "scene_exit_traversed",
+        "exit_index": 3,
+        "entrance_index": 0x211,
+        "nested": {
+            "exit_index": 4,
+            "detail": "kept",
+        },
+        "rows": [{"entrance_index": 0x222, "value": 7}],
+    }
+    visible = _strip_transition_ids(raw)
+    serialized = json.dumps(visible)
+    assert "exit_index" not in serialized
+    assert "entrance_index" not in serialized
+    assert visible["nested"]["detail"] == "kept"
+    assert visible["rows"][0]["value"] == 7
+    floor = _strip_transition_ids({"floor_exit_index": 7, "value": 1})
+    assert floor == {"value": 1}
+
+
+    nested_actor = {
+        "actor_id": 77, "actor_uid": "warp-result", "category": 7,
+        "category_name": "item_action", "name": "Warp Portal",
+        "description": "Exit to a hidden destination", "params": 2,
+    }
+    actor_visible = _strip_transition_ids({
+        "actor": nested_actor,
+        "dialogue": {"speaker": nested_actor},
+    })
+    assert actor_visible["actor"]["name"] == "Transition Object"
+    assert actor_visible["actor"]["description"] == ""
+    assert actor_visible["dialogue"]["speaker"]["name"] == "Transition Object"
+    assert "hidden destination" not in json.dumps(actor_visible)
+
+
+
+def test_freeform_model_memory_is_never_persistent(decision):
+    transition = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "traverse_exit",
+        "args": {
+            **decision.args.model_dump(),
+            "target_position": [70, 0, 116],
+            "duration_ms": 8000,
+        },
+        "memory_note": "This warp leads somewhere I am guessing.",
+    })
+    ordinary = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "wait",
+        "args": {**decision.args.model_dump(), "duration_ms": 500},
+        "memory_note": "A guessed world topology note hidden on wait.",
+    })
+    assert not _model_memory_note_persistent(transition)
+    assert not _model_memory_note_persistent(ordinary)
+
+
+def test_model_does_not_receive_previous_decision_guessed_prose():
+    visible = _model_last_decision({
+        "goal": "Go to a guessed destination",
+        "summary": "I think this warp leads to Kokiri Forest",
+        "skill": "traverse_exit",
+        "args": {"target_position": [70, 0, 116], "entrance_index": 0x211},
+        "memory_note": "Warp leads to Kokiri Forest",
+    })
+    assert visible == {
+        "skill": "traverse_exit",
+        "args": {"target_position": [70, 0, 116]},
+    }
+    assert "Kokiri Forest" not in json.dumps(visible)
+
+
+def test_model_facing_decision_events_drop_model_authored_summary():
+    visible = _model_recent_events([{
+        "kind": "decision",
+        "data": {
+            "skill": "traverse_exit",
+            "summary": "This warp probably leads to Kokiri Forest",
+        },
+        "at": 1.0,
+    }])
+    assert visible == [{
+        "kind": "decision",
+        "data": {"skill": "traverse_exit"},
+        "at": 1.0,
+    }]
+    assert "Kokiri Forest" not in json.dumps(visible)
+
+
+def test_model_recent_events_strip_nested_decision_prose():
+    rows = [{
+        "kind": "player_died",
+        "data": {
+            "scene": 52,
+            "last_skill": {
+                "skill": "wait",
+                "goal": "Go through the warp to Kokiri Forest",
+                "summary": "This must lead to Kokiri Forest",
+                "memory_note": "Warp leads to Kokiri Forest",
+                "args": {"duration_ms": 100},
+            },
+        },
+        "at": 1.0,
+    }]
+    visible = _model_recent_events(rows)
+    serialized = json.dumps(visible)
+    assert "Kokiri Forest" not in serialized
+    assert "goal" not in serialized
+    assert "summary" not in serialized
+    assert "memory_note" not in serialized
+    assert visible[0]["data"]["last_skill"]["skill"] == "wait"

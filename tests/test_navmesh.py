@@ -106,6 +106,52 @@ def test_realtime_probe_can_veto_stale_navmesh_waypoint(state):
     assert not waypoint_probe_safe(game, (0, 0, 70))
 
 
+def test_known_exit_target_does_not_require_floor_beyond_threshold(state):
+    beyond_exit = {
+        "direction": "forward", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"],
+        "navigation_probes": [beyond_exit],
+    })
+    target = (0.0, game.player.floor_height, 25.0)
+    assert not waypoint_probe_safe(game, target)
+    assert waypoint_probe_safe(game, target, known_floor_target=True)
+
+
+def test_known_exit_target_still_rejects_intervening_wall(state):
+    wall = {
+        "direction": "forward", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": True, "wall_distance": 20, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"],
+        "navigation_probes": [wall],
+    })
+    target = (0.0, game.player.floor_height, 25.0)
+    assert not waypoint_probe_safe(game, target, known_floor_target=True)
+
+
+def test_known_exit_target_rejects_unsafe_height_change(state):
+    safe_direction = {
+        "direction": "forward", "distance": 70, "floor_found": False,
+        "floor_y": None, "delta_y": None, "floor_type": None,
+        "wall_hit": False, "wall_distance": None, "wall_flags": 0,
+    }
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"],
+        "navigation_probes": [safe_direction],
+    })
+    target = (0.0, game.player.floor_height + 40.0, 25.0)
+    assert not waypoint_probe_safe(game, target, known_floor_target=True)
+
+
 def test_probe_blocks_wall_before_full_navmesh_waypoint(state):
     wall = {
         "direction": "forward", "distance": 70, "floor_found": True,
@@ -199,13 +245,21 @@ def test_navmesh_contract_rejects_duplicate_cells(state):
 
 def test_native_bridge_exposes_navmesh_only_as_slow_state():
     native = (Path(__file__).parents[1] / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
-    assert 'BRIDGE_BUILD = "rt-input-v2.6"' in native
+    assert 'BRIDGE_BUILD = "rt-input-v2.7"' in native
     assert '"forward", "forward_left", "left", "back_left"' in native
     assert '"back", "back_right", "right", "forward_right"' in native
     assert '"local_navmesh"' in native
     assert '"probe_yaw_v2"' in native
+    assert '"scene_exit_surfaces"' in native
+    assert "SurfaceType_GetSceneExitIndex" in native
+    assert '"scene_exits"' in native
     assert "json NavigationMesh(Player* player)" in native
     assert "EDGE_FLOOR_SAMPLES = 4" in native
     assert "sampleIndex <= EDGE_FLOOR_SAMPLES" in native
-    assert '"nearby_actors", "navmesh"' in native
+    assert "EXIT_SCAN_STEP = 35.0f" in native
+    assert "EXIT_SCAN_HALF_EXTENT = HALF_EXTENT * 2" in native
+    assert "DIRECT_FLOOR_SAMPLES = 4" in native
+    assert '"direct_reachable"' in native
+
+    assert '"nearby_actors", "scene_exits", "navmesh"' in native
     assert 'state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}' in native

@@ -5,6 +5,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import math
 import time
 from collections import deque
 from pydantic import ValidationError
@@ -73,7 +74,93 @@ from .skills.traversal import _best_traversal_probe as _best_traversal_probe
 from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_probe
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v7/skills-v8/trajectory-v3/prompt-v11"
+CONTRACT_VERSION = "state-v8/skills-v9/trajectory-v3/prompt-v12"
+
+def _sanitize_transition_actor(actor: dict | None) -> dict | None:
+    if actor is None:
+        return None
+    row = dict(actor)
+    category = str(row.get("category_name") or "").lower()
+    metadata = f"{row.get('name') or ''} {row.get('description') or ''}".lower()
+    transition_words = ("warp", "scene change", "scene_change", "scene exit",
+                        "loading zone", "entrance", "exit", "portal", "teleport")
+    if category == "door":
+        row["name"] = "Door"
+        row["description"] = ""
+    elif any(word in metadata for word in transition_words):
+        row["name"] = "Transition Object"
+        row["description"] = ""
+    return row
+
+
+def _strip_transition_ids(value):
+    if isinstance(value, dict):
+        row = {key: _strip_transition_ids(item) for key, item in value.items()
+               if key not in {"exit_index", "entrance_index", "floor_exit_index"}}
+        if "actor_id" in row and ("name" in row or "category_name" in row):
+            row = _sanitize_transition_actor(row) or {}
+        return row
+    if isinstance(value, list):
+        return [_strip_transition_ids(item) for item in value]
+    return value
+
+
+def _model_state_payload(game: GameState) -> dict:
+    """Model-facing state: transition surfaces are physical but destination-opaque."""
+    payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
+        "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
+        "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
+        "scene_exits", "entrance_index"})
+    payload["scene_exits"] = [{"position": list(row.position)} for row in game.scene_exits]
+    payload = _strip_transition_ids(payload)
+    if game.room_actors:
+        payload.pop("nearby_actors", None)
+    return payload
+
+
+def _model_world_edges(rows: list[dict]) -> list[dict]:
+    """Only empirically observed topology is model-visible; native entrance IDs remain local."""
+    allowed = ("from_scene", "from_scene_name", "from_room", "from_position",
+               "to_scene", "to_scene_name", "to_room", "to_position", "traversals")
+    return [{key: row.get(key) for key in allowed} for row in rows]
+
+
+def _model_last_decision(row: dict | None) -> dict | None:
+    if not row:
+        return None
+    # Do not echo model-authored goal/summary/memory_note back into inference.
+    # They may contain an unsupported transition guess. The executable action
+    # itself is enough context for interpreting last_result.
+    return _strip_transition_ids({
+        "skill": row.get("skill"),
+        "args": row.get("args") or {},
+    })
+
+
+def _strip_model_authored_prose(value):
+    if isinstance(value, dict):
+        return {key: _strip_model_authored_prose(item) for key, item in value.items()
+                if key not in {"goal", "summary", "memory_note"}}
+    if isinstance(value, list):
+        return [_strip_model_authored_prose(item) for item in value]
+    return value
+
+
+def _model_recent_events(rows: list[dict]) -> list[dict]:
+    visible = []
+    for raw in rows:
+        row = _strip_model_authored_prose(_strip_transition_ids(raw))
+        if row.get("kind") == "decision":
+            data = row.get("data") or {}
+            row["data"] = {"skill": data.get("skill")}
+        visible.append(row)
+    return visible
+
+
+def _model_memory_note_persistent(_: Decision) -> bool:
+    """Free-form model notes are non-authoritative; persistent learning is runtime-owned."""
+    return False
+
 
 
 class Runtime:
@@ -186,6 +273,33 @@ class Runtime:
         # A failed command may have moved Link; removing it creates a fictional trajectory.
 
 
+    def _transition_origin_position(self, old: GameState):
+        decision = self.last_decision or {}
+        args = decision.get("args") or {}
+
+        evidence = self.bridge.previous_state
+        if (not evidence or evidence.instance_id != old.instance_id or
+                (evidence.scene, evidence.room) != (old.scene, old.room)):
+            evidence = old
+
+        if decision.get("skill") == "traverse_exit" and old.scene_exits and evidence.player:
+            target = args.get("target_position")
+            if isinstance(target, list) and len(target) == 3:
+                requested = tuple(float(v) for v in target)
+                nearest = min(old.scene_exits, key=lambda row: math.dist(row.position, requested))
+                if (math.dist(nearest.position, requested) <= 140.0 and
+                        evidence.player.floor_exit_index == nearest.exit_index):
+                    # This is the only case where an exit-surface coordinate is
+                    # promoted: Link's actual pre-transition floor poly identifies
+                    # the same exit the model selected.
+                    return nearest.position
+
+        # A different exit, door, script, or accidental transition occurred.
+        # Preserve the latest actual player position and do not assign the
+        # destination to the planned surface.
+        return evidence.player.position if evidence.player else (
+            old.player.position if old.player else None)
+
     def _learn_transition(self, state: GameState, old: GameState | None):
         if self.state != "running" or self.trajectory_tainted:
             return
@@ -197,9 +311,10 @@ class Runtime:
             return
         if (old.scene, old.room) == (state.scene, state.room):
             return
+        transition_origin = self._transition_origin_position(old)
         edge_id = self.store.learn_world_edge(self.namespace,
             {"scene": old.scene, "scene_name": old.scene_name, "room": old.room,
-             "position": old.player.position if old.player else None},
+             "position": transition_origin},
             {"scene": state.scene, "scene_name": state.scene_name, "room": state.room,
              "position": state.player.position if state.player else None,
              "entrance_index": state.entrance_index})
@@ -335,7 +450,8 @@ class Runtime:
                         if self.task and self.task is not asyncio.current_task():
                             self.task.cancel()
             if old and old.player and state.player and old.player.health > 0 and state.player.health == 0:
-                self.log("player_died", {"scene": state.scene, "last_skill": self.last_decision})
+                self.log("player_died", {"scene": state.scene,
+                    "last_skill": (self.last_decision or {}).get("skill")})
                 self.store.remember(self.namespace, state.scene,
                     f"Death observed after skill: {(self.last_decision or {}).get('skill', 'unknown')}. "
                     "Causality is unconfirmed; reconsider the tactic.")
@@ -786,19 +902,17 @@ class Runtime:
                 if await self._auto_unstick(game):
                     await asyncio.sleep(0.08)
                     game = self.bridge.state or game
-                state_payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
-                    "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
-                    "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh"})
-                if game.room_actors:
-                    # Avoid sending the rendered subset twice once the room-wide observer is available.
-                    state_payload.pop("nearby_actors", None)
+                state_payload = _model_state_payload(game)
                 observation = {"contract": CONTRACT_VERSION, "objective": self.config.goal,
                     "state": state_payload,
-                    "last_decision": self.last_decision, "last_result": self.last_result,
-                    "events": list(self.recent)[-5:], "dialogue_transcript": list(self.dialogue_transcript),
+                    "last_decision": _model_last_decision(self.last_decision),
+                    "last_result": _strip_transition_ids(self.last_result),
+                    "events": _model_recent_events(list(self.recent)[-5:]),
+                    "dialogue_transcript": _strip_transition_ids(list(self.dialogue_transcript)),
                     "memory": [r["note"] for r in self.store.recall(self.namespace, game.scene, limit=6)],
                     "recent_global_memory": [r["note"] for r in self.store.recall(self.namespace, limit=8)],
-                    "known_world_edges": self.store.world_neighbors(self.namespace, game.scene, game.room),
+                    "known_world_edges": _model_world_edges(
+                        self.store.world_neighbors(self.namespace, game.scene, game.room)),
                     "enemy_learning": self._enemy_learning_context(game),
                     "navigation_mesh": {
                         "available": game.navmesh.available,
@@ -844,13 +958,19 @@ class Runtime:
                 self.last_decision = decision.model_dump()
                 if not game.dialogue.active and self.dialogue_transcript:
                     self.dialogue_transcript.clear()
-                if decision.memory_note:
-                    self.store.remember(self.namespace, game.scene, decision.memory_note)
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
                 self._record_trajectory_action(decision, game)
                 combat_profile, combat_enemy = self._combat_profile_for_decision(game, decision)
                 self.last_result = await execute_skill(self.bridge, decision, game,
                     combat_profile=combat_profile)
+                if decision.memory_note:
+                    if _model_memory_note_persistent(decision):
+                        self.store.remember(self.namespace, game.scene, decision.memory_note)
+                    else:
+                        self.log("memory_note_skipped_unverified", {
+                            "skill": decision.skill,
+                            "reason": "freeform_model_memory_is_not_persistent",
+                        })
                 if (combat_enemy and self.config.memory_mode == "adaptive" and self.namespace
                         and not self.combat_learning_tainted
                         and isinstance(self.last_result.get("learning_trace"), list)

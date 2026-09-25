@@ -244,7 +244,8 @@ def _probe_direction(game: GameState, waypoint: tuple[float, float, float]) -> s
 
 def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
                         *, probe_distance: float = 75.0,
-                        wall_clearance: float = 42.0) -> bool:
+                        wall_clearance: float = 42.0,
+                        known_floor_target: bool = False) -> bool:
     """Validate the next NavMesh heading against the fast, Link-relative probes."""
     direction = _probe_direction(game, waypoint)
     if direction is None:
@@ -257,20 +258,26 @@ def waypoint_probe_safe(game: GameState, waypoint: tuple[float, float, float],
         return False
     desired_sample = 140.0 if probe_distance > 100.0 else 70.0
     probe = min(probes, key=lambda row: abs(row.distance - desired_sample))
-    if not probe.floor_found or probe.delta_y is None:
-        return False
-    if abs(probe.delta_y) > 24.0:
-        return False
+    waypoint_distance = math.hypot(
+        waypoint[0] - game.player.position[0],
+        waypoint[2] - game.player.position[2],
+    )
+    target_delta_y = waypoint[1] - game.player.floor_height
+    if known_floor_target and waypoint_distance <= probe.distance:
+        # A scene-exit target was raycast from a real floor polygon. The fixed
+        # 70u probe may land beyond the threshold in unloaded collision, so for
+        # the final segment validate the known target floor itself instead of
+        # requiring floor beyond the exit.
+        if abs(target_delta_y) > 24.0:
+            return False
+    else:
+        if not probe.floor_found or probe.delta_y is None:
+            return False
+        if abs(probe.delta_y) > 24.0:
+            return False
     if probe.wall_hit:
         if probe.wall_distance is None:
             return False
-        if game.player:
-            waypoint_distance = math.hypot(
-                waypoint[0] - game.player.position[0],
-                waypoint[2] - game.player.position[2],
-            )
-        else:
-            waypoint_distance = probe.distance
         required_clearance = min(probe.distance, waypoint_distance + 18.0)
         if probe.wall_distance < max(wall_clearance, required_clearance):
             return False

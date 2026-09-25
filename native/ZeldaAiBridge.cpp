@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.6";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.7";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -422,6 +422,8 @@ json NavigationMesh(Player* player) {
     constexpr float BODY_CLEARANCE = 18.0f;
     constexpr float EDGE_FLOOR_TOLERANCE = 24.0f;
     constexpr int EDGE_FLOOR_SAMPLES = 4;
+    constexpr int EXIT_SCAN_HALF_EXTENT = HALF_EXTENT * 2;
+    constexpr float EXIT_SCAN_STEP = 35.0f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
     static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
 
@@ -430,6 +432,7 @@ json NavigationMesh(Player* player) {
         {"step", STEP},
         {"half_extent", HALF_EXTENT},
         {"cells", json::array()},
+        {"scene_exits", json::array()},
     };
     if (!player) {
         result["step"] = 0.0f;
@@ -443,7 +446,15 @@ json NavigationMesh(Player* player) {
         float y = 0.0f;
         uint8_t links = 0;
     };
+    struct ExitSamples {
+        int count = 0;
+        float nearestDistSq = 1.0e30f;
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+    };
     Cell grid[SIDE][SIDE]{};
+    ExitSamples exits[32]{};
     const Vec3f origin = player->actor.world.pos;
     result["origin"] = {origin.x, player->actor.floorHeight, origin.z};
 
@@ -452,7 +463,24 @@ json NavigationMesh(Player* player) {
         CollisionPoly* poly = nullptr;
         s32 bgId = BGCHECK_SCENE;
         floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
-        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+        const bool found = poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+        if (found) {
+            const u32 exitIndex = SurfaceType_GetSceneExitIndex(&gPlayState->colCtx, poly, bgId);
+            if (exitIndex > 0 && exitIndex < ARRAY_COUNT(exits)) {
+                auto& sample = exits[exitIndex];
+                sample.count++;
+                const float dx = x - origin.x;
+                const float dz = z - origin.z;
+                const float distSq = dx * dx + dz * dz;
+                if (distSq < sample.nearestDistSq) {
+                    sample.nearestDistSq = distSq;
+                    sample.x = x;
+                    sample.y = floorY;
+                    sample.z = z;
+                }
+            }
+        }
+        return found;
     };
     auto lineBlocked = [&](Vec3f start, Vec3f end) -> bool {
         Vec3f hit{};
@@ -461,6 +489,13 @@ json NavigationMesh(Player* player) {
         return BgCheck_EntityLineTest1(
             &gPlayState->colCtx, &start, &end, &hit, &poly,
             true, false, false, true, &bgId) != 0;
+    };
+    auto floorAt = [&](float x, float z, float startY, float& floorY) -> bool {
+        Vec3f pos{x, startY, z};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
+        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
     };
 
     for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
@@ -488,6 +523,20 @@ json NavigationMesh(Player* player) {
                 }
             }
             cell.clear = clear;
+        }
+    }
+
+    // Scene-exit polygons can be narrower than the 70-unit NavMesh grid or sit
+    // at a threshold whose nearby NavMesh node is rejected by body clearance.
+    // Sample a denser 35-unit window solely for non-zero SceneExitIndex.
+    for (int ez = -EXIT_SCAN_HALF_EXTENT; ez <= EXIT_SCAN_HALF_EXTENT; ++ez) {
+        for (int ex = -EXIT_SCAN_HALF_EXTENT; ex <= EXIT_SCAN_HALF_EXTENT; ++ex) {
+            float ignoredFloor = 0.0f;
+            sampleFloor(
+                origin.x + ex * EXIT_SCAN_STEP,
+                origin.z + ez * EXIT_SCAN_STEP,
+                player->actor.floorHeight + 64.0f,
+                ignoredFloor);
         }
     }
 
@@ -572,6 +621,65 @@ json NavigationMesh(Player* player) {
             const Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
             result["cells"].push_back({gx, gz, cell.y, cell.links});
         }
+    }
+    for (u32 exitIndex = 1; exitIndex < ARRAY_COUNT(exits); ++exitIndex) {
+        const auto& sample = exits[exitIndex];
+        if (sample.count <= 0) continue;
+        const int entranceIndex = gPlayState->setupExitList
+            ? gPlayState->setupExitList[exitIndex - 1] : -1;
+
+        bool directReachable = false;
+        const float vx = sample.x - origin.x;
+        const float vz = sample.z - origin.z;
+        const float directDistance = std::sqrt(vx * vx + vz * vz);
+        if (directDistance <= 80.0f &&
+            std::abs(sample.y - player->actor.floorHeight) <= MAX_HEIGHT_DELTA) {
+            directReachable = true;
+            constexpr int DIRECT_FLOOR_SAMPLES = 4;
+            for (int i = 1; i <= DIRECT_FLOOR_SAMPLES; ++i) {
+                const float t = static_cast<float>(i) /
+                                static_cast<float>(DIRECT_FLOOR_SAMPLES + 1);
+                float sampledY = 0.0f;
+                if (!floorAt(origin.x + vx * t, origin.z + vz * t,
+                        std::max(player->actor.floorHeight, sample.y) + 32.0f,
+                        sampledY)) {
+                    directReachable = false;
+                    break;
+                }
+                const float expectedY =
+                    player->actor.floorHeight + (sample.y - player->actor.floorHeight) * t;
+                if (std::abs(sampledY - expectedY) > EDGE_FLOOR_TOLERANCE) {
+                    directReachable = false;
+                    break;
+                }
+            }
+
+            if (directReachable && directDistance > 0.001f) {
+                Vec3f start{origin.x, player->actor.floorHeight + 26.0f, origin.z};
+                Vec3f end{sample.x, sample.y + 26.0f, sample.z};
+                if (lineBlocked(start, end)) {
+                    directReachable = false;
+                } else {
+                    const float px = -vz / directDistance * BODY_CLEARANCE;
+                    const float pz = vx / directDistance * BODY_CLEARANCE;
+                    Vec3f leftStart{start.x + px, start.y, start.z + pz};
+                    Vec3f leftEnd{end.x + px, end.y, end.z + pz};
+                    Vec3f rightStart{start.x - px, start.y, start.z - pz};
+                    Vec3f rightEnd{end.x - px, end.y, end.z - pz};
+                    if (lineBlocked(leftStart, leftEnd) || lineBlocked(rightStart, rightEnd)) {
+                        directReachable = false;
+                    }
+                }
+            }
+        }
+
+        result["scene_exits"].push_back({
+            {"exit_index", exitIndex},
+            {"entrance_index", entranceIndex},
+            {"position", {sample.x, sample.y, sample.z}},
+            {"samples", sample.count},
+            {"direct_reachable", directReachable},
+        });
     }
     return result;
 }
@@ -875,7 +983,7 @@ void Snapshot() {
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
-                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2"}},
+                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -913,6 +1021,7 @@ void Snapshot() {
         {"room_actor_count", 0},
         {"room_actors_truncated", false},
         {"navigation_probes", json::array()},
+        {"scene_exits", json::array()},
         {"navmesh", {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f}, {"half_extent", 0}, {"cells", json::array()}}},
         {"cutscene_active", false},
         {"paused", false},
@@ -971,6 +1080,10 @@ void Snapshot() {
                 {"yaw", player->actor.shape.rot.y},
                 {"speed_xz", player->actor.speedXZ},
                 {"floor_height", player->actor.floorHeight},
+                {"floor_exit_index", player->actor.floorPoly
+                    ? SurfaceType_GetSceneExitIndex(
+                        &gPlayState->colCtx, player->actor.floorPoly, player->actor.floorBgId)
+                    : 0},
                 {"wall_yaw", player->actor.wallYaw},
                 {"bg_check_flags", player->actor.bgCheckFlags},
                 {"wall_flags", player->actor.wallPoly
@@ -1019,7 +1132,10 @@ void Snapshot() {
             state["navigation_probes"] = NavigationProbes(player);
             if (full && !state["paused"].get<bool>() && !state["cutscene_active"].get<bool>() &&
                 state["game_over_state"].get<int>() == 0 && !state["dialogue"]["active"].get<bool>()) {
-                state["navmesh"] = NavigationMesh(player);
+                auto navigation = NavigationMesh(player);
+                state["scene_exits"] = navigation["scene_exits"];
+                navigation.erase("scene_exits");
+                state["navmesh"] = navigation;
             }
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
@@ -1045,7 +1161,7 @@ void Snapshot() {
         static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
             "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
             "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
-            "nearby_actors", "navmesh"};
+            "nearby_actors", "scene_exits", "navmesh"};
         for (const char* field : slowFields) state.erase(field);
     }
     std::string serialized = state.dump();

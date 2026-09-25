@@ -2,6 +2,7 @@ from zelda_ai.models import Decision, SkillArgs
 from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _probe_stick, _rotate_stick_quadrants, _world_yaw_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
+from zelda_ai.skills.navigation import _resolve_scene_exit
 
 
 def decision(skill, direction, duration=700, strength=0.7, slot=None, song=None, choice_index=None,
@@ -386,3 +387,65 @@ def test_stick_quadrant_feedback_correction():
 def test_common_controller_imports_time_for_monotonic_deadlines():
     import zelda_ai.skills.common as common
     assert common.time.monotonic() > 0
+
+
+def test_scene_exit_target_resolves_to_engine_observation(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211, "position": [70, 0, 116], "samples": 5},
+            {"exit_index": 2, "entrance_index": 0x300, "position": [-180, 0, 20], "samples": 2},
+        ],
+    })
+    selected = _resolve_scene_exit(game, [75, 0, 110])
+    assert selected is not None
+    assert selected.exit_index == 1
+    assert selected.position == (70.0, 0.0, 116.0)
+
+
+def test_single_scene_exit_is_selected_without_inventing_door(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211, "position": [70, 0, 116], "samples": 5},
+        ],
+    })
+    selected = _resolve_scene_exit(game, [65, 0, 100])
+    assert selected is not None
+    assert selected.entrance_index == 0x211
+
+
+def test_traverse_exit_rejects_unobserved_coordinate_even_with_single_exit(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211,
+             "position": [70, 0, 116], "samples": 5},
+        ],
+    })
+    assert _resolve_scene_exit(game, [900, 0, 900]) is None
+
+
+def test_scene_exit_resolution_uses_current_observation_only(state):
+    observed = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211,
+             "position": [70, 0, 116], "samples": 5},
+        ],
+    })
+    assert _resolve_scene_exit(observed, [70, 0, 116]) is not None
+
+    refreshed = type(state).model_validate({
+        **observed.model_dump(),
+        "scene_exits": [],
+    })
+    assert _resolve_scene_exit(refreshed, [70, 0, 116]) is None
