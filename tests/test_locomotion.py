@@ -120,6 +120,27 @@ def test_world_yaw_stick_respects_exact_camera_yaw_and_mirroring(state):
     assert _world_yaw_stick(mirrored, 0, 70) == (-70, 0)
 
 
+def test_door_final_micro_step_allows_door_wall_but_rejects_intervening_wall(state):
+    door = {"actor_id": 9, "actor_uid": "door-1", "name": "En_Door", "description": "Door",
+        "category": 10, "category_name": "door", "room": 0, "params": 2,
+        "position": [0, 0, 100], "focus_position": [0, 20, 100], "distance": 100.0,
+        "targeted": False, "drawn": False, "text_id": 0}
+    probe = {"direction": "forward", "distance": 70, "floor_found": True,
+        "floor_y": 0, "delta_y": 0, "floor_type": 0,
+        "wall_hit": True, "wall_distance": 100, "wall_flags": 0}
+    game = type(state).model_validate({
+        **state.model_dump(), "capabilities": ["local_navmesh"],
+        "room_actors": [door], "room_actor_count": 1, "navigation_probes": [probe],
+    })
+    actor = game.room_actors[0]
+    assert interactions._door_step_safe(game, actor)
+    blocked = type(state).model_validate({
+        **game.model_dump(),
+        "navigation_probes": [{**probe, "wall_distance": 30}],
+    })
+    assert not interactions._door_step_safe(blocked, blocked.room_actors[0])
+
+
 def test_door_does_not_bypass_failed_navmesh_approach(state, monkeypatch):
     import asyncio
 
