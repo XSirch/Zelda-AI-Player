@@ -210,5 +210,7 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "json NavigationMesh(Player* player)" in native
     assert "EDGE_FLOOR_SAMPLES = 4" in native
     assert "sampleIndex <= EDGE_FLOOR_SAMPLES" in native
+    assert "EXIT_SCAN_STEP = 35.0f" in native
+    assert "EXIT_SCAN_HALF_EXTENT = 4" in native
     assert '"nearby_actors", "scene_exits", "navmesh"' in native
     assert 'state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}' in native
