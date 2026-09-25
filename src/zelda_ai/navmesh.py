@@ -282,7 +282,7 @@ def primitive_move_safe(game: GameState, direction: str, *,
                         wall_clearance: float = 42.0) -> bool:
     """Probe the world heading that OoT will actually derive from a raw move stick."""
     if not game.player:
-        return True
+        return False
     if not game.navigation_probes:
         return "local_navmesh" not in game.capabilities
 
