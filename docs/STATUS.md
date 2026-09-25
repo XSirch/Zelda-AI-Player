@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.8 + Navigation V2
+# Implementation status — realtime-input foundation v2.9 + Navigation V2
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -7,7 +7,7 @@ The historical pre-v2 status is preserved as `STATUS_V1.md`.
 
 ## Implemented
 
-Independent zero/unlimited budgets and UI labels; nonblocking stop/model validation with stale-result fencing; global run deadline; input-owner generations; versioned fast/full snapshots; consumed receipts; native discrete sequences with wall-clock watchdog and deduplication; stable actor lifetime IDs and a recoverable bounded event journal; collision-derived moving local NavMesh with reciprocal A* links; observed SceneExitIndex surfaces plus `traverse_exit`; realtime probe veto before movement; conservative RT retreat and time-based stuck windows; skill-module extraction; versioned learning and removal of unsolicited replay; native installer migration/backup manifest; live transport/input telemetry.
+Independent zero/unlimited budgets and UI labels; nonblocking stop/model validation with stale-result fencing; global run deadline; input-owner generations; versioned fast/full snapshots; consumed receipts; native discrete sequences with wall-clock watchdog and deduplication; stable actor lifetime IDs and a recoverable bounded event journal; collision-derived moving local NavMesh with reciprocal A* links; observed SceneExitIndex surfaces plus `traverse_exit`; 16-direction traversal-affordance scan plus `traverse_to` for stairs/ladders/climbable walls; realtime probe veto before movement; conservative RT retreat and time-based stuck windows; skill-module extraction; versioned learning and removal of unsolicited replay; native installer migration/backup manifest; live transport/input telemetry.
 
 Deployment/contracts: [REALTIME_V2.md](REALTIME_V2.md).
 
@@ -37,7 +37,7 @@ That run also emitted a Starlette/httpx deprecation warning and Pydantic seriali
 - Windows SoH reconfigure/build and in-game input/animation/targeting tests.
 - Actual p50/p95/p99 latency under load.
 - Robust combat across enemies/bosses, cross-room/global route planning and special navigation links, goal-bound route replay and process-level isolation of the fast motor.
-- Windows SoH build + in-game validation of the v2.8 NavMesh/scene-exit interior-target sampling, frame cost and wall/ledge avoidance.
+- Windows SoH build + in-game validation of the v2.9 NavMesh/scene-exit/traversal-affordance sampling, frame cost and wall/ledge avoidance.
 
 The local controller still contains heuristic skills and bounded fallbacks. This is not an autonomous completion claim.
 
