@@ -215,7 +215,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     "skill": decision.skill}
 
             steer_target = target
-            if current.navmesh.available:
+            if "local_navmesh" in current.capabilities:
                 plan = plan_navmesh(current, target)
                 if plan is None:
                     navmesh_blocked_samples += 1
@@ -439,7 +439,7 @@ async def _follow_actor(bridge: Bridge, decision: Decision, observation: GameSta
 
             if actor.distance > desired + 35:
                 steer_target = actor.position
-                if current.navmesh.available:
+                if "local_navmesh" in current.capabilities:
                     plan = plan_navmesh(current, actor.position)
                     if plan is None or not waypoint_probe_safe(current, plan.waypoint):
                         bridge.release()
@@ -574,7 +574,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
             if turn_ticks > 0:
                 buttons, stick_x, stick_y = 0, 58 * turn_side, 8
                 turn_ticks -= 1
-            elif current.navmesh.available:
+            elif "local_navmesh" in current.capabilities:
                 angle = current.player.yaw * math.pi / 32768.0
                 explore_target = (
                     current.player.position[0] + math.sin(angle) * 350.0,
