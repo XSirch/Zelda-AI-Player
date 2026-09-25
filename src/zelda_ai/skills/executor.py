@@ -17,6 +17,23 @@ from .aim import _aim_at
 from .combat import _fight_enemy
 from .traversal import _traverse_local
 
+PLAYER_STATE2_HOPPING = 1 << 19
+
+async def _observe_hop(bridge: Bridge, before: GameState, timeout: float = .65) -> tuple[bool, float]:
+    current = bridge.state
+    hopping = False
+    max_distance = 0.0
+    deadline = time.monotonic() + timeout
+    while current and time.monotonic() < deadline:
+        if current.player and before.player and current.scene_epoch == before.scene_epoch:
+            hopping |= bool(current.player.state_flags_2 & PLAYER_STATE2_HOPPING)
+            max_distance = max(max_distance, math.dist(before.player.position, current.player.position))
+        try:
+            current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
+        except RuntimeError:
+            break
+    return hopping, max_distance
+
 async def execute_skill(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
     if decision.args.target_actor_id is not None and decision.args.target_actor_uid is None:
         actor = _matching_actor(observation, decision.args.target_actor_id, decision.args.target_actor_params)
@@ -85,9 +102,23 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
     if is_realtime(bridge) and decision.skill in {"attack", "interact", "advance_dialogue", "camera_center",
             "backflip", "sidestep", "jump_attack", "roll", "pause_toggle", "menu_confirm", "menu_cancel",
             "menu_assign", "continue_gameover", "menu_move"}:
+        if decision.skill in {"backflip", "sidestep"}:
+            row = await bridge.sequence_receipt([
+                {"buttons": BUTTONS["Z"], "stick_x": x, "stick_y": y, "ticks": 1},
+                {"buttons": buttons, "stick_x": x, "stick_y": y, "ticks": 1},
+                {"buttons": BUTTONS["Z"], "stick_x": x, "stick_y": y, "ticks": 2},
+                {"buttons": BUTTONS["Z"], "stick_x": 0, "stick_y": 0, "ticks": 1},
+            ], baseline_buttons=BUTTONS["Z"], edge_buttons=BUTTONS["A"])
+            delivered = bool(row and row.first_tick > 0 and row.status not in {"rejected", "cancelled", "superseded"})
+            hopping, moved = await _observe_hop(bridge, before) if delivered else (False, 0.0)
+            effect_confirmed = hopping or moved >= 10.0
+            return {"status": "completed" if effect_confirmed else "failed",
+                "reason": "dodge_confirmed" if effect_confirmed else
+                          ("input_consumed_effect_unconfirmed" if delivered else "input_not_consumed"),
+                "distance": moved, "hopping_seen": hopping, "acknowledged": delivered,
+                "ack_stage": "consumed", "effect_confirmed": effect_confirmed, "skill": decision.skill}
         delivered = await bridge.pulse(buttons=buttons, stick_x=x, stick_y=y,
-            hold_ticks=1, edge_buttons=buttons & ~BUTTONS["Z"] if decision.skill in
-            {"backflip", "sidestep", "jump_attack"} else buttons)
+            hold_ticks=1, edge_buttons=buttons & ~BUTTONS["Z"] if decision.skill == "jump_attack" else buttons)
         return {"status": "completed" if delivered else "failed",
             "reason": "input_consumed_effect_unconfirmed" if delivered else "input_not_consumed",
             "acknowledged": delivered, "ack_stage": "consumed", "effect_confirmed": False,

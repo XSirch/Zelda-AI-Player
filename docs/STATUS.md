@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.1
+# Implementation status — realtime-input foundation v2.2
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -54,3 +54,8 @@ The live Realtime panel now exposes explicit provider-free input diagnostics. Th
 
 
 Emergency diagnostic handoff is independent of the long-running diagnostic coroutine: the UI can revoke controller ownership immediately, the active test then exits as `control_revoked`, and starting a run is blocked until diagnostic cleanup completes.
+
+
+## Realtime latency/effect correction v2.2
+
+The first live backflip diagnostic exposed two measurement issues: native accept→consume rounded to 0 ms because UDP polling happens inside the input-consumer hook, and a consumed Z+A edge was reported as success without observing the dodge effect. V2.2 keeps sub-millisecond native queue timing, adds Python-monotonic→native-consume latency (sanity-bounded to the shared system monotonic clock), primes backflip/sidestep direction one consumer tick before the A edge, and confirms dodge effect using PLAYER_STATE2_HOPPING or observed displacement. A rebuilt SoH adapter is required for the new end-to-end timing field.

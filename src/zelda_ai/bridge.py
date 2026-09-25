@@ -41,6 +41,7 @@ class Bridge(asyncio.DatagramProtocol):
         self.receipts: OrderedDict[int, InputReceipt] = OrderedDict()
         self._intervals: deque[float] = deque(maxlen=200)
         self._apply_latencies: deque[float] = deque(maxlen=200)
+        self._client_latencies: deque[float] = deque(maxlen=200)
         self._latency_seen: deque[int] = deque(maxlen=512)
         self.input_tick_ms = 50.0
         self.event_gaps = 0
@@ -173,6 +174,7 @@ class Bridge(asyncio.DatagramProtocol):
                 self._observer_state = None
                 self._intervals.clear()
                 self._apply_latencies.clear()
+                self._client_latencies.clear()
                 self._latency_seen.clear()
                 self._owner_base = state.owner_epoch + 1
                 if previous is not None:
@@ -195,6 +197,8 @@ class Bridge(asyncio.DatagramProtocol):
                 if receipt.first_tick and receipt.apply_latency_ms is not None and receipt.seq not in self._latency_seen:
                     self._latency_seen.append(receipt.seq)
                     self._apply_latencies.append(receipt.apply_latency_ms)
+                    if receipt.client_to_consume_ms is not None:
+                        self._client_latencies.append(receipt.client_to_consume_ms)
             while len(self.receipts) > 512:
                 self.receipts.popitem(last=False)
             self.state, self.last_seen = state, now
@@ -228,6 +232,9 @@ class Bridge(asyncio.DatagramProtocol):
                 "native_apply_p50_ms": percentile(self._apply_latencies, .5),
                 "native_apply_p95_ms": percentile(self._apply_latencies, .95),
                 "native_apply_p99_ms": percentile(self._apply_latencies, .99),
+                "client_to_consume_p50_ms": percentile(self._client_latencies, .50),
+                "client_to_consume_p95_ms": percentile(self._client_latencies, .95),
+                "client_to_consume_p99_ms": percentile(self._client_latencies, .99),
                 "last_receipt": last_consumed.model_dump() if last_consumed else None,
                 "dropped_samples": self.dropped_samples, "event_gaps": self.event_gaps,
                 "fast_base_misses": self.fast_base_misses,
@@ -265,7 +272,8 @@ class Bridge(asyncio.DatagramProtocol):
             "buttons": buttons, "stick_x": stick_x, "stick_y": stick_y, "lease_ms": lease_ms}
         if self.realtime:
             command.update(kind=kind, owner_epoch=self._owner_base+self.authority.epoch,
-                           context_epoch=self.state.context_epoch, **extra)
+                           context_epoch=self.state.context_epoch,
+                           client_sent_us=time.monotonic_ns() // 1000, **extra)
         else:
             command["active"] = kind not in {"release", "cancel"}
         self.transport.sendto(json.dumps(command, separators=(",", ":")).encode(), self.peer)
@@ -276,20 +284,18 @@ class Bridge(asyncio.DatagramProtocol):
         return self._command("setpoint" if active else "cancel", buttons=buttons,
             stick_x=stick_x, stick_y=stick_y, lease_ms=lease_ms if active else (200 if self.realtime else 0))
 
-    async def pulse_receipt(self, *, buttons=0, stick_x=0, stick_y=0, hold_ticks=1,
-                            baseline_buttons=0, edge_buttons=None, timeout=1.5) -> InputReceipt | None:
-        """Return the exact native sequence receipt; consumption is delivery evidence, not gameplay success."""
+    async def sequence_receipt(self, steps: list[dict], *, baseline_buttons=0, edge_buttons=0,
+                               timeout=1.5) -> InputReceipt | None:
+        """Execute a native input-consumer sequence and return its exact receipt."""
         self.authority.check()
         if not self.realtime:
             raise RuntimeError("native_sequence_not_supported")
-        if not 1 <= hold_ticks <= 8:
-            raise ValueError("hold_ticks must be between 1 and 8")
+        if not steps or len(steps) > 8:
+            raise ValueError("sequence must contain between 1 and 8 steps")
         state = self.state
         context = (state.instance_id, state.scene_epoch, state.context_epoch)
         seq = self._command("sequence", buttons=baseline_buttons, lease_ms=300,
-            edge_buttons=buttons if edge_buttons is None else edge_buttons, steps=[
-                {"buttons": buttons, "stick_x": stick_x, "stick_y": stick_y, "ticks": hold_ticks},
-                {"buttons": baseline_buttons, "stick_x": 0, "stick_y": 0, "ticks": 1}])
+            edge_buttons=edge_buttons, steps=steps)
         deadline = time.monotonic()+timeout
         last_seq = state.seq
         try:
@@ -310,6 +316,16 @@ class Bridge(asyncio.DatagramProtocol):
                 self._command("cancel", buttons=baseline_buttons, lease_ms=200)
             else:
                 self.release()
+
+    async def pulse_receipt(self, *, buttons=0, stick_x=0, stick_y=0, hold_ticks=1,
+                            baseline_buttons=0, edge_buttons=None, timeout=1.5) -> InputReceipt | None:
+        if not 1 <= hold_ticks <= 8:
+            raise ValueError("hold_ticks must be between 1 and 8")
+        return await self.sequence_receipt([
+            {"buttons": buttons, "stick_x": stick_x, "stick_y": stick_y, "ticks": hold_ticks},
+            {"buttons": baseline_buttons, "stick_x": 0, "stick_y": 0, "ticks": 1},
+        ], baseline_buttons=baseline_buttons,
+            edge_buttons=buttons if edge_buttons is None else edge_buttons, timeout=timeout)
 
     async def pulse(self, *, buttons=0, stick_x=0, stick_y=0, hold_ticks=1, baseline_buttons=0,
                     edge_buttons=None, timeout=1.5) -> bool:

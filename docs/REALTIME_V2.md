@@ -1,4 +1,4 @@
-# Realtime input foundation (v2.1)
+# Realtime input foundation (v2.2)
 
 ## Delivered scope
 
@@ -10,7 +10,7 @@ This change implements the input/observation foundation of the reviewed rollout,
 - A global monotonic run deadline also covers dialogue, cutscene, replay and model waits. A zero duration disables that deadline, not the native input watchdog.
 - One input owner epoch and task-local generation fence. A stale skill's `finally` cannot release its successor. Neutral/cancel is distinct from human handoff.
 - V2 uses latest-wins continuous setpoints and separately identified discrete sequences. Sequences advance at consuming `PadMgr_RequestPadData` reads (mode 1), not render frames. Duplicate packets neither replay a sequence nor extend its lease.
-- Accepted, consumed and completed receipts are separate. Consumed input is NOT proof of a gameplay effect or animation. Feedback loss ends renewal; the monotonic native watchdog releases control.
+- Accepted, consumed and completed receipts are separate. The panel separates Python→consume latency from the sub-millisecond native accept→consume queue. Consumed input is NOT proof of gameplay effect; dodge skills additionally verify HOPPING/displacement. Feedback loss ends renewal; the monotonic native watchdog releases control.
 - Fast snapshots carry dynamic observations. Full snapshots at approximately 200 ms carry slow metadata. Fast samples require an exact full snapshot and matching scene/context. Gaps trigger resynchronization instead of mixing maps.
 - Native actor lifetime IDs prevent selecting another enemy of the same type. Lock target and targeting candidate are distinct. A bounded event journal resends unacknowledged events and reports unrecoverable gaps.
 - Basic generic combat acquires a real lock, approaches and alternates attacks with guarded recovery locally. It does not infer enemy animation openings, guarantee boss victories or use hidden solution flags.
@@ -26,7 +26,7 @@ This change implements the input/observation foundation of the reviewed rollout,
    The installer recognizes the verified original or the previous hook, validates the reconstructed upstream file, backs up files outside the CMake source glob, and installs every required header. It does not reset the checkout or touch game assets.
 4. Reconfigure and rebuild the pinned Shipwright C++ project. **An existing soh.exe does not change when adapter source changes.**
 5. Run `npm install` and `npm run build` in `web`, then restart `uv run zelda-ai serve` and the newly built game.
-6. The panel must report `rt-input-v2.1`, protocol 2 and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
+6. The panel must report `rt-input-v2.2`, protocol 2 and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
 
 A new backend is compatible with the old V1 bridge for rollback/testing, but V1 acknowledgment means acceptance only. The new V2 native bridge requires this backend. To fully roll back, restore both the previous backend and game binary/adapter from the preserved backup.
 

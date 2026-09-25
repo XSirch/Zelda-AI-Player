@@ -20,7 +20,8 @@ export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnosti
   onRelease: () => void;
 }) {
   const rt = bridge?.realtime;
-  const ms = (value?: number | null) => value == null ? '—' : `${value.toFixed(1)} ms`;
+  const ms = (value?: number | null) => value == null ? '—' :
+    (value < 1 ? `${value.toFixed(3)} ms` : `${value.toFixed(1)} ms`);
   const blocked = !rt?.enabled || ['starting', 'running', 'paused'].includes(runtimeStatus ?? '') || busy;
   const last = rt?.last_receipt;
   return <section className="panel realtime-panel">
@@ -28,12 +29,13 @@ export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnosti
     <div className="telemetry">
       <div><span>ESTADO RECEBIDO</span><strong>{rt?.state_hz == null ? '—' : `${rt.state_hz.toFixed(1)} Hz`}</strong></div>
       <div><span>INTERVALO P95</span><strong>{ms(rt?.state_interval_p95_ms)}</strong></div>
-      <div><span>ACEITO → CONSUMIDO</span><strong>P50 {ms(rt?.native_apply_p50_ms)} · P95 {ms(rt?.native_apply_p95_ms)} · P99 {ms(rt?.native_apply_p99_ms)}</strong></div>
+      <div><span>PYTHON → CONSUMIDO</span><strong>P50 {ms(rt?.client_to_consume_p50_ms)} · P95 {ms(rt?.client_to_consume_p95_ms)} · P99 {ms(rt?.client_to_consume_p99_ms)}</strong></div>
+      <div><span>FILA NATIVA</span><strong>P95 {ms(rt?.native_apply_p95_ms)}</strong></div>
       <div><span>DONO DO INPUT</span><strong>{rt?.owner ?? '—'}</strong></div>
       <div><span>LACUNAS DE EVENTOS</span><strong>{rt?.event_gaps ?? 0}</strong></div>
       <div><span>AMOSTRAS PERDIDAS</span><strong>{rt?.dropped_samples ?? 0}</strong></div>
     </div>
-    {last && <div className="diagnostic-last"><span>ÚLTIMO CONSUMO</span><code>SEQ {last.seq} · {last.status} · {ms(last.apply_latency_ms)} · PRESS 0x{last.pressed.toString(16).toUpperCase().padStart(4, '0')} · RELEASE 0x{last.released.toString(16).toUpperCase().padStart(4, '0')}</code></div>}
+    {last && <div className="diagnostic-last"><span>ÚLTIMO CONSUMO</span><code>SEQ {last.seq} · {last.status} · E2E {ms(last.client_to_consume_ms)} · FILA {ms(last.apply_latency_ms)} · PRESS 0x{last.pressed.toString(16).toUpperCase().padStart(4, '0')} · RELEASE 0x{last.released.toString(16).toUpperCase().padStart(4, '0')}</code></div>}
     <div className="diagnostic-block">
       <div className="section-head"><span>DIAGNÓSTICO LOCAL</span><span>SEM MODELO · SEM BENCHMARK</span></div>
       <div className="diagnostic-actions">{actions.map(([action, label]) =>
@@ -45,8 +47,10 @@ export function RealtimePanel({ bridge, runtimeStatus, busy, result, onDiagnosti
         <div><span>RESULTADO</span><strong>{result.status} / {result.reason}</strong></div>
         <div><span>COMANDOS</span><strong>{result.commands} · consumidos {result.consumed} · perdidos {result.lost}</strong></div>
         <div><span>EDGES</span><strong>press {result.presses}/{result.expected_edges} · release {result.releases}/{result.expected_edges}</strong></div>
-        <div><span>LATÊNCIA</span><strong>P50 {ms(result.latency_ms.p50)} · P95 {ms(result.latency_ms.p95)} · P99 {ms(result.latency_ms.p99)}</strong></div>
-        <div><span>DESLOCAMENTO</span><strong>{result.distance == null ? '—' : `${result.distance.toFixed(1)} u`}</strong></div>
+        <div><span>LATÊNCIA E2E</span><strong>P50 {ms(result.latency_ms.p50)} · P95 {ms(result.latency_ms.p95)} · P99 {ms(result.latency_ms.p99)}</strong></div>
+        <div><span>FILA NATIVA</span><strong>P95 {ms(result.native_queue_ms.p95)}</strong></div>
+        <div><span>EFEITO</span><strong>{result.effect_confirmed == null ? 'não avaliado' : (result.effect_confirmed ? 'confirmado' : 'não observado')}{result.hopping_seen ? ' · HOPPING' : ''}</strong></div>
+        <div><span>DESLOCAMENTO</span><strong>final {result.distance == null ? '—' : `${result.distance.toFixed(1)} u`} · pico {result.max_distance.toFixed(1)} u</strong></div>
       </div>}
     </div>
     <p className="muted content">{rt?.enabled

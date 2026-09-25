@@ -29,6 +29,7 @@ struct ScheduledInput {
     InputKind kind = InputKind::Setpoint;
     PadState pad; // Setpoint or the neutral/held baseline following a sequence.
     int leaseMs = 300;
+    int64_t clientSentUs = -1;
     uint16_t edgeButtons = 0;
     std::vector<InputStep> steps;
 };
@@ -47,7 +48,8 @@ struct InputReceipt {
     uint64_t seq = 0, ownerEpoch = 0, firstTick = 0, lastTick = 0;
     ReceiptStatus status = ReceiptStatus::Accepted;
     uint16_t pressed = 0, released = 0;
-    int64_t receivedMs = 0, applyLatencyMs = -1;
+    int64_t receivedUs = 0, clientSentUs = -1;
+    double applyLatencyMs = -1.0, clientToConsumeMs = -1.0;
     const char* reason = "";
 };
 struct ConsumedInput {
@@ -81,7 +83,8 @@ class InputScheduler {
     }
     bool Active(int64_t nowMs) const { return active && nowMs < expiresAt; }
 
-    bool Accept(const ScheduledInput& cmd, int64_t nowMs) {
+    bool Accept(const ScheduledInput& cmd, int64_t nowMs, int64_t nowUs = -1) {
+        if (nowUs < 0) nowUs = nowMs * 1000;
         Expire(nowMs);
         // A duplicate never extends the watchdog, changes data, or replays an action.
         if (auto* row = Receipt(cmd.seq)) {
@@ -89,38 +92,38 @@ class InputScheduler {
         }
         if (cmd.seq == 0 || cmd.seq <= lastReceivedSeq) return false;
         lastReceivedSeq = cmd.seq;
-        if (cmd.ownerEpoch < ownerEpoch) return Reject(cmd, nowMs, "old_owner");
+        if (cmd.ownerEpoch < ownerEpoch) return Reject(cmd, nowMs, nowUs, "old_owner");
         if (cmd.kind == InputKind::Release) {
             // An authenticated emergency handoff must work even with stale scene/sample data.
             ownerEpoch = cmd.ownerEpoch;
             Release("released");
-            AddReceipt(cmd, nowMs).status = ReceiptStatus::Completed;
+            AddReceipt(cmd, nowMs, nowUs).status = ReceiptStatus::Completed;
             lastCommandSeq = cmd.seq;
             return true;
         }
         if (!cmd.pad.Valid() || cmd.leaseMs < 1 || cmd.leaseMs > 500) {
-            return Reject(cmd, nowMs, "invalid_input");
+            return Reject(cmd, nowMs, nowUs, "invalid_input");
         }
         const auto& sample = samples[cmd.baseSeq % samples.size()];
         if (cmd.sceneEpoch != sceneEpoch || cmd.contextEpoch != contextEpoch ||
             sample.seq != cmd.baseSeq || cmd.baseSeq == 0 || sample.scene != sceneEpoch ||
             sample.context != contextEpoch || nowMs < sample.atMs || nowMs - sample.atMs > MaxStateAgeMs) {
-            return Reject(cmd, nowMs, "stale_context_or_sample");
+            return Reject(cmd, nowMs, nowUs, "stale_context_or_sample");
         }
         if (cmd.kind == InputKind::Renew && (cmd.ownerEpoch != ownerEpoch || !active)) {
-            return Reject(cmd, nowMs, "nothing_to_renew");
+            return Reject(cmd, nowMs, nowUs, "nothing_to_renew");
         }
         if (cmd.kind == InputKind::Sequence) {
-            if (cmd.steps.empty() || cmd.steps.size() > 8) return Reject(cmd, nowMs, "invalid_sequence");
+            if (cmd.steps.empty() || cmd.steps.size() > 8) return Reject(cmd, nowMs, nowUs, "invalid_sequence");
             int total = 0;
             for (const auto& step : cmd.steps) {
                 if (!step.pad.Valid() || step.ticks < 1 || step.ticks > 8) {
-                    return Reject(cmd, nowMs, "invalid_sequence");
+                    return Reject(cmd, nowMs, nowUs, "invalid_sequence");
                 }
                 total += step.ticks;
             }
-            if (total > 31) return Reject(cmd, nowMs, "sequence_too_long");
-            if (actionSeq != 0 && cmd.ownerEpoch == ownerEpoch) return Reject(cmd, nowMs, "sequence_busy");
+            if (total > 31) return Reject(cmd, nowMs, nowUs, "sequence_too_long");
+            if (actionSeq != 0 && cmd.ownerEpoch == ownerEpoch) return Reject(cmd, nowMs, nowUs, "sequence_busy");
         }
         if (cmd.kind == InputKind::Cancel) {
             Release("cancelled_by_owner");
@@ -132,7 +135,7 @@ class InputScheduler {
         active = true;
         expiresAt = nowMs + cmd.leaseMs;
         lastCommandSeq = cmd.seq;
-        auto& receipt = AddReceipt(cmd, nowMs);
+        auto& receipt = AddReceipt(cmd, nowMs, nowUs);
         if (cmd.kind == InputKind::Renew) {
             receipt.status = ReceiptStatus::Completed;
             return true;
@@ -156,7 +159,8 @@ class InputScheduler {
         return true;
     }
 
-    ConsumedInput Consume(int64_t nowMs, PadState human = {}) {
+    ConsumedInput Consume(int64_t nowMs, PadState human = {}, int64_t nowUs = -1) {
+        if (nowUs < 0) nowUs = nowMs * 1000;
         ++inputTick;
         Expire(nowMs);
         if (!active) {
@@ -175,7 +179,11 @@ class InputScheduler {
             if (auto* row = MutableReceipt(out.commandSeq)) {
                 if (row->firstTick == 0) {
                     row->firstTick = inputTick;
-                    row->applyLatencyMs = std::max<int64_t>(0, nowMs - row->receivedMs);
+                    row->applyLatencyMs = std::max<int64_t>(0, nowUs - row->receivedUs) / 1000.0;
+                    const int64_t clientDeltaUs = nowUs - row->clientSentUs;
+                    if (row->clientSentUs > 0 && clientDeltaUs >= 0 && clientDeltaUs <= 5000000) {
+                        row->clientToConsumeMs = clientDeltaUs / 1000.0;
+                    }
                 }
                 row->lastTick = inputTick;
                 row->pressed |= out.pressed;
@@ -228,7 +236,7 @@ class InputScheduler {
         for (auto& row : receipts) if (row.seq == seq) return &row;
         return nullptr;
     }
-    InputReceipt& AddReceipt(const ScheduledInput& cmd, int64_t nowMs) {
+    InputReceipt& AddReceipt(const ScheduledInput& cmd, int64_t nowMs, int64_t nowUs) {
         // Do not evict a live sequence receipt during frequent renewals.
         if (receipts.size() >= MaxReceipts) {
             auto victim = std::find_if(receipts.begin(), receipts.end(), [&](const InputReceipt& row) {
@@ -236,11 +244,13 @@ class InputScheduler {
             });
             if (victim != receipts.end()) receipts.erase(victim);
         }
-        receipts.push_back({cmd.seq, cmd.ownerEpoch, 0, 0, ReceiptStatus::Accepted, 0, 0, nowMs, -1, ""});
+        (void)nowMs;
+        receipts.push_back({cmd.seq, cmd.ownerEpoch, 0, 0, ReceiptStatus::Accepted, 0, 0,
+                            nowUs, cmd.clientSentUs, -1.0, -1.0, ""});
         return receipts.back();
     }
-    bool Reject(const ScheduledInput& cmd, int64_t nowMs, const char* reason) {
-        auto& row = AddReceipt(cmd, nowMs);
+    bool Reject(const ScheduledInput& cmd, int64_t nowMs, int64_t nowUs, const char* reason) {
+        auto& row = AddReceipt(cmd, nowMs, nowUs);
         row.status = ReceiptStatus::Rejected;
         row.reason = reason;
         return false;

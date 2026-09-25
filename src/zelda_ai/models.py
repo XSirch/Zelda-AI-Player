@@ -155,7 +155,8 @@ class InputReceipt(StrictModel):
     last_tick: int = Field(ge=0)
     pressed: int = Field(ge=0, le=65535)
     released: int = Field(ge=0, le=65535)
-    apply_latency_ms: int | None = Field(default=None, ge=0)
+    apply_latency_ms: float | None = Field(default=None, ge=0)
+    client_to_consume_ms: float | None = Field(default=None, ge=0)
     reason: str = Field(default="", max_length=80)
 
 

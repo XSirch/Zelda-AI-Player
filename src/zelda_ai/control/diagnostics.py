@@ -10,6 +10,7 @@ from ..control.authority import ControlRevoked
 from ..models import GameState, InputReceipt
 
 A, B, Z = 0x8000, 0x4000, 0x2000
+PLAYER_STATE2_HOPPING = 1 << 19
 ACTIONS = {"tap_a", "tap_b", "target", "forward", "back", "backflip", "stress_a", "stress_b"}
 
 
@@ -40,7 +41,8 @@ def summarize_receipts(receipts: Iterable[InputReceipt | None], *, edge_button: 
     attempts = list(receipts)
     rows = [row for row in attempts if row is not None]
     consumed = [row for row in rows if row.first_tick > 0]
-    latencies = [float(row.apply_latency_ms) for row in consumed if row.apply_latency_ms is not None]
+    latencies = [float(row.client_to_consume_ms) for row in consumed if row.client_to_consume_ms is not None]
+    native_latencies = [float(row.apply_latency_ms) for row in consumed if row.apply_latency_ms is not None]
     presses = sum(1 for row in consumed if edge_button and row.pressed & edge_button)
     releases = sum(1 for row in consumed if edge_button and row.released & edge_button)
     return {
@@ -57,8 +59,13 @@ def summarize_receipts(receipts: Iterable[InputReceipt | None], *, edge_button: 
             "p50": _percentile(latencies, .50),
             "p95": _percentile(latencies, .95),
             "p99": _percentile(latencies, .99),
-            "min": round(min(latencies), 2) if latencies else None,
-            "max": round(max(latencies), 2) if latencies else None,
+            "min": round(min(latencies), 3) if latencies else None,
+            "max": round(max(latencies), 3) if latencies else None,
+        },
+        "native_queue_ms": {
+            "p50": _percentile(native_latencies, .50),
+            "p95": _percentile(native_latencies, .95),
+            "p99": _percentile(native_latencies, .99),
         },
     }
 
@@ -106,6 +113,22 @@ async def _motion(bridge: Bridge, direction: str, *, seconds: float = 1.0) -> tu
     return receipts, reason
 
 
+async def _observe_hop_effect(bridge: Bridge, start: GameState, timeout: float = .75) -> tuple[bool, float]:
+    current = bridge.state
+    max_distance = 0.0
+    hopping_seen = False
+    deadline = time.monotonic() + timeout
+    while current and time.monotonic() < deadline:
+        if current.player and start.player and current.scene_epoch == start.scene_epoch:
+            max_distance = max(max_distance, math.dist(start.player.position, current.player.position))
+            hopping_seen |= bool(current.player.state_flags_2 & PLAYER_STATE2_HOPPING)
+        try:
+            current = await bridge.next_state(current.seq, timeout=min(.2, max(.001, deadline-time.monotonic())))
+        except RuntimeError:
+            break
+    return hopping_seen, round(max_distance, 2)
+
+
 async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
     if action not in ACTIONS:
         raise ValueError("Unknown input diagnostic")
@@ -117,6 +140,9 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
     edge_button = 0
     expected_edges = 0
     reason = "completed"
+    effect_confirmed = None
+    hopping_seen = False
+    max_distance = 0.0
 
     try:
         with bridge.input_scope(f"diagnostic:{action}"):
@@ -144,8 +170,16 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
                 else:
                     edge_button = A
                     expected_edges = 1
-                    receipts.append(await bridge.pulse_receipt(buttons=Z | A, stick_y=-60,
-                        baseline_buttons=Z, edge_buttons=A, hold_ticks=1))
+                    receipts.append(await bridge.sequence_receipt([
+                        {"buttons": Z, "stick_x": 0, "stick_y": -60, "ticks": 1},
+                        {"buttons": Z | A, "stick_x": 0, "stick_y": -60, "ticks": 1},
+                        {"buttons": Z, "stick_x": 0, "stick_y": -60, "ticks": 2},
+                        {"buttons": Z, "stick_x": 0, "stick_y": 0, "ticks": 1},
+                    ], baseline_buttons=Z, edge_buttons=A))
+                    hopping_seen, max_distance = await _observe_hop_effect(bridge, start)
+                    effect_confirmed = hopping_seen or max_distance >= 10.0
+                    if not effect_confirmed:
+                        reason = "backflip_effect_not_observed"
     except ControlRevoked:
         reason = "control_revoked"
     except RuntimeError as exc:
@@ -167,7 +201,8 @@ async def run_input_diagnostic(bridge: Bridge, action: str) -> dict:
     return {
         "action": action, "status": status, "reason": reason, **summary,
         "duration_ms": round((time.monotonic()-started)*1000, 2),
-        "distance": distance,
+        "effect_confirmed": effect_confirmed, "hopping_seen": hopping_seen,
+        "max_distance": max_distance, "distance": distance,
         "start_position": list(start.player.position) if start and start.player else None,
         "end_position": list(after.player.position) if after and after.player else None,
     }

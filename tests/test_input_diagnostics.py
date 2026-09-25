@@ -11,7 +11,8 @@ def with_probe(state: GameState, **changes):
 
 def receipt(seq, **changes):
     data = dict(seq=seq, owner_epoch=1, status="completed", first_tick=seq, last_tick=seq,
-                pressed=0x8000, released=0x8000, apply_latency_ms=seq, reason="")
+                pressed=0x8000, released=0x8000, apply_latency_ms=seq / 100.0,
+                client_to_consume_ms=seq, reason="")
     data.update(changes)
     return InputReceipt.model_validate(data)
 
@@ -35,6 +36,7 @@ def test_receipt_summary_counts_edges_and_latency():
     assert summary["latency_ms"]["p95"] == 19
     assert summary["latency_ms"]["p99"] == 20
     assert summary["latency_ms"]["max"] == 20
+    assert summary["native_queue_ms"]["p95"] == .19
 
 
 def test_receipt_summary_does_not_turn_missing_delivery_into_success():
