@@ -65,3 +65,15 @@ def test_dashboard_types_include_navigation_debug_contract():
     assert 'bridge_build: string' in text
     assert 'capabilities: string[]' in text
     assert 'navigation?: NavigationDebugTelemetry | null' in text
+    assert 'SceneExitObservation' in text
+    assert 'scene_exits: SceneExitObservation[]' in text
+
+
+
+def test_terrain_panel_exposes_scene_exit_surfaces():
+    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    assert 'SAÍDAS DE CENA OBSERVADAS' in text
+    assert 'SCENE EXITS' in text
+    assert 'use traverse_exit' in text
+    assert 'exit.exit_index' in text
+    assert 'exit.entrance_index' in text
