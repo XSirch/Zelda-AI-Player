@@ -210,6 +210,13 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 target = decision.args.target_position
 
             _, _, target_distance = _steer_to(current, target, decision.args.strength)
+            direct_exit_proven = False
+            if exit_mode and selected_exit and current.navmesh.available:
+                px, _, pz = current.player.position
+                ox, _, oz = current.navmesh.origin
+                proof_age_distance = math.hypot(px - ox, pz - oz)
+                direct_exit_proven = bool(
+                    selected_exit.direct_reachable and proof_age_distance <= 35.0)
             if target_distance <= stop_distance and abs(current.player.position[1] - target[1]) > 45:
                 return {"status": "failed", "reason": "target_on_different_floor",
                     "target_distance": target_distance, "skill": decision.skill}
@@ -277,7 +284,8 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
             if "local_navmesh" in current.capabilities:
                 plan = plan_navmesh(current, target)
                 if plan is None:
-                    final_exit_direct = bool(exit_mode and target_distance <= 70.0 and
+                    final_exit_direct = bool(
+                        exit_mode and direct_exit_proven and target_distance <= 70.0 and
                         waypoint_probe_safe(current, target, wall_clearance=30.0,
                             known_floor_target=True))
                     if final_exit_direct:
@@ -314,7 +322,8 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     last_path_cells = len(plan.path)
                     steer_target = plan.waypoint
                     final_exit_waypoint = bool(
-                        exit_mode and math.dist(tuple(steer_target), tuple(target)) <= 1e-3)
+                        exit_mode and direct_exit_proven and
+                        math.dist(tuple(steer_target), tuple(target)) <= 1e-3)
                     probe_safe = waypoint_probe_safe(
                         current, steer_target,
                         known_floor_target=final_exit_waypoint)
