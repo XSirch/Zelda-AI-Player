@@ -63,6 +63,18 @@ def _local_traversal_evidence(game: GameState, direction: str,
     return _best_traversal_probe(game, direction) is not None
 
 
+def _fast_revalidation_matches_original(game: GameState, original) -> bool:
+    """Require fast traversal evidence to be physically near the original target."""
+    if not game.player:
+        return False
+    step = game.navmesh.step if game.navmesh.available else 70.0
+    max_distance = max(150.0, step * 2.25)
+    if math.dist(game.player.position, original.target_position) > max_distance:
+        return False
+    return _local_traversal_evidence(
+        game, original.direction, kind=original.kind)
+
+
 def _refresh_traversal_affordance(game: GameState, original):
     """Re-identify a moving/recentered affordance by nearby physical geometry."""
     if not game.player:
@@ -79,8 +91,8 @@ def _refresh_traversal_affordance(game: GameState, original):
         best = min(same_kind, key=lambda row: (
             math.dist(row.target_position, original.target_position),
             math.dist(row.approach_position, player_pos)))
-        if (math.dist(best.target_position, original.target_position) <= max(120.0, step * 2.0) or
-                math.dist(best.approach_position, player_pos) <= max(80.0, step * 1.25)):
+        if (math.dist(best.target_position, original.target_position) <= max(160.0, step * 2.5) and
+                math.dist(best.approach_position, player_pos) <= max(120.0, step * 1.75)):
             return best
 
     # The same ladder/ledge can be reclassified after Link reaches its top/base.
@@ -154,8 +166,7 @@ async def _traverse_to_affordance(bridge: Bridge, decision: Decision,
     if not current or not current.player:
         return {"status": "interrupted", "reason": "game_not_ready", "skill": decision.skill}
     refreshed = _refresh_traversal_affordance(current, affordance)
-    local_evidence = _local_traversal_evidence(
-        current, decision.args.direction, kind=affordance.kind)
+    local_evidence = _fast_revalidation_matches_original(current, affordance)
     if refreshed is None and not local_evidence:
         return {"status": "failed", "reason": "traversal_affordance_lost",
             "affordance_kind": affordance.kind, "direction": decision.args.direction,
