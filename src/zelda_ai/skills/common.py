@@ -101,26 +101,7 @@ def _player_relative_stick(game: GameState, direction: str, magnitude: int = 70)
         return 0, 0
     offsets = {"forward": 0x0000, "left": 0x4000, "back": 0x8000, "right": -0x4000}
     desired_world_yaw = game.player.yaw + offsets[direction]
-    if game.camera_input_yaw is not None:
-        return _world_yaw_stick(game, desired_world_yaw, magnitude)
-
-    if game.camera_eye is not None and game.camera_at is not None:
-        cfx = game.camera_at[0] - game.camera_eye[0]
-        cfz = game.camera_at[2] - game.camera_eye[2]
-        length = math.hypot(cfx, cfz)
-    else:
-        length = 0.0
-    if length < 1e-4:
-        camera_angle = game.player.yaw * math.pi / 32768.0
-        cfx, cfz = math.sin(camera_angle), math.cos(camera_angle)
-    else:
-        cfx, cfz = cfx / length, cfz / length
-    crx, crz = cfz, -cfx
-    desired_angle = desired_world_yaw * math.pi / 32768.0
-    wx, wz = math.sin(desired_angle), math.cos(desired_angle)
-    x = round((wx * crx + wz * crz) * magnitude)
-    y = round((wx * cfx + wz * cfz) * magnitude)
-    return max(-80, min(80, x)), max(-80, min(80, y))
+    return _world_yaw_stick(game, desired_world_yaw, magnitude)
 
 
 def _rotate_stick_quadrants(stick_x: int, stick_y: int, steps: int) -> tuple[int, int]:
