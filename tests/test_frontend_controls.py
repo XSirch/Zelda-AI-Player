@@ -77,3 +77,6 @@ def test_terrain_panel_exposes_scene_exit_surfaces():
     assert 'use traverse_exit' in text
     assert 'exit.exit_index' in text
     assert 'exit.entrance_index' in text
+    assert "capabilities.includes('scene_exit_surfaces')" in text
+    assert 'SCENE EXIT SURFACES INDISPONÍVEIS' in text
+    assert 'rt-input-v2.7' in text
