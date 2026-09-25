@@ -90,3 +90,68 @@ def test_transition_builds_observed_world_graph(store, state):
     assert edges[0]["entrance_index"] == 187
     assert edges[0]["from_position"] == [10.0, 0.0, 20.0]
     assert edges[0]["to_position"] == [-30.0, 0.0, 45.0]
+
+
+def test_traverse_exit_learns_destination_only_after_transition(store, state):
+    bridge = Bridge("x" * 32, True)
+    runtime = Runtime(bridge, store, {})
+    runtime.config = RunConfig(provider="demo", model="deterministic-demo", memory_mode="adaptive")
+    runtime.run_id = store.new_run(runtime.config.model_dump(), "simulator", "hash")
+    runtime.namespace = runtime.new_namespace(runtime.config)
+    runtime.state = "running"
+
+    exit_position = [70.0, 0.0, 116.0]
+    origin = type(state).model_validate({
+        **state.model_dump(),
+        "scene": 52,
+        "scene_name": "Origin Interior",
+        "room": 0,
+        "capabilities": [*state.capabilities, "scene_exit_surfaces"],
+        "scene_exits": [{
+            "exit_index": 1,
+            "entrance_index": 0x211,
+            "position": exit_position,
+            "samples": 6,
+        }],
+    })
+    runtime._reset_trajectory_trace(origin)
+    runtime.last_decision = {
+        "goal": "Leave this interior",
+        "summary": "Traverse the observed exit surface.",
+        "skill": "traverse_exit",
+        "args": {
+            "direction": None, "duration_ms": 8000, "strength": 0.7, "slot": None,
+            "choice_index": None, "song": None, "target_actor_id": None,
+            "target_actor_uid": None, "target_actor_params": None,
+            "target_position": exit_position, "stop_distance": None, "item_id": None,
+        },
+        "memory_note": None,
+    }
+    runtime.trajectory_trace.append({
+        "skill": "traverse_exit",
+        "args": runtime.last_decision["args"],
+    })
+
+    # No transition yet => there is no learned destination.
+    assert store.world_neighbors(runtime.namespace, origin.scene, origin.room) == []
+
+    destination = origin.model_copy(update={
+        "seq": origin.seq + 1,
+        "scene_epoch": origin.scene_epoch + 1,
+        "scene": 84,
+        "scene_name": "Observed Destination",
+        "room": 0,
+        "entrance_index": 187,
+        "scene_exits": [],
+    })
+    runtime.on_state(destination, origin)
+
+    edges = store.world_neighbors(runtime.namespace, origin.scene, origin.room)
+    assert len(edges) == 1
+    assert edges[0]["from_position"] == exit_position
+    assert edges[0]["to_scene_name"] == "Observed Destination"
+
+    route = store.best_trajectory(runtime.namespace, origin.scene, origin.room,
+                                  tuple(origin.player.position), origin.player.yaw)
+    assert route is not None
+    assert route["actions"][0]["skill"] == "traverse_exit"
