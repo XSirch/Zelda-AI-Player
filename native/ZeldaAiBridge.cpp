@@ -438,6 +438,7 @@ json NavigationMesh(Player* player) {
         bool floor = false;
         bool clear = false;
         float y = 0.0f;
+        uint8_t links = 0;
     };
     Cell grid[SIDE][SIDE]{};
     const Vec3f origin = player->actor.world.pos;
@@ -494,23 +495,23 @@ json NavigationMesh(Player* player) {
         return cell.floor && cell.clear;
     };
 
+    // Evaluate each undirected edge once (N, NE, E, SE), then set both
+    // reciprocal bits. This halves collision queries and guarantees the Python
+    // planner never sees a one-way edge caused by sampling asymmetry.
     for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
         for (int gx = -HALF_EXTENT; gx <= HALF_EXTENT; ++gx) {
             if (!validCell(gx, gz)) continue;
-            const Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
-            uint8_t links = 0;
+            Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
             const float x = origin.x + gx * STEP;
             const float z = origin.z + gz * STEP;
 
-            for (int direction = 0; direction < 8; ++direction) {
+            for (int direction = 0; direction < 4; ++direction) {
                 const int nx = gx + dx[direction];
                 const int nz = gz + dz[direction];
                 if (!validCell(nx, nz)) continue;
-                const Cell& neighbor = grid[nz + HALF_EXTENT][nx + HALF_EXTENT];
+                Cell& neighbor = grid[nz + HALF_EXTENT][nx + HALF_EXTENT];
                 if (std::abs(neighbor.y - cell.y) > MAX_HEIGHT_DELTA) continue;
 
-                // Diagonals require both adjacent cardinal cells so A* cannot
-                // cut through an inside corner.
                 if (dx[direction] != 0 && dz[direction] != 0 &&
                     (!validCell(gx + dx[direction], gz) ||
                      !validCell(gx, gz + dz[direction]))) {
@@ -532,8 +533,6 @@ json NavigationMesh(Player* player) {
                 Vec3f end{nxWorld, neighbor.y + 26.0f, nzWorld};
                 if (lineBlocked(start, end)) continue;
 
-                // Check two parallel corridor rays at roughly Link's body
-                // radius. A point path that merely misses a wall is not enough.
                 const float vx = nxWorld - x;
                 const float vz = nzWorld - z;
                 const float length = std::sqrt(vx * vx + vz * vz);
@@ -546,9 +545,17 @@ json NavigationMesh(Player* player) {
                 Vec3f rightEnd{end.x - px, end.y, end.z - pz};
                 if (lineBlocked(leftStart, leftEnd) || lineBlocked(rightStart, rightEnd)) continue;
 
-                links |= static_cast<uint8_t>(1u << direction);
+                cell.links |= static_cast<uint8_t>(1u << direction);
+                neighbor.links |= static_cast<uint8_t>(1u << (direction + 4));
             }
-            result["cells"].push_back({gx, gz, cell.y, links});
+        }
+    }
+
+    for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
+        for (int gx = -HALF_EXTENT; gx <= HALF_EXTENT; ++gx) {
+            if (!validCell(gx, gz)) continue;
+            const Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
+            result["cells"].push_back({gx, gz, cell.y, cell.links});
         }
     }
     return result;
