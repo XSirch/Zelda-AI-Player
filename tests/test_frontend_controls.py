@@ -45,3 +45,23 @@ def test_live_dashboard_uses_tabs_instead_of_stacked_panels():
     live_start = text.index("{tab === 'AO VIVO'")
     live_end = text.index("{(tab === 'BENCHMARKS'", live_start)
     assert 'bottom-grid' not in text[live_start:live_end]
+
+
+def test_navigation_v2_dashboard_exposes_build_mesh_and_astar():
+    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    for label in ['NAVIGATION V2 / A*', 'BRIDGE BUILD', 'NAVMESH', 'CELLS', 'RAIO LOCAL',
+                  'PROBE YAW', 'WAYPOINT', 'CUSTO A*', 'NAVIGATION V2 NÃO CONFIRMADO']:
+        assert label in text
+    assert "game.bridge_build === 'rt-input-v2.6'" in text
+    assert "capabilities.includes('local_navmesh')" in text
+    assert "capabilities.includes('probe_yaw_v2')" in text
+    assert "Conectado · ${game?.bridge_build" in text
+
+
+def test_dashboard_types_include_navigation_debug_contract():
+    text = Path('web/src/types.ts').read_text(encoding='utf-8')
+    assert 'NavigationMeshSnapshot' in text
+    assert 'NavigationDebugTelemetry' in text
+    assert 'bridge_build: string' in text
+    assert 'capabilities: string[]' in text
+    assert 'navigation?: NavigationDebugTelemetry | null' in text
