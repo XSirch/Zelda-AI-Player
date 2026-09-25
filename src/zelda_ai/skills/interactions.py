@@ -58,6 +58,7 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
         })
         approach_decision = decision.model_copy(update={"skill": "approach_actor", "args": approach_args})
         approach = await _navigate_local(bridge, approach_decision, observation, actor_mode=True)
+        acknowledged |= bool(approach.get("acknowledged"))
         current = bridge.state
         actor = (_matching_actor(current, decision.args.target_actor_id,
                     decision.args.target_actor_params, decision.args.target_actor_uid)
