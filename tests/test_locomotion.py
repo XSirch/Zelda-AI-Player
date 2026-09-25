@@ -884,3 +884,27 @@ def test_traverse_auto_uses_native_attached_state_before_navpath(state, monkeypa
     result = asyncio.run(_traverse_auto(FakeBridge(game), requested, game))
     assert result["auto_navpath"] is False
     assert result["navpath_mode"] == "native_state"
+
+
+def test_traverse_auto_preserves_legacy_local_behavior_without_affordance_capability(state, monkeypatch):
+    import asyncio
+    import zelda_ai.skills.traversal as traversal
+
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [],
+    })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    async def fake_local(_bridge, _decision, _observation, _direction):
+        return {"status": "completed", "reason": "legacy_local", "skill": "traverse"}
+
+    monkeypatch.setattr(traversal, "_traverse_local", fake_local)
+    requested = decision("traverse", "down", duration=3000)
+    result = asyncio.run(_traverse_auto(FakeBridge(game), requested, game))
+    assert result["status"] == "completed"
+    assert result["auto_navpath"] is False
+    assert result["navpath_mode"] == "legacy_local"
