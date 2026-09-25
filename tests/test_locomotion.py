@@ -413,3 +413,18 @@ def test_single_scene_exit_is_selected_without_inventing_door(state):
     selected = _resolve_scene_exit(game, [65, 0, 100])
     assert selected is not None
     assert selected.entrance_index == 0x211
+
+
+def test_traverse_exit_rejects_unobserved_coordinate_even_with_single_exit(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211,
+             "position": [70, 0, 116], "samples": 5},
+        ],
+    })
+    assert _resolve_scene_exit(game, [900, 0, 900]) is None
