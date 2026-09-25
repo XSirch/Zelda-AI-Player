@@ -87,9 +87,6 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
     if decision.skill == "move" and decision.args.direction and not primitive_move_safe(before, decision.args.direction):
         return {"status": "failed", "reason": "unsafe_navigation_probe",
             "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
-    if decision.skill == "turn" and decision.args.direction and not primitive_move_safe(before, decision.args.direction):
-        return {"status": "failed", "reason": "unsafe_turn_probe",
-            "acknowledged": False, "effect_confirmed": False, "skill": decision.skill}
     if decision.skill == "roll" and not primitive_move_safe(
             before, "forward", probe_distance=145.0, wall_clearance=120.0):
         return {"status": "failed", "reason": "unsafe_roll_probe",
@@ -159,10 +156,6 @@ async def _execute_skill(bridge: Bridge, decision: Decision, observation: GameSt
             if decision.skill == "move" and decision.args.direction and not primitive_move_safe(
                     current, decision.args.direction):
                 status, reason = "failed", "unsafe_navigation_probe"
-                break
-            if decision.skill == "turn" and decision.args.direction and not primitive_move_safe(
-                    current, decision.args.direction):
-                status, reason = "failed", "unsafe_turn_probe"
                 break
             if target_turn_units is not None and current.player:
                 delta = ((current.player.yaw - start_yaw + 32768) % 65536) - 32768
