@@ -78,6 +78,7 @@ class SceneExitObservation(StrictModel):
     entrance_index: int = Field(ge=-32768, le=65535)
     position: tuple[float, float, float]
     samples: int = Field(ge=1, le=10000)
+    direct_reachable: bool = False
 
     @field_validator("position")
     @classmethod
