@@ -168,8 +168,11 @@ async def _do_action(bridge: Bridge, action: str, game: GameState, actor: ActorO
         else:
             steer_target = _combat_nav_target(game, actor)
             if steer_target is None:
-                command = bridge.send(lease_ms=140)
-                detail = "navmesh_blocked_acquire"
+                bridge.release()
+                await feedback(bridge, game, .1)
+                return {"ok": False, "executed": False, "detail": "navmesh_blocked_acquire",
+                        "locked": _locked_to(bridge.state or game, actor),
+                        "after": bridge.state or game}
             else:
                 x, y, _ = _steer_to(game, steer_target, .35)
                 command = bridge.send(stick_x=x, stick_y=y, lease_ms=180)
@@ -182,10 +185,9 @@ async def _do_action(bridge: Bridge, action: str, game: GameState, actor: ActorO
     if action == "approach":
         steer_target = _combat_nav_target(game, actor)
         if steer_target is None:
-            command = bridge.send(buttons=BUTTONS["Z"] if _locked_to(game, actor) else 0,
-                                  lease_ms=140)
+            bridge.release()
             await feedback(bridge, game, .1)
-            return {"ok": False, "detail": "navmesh_blocked_approach",
+            return {"ok": False, "executed": False, "detail": "navmesh_blocked_approach",
                     "after": bridge.state or game}
         x, y, _ = _steer_to(game, steer_target, min(.68, max(.34, strength)))
         command = bridge.send(buttons=BUTTONS["Z"] if _locked_to(game, actor) else 0,
@@ -372,6 +374,16 @@ async def _fight_enemy(bridge: Bridge, decision: Decision, observation: GameStat
             after = action_result.get("after") or bridge.state or current
             actor_after = _matching_actor(after, decision.args.target_actor_id,
                                           decision.args.target_actor_params, target_uid) if after else None
+            if action_result.get("executed") is False:
+                # Collision/transport constraints are not tactical evidence about
+                # this enemy class. Keep the episode moving but do not train on
+                # an action that the motor layer refused to execute.
+                previous_player_health = after.player.health if after.player else previous_player_health
+                previous_distance = actor_after.distance if actor_after else actor.distance
+                previous_at = time.monotonic()
+                step += 1
+                continue
+
             reward = _reward(action, before_action, after, actor_before, actor_after, action_result, assessment)
             trace.append({"state": state, "action": action, "reward": reward,
                           "detail": action_result.get("detail", "")})
