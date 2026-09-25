@@ -308,12 +308,20 @@ def test_aim_error_and_stick_point_toward_right_and_up(state):
 
 
 def test_probe_stick_targets_link_relative_world_direction_with_rotated_camera(state):
-    game = state.model_copy(update={"camera_input_yaw": 16384, "mirrored_world": False})
+    game = state.model_copy(update={"camera_input_yaw": 16384, "mirrored_world": False,
+        "capabilities": ["probe_yaw_v2"]})
     game.player.yaw = 0
     # Link-forward world yaw 0 is camera-left when camera input yaw is +90.
     assert _probe_stick("forward", game) == (48, 0)
     # OoT enum: +90 relative yaw is LEFT, and here that equals camera-forward.
     assert _probe_stick("left", game) == (0, 48)
+
+
+def test_legacy_probe_label_left_maps_to_old_negative_yaw_sample(state):
+    game = state.model_copy(update={"camera_input_yaw": 0, "capabilities": []})
+    game.player.yaw = 0
+    # v2.5 called the -90-degree sample "left"; preserve that interpretation.
+    assert _probe_stick("left", game) == (48, 0)
 
 
 def test_player_relative_dodge_stick_uses_exact_camera_input_yaw(state):
