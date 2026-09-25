@@ -428,3 +428,24 @@ def test_traverse_exit_rejects_unobserved_coordinate_even_with_single_exit(state
         ],
     })
     assert _resolve_scene_exit(game, [900, 0, 900]) is None
+
+
+def test_scene_exit_resolution_uses_current_observation_only(state):
+    observed = type(state).model_validate({
+        **state.model_dump(),
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "scene_exits": [
+            {"exit_index": 1, "entrance_index": 0x211,
+             "position": [70, 0, 116], "samples": 5},
+        ],
+    })
+    assert _resolve_scene_exit(observed, [70, 0, 116]) is not None
+
+    refreshed = type(state).model_validate({
+        **observed.model_dump(),
+        "scene_exits": [],
+    })
+    assert _resolve_scene_exit(refreshed, [70, 0, 116]) is None
