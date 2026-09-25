@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.6";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.7";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -430,6 +430,7 @@ json NavigationMesh(Player* player) {
         {"step", STEP},
         {"half_extent", HALF_EXTENT},
         {"cells", json::array()},
+        {"scene_exits", json::array()},
     };
     if (!player) {
         result["step"] = 0.0f;
@@ -443,7 +444,14 @@ json NavigationMesh(Player* player) {
         float y = 0.0f;
         uint8_t links = 0;
     };
+    struct ExitSamples {
+        int count = 0;
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+    };
     Cell grid[SIDE][SIDE]{};
+    ExitSamples exits[32]{};
     const Vec3f origin = player->actor.world.pos;
     result["origin"] = {origin.x, player->actor.floorHeight, origin.z};
 
@@ -452,7 +460,18 @@ json NavigationMesh(Player* player) {
         CollisionPoly* poly = nullptr;
         s32 bgId = BGCHECK_SCENE;
         floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
-        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+        const bool found = poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+        if (found) {
+            const u32 exitIndex = SurfaceType_GetSceneExitIndex(&gPlayState->colCtx, poly, bgId);
+            if (exitIndex > 0 && exitIndex < ARRAY_COUNT(exits)) {
+                auto& sample = exits[exitIndex];
+                sample.count++;
+                sample.x += x;
+                sample.y += floorY;
+                sample.z += z;
+            }
+        }
+        return found;
     };
     auto lineBlocked = [&](Vec3f start, Vec3f end) -> bool {
         Vec3f hit{};
@@ -572,6 +591,22 @@ json NavigationMesh(Player* player) {
             const Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
             result["cells"].push_back({gx, gz, cell.y, cell.links});
         }
+    }
+    for (u32 exitIndex = 1; exitIndex < ARRAY_COUNT(exits); ++exitIndex) {
+        const auto& sample = exits[exitIndex];
+        if (sample.count <= 0) continue;
+        const int entranceIndex = gPlayState->setupExitList
+            ? gPlayState->setupExitList[exitIndex - 1] : -1;
+        result["scene_exits"].push_back({
+            {"exit_index", exitIndex},
+            {"entrance_index", entranceIndex},
+            {"position", {
+                sample.x / sample.count,
+                sample.y / sample.count,
+                sample.z / sample.count,
+            }},
+            {"samples", sample.count},
+        });
     }
     return result;
 }
@@ -875,7 +910,7 @@ void Snapshot() {
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
-                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2"}},
+                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -913,6 +948,7 @@ void Snapshot() {
         {"room_actor_count", 0},
         {"room_actors_truncated", false},
         {"navigation_probes", json::array()},
+        {"scene_exits", json::array()},
         {"navmesh", {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f}, {"half_extent", 0}, {"cells", json::array()}}},
         {"cutscene_active", false},
         {"paused", false},
@@ -1019,7 +1055,10 @@ void Snapshot() {
             state["navigation_probes"] = NavigationProbes(player);
             if (full && !state["paused"].get<bool>() && !state["cutscene_active"].get<bool>() &&
                 state["game_over_state"].get<int>() == 0 && !state["dialogue"]["active"].get<bool>()) {
-                state["navmesh"] = NavigationMesh(player);
+                auto navigation = NavigationMesh(player);
+                state["scene_exits"] = navigation["scene_exits"];
+                navigation.erase("scene_exits");
+                state["navmesh"] = navigation;
             }
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
@@ -1045,7 +1084,7 @@ void Snapshot() {
         static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
             "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
             "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
-            "nearby_actors", "navmesh"};
+            "nearby_actors", "scene_exits", "navmesh"};
         for (const char* field : slowFields) state.erase(field);
     }
     std::string serialized = state.dump();
