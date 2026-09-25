@@ -101,6 +101,7 @@ def test_traverse_exit_learns_destination_only_after_transition(store, state):
     runtime.state = "running"
 
     exit_position = [70.0, 0.0, 116.0]
+    requested_position = [82.0, 0.0, 110.0]
     origin = type(state).model_validate({
         **state.model_dump(),
         "scene": 52,
@@ -123,7 +124,7 @@ def test_traverse_exit_learns_destination_only_after_transition(store, state):
             "direction": None, "duration_ms": 8000, "strength": 0.7, "slot": None,
             "choice_index": None, "song": None, "target_actor_id": None,
             "target_actor_uid": None, "target_actor_params": None,
-            "target_position": exit_position, "stop_distance": None, "item_id": None,
+            "target_position": requested_position, "stop_distance": None, "item_id": None,
         },
         "memory_note": None,
     }
@@ -148,7 +149,10 @@ def test_traverse_exit_learns_destination_only_after_transition(store, state):
 
     edges = store.world_neighbors(runtime.namespace, origin.scene, origin.room)
     assert len(edges) == 1
+    # The learned edge is anchored to the bridge-observed exit surface, not
+    # the model's approximate requested coordinate.
     assert edges[0]["from_position"] == exit_position
+    assert edges[0]["from_position"] != requested_position
     assert edges[0]["to_scene_name"] == "Observed Destination"
 
     route = store.best_trajectory(runtime.namespace, origin.scene, origin.room,
