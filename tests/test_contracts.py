@@ -8,7 +8,7 @@ from zelda_ai.models import Decision, PlayerState, Usage
 from zelda_ai.providers.codex import parse_usage as codex_usage
 from zelda_ai.providers.openrouter import model_info, parse_usage, reserve_cost
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.runtime import controller_input
+from zelda_ai.runtime import controller_input, _model_state_payload, _model_world_edges
 
 
 def test_token_subsets_are_not_double_counted():
@@ -284,3 +284,45 @@ def test_planner_prompt_understands_actorless_scene_exits():
     assert 'scene_exits' in SYSTEM_PROMPT
     assert "Link's House" in SYSTEM_PROMPT
     assert 'no door actor' in SYSTEM_PROMPT
+
+
+def test_model_sees_scene_exit_as_opaque_position_only(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "scene_exit_surfaces"],
+        "scene_exits": [{
+            "exit_index": 7,
+            "entrance_index": 0x211,
+            "position": [70.0, 0.0, 116.0],
+            "samples": 9,
+        }],
+    })
+    payload = _model_state_payload(game)
+    assert payload["scene_exits"] == [{"position": [70.0, 0.0, 116.0]}]
+    serialized = json.dumps(payload["scene_exits"])
+    assert "exit_index" not in serialized
+    assert "entrance_index" not in serialized
+    assert "samples" not in serialized
+
+
+def test_model_world_edges_expose_only_empirically_observed_topology():
+    rows = [{
+        "id": "edge-secret",
+        "from_scene": 1,
+        "from_scene_name": "Origin",
+        "from_room": 0,
+        "from_position": [70.0, 0.0, 116.0],
+        "to_scene": 2,
+        "to_scene_name": "Observed Destination",
+        "to_room": 0,
+        "to_position": [0.0, 0.0, 0.0],
+        "entrance_index": 0x211,
+        "traversals": 1,
+        "created_at": 1.0,
+        "updated_at": 2.0,
+    }]
+    visible = _model_world_edges(rows)
+    assert visible[0]["to_scene_name"] == "Observed Destination"
+    assert visible[0]["from_position"] == [70.0, 0.0, 116.0]
+    assert "entrance_index" not in visible[0]
+    assert "id" not in visible[0]
