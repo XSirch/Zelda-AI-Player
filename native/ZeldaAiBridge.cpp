@@ -422,6 +422,8 @@ json NavigationMesh(Player* player) {
     constexpr float BODY_CLEARANCE = 18.0f;
     constexpr float EDGE_FLOOR_TOLERANCE = 24.0f;
     constexpr int EDGE_FLOOR_SAMPLES = 4;
+    constexpr int EXIT_SCAN_HALF_EXTENT = 4;
+    constexpr float EXIT_SCAN_STEP = 35.0f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
     static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
 
@@ -514,6 +516,20 @@ json NavigationMesh(Player* player) {
                 }
             }
             cell.clear = clear;
+        }
+    }
+
+    // Scene-exit polygons can be narrower than the 70-unit NavMesh grid or sit
+    // at a threshold whose nearby NavMesh node is rejected by body clearance.
+    // Sample a denser 35-unit window solely for non-zero SceneExitIndex.
+    for (int ez = -EXIT_SCAN_HALF_EXTENT; ez <= EXIT_SCAN_HALF_EXTENT; ++ez) {
+        for (int ex = -EXIT_SCAN_HALF_EXTENT; ex <= EXIT_SCAN_HALF_EXTENT; ++ex) {
+            float ignoredFloor = 0.0f;
+            sampleFloor(
+                origin.x + ex * EXIT_SCAN_STEP,
+                origin.z + ez * EXIT_SCAN_STEP,
+                player->actor.floorHeight + 64.0f,
+                ignoredFloor);
         }
     }
 
