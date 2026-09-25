@@ -38,7 +38,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.5";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.6";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -412,6 +412,148 @@ json NavigationProbes(Player* player) {
     return result;
 }
 
+json NavigationMesh(Player* player) {
+    constexpr int HALF_EXTENT = 4;
+    constexpr int SIDE = HALF_EXTENT * 2 + 1;
+    constexpr float STEP = 70.0f;
+    constexpr float MAX_HEIGHT_DELTA = 45.0f;
+    constexpr float BODY_CLEARANCE = 18.0f;
+    constexpr float MIDPOINT_TOLERANCE = 36.0f;
+    static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
+    static const int dz[] = {1, 1, 0, -1, -1, -1, 0, 1};
+
+    json result = {
+        {"origin", {0.0f, 0.0f, 0.0f}},
+        {"step", STEP},
+        {"half_extent", HALF_EXTENT},
+        {"cells", json::array()},
+    };
+    if (!player) {
+        result["step"] = 0.0f;
+        result["half_extent"] = 0;
+        return result;
+    }
+
+    struct Cell {
+        bool floor = false;
+        bool clear = false;
+        float y = 0.0f;
+    };
+    Cell grid[SIDE][SIDE]{};
+    const Vec3f origin = player->actor.world.pos;
+    result["origin"] = {origin.x, player->actor.floorHeight, origin.z};
+
+    auto sampleFloor = [&](float x, float z, float startY, float& floorY) -> bool {
+        Vec3f pos{x, startY, z};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
+        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+    };
+    auto lineBlocked = [&](Vec3f start, Vec3f end) -> bool {
+        Vec3f hit{};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        return BgCheck_EntityLineTest1(
+            &gPlayState->colCtx, &start, &end, &hit, &poly,
+            true, false, false, true, &bgId) != 0;
+    };
+
+    for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
+        for (int gx = -HALF_EXTENT; gx <= HALF_EXTENT; ++gx) {
+            Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
+            const float x = origin.x + gx * STEP;
+            const float z = origin.z + gz * STEP;
+            if (!sampleFloor(x, z, origin.y + 200.0f, cell.y)) continue;
+            cell.floor = true;
+
+            // Approximate Link's body radius at each graph node. The current
+            // player cell remains eligible so a Link already near a wall can
+            // still plan an escape away from it.
+            bool clear = true;
+            if (gx != 0 || gz != 0) {
+                static const float cx[] = {BODY_CLEARANCE, -BODY_CLEARANCE, 0.0f, 0.0f};
+                static const float cz[] = {0.0f, 0.0f, BODY_CLEARANCE, -BODY_CLEARANCE};
+                for (size_t i = 0; i < ARRAY_COUNT(cx); ++i) {
+                    Vec3f start{x, cell.y + 26.0f, z};
+                    Vec3f end{x + cx[i], cell.y + 26.0f, z + cz[i]};
+                    if (lineBlocked(start, end)) {
+                        clear = false;
+                        break;
+                    }
+                }
+            }
+            cell.clear = clear;
+        }
+    }
+
+    auto validCell = [&](int gx, int gz) -> bool {
+        if (gx < -HALF_EXTENT || gx > HALF_EXTENT || gz < -HALF_EXTENT || gz > HALF_EXTENT)
+            return false;
+        const Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
+        return cell.floor && cell.clear;
+    };
+
+    for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
+        for (int gx = -HALF_EXTENT; gx <= HALF_EXTENT; ++gx) {
+            if (!validCell(gx, gz)) continue;
+            const Cell& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
+            uint8_t links = 0;
+            const float x = origin.x + gx * STEP;
+            const float z = origin.z + gz * STEP;
+
+            for (int direction = 0; direction < 8; ++direction) {
+                const int nx = gx + dx[direction];
+                const int nz = gz + dz[direction];
+                if (!validCell(nx, nz)) continue;
+                const Cell& neighbor = grid[nz + HALF_EXTENT][nx + HALF_EXTENT];
+                if (std::abs(neighbor.y - cell.y) > MAX_HEIGHT_DELTA) continue;
+
+                // Diagonals require both adjacent cardinal cells so A* cannot
+                // cut through an inside corner.
+                if (dx[direction] != 0 && dz[direction] != 0 &&
+                    (!validCell(gx + dx[direction], gz) ||
+                     !validCell(gx, gz + dz[direction]))) {
+                    continue;
+                }
+
+                const float nxWorld = origin.x + nx * STEP;
+                const float nzWorld = origin.z + nz * STEP;
+                float middleY = 0.0f;
+                if (!sampleFloor(
+                        (x + nxWorld) * 0.5f, (z + nzWorld) * 0.5f,
+                        std::max(cell.y, neighbor.y) + 180.0f, middleY)) {
+                    continue;
+                }
+                const float expectedMiddle = (cell.y + neighbor.y) * 0.5f;
+                if (std::abs(middleY - expectedMiddle) > MIDPOINT_TOLERANCE) continue;
+
+                Vec3f start{x, cell.y + 26.0f, z};
+                Vec3f end{nxWorld, neighbor.y + 26.0f, nzWorld};
+                if (lineBlocked(start, end)) continue;
+
+                // Check two parallel corridor rays at roughly Link's body
+                // radius. A point path that merely misses a wall is not enough.
+                const float vx = nxWorld - x;
+                const float vz = nzWorld - z;
+                const float length = std::sqrt(vx * vx + vz * vz);
+                if (length <= 0.001f) continue;
+                const float px = -vz / length * BODY_CLEARANCE;
+                const float pz = vx / length * BODY_CLEARANCE;
+                Vec3f leftStart{start.x + px, start.y, start.z + pz};
+                Vec3f leftEnd{end.x + px, end.y, end.z + pz};
+                Vec3f rightStart{start.x - px, start.y, start.z - pz};
+                Vec3f rightEnd{end.x - px, end.y, end.z - pz};
+                if (lineBlocked(leftStart, leftEnd) || lineBlocked(rightStart, rightEnd)) continue;
+
+                links |= static_cast<uint8_t>(1u << direction);
+            }
+            result["cells"].push_back({gx, gz, cell.y, links});
+        }
+    }
+    return result;
+}
+
 json ActorJson(Actor* actor, Player* player, bool metadata = true) {
     if (!actor || !player) return nullptr;
     std::string actorName;
@@ -711,7 +853,7 @@ void Snapshot() {
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
-                          "actor_uid", "event_cursor"}},
+                          "actor_uid", "event_cursor", "local_navmesh"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -749,6 +891,7 @@ void Snapshot() {
         {"room_actor_count", 0},
         {"room_actors_truncated", false},
         {"navigation_probes", json::array()},
+        {"navmesh", {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f}, {"half_extent", 0}, {"cells", json::array()}}},
         {"cutscene_active", false},
         {"paused", false},
         {"events", pendingEvents},
@@ -852,6 +995,7 @@ void Snapshot() {
             state["room_actor_count"] = roomActors["count"];
             state["room_actors_truncated"] = roomActors["truncated"];
             state["navigation_probes"] = NavigationProbes(player);
+            if (full) state["navmesh"] = NavigationMesh(player);
             state["inventory"] = json::array();
             state["inventory_named"] = json::array();
             state["equipped"] = json::array();
@@ -876,7 +1020,7 @@ void Snapshot() {
         static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
             "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
             "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
-            "nearby_actors"};
+            "nearby_actors", "navmesh"};
         for (const char* field : slowFields) state.erase(field);
     }
     std::string serialized = state.dump();
