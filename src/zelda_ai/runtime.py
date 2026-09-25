@@ -76,6 +76,22 @@ from .skills.traversal import _traverse_local as _traverse_local
 
 CONTRACT_VERSION = "state-v8/skills-v9/trajectory-v3/prompt-v12"
 
+def _sanitize_transition_actor(actor: dict | None) -> dict | None:
+    if actor is None:
+        return None
+    row = dict(actor)
+    category = str(row.get("category_name") or "").lower()
+    metadata = f"{row.get('name') or ''} {row.get('description') or ''}".lower()
+    transition_words = ("warp", "scene change", "scene exit", "loading zone", "entrance", "exit portal")
+    if category == "door":
+        row["name"] = "Door"
+        row["description"] = ""
+    elif any(word in metadata for word in transition_words):
+        row["name"] = "Transition Object"
+        row["description"] = ""
+    return row
+
+
 def _model_state_payload(game: GameState) -> dict:
     """Model-facing state: transition surfaces are physical but destination-opaque."""
     payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
@@ -83,6 +99,11 @@ def _model_state_payload(game: GameState) -> dict:
         "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
         "scene_exits"})
     payload["scene_exits"] = [{"position": list(row.position)} for row in game.scene_exits]
+    for field in ("target_actor", "target_candidate", "context_actor"):
+        payload[field] = _sanitize_transition_actor(payload.get(field))
+    for field in ("room_actors", "nearby_actors"):
+        if field in payload:
+            payload[field] = [_sanitize_transition_actor(row) for row in payload[field]]
     if game.room_actors:
         payload.pop("nearby_actors", None)
     return payload
