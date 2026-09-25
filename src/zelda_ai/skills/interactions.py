@@ -7,6 +7,7 @@ import time
 from ..bridge import Bridge
 from ..control.feedback import consumed
 from ..models import Decision, GameState
+from ..navmesh import waypoint_probe_safe
 from .catalog import BUTTONS
 from .common import _is_door_actor, _matching_actor, _pulse, _yaw_error_units, _yaw_to_target
 from .navigation import _backtrack_recovery, _navigate_local
@@ -32,6 +33,26 @@ async def _wait_interaction_evidence(bridge: Bridge, observation: GameState, bef
             return outcome.kind, {"detail": outcome.detail}
         await asyncio.sleep(0.06)
     return None, {}
+
+
+def _door_step_safe(game: GameState, actor, step_distance: float = 28.0) -> bool:
+    """Validate only the next short advance; the closed door itself may be the final wall."""
+    if "local_navmesh" not in game.capabilities:
+        return True
+    if not game.player:
+        return False
+    dx = actor.position[0] - game.player.position[0]
+    dz = actor.position[2] - game.player.position[2]
+    distance = math.hypot(dx, dz)
+    if distance < 1e-4:
+        return True
+    step = min(step_distance, distance)
+    target = (
+        game.player.position[0] + dx / distance * step,
+        game.player.position[1],
+        game.player.position[2] + dz / distance * step,
+    )
+    return waypoint_probe_safe(game, target, wall_clearance=36.0)
 
 
 async def _interact_with_door(bridge: Bridge, decision: Decision, observation: GameState) -> dict:
@@ -145,7 +166,13 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
             actor = _matching_actor(current, decision.args.target_actor_id, decision.args.target_actor_params, decision.args.target_actor_uid) or actor
 
             if actor.distance <= 115.0:
-                # A slight forward bias helps the engine establish doorActor/context action on the final step.
+                # A slight forward bias helps the engine establish doorActor/context action on the final step,
+                # but never cross an unvalidated wall on the way there.
+                if not _door_step_safe(current, actor, 20.0):
+                    return {"status": "failed", "reason": "door_final_path_blocked",
+                        "target_distance": actor.distance,
+                        "distance": math.dist(start_position, current.player.position),
+                        "acknowledged": acknowledged, "skill": decision.skill}
                 command_id = bridge.send(buttons=BUTTONS["A"], stick_y=24, lease_ms=180)
                 await asyncio.sleep(0.18)
                 bridge.release()
@@ -160,7 +187,13 @@ async def _interact_with_door(bridge: Bridge, decision: Decision, observation: G
                             if (bridge.state or current).player else None,
                         "acknowledged": acknowledged, "skill": decision.skill, **extra}
 
-            # Straight approach after Z-centering; this intentionally avoids lateral steering/orbiting.
+            # Straight approach after Z-centering; validate a short world-space step first so
+            # an intervening wall cannot be mistaken for the closed door at the target.
+            if not _door_step_safe(current, actor):
+                return {"status": "failed", "reason": "door_final_path_blocked",
+                    "target_distance": actor.distance,
+                    "distance": math.dist(start_position, current.player.position),
+                    "acknowledged": acknowledged, "skill": decision.skill}
             hold_ms = 220 if actor.distance > 180 else 140
             command_id = bridge.send(stick_x=0, stick_y=56, lease_ms=hold_ms)
             await asyncio.sleep(hold_ms / 1000)
