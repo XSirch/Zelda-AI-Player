@@ -677,6 +677,8 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
     recovery_attempts = 0
     first_command = None
     acknowledged = False
+    affordance_full_seq = -1
+    reachable_affordances_cache = []
 
     try:
         while time.monotonic() < deadline:
@@ -698,6 +700,9 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
 
             if first_command is not None:
                 acknowledged |= consumed(bridge, first_command)
+            if current.full_seq != affordance_full_seq:
+                reachable_affordances_cache = _reachable_traversal_affordances(current)
+                affordance_full_seq = current.full_seq
             new_actors = [actor for actor in current.room_actors
                 if (actor.actor_id, actor.params) not in baseline_actors]
             if new_actors:
@@ -705,7 +710,7 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                 return {"status": "completed", "reason": "actor_discovered",
                     "actor": actor.model_dump(), "distance": math.dist(start_position, current.player.position),
                     "acknowledged": acknowledged, "skill": decision.skill}
-            new_affordances = [row for row in _reachable_traversal_affordances(current)
+            new_affordances = [row for row in reachable_affordances_cache
                 if (row.kind, row.direction,
                     round(row.approach_position[0] / 35.0),
                     round(row.approach_position[2] / 35.0)) not in baseline_affordances]
@@ -797,9 +802,8 @@ async def _explore_area(bridge: Bridge, decision: Decision, observation: GameSta
                     plan_cost=round(plan.cost, 2) if plan else None,
                     exact_goal_reachable=plan.exact_goal_reachable if plan else False)
                 if plan is None or not probe_safe:
-                    reachable_affordances = _reachable_traversal_affordances(current)
-                    if reachable_affordances:
-                        affordance = min(reachable_affordances, key=lambda row: row.distance)
+                    if reachable_affordances_cache:
+                        affordance = min(reachable_affordances_cache, key=lambda row: row.distance)
                         return {"status": "completed", "reason": "traversal_affordance_available",
                             "affordance": {
                                 "kind": affordance.kind, "direction": affordance.direction,
