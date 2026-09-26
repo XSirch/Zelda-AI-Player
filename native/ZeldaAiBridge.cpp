@@ -510,7 +510,7 @@ json NavigationProbes(Player* player) {
 }
 
 json NavigationGapLinks(Player* player) {
-    constexpr int DIRECTION_COUNT = 16;
+    constexpr int DIRECTION_COUNT = 32;
     constexpr float STEP = 35.0f;
     constexpr float MAX_RADIUS = 245.0f;
     constexpr float GAP_FLOOR_DROP = 80.0f;
@@ -521,7 +521,7 @@ json NavigationGapLinks(Player* player) {
     constexpr float BODY_HEIGHT = 26.0f;
 
     json result = json::array();
-    if (!player) return result;
+    if (!player || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) return result;
 
     const Vec3f origin = player->actor.world.pos;
     const float originFloor = player->actor.floorHeight;
@@ -590,7 +590,10 @@ json NavigationGapLinks(Player* player) {
                 }
 
                 const bool deepBelow = found && floorY < takeoffY - GAP_FLOOR_DROP;
-                if (haveTakeoff && takeoffRadius >= STEP && (!found || deepBelow)) {
+                if (haveTakeoff && (!found || deepBelow)) {
+                    // When Link is already standing at the edge, the first 35u
+                    // sample can be the gap. In that case the native floor under
+                    // Link itself is the takeoff support (takeoffRadius == 0).
                     inGap = true;
                     continue;
                 }
