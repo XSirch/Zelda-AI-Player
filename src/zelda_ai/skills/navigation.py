@@ -322,6 +322,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
     last_actor = None
     last_progress_seq = -1
     last_progress_at = time.monotonic()
+    progress_mode = "target"
     navmesh_blocked_samples = 0
     navmesh_used = False
     last_path_cells = 0
@@ -456,8 +457,54 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                         "skill": decision.skill}
 
             steer_target = target
+            progress_distance = target_distance
+            next_progress_mode = "target"
+            gap_link = None
+            gap_approach = False
             if "local_navmesh" in current.capabilities:
                 plan = plan_navmesh(current, target)
+
+                if (not exit_mode and "offmesh_jump_links_v1" in current.capabilities and
+                        (plan is None or not plan.exact_goal_reachable)):
+                    gap_link = _best_gap_link(current, target)
+                    if gap_link is not None:
+                        takeoff_distance = math.hypot(
+                            gap_link.takeoff_position[0] - current.player.position[0],
+                            gap_link.takeoff_position[2] - current.player.position[2],
+                        )
+                        takeoff_height = abs(
+                            gap_link.takeoff_position[1] - current.player.position[1])
+                        if takeoff_distance <= 70.0 and takeoff_height <= 30.0:
+                            jump = await _execute_gap_link(
+                                bridge, observation, gap_link, decision.skill)
+                            acknowledged |= bool(jump.get("acknowledged"))
+                            if jump.get("status") == "completed":
+                                navmesh_blocked_samples = 0
+                                best_distance = float("inf")
+                                progress_mode = "target"
+                                last_progress_at = time.monotonic()
+                                continue
+                            return {
+                                **jump,
+                                "skill": decision.skill,
+                                "target_distance": target_distance,
+                                "navmesh_used": True,
+                                "offmesh_kind": gap_link.kind,
+                            }
+
+                        approach_plan = plan_navmesh(current, gap_link.takeoff_position)
+                        if approach_plan and approach_plan.exact_goal_reachable:
+                            plan = approach_plan
+                            gap_approach = True
+                            next_progress_mode = "gap_takeoff"
+                            progress_distance = takeoff_distance
+
+                if progress_mode != next_progress_mode:
+                    progress_mode = next_progress_mode
+                    best_distance = float("inf")
+                    stagnant_samples = 0
+                    last_progress_at = time.monotonic()
+
                 if plan is None:
                     final_exit_direct = bool(
                         exit_mode and direct_exit_proven and target_distance <= 70.0 and
@@ -499,17 +546,26 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                     final_exit_waypoint = bool(
                         exit_mode and direct_exit_proven and
                         math.dist(tuple(steer_target), tuple(target)) <= 1e-3)
+                    final_takeoff_waypoint = bool(
+                        gap_approach and gap_link is not None and
+                        math.dist(tuple(steer_target), tuple(gap_link.takeoff_position)) <= 1e-3)
                     probe_safe = waypoint_probe_safe(
                         current, steer_target,
-                        known_floor_target=final_exit_waypoint)
+                        known_floor_target=(final_exit_waypoint or final_takeoff_waypoint))
+                    debug_status = (
+                        "gap_link_approach" if gap_approach else
+                        ("active" if probe_safe else "blocked"))
                     bridge.set_navigation_debug(
-                        skill=decision.skill, status="active" if probe_safe else "blocked",
+                        skill=decision.skill, status=debug_status if probe_safe else "blocked",
                         target_position=list(target), waypoint=list(plan.waypoint),
                         path_cells=last_path_cells, probe_safe=probe_safe, navmesh_used=True,
                         target_distance=target_distance, plan_target_distance=plan.target_distance,
                         plan_cost=round(plan.cost, 2), exact_goal_reachable=plan.exact_goal_reachable,
                         exit_index=selected_exit_index if exit_mode else None,
-                        entrance_index=selected_entrance_index if exit_mode else None)
+                        entrance_index=selected_entrance_index if exit_mode else None,
+                        offmesh_kind=gap_link.kind if gap_link else None,
+                        offmesh_takeoff=list(gap_link.takeoff_position) if gap_link else None,
+                        offmesh_landing=list(gap_link.landing_position) if gap_link else None)
                     if not probe_safe:
                         navmesh_blocked_samples += 1
                         if navmesh_blocked_samples >= 5:
@@ -532,9 +588,9 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
 
             if current.seq != last_progress_seq:
                 last_progress_seq = current.seq
-                if target_distance + 2.0 < best_distance:
-                    progress_gain = best_distance - target_distance
-                    best_distance = target_distance
+                if progress_distance + 2.0 < best_distance:
+                    progress_gain = best_distance - progress_distance
+                    best_distance = progress_distance
                     stagnant_samples = 0
                     last_progress_at = time.monotonic()
                     if math.isfinite(progress_gain) and progress_gain >= 12.0:
