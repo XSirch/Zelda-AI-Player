@@ -92,7 +92,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
     {navCapable && !offmeshLinks && bridge?.connected && <div className="notice">
       OFF-MESH JUMP LINKS INDISPONÍVEIS — para cruzar gaps/plataformas automaticamente,
       use <code>rt-input-v2.11</code> ou superior e recompile o SoH.
-    </div>
+    </div>}
     <section className="panel">
       <div className="section-head"><span>NAVIGATION V2 / A*</span><span className="muted">{navState}</span></div>
       <div className="telemetry">
