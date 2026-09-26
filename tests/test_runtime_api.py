@@ -120,3 +120,18 @@ async def test_auto_unstick_skips_semantic_traversal_failure(store, state):
     recovered = await runtime._auto_unstick(state)
     assert recovered is False
     assert runtime.stuck_score == 6
+
+
+def test_checkpoint_repeat_block_does_not_increase_stuck_score(store, state):
+    from zelda_ai.models import Decision, SkillArgs
+    runtime = Runtime(Bridge("x" * 32, True), store, {})
+    runtime.stuck_score = 7
+    decision = Decision(goal="repeat", summary="repeat", skill="talk_to_actor",
+        args=SkillArgs(direction=None, duration_ms=5000, strength=.7,
+            slot=None, choice_index=None, song=None, target_actor_id=100,
+            target_actor_uid=None, target_actor_params=0, target_position=None,
+            stop_distance=None, item_id=None),
+        memory_note=None)
+    runtime._update_stuck(decision, {"status": "failed", "reason": "checkpoint_repeat_blocked"})
+    assert runtime.stuck_score == 5
+    assert not any(row["kind"] == "stuck_detected" for row in runtime.recent)
