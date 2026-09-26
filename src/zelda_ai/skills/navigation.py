@@ -306,7 +306,8 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
         selected_exit_index = None
         selected_entrance_index = None
 
-    deadline = time.monotonic() + min(8.0, max(0.25, decision.args.duration_ms / 1000))
+    max_window = 12.0 if "offmesh_jump_links_v1" in before.capabilities else 8.0
+    deadline = time.monotonic() + min(max_window, max(0.25, decision.args.duration_ms / 1000))
     start_position = before.player.position
     stop_distance = 4.0 if exit_mode else decision.args.stop_distance
     interaction_mode = talk or interact
