@@ -95,6 +95,7 @@ SEMANTIC_REPLAN_REASONS = TRAVERSAL_REPLAN_REASONS | frozenset({
     "offmesh_jump_fell",
     "offmesh_jump_not_triggered",
     "offmesh_jump_timeout",
+    "offmesh_jump_deadline",
 })
 
 
