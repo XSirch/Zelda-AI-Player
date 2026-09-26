@@ -168,3 +168,26 @@ def test_checkpoint_plan_is_unavailable_on_old_bridge(state):
     plan = opening_checkpoint_plan(old)
     assert plan["available"] is False
     assert plan["current"] is None
+
+
+def test_terminal_progress_prevents_opening_regression_after_shield_loss(state):
+    game = _game(state, scene_name="Kokiri Forest", story_flags={
+        "greeted_by_saria": True,
+        "showed_mido_sword_shield": True,
+        "met_deku_tree": True,
+        "obtained_kokiri_emerald": True,
+    }, equipment=[
+        _equipment("Kokiri Sword", "sword", equipped=True, item_id=59),
+        # Shield intentionally missing: it may have burned after the opening gate.
+    ])
+    plan = opening_checkpoint_plan(game)
+    assert plan["active"] is False
+    assert plan["completed_count"] == plan["total"]
+
+
+def test_checkpoint_copy_is_portuguese(state):
+    game = _game(state, scene_name="Kokiri Forest", story_flags={"greeted_by_saria": True})
+    plan = opening_checkpoint_plan(game)
+    assert plan["current"]["title"] == "Obter a Kokiri Sword"
+    assert "Explore Kokiri Forest" in plan["current"]["instruction"]
+    assert all(not row.startswith("Do not") for row in plan["do_not_repeat"])
