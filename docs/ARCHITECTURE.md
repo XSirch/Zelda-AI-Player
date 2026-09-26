@@ -70,3 +70,10 @@ Saídas de cena são opacas ao modelo até serem atravessadas. IDs nativos perma
 ### Scene autosave
 
 Bridge v2.10 tracks real scene transitions. On a non-initial `OnSceneInit` it schedules an autosave and later performs `Play_PerformSave` from `OnGameFrameUpdate` only after the destination scene is stable and save-safe. Autosave telemetry is part of the slow/full state.
+
+
+### Checkpoint layer
+
+The quest checkpoint layer sits above skills/navigation and below model planning. It derives a single active opening objective from native save/progress evidence, exposes the next few milestones, and blocks obvious completed-NPC loops. It deliberately does not encode world-space routes; route discovery remains the responsibility of collision/NavMesh/actors/learned edges.
+
+Scene autosave is native-side and independent of the LLM. Scene changes schedule a deferred `Play_PerformSave` once the destination is stable; room changes remain logical checkpoints only.
