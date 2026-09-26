@@ -93,11 +93,11 @@ def test_opening_checkpoint_sequence_uses_observable_progress(state):
 def test_kokiri_emerald_keeps_opening_plan_completed_after_leaving_dungeon(state):
     game = _game(state, scene_name="Kokiri Forest", story_flags={
         "greeted_by_saria": True, "showed_mido_sword_shield": True,
-        "met_deku_tree": True,
+        "met_deku_tree": True, "obtained_kokiri_emerald": True,
     }, equipment=[
         _equipment("Kokiri Sword", "sword", equipped=True, item_id=59),
         _equipment("Deku Shield", "shield", equipped=True, item_id=60),
-    ], quest_items=["Kokiri Emerald"])
+    ])
     assert opening_checkpoint_plan(game)["active"] is False
 
 
