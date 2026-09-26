@@ -88,6 +88,10 @@ TRAVERSAL_REPLAN_REASONS = frozenset({
     "traversal_timeout",
 })
 
+SEMANTIC_REPLAN_REASONS = TRAVERSAL_REPLAN_REASONS | frozenset({
+    "checkpoint_repeat_blocked",
+})
+
 
 def _sanitize_transition_actor(actor: dict | None) -> dict | None:
     if actor is None:
@@ -302,7 +306,7 @@ class Runtime:
     def _update_stuck(self, decision: Decision, result: dict):
         status = result.get("status")
         reason = result.get("reason")
-        if status in {"failed", "stale"} and reason in TRAVERSAL_REPLAN_REASONS:
+        if status in {"failed", "stale"} and reason in SEMANTIC_REPLAN_REASONS:
             # This is a route-selection/revalidation failure, not proof that Link is
             # physically wedged. Do not emit stuck_detected instructions that would
             # back him away from a valid ladder approach.
@@ -583,7 +587,7 @@ class Runtime:
                 return False
             # Semantic traversal failures should replan/select another vertical
             # route; backing away here can undo a successful A* approach to a ladder.
-            if (self.last_result or {}).get("reason") in TRAVERSAL_REPLAN_REASONS:
+            if (self.last_result or {}).get("reason") in SEMANTIC_REPLAN_REASONS:
                 self.stuck_score = max(0, self.stuck_score - 2)
                 return False
             # If the game already exposes an actionable A prompt, let the planner interact instead of backing away.
