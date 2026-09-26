@@ -289,6 +289,7 @@ void TrySceneAutosave() {
     std::scoped_lock lock(bridge.mutex);
     if (!bridge.sceneAutosavePending || bridge.sceneAutosaveTarget != targetScene) return;
     bridge.sceneAutosavePending = false;
+    bridge.sceneAutosaveTarget = -1;
     bridge.lastAutosaveScene = targetScene;
     bridge.autosaveCount++;
     bridge.lastAutosaveAtMs = NowMs();
@@ -1210,6 +1211,8 @@ void Snapshot() {
     } else {
         bridge.scheduler.Release("game_not_ready");
         bridge.lastScene = bridge.lastRoom = -1;
+        bridge.sceneAutosavePending = false;
+        bridge.sceneAutosaveTarget = -1;
     }
     if (mode != bridge.previousMode) {
         ++bridge.contextEpoch;
