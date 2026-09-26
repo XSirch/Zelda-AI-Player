@@ -61,7 +61,7 @@ def opening_checkpoint_plan(game: GameState) -> dict:
             "id": "leave_links_house",
             "title": "Leave Link's House",
             "instruction": "Leave the house through the observed scene-exit surface. Do not wait for a door actor.",
-            "done": game.scene_name != "Link's House" or greeted_saria,
+            "done": game.scene_name != "Link's House",
             "completion": "scene changes away from Link's House",
         },
         {
