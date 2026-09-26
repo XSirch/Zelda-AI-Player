@@ -283,6 +283,11 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "TrySceneAutosave" in native
     assert "ScheduleSceneAutosaveLocked" in native
     assert "if (!bridge.socket || bridge.token.empty()) return;" in native
+    assert "lastPeerSeenMs = NowMs()" in native
+    assert "++peerContactSeq" in native
+    assert "sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq" in native
+    assert "bridge.peerContactSeq <= bridge.sceneAutosaveScheduledPeerSeq" in native
+    assert '"scene_autosave_cancelled"' in native
     assert "ScheduleSceneAutosaveLocked(bridge, bridge.lastScene, scene)" in native
     assert "ScheduleSceneAutosaveLocked(bridge, previous, scene)" in native
     assert "Play_PerformSave(gPlayState)" in native
