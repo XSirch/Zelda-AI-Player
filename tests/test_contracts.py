@@ -617,3 +617,21 @@ def test_system_prompt_prioritizes_checkpoint_plan_without_leaking_routes():
     assert "checkpoint_plan is a deterministic high-level quest sequencer" in SYSTEM_PROMPT
     assert "Do not deliberately repeat checkpoint_plan.completed steps" in SYSTEM_PROMPT
     assert "does not reveal hidden physical routes" in SYSTEM_PROMPT
+
+
+def test_model_hides_raw_story_flags_and_autosave(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "story_progress_v1", "scene_autosave_v1"],
+        "progress": {
+            **state.progress.model_dump(),
+            "story_flags": {"greeted_by_saria": True, "showed_mido_sword_shield": False},
+        },
+        "autosave": {
+            "pending": False, "target_scene": -1, "last_scene": 85,
+            "count": 2, "last_saved_at_ms": 1234,
+        },
+    })
+    visible = _model_state_payload(game)
+    assert "story_flags" not in visible["progress"]
+    assert "autosave" not in visible
