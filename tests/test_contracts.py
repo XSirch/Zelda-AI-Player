@@ -635,3 +635,18 @@ def test_model_hides_raw_story_flags_and_autosave(state):
     visible = _model_state_payload(game)
     assert "story_flags" not in visible["progress"]
     assert "autosave" not in visible
+
+
+def test_offmesh_links_are_local_motor_state_not_raw_model_payload(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_links": [{
+            "kind": "auto_jump_gap",
+            "takeoff_position": [70, 0, 0],
+            "landing_position": [175, 0, 0],
+            "gap_distance": 105,
+            "height_delta": 0,
+        }],
+    })
+    visible = _model_state_payload(game)
+    assert "navigation_links" not in visible
