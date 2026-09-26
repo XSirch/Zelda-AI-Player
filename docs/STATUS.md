@@ -88,3 +88,6 @@ Combat-learning benchmark integrity: a human hint or a pause/take-control opport
 
 - Opening quest checkpoint sequencer: implemented from native save/equipment evidence; repeated Saria/Mido interactions are locally blocked when their checkpoint is not active.
 - Scene autosave: implemented natively; saves after safe stabilization on scene change, not on room change.
+
+- opening checkpoint planner derived from native save/equipment state, with Saria/Mido repeat guards;
+- native scene autosave on scene transitions via Play_PerformSave; room-only transitions do not save.
