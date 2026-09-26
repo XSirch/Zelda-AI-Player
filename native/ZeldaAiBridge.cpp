@@ -235,6 +235,9 @@ void Event(const char* kind, const std::string& detail) {
 }
 
 void ScheduleSceneAutosaveLocked(BridgeData& bridge, int16_t previousScene, int16_t nextScene) {
+    // The custom autosave belongs to an active Zelda AI bridge session. Merely
+    // compiling the adapter into SoH must not change standalone save behavior.
+    if (!bridge.socket || bridge.token.empty()) return;
     if (previousScene < 0 || previousScene == nextScene) return;
     if (bridge.sceneAutosavePending && bridge.sceneAutosaveTarget == nextScene) return;
     bridge.sceneAutosavePending = true;
