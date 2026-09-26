@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.9 + Navigation V2
+# Implementation status — realtime-input foundation v2.10 + Navigation V2
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -37,7 +37,7 @@ That run also emitted a Starlette/httpx deprecation warning and Pydantic seriali
 - Windows SoH reconfigure/build and in-game input/animation/targeting tests.
 - Actual p50/p95/p99 latency under load.
 - Robust combat across enemies/bosses, cross-room/global route planning and special navigation links, goal-bound route replay and process-level isolation of the fast motor.
-- Windows SoH build + in-game validation of the v2.9 NavMesh/scene-exit/traversal-affordance sampling, frame cost and wall/ledge avoidance.
+- Windows SoH build + in-game validation of the v2.10 NavMesh/scene-exit/traversal-affordance/story-progress/autosave sampling, frame cost and wall/ledge avoidance.
 
 The local controller still contains heuristic skills and bounded fallbacks. This is not an autonomous completion claim.
 
@@ -85,3 +85,6 @@ Combat profiles are not shared between benchmark models/efforts. Isolated/zero-s
 
 
 Combat-learning benchmark integrity: a human hint or a pause/take-control opportunity taints combat learning for the remainder of that run. Existing opponent profiles may still be used, but new combat traces from the assisted run are not persisted into the adaptive namespace.
+
+- Opening quest checkpoint sequencer: implemented from native save/equipment evidence; repeated Saria/Mido interactions are locally blocked when their checkpoint is not active.
+- Scene autosave: implemented natively; saves after safe stabilization on scene change, not on room change.
