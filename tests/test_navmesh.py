@@ -269,6 +269,12 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert '"scene_autosave_v1"' in native
     assert '"offmesh_jump_links_v1"' in native
     assert "json NavigationGapLinks(Player* player)" in native
+    gap_start = native.index("json NavigationGapLinks(Player* player)")
+    gap_end = native.index("json TraversalAffordances(Player* player)", gap_start)
+    gap_scan = native[gap_start:gap_end]
+    assert "DIRECTION_COUNT = 32" in gap_scan
+    assert "BGCHECKFLAG_GROUND" in gap_scan
+    assert "takeoffRadius == 0" in gap_scan
     assert '"auto_jump_gap"' in native
     assert "MIN_GAP = 55.0f" in native
     assert "MAX_GAP = 145.0f" in native
