@@ -131,6 +131,8 @@ struct BridgeData {
     uint64_t autosaveCount = 0;
     int64_t lastAutosaveAtMs = 0;
     int64_t lastPeerSeenMs = 0;
+    uint64_t peerContactSeq = 0;
+    uint64_t sceneAutosaveScheduledPeerSeq = 0;
     uint16_t doAction = DO_ACTION_NONE;
     std::deque<json> events;
     zelda_ai::InputScheduler scheduler;
@@ -164,6 +166,7 @@ struct BridgeData {
                 if (data.at("protocol") != 2 || data.at("token") != token || data.at("instance_id") != instance)
                     continue;
                 lastPeerSeenMs = NowMs();
+                ++peerContactSeq;
                 auto number = [&](const char* name) -> uint64_t {
                     const auto& v = data.at(name);
                     if (!v.is_number_unsigned()) throw std::runtime_error("invalid sequence");
@@ -246,6 +249,7 @@ void ScheduleSceneAutosaveLocked(BridgeData& bridge, int16_t previousScene, int1
     if (bridge.sceneAutosavePending && bridge.sceneAutosaveTarget == nextScene) return;
     bridge.sceneAutosavePending = true;
     bridge.sceneAutosaveTarget = nextScene;
+    bridge.sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq;
     PushEventLocked(bridge, "scene_autosave_pending", std::to_string(nextScene));
 }
 
@@ -295,6 +299,10 @@ void TrySceneAutosave() {
             bridge.forceFull = true;
             return;
         }
+        // Require at least one authenticated packet after the scene-change
+        // scheduling point. This prevents a stale socket/token from authorizing
+        // writes after the backend has disappeared.
+        if (bridge.peerContactSeq <= bridge.sceneAutosaveScheduledPeerSeq) return;
         targetScene = bridge.sceneAutosaveTarget;
     }
     if (!gPlayState || gPlayState->sceneNum != targetScene || !SceneAutosaveCanSave()) return;
@@ -305,6 +313,7 @@ void TrySceneAutosave() {
     if (!bridge.sceneAutosavePending || bridge.sceneAutosaveTarget != targetScene) return;
     bridge.sceneAutosavePending = false;
     bridge.sceneAutosaveTarget = -1;
+    bridge.sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq;
     bridge.lastAutosaveScene = targetScene;
     bridge.autosaveCount++;
     bridge.lastAutosaveAtMs = NowMs();
