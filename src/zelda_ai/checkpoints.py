@@ -149,6 +149,8 @@ def opening_checkpoint_plan(game: GameState) -> dict:
 
 def checkpoint_blocks_decision(game: GameState, decision: Decision, checkpoint: dict) -> dict | None:
     """Fail closed on obvious repeated NPC interactions that contradict completed checkpoints."""
+    if not checkpoint.get("available", True):
+        return None
     if decision.skill not in {"talk_to_actor", "interact_with_actor"}:
         return None
     if decision.args.target_actor_id is None:
