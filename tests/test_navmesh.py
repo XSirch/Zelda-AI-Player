@@ -279,6 +279,9 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "Flags_GetEventChkInf(EVENTCHKINF_SHOWED_MIDO_SWORD_SHIELD)" in native
     assert "GameInteractor::OnGameFrameUpdate" in native
     assert "TrySceneAutosave" in native
+    assert "ScheduleSceneAutosaveLocked" in native
+    assert "ScheduleSceneAutosaveLocked(bridge, bridge.lastScene, scene)" in native
+    assert "ScheduleSceneAutosaveLocked(bridge, previous, scene)" in native
     assert "Play_PerformSave(gPlayState)" in native
     assert "scene_autosave_pending" in native
     assert "scene_autosave_completed" in native
