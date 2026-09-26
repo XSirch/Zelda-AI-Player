@@ -393,10 +393,15 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                 proof_age_distance = math.hypot(px - ox, pz - oz)
                 direct_exit_proven = bool(
                     selected_exit.direct_reachable and proof_age_distance <= 18.0)
+            interaction_path_ready = True
+            if (interaction_mode and target_distance > 45.0 and current.navmesh.available):
+                interaction_plan = plan_navmesh(current, target)
+                interaction_path_ready = bool(
+                    interaction_plan and interaction_plan.exact_goal_reachable)
             if target_distance <= stop_distance and abs(current.player.position[1] - target[1]) > 45:
                 return {"status": "failed", "reason": "target_on_different_floor",
                     "target_distance": target_distance, "skill": decision.skill}
-            if target_distance <= stop_distance:
+            if target_distance <= stop_distance and (not interaction_mode or interaction_path_ready):
                 bridge.set_navigation_debug(
                     skill=decision.skill, status="reached", target_position=list(target),
                     waypoint=None, path_cells=last_path_cells, probe_safe=True,
