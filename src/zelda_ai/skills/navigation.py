@@ -181,7 +181,8 @@ def _refresh_gap_link(game: GameState, original):
     return None
 
 
-async def _execute_gap_link(bridge: Bridge, observation: GameState, original, skill: str) -> dict:
+async def _execute_gap_link(bridge: Bridge, observation: GameState, original, skill: str,
+                            *, hard_deadline: float | None = None) -> dict:
     """Run toward a native-observed landing and let OoT trigger its own auto-jump."""
     current = bridge.state
     if not current or not current.player:
@@ -206,7 +207,11 @@ async def _execute_gap_link(bridge: Bridge, observation: GameState, original, sk
     seen_air = False
     acknowledged = False
     first_command = None
-    deadline = time.monotonic() + 2.4
+    now = time.monotonic()
+    deadline = min(now + 2.4, hard_deadline) if hard_deadline is not None else now + 2.4
+    if deadline - now < 0.25:
+        return {"status": "failed", "reason": "offmesh_jump_deadline",
+            "acknowledged": False}
 
     bridge.set_navigation_debug(
         skill=skill, status="gap_link_takeoff",
@@ -485,7 +490,8 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                             gap_link.takeoff_position[1] - current.player.position[1])
                         if takeoff_distance <= 70.0 and takeoff_height <= 30.0:
                             jump = await _execute_gap_link(
-                                bridge, observation, gap_link, decision.skill)
+                                bridge, observation, gap_link, decision.skill,
+                                hard_deadline=hard_deadline)
                             acknowledged |= bool(jump.get("acknowledged"))
                             if jump.get("status") == "completed":
                                 navmesh_blocked_samples = 0
