@@ -2,7 +2,7 @@ from zelda_ai.models import Decision, SkillArgs
 from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _probe_stick, _rotate_stick_quadrants, _world_yaw_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
-from zelda_ai.skills.navigation import _resolve_scene_exit, _best_gap_link, _refresh_gap_link
+from zelda_ai.skills.navigation import _resolve_scene_exit, _best_gap_link, _refresh_gap_link, _execute_gap_link
 from zelda_ai.skills.traversal import (
     _resolve_traversal_affordance, _refresh_traversal_affordance,
     _local_traversal_evidence, _fast_revalidation_matches_original,
@@ -988,3 +988,30 @@ def test_gap_link_refresh_matches_recentered_geometry(state):
     refreshed = _refresh_gap_link(refreshed_game, original)
     assert refreshed is not None
     assert refreshed.landing_position == (185.0, 0.0, 5.0)
+
+
+def test_gap_executor_respects_outer_hard_deadline(state):
+    import asyncio
+    import time
+
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_links": [{
+            "kind": "auto_jump_gap",
+            "takeoff_position": [0, 0, 0],
+            "landing_position": [105, 0, 0],
+            "gap_distance": 105,
+            "height_delta": 0,
+        }],
+    })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    result = asyncio.run(_execute_gap_link(
+        FakeBridge(game), game, game.navigation_links[0], "navigate_to",
+        hard_deadline=time.monotonic() + 0.1,
+    ))
+    assert result["status"] == "failed"
+    assert result["reason"] == "offmesh_jump_deadline"
