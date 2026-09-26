@@ -20,11 +20,13 @@
 #include "soh/Enhancements/game-interactor/GameInteractor.h"
 #include "soh/Enhancements/item-tables/ItemTableTypes.h"
 #include "soh/ShipInit.hpp"
+#include "soh/SaveManager.h"
 #include "soh/cvar_prefixes.h"
 #include "soh/ActorDB.h"
 #include "soh/util.h"
 extern "C" {
 #include "global.h"
+#include "functions.h"
 #include "message_data_fmt.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
@@ -38,7 +40,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.9";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.10";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -123,6 +125,15 @@ struct BridgeData {
     bool playable = false;
     int16_t lastScene = -1;
     int16_t lastRoom = -1;
+    bool sceneAutosavePending = false;
+    int16_t sceneAutosaveTarget = -1;
+    int16_t lastAutosaveScene = -1;
+    uint64_t autosaveCount = 0;
+    int64_t lastAutosaveAtMs = 0;
+    int64_t lastPeerSeenMs = 0;
+    uint64_t peerContactSeq = 0;
+    uint64_t sceneAutosaveScheduledPeerSeq = 0;
+    int64_t sceneAutosaveScheduledAtMs = 0;
     uint16_t doAction = DO_ACTION_NONE;
     std::deque<json> events;
     zelda_ai::InputScheduler scheduler;
@@ -155,6 +166,8 @@ struct BridgeData {
                 auto data = json::parse(packet->data, packet->data + packet->len);
                 if (data.at("protocol") != 2 || data.at("token") != token || data.at("instance_id") != instance)
                     continue;
+                lastPeerSeenMs = NowMs();
+                ++peerContactSeq;
                 auto number = [&](const char* name) -> uint64_t {
                     const auto& v = data.at(name);
                     if (!v.is_number_unsigned()) throw std::runtime_error("invalid sequence");
@@ -227,6 +240,20 @@ void Event(const char* kind, const std::string& detail) {
     PushEventLocked(bridge, kind, detail);
 }
 
+void ScheduleSceneAutosaveLocked(BridgeData& bridge, int16_t previousScene, int16_t nextScene) {
+    // The custom autosave belongs to an active Zelda AI bridge session. Merely
+    // compiling the adapter into SoH must not change standalone save behavior.
+    if (!bridge.socket || bridge.token.empty()) return;
+    if (previousScene < 0 || previousScene == nextScene) return;
+    if (bridge.sceneAutosavePending && bridge.sceneAutosaveTarget == nextScene) return;
+    bridge.sceneAutosavePending = true;
+    bridge.sceneAutosaveTarget = nextScene;
+    bridge.sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq;
+    bridge.sceneAutosaveScheduledAtMs = NowMs();
+    PushEventLocked(bridge, "scene_autosave_pending", std::to_string(nextScene));
+}
+
+
 bool ItemUsesAmmo(int item) {
     switch (item) {
         case ITEM_STICK:
@@ -240,6 +267,65 @@ bool ItemUsesAmmo(int item) {
         default:
             return false;
     }
+}
+
+bool SceneAutosaveCanSave() {
+    if (!gPlayState || !GameInteractor::IsSaveLoaded(false) || !SaveManager::Instance ||
+        !SaveManager::Instance->SaveFile_Exist(gSaveContext.fileNum) ||
+        gPlayState->gameplayFrames < 60 ||
+        gPlayState->sceneNum == SCENE_CHAMBER_OF_THE_SAGES ||
+        gPlayState->sceneNum == SCENE_CUTSCENE_MAP ||
+        (!CHECK_QUEST_ITEM(QUEST_SONG_TIME) &&
+         (INV_CONTENT(ITEM_OCARINA_TIME) == ITEM_OCARINA_TIME)) ||
+        GameInteractor::IsGameplayPaused() ||
+        gPlayState->csCtx.state != CS_STATE_IDLE ||
+        Player_InCsMode(gPlayState)) {
+        return false;
+    }
+    return GET_PLAYER(gPlayState) != nullptr;
+}
+
+void TrySceneAutosave() {
+    auto& bridge = Data();
+    int16_t targetScene = -1;
+    {
+        std::scoped_lock lock(bridge.mutex);
+        if (!bridge.sceneAutosavePending) return;
+        constexpr int64_t PEER_LIVENESS_MS = 15000;
+        constexpr int64_t PEER_CONFIRM_TIMEOUT_MS = 5000;
+        const int64_t nowMs = NowMs();
+        const bool confirmedAfterSchedule =
+            bridge.peerContactSeq > bridge.sceneAutosaveScheduledPeerSeq;
+        const bool peerFresh =
+            bridge.lastPeerSeenMs > 0 && nowMs - bridge.lastPeerSeenMs <= PEER_LIVENESS_MS;
+        if (!confirmedAfterSchedule || !peerFresh) {
+            if (bridge.sceneAutosaveScheduledAtMs > 0 &&
+                nowMs - bridge.sceneAutosaveScheduledAtMs > PEER_CONFIRM_TIMEOUT_MS) {
+                bridge.sceneAutosavePending = false;
+                bridge.sceneAutosaveTarget = -1;
+                bridge.sceneAutosaveScheduledAtMs = 0;
+                PushEventLocked(bridge, "scene_autosave_cancelled", "backend_not_confirmed");
+                bridge.forceFull = true;
+            }
+            return;
+        }
+        targetScene = bridge.sceneAutosaveTarget;
+    }
+    if (!gPlayState || gPlayState->sceneNum != targetScene || !SceneAutosaveCanSave()) return;
+
+    Play_PerformSave(gPlayState);
+
+    std::scoped_lock lock(bridge.mutex);
+    if (!bridge.sceneAutosavePending || bridge.sceneAutosaveTarget != targetScene) return;
+    bridge.sceneAutosavePending = false;
+    bridge.sceneAutosaveTarget = -1;
+    bridge.sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq;
+    bridge.sceneAutosaveScheduledAtMs = 0;
+    bridge.lastAutosaveScene = targetScene;
+    bridge.autosaveCount++;
+    bridge.lastAutosaveAtMs = NowMs();
+    PushEventLocked(bridge, "scene_autosave_completed", std::to_string(targetScene));
+    bridge.forceFull = true;
 }
 
 json ProgressJson() {
@@ -321,6 +407,15 @@ json ProgressJson() {
         {"map_index", mapIndex},
         {"dungeon_items", dungeonItems},
         {"small_keys", smallKeys},
+        {"story_flags", {
+            {"greeted_by_saria", Flags_GetInfTable(INFTABLE_GREETED_BY_SARIA) != 0},
+            {"first_spoke_to_mido", Flags_GetEventChkInf(EVENTCHKINF_FIRST_SPOKE_TO_MIDO) != 0},
+            {"complained_about_mido", Flags_GetEventChkInf(EVENTCHKINF_COMPLAINED_ABOUT_MIDO) != 0},
+            {"showed_mido_sword_shield", Flags_GetEventChkInf(EVENTCHKINF_SHOWED_MIDO_SWORD_SHIELD) != 0},
+            {"deku_tree_opened_mouth", Flags_GetEventChkInf(EVENTCHKINF_DEKU_TREE_OPENED_MOUTH) != 0},
+            {"met_deku_tree", Flags_GetEventChkInf(EVENTCHKINF_MET_DEKU_TREE) != 0},
+            {"obtained_kokiri_emerald", CHECK_QUEST_ITEM(QUEST_KOKIRI_EMERALD) != 0},
+        }},
     };
 }
 
@@ -1128,10 +1223,12 @@ void Snapshot() {
         const int16_t scene = gPlayState->sceneNum;
         const int16_t room = gPlayState->roomCtx.curRoom.num;
         if (bridge.lastScene != scene || bridge.lastRoom != room) {
-            if (bridge.lastScene >= 0 && bridge.lastScene != scene)
+            if (bridge.lastScene >= 0 && bridge.lastScene != scene) {
+                ScheduleSceneAutosaveLocked(bridge, bridge.lastScene, scene);
                 PushEventLocked(bridge, "scene_changed", std::to_string(bridge.lastScene) + "->" + std::to_string(scene));
-            else if (bridge.lastRoom >= 0 && bridge.lastRoom != room)
+            } else if (bridge.lastRoom >= 0 && bridge.lastRoom != room) {
                 PushEventLocked(bridge, "room_changed", std::to_string(bridge.lastRoom) + "->" + std::to_string(room));
+            }
             ++bridge.sceneEpoch;
             bridge.lastScene = scene;
             bridge.lastRoom = room;
@@ -1145,6 +1242,9 @@ void Snapshot() {
     } else {
         bridge.scheduler.Release("game_not_ready");
         bridge.lastScene = bridge.lastRoom = -1;
+        bridge.sceneAutosavePending = false;
+        bridge.sceneAutosaveTarget = -1;
+        bridge.sceneAutosaveScheduledAtMs = 0;
     }
     if (mode != bridge.previousMode) {
         ++bridge.contextEpoch;
@@ -1197,7 +1297,7 @@ void Snapshot() {
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
                           "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces",
-                          "traversal_affordances_v1"}},
+                          "traversal_affordances_v1", "story_progress_v1", "scene_autosave_v1"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -1238,6 +1338,13 @@ void Snapshot() {
         {"traversal_affordances", json::array()},
         {"scene_exits", json::array()},
         {"navmesh", {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f}, {"half_extent", 0}, {"cells", json::array()}}},
+        {"autosave", {
+            {"pending", bridge.sceneAutosavePending},
+            {"target_scene", bridge.sceneAutosaveTarget},
+            {"last_scene", bridge.lastAutosaveScene},
+            {"count", bridge.autosaveCount},
+            {"last_saved_at_ms", bridge.lastAutosaveAtMs},
+        }},
         {"cutscene_active", false},
         {"paused", false},
         {"events", pendingEvents},
@@ -1377,7 +1484,7 @@ void Snapshot() {
         static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
             "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
             "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
-            "nearby_actors", "traversal_affordances", "scene_exits", "navmesh"};
+            "nearby_actors", "traversal_affordances", "scene_exits", "navmesh", "autosave"};
         for (const char* field : slowFields) state.erase(field);
     }
     std::string serialized = state.dump();
@@ -1415,6 +1522,7 @@ void RegisterZeldaAiBridge() {
     registered = true;
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>(Snapshot);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>(TrySceneAutosave);
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](int16_t scene) {
         auto& bridge = Data();
@@ -1427,6 +1535,7 @@ void RegisterZeldaAiBridge() {
         bridge.actors.Clear();
         bridge.lastScene = scene;
         bridge.lastRoom = -1;
+        ScheduleSceneAutosaveLocked(bridge, previous, scene);
         PushEventLocked(bridge, "scene_changed",
             std::to_string(previous) + "->" + std::to_string(scene));
     });

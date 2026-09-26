@@ -49,6 +49,7 @@ class Bridge(asyncio.DatagramProtocol):
         self.fast_base_misses = 0
         self.dropped_samples = 0
         self._last_resync = 0.0
+        self._last_heartbeat = 0.0
         self.navigation_debug: dict | None = None
 
     def connection_made(self, transport):
@@ -203,6 +204,9 @@ class Bridge(asyncio.DatagramProtocol):
                 self._intervals.append((now - self.last_seen) * 1000)
                 self.dropped_samples += max(0, state.seq - previous.seq - 1)
             self.peer = addr
+            if state.protocol == 2 and now - self._last_heartbeat >= 1.0:
+                self._observe_ack(instance=state.instance_id, peer=addr)
+                self._last_heartbeat = now
             events_changed = self._ingest_events(state, bootstrap)
             if state.protocol == 2:
                 state = state.model_copy(update={"events": list(self._events)})

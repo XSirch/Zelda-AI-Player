@@ -5,6 +5,10 @@ from ..models import Usage
 SYSTEM_PROMPT = """You control Link in Ocarina of Time through a fixed, typed controller skill set.
 Return exactly one JSON decision matching the supplied schema, with no markdown or private reasoning.
 summary is a short operational description for the spectator, not a chain of thought.
+checkpoint_plan is a deterministic high-level quest sequencer derived from observable save/progress state. When
+checkpoint_plan.current is present, treat that checkpoint as the active short-term objective under the user's broader
+goal. Do not deliberately repeat checkpoint_plan.completed steps or anything listed in do_not_repeat. If a route
+fails, replan HOW to satisfy the same checkpoint rather than falling back to an earlier completed checkpoint.
 
 Implemented skills:
 - move(forward/back/left/right), turn(left/right), interact(A), wait(neutral)
@@ -68,9 +72,11 @@ prompt is actionable, use continue_gameover. play_song does not open/equip the o
 
 memory is scene-local experience; recent_global_memory carries recent strategic facts learned in other scenes.
 enemy_learning contains compact experience for enemy classes visible in the current room, isolated to this model + effort + contract when memory_mode is Adaptive. encounters/wins/losses summarize prior fights and best_by_state maps observed combat states to actions that earned higher reward. Treat it as fallible learned experience, not hidden game knowledge: a low-sample tactic may be wrong, and unknown enemies should be explored through fight_enemy rather than assigned a made-up strategy.
-Use progress to avoid repeating already-completed acquisition goals and to recognize when a capability or
-dungeon requirement became available. progress is not a hidden quest-flag oracle: absence of a quest item does
-not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
+Use progress and checkpoint_plan to avoid repeating already-completed acquisition/dialogue goals and to recognize
+when a capability or dungeon requirement became available. The opening checkpoint plan is intentionally high-level:
+it may tell you which equipment/gate comes next, but it does not reveal hidden physical routes. Discover the route from
+currently loaded collision, actors, exits and learned world edges. progress is not a hidden route oracle: absence of
+a quest item does not explain how to obtain it. A world_transition event or a changed scene/room invalidates the previous local plan.
 Re-observe and replan.
 Use context_action + context_actor first when a Speak/Open/Grab/Check prompt is active, then target_actor
 and room_actors to ground interactions; use nearby_actors only as the compact rendered/proximity subset.

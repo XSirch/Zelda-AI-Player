@@ -155,11 +155,23 @@ function ActorsPanel({ game }: { game: GameState | null }) {
   </section>;
 }
 
-function ProgressPanel({ game }: { game: GameState | null }) {
+function ProgressPanel({ game, checkpoint }: { game: GameState | null; checkpoint: Snapshot['checkpoint_plan'] }) {
   const p = game?.progress;
   if (!p) return null;
   const upgrades = Object.entries(p.upgrade_levels ?? {}).filter(([, level]) => level > 0);
-  return <section className="panel progress-panel">
+  const current = checkpoint?.current;
+  return <>
+    {checkpoint && <section className="panel progress-panel">
+      <div className="section-head"><span>PLANO / CHECKPOINT</span><span className="muted">{checkpoint.available ? `${checkpoint.completed_count} / ${checkpoint.total}` : 'INDISPONÍVEL'}</span></div>
+      {!checkpoint.available ? <div className="notice">Checkpoint nativo indisponível nesta bridge. Atualize/recompile para <code>rt-input-v2.10</code> antes de usar o plano de abertura.</div> : current ? <div className="progress-grid">
+        <div><span>ETAPA ATIVA</span><strong>{current.title}</strong></div>
+        <div><span>INSTRUÇÃO</span><strong>{current.instruction ?? '—'}</strong></div>
+        <div><span>CONCLUSÃO</span><strong>{current.completion ?? '—'}</strong></div>
+        <div><span>PRÓXIMAS</span><strong>{checkpoint.upcoming.length ? checkpoint.upcoming.map(row => row.title).join(' → ') : 'Fim do plano inicial'}</strong></div>
+        <div><span>NÃO REPETIR</span><strong>{checkpoint.do_not_repeat.length ? checkpoint.do_not_repeat.join(' · ') : 'Nenhuma restrição adicional'}</strong></div>
+      </div> : <p className="empty">Plano inicial concluído. O agente segue o objetivo global e a memória observada.</p>}
+    </section>}
+    <section className="panel progress-panel">
     <div className="section-head"><span>PROGRESSO OBSERVÁVEL</span><span className="muted">PAUSE / HUD</span></div>
     <div className="progress-grid">
       <div><span>QUEST / SONGS</span><strong>{p.quest_items.length ? p.quest_items.join(' · ') : 'Nenhum registrado'}</strong></div>
@@ -168,7 +180,8 @@ function ProgressPanel({ game }: { game: GameState | null }) {
       <div><span>UPGRADES</span><strong>{upgrades.length ? upgrades.map(([name, level]) => `${name} ${level}`).join(' · ') : 'Nenhum'}</strong></div>
       <div><span>OUTROS</span><strong>{p.heart_pieces}/4 heart pieces · {p.skull_tokens} skulltulas · magia {p.magic_acquired ? (p.double_magic ? 'dupla' : 'sim') : 'não'} · defesa dupla {p.double_defense ? 'sim' : 'não'}</strong></div>
     </div>
-  </section>;
+  </section>
+  </>;
 }
 
 function InventoryPanel({ game }: { game: GameState | null }) {
@@ -306,12 +319,13 @@ function App() {
           {liveTab === 'COMBATE' && <CombatLearningPanel profiles={snap?.combat_profiles ?? []} game={game}/>}
           {liveTab === 'TERRENO' && <TerrainPanel game={game} bridge={snap?.bridge}/>}
           {liveTab === 'ATORES' && <ActorsPanel game={game}/>}
-          {liveTab === 'PROGRESSO' && <><ProgressPanel game={game}/><InventoryPanel game={game}/></>}
+          {liveTab === 'PROGRESSO' && <><ProgressPanel game={game} checkpoint={snap?.checkpoint_plan ?? null}/><InventoryPanel game={game}/></>}
           {liveTab === 'ESTADO' && <div className="telemetry panel">
             <div><span>VIDA</span><strong>{player ? number(player.health / 16) + ' / ' + number(player.max_health / 16) + ' corações' : '—'}</strong></div>
             <div><span>RUPIAS</span><strong>{number(player?.rupees)}</strong></div>
             <div><span>POSIÇÃO NATIVA</span><strong>{player?.position.map(v => number(v)).join(' / ') ?? '—'}</strong></div>
             <div><span>BRIDGE</span><strong>{snap?.bridge.connected ? `Conectado · ${game?.bridge_build ?? 'build desconhecida'} · P${game?.protocol ?? '—'}` : 'Desconectado'}</strong></div>
+            <div><span>AUTOSAVE</span><strong>{game?.capabilities?.includes('scene_autosave_v1') ? (game.autosave.pending ? `Pendente · SCENE ${game.autosave.target_scene}` : `${game.autosave.count} saves · última SCENE ${game.autosave.last_scene >= 0 ? game.autosave.last_scene : '—'}`) : 'indisponível · requer v2.10'}</strong></div>
             <div><span>AÇÃO CONTEXTUAL</span><strong>{game?.context_action?.label ?? '—'}</strong></div>
             <div><span>ATOR CONTEXTUAL</span><strong>{game?.context_actor ? (game.context_actor.description || game.context_actor.name || 'ID ' + game.context_actor.actor_id) : '—'}</strong></div>
             <div><span>ENTRADA</span><strong>{game?.entrance_index ?? '—'}</strong></div>
