@@ -77,7 +77,7 @@ from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_p
 from .skills.traversal import _traverse_auto as _traverse_auto
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v10/skills-v11/trajectory-v3/prompt-v15"
+CONTRACT_VERSION = "state-v11/skills-v11/trajectory-v3/prompt-v16"
 
 TRAVERSAL_REPLAN_REASONS = frozenset({
     "no_traversal_affordance_observed",
