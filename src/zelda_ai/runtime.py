@@ -476,8 +476,9 @@ class Runtime:
 
     def on_state(self, state: GameState, old: GameState | None):
         self._learn_transition(state, old)
+        self._refresh_checkpoint(
+            state, emit=bool(self.run_id and self.state in {"running", "paused"}))
         if self.run_id and self.state in {"running", "paused"}:
-            self._refresh_checkpoint(state)
             if old and old.instance_id != state.instance_id:
                 self.log("game_instance_changed")
                 self.bridge.release()
@@ -1117,8 +1118,10 @@ class Runtime:
 
     def snapshot(self) -> dict:
         game = self.bridge.state
-        checkpoint_plan = self.checkpoint_plan or (
-            opening_checkpoint_plan(game) if game and game.player else None)
+        checkpoint_plan = (
+            opening_checkpoint_plan(game)
+            if game and game.player and self.bridge.connected else None
+        )
         if self.run_id and (self.metrics_cache is None or time.monotonic() - self.metrics_at >= 1):
             self.metrics_cache = self.store.metrics(self.run_id)
             self.metrics_at = time.monotonic()
