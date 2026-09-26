@@ -129,3 +129,4 @@ def test_terrain_panel_exposes_offmesh_jump_links():
     assert 'rt-input-v2.11' in main
     assert 'NavigationLinkObservation' in types
     assert 'navigation_links: NavigationLinkObservation[]' in types
+    assert "use <code>rt-input-v2.11</code> ou superior e recompile o SoH.\n    </div>}" in main
