@@ -226,6 +226,15 @@ class ProgressState(StrictModel):
     map_index: int = Field(default=0, ge=0, le=65535)
     dungeon_items: list[str] = Field(default_factory=list, max_length=3)
     small_keys: int = Field(default=0, ge=0, le=99)
+    story_flags: dict[str, bool] = Field(default_factory=dict, max_length=32)
+
+
+class AutosaveState(StrictModel):
+    pending: bool = False
+    target_scene: int = Field(default=-1, ge=-1, le=65535)
+    last_scene: int = Field(default=-1, ge=-1, le=65535)
+    count: int = Field(default=0, ge=0)
+    last_saved_at_ms: int = Field(default=0, ge=0)
 
 
 class ContextAction(StrictModel):
@@ -310,6 +319,7 @@ class GameState(StrictModel):
     traversal_affordances: list[TraversalAffordanceObservation] = Field(default_factory=list, max_length=24)
     scene_exits: list[SceneExitObservation] = Field(default_factory=list, max_length=31)
     navmesh: NavigationMeshSnapshot = Field(default_factory=NavigationMeshSnapshot)
+    autosave: AutosaveState = Field(default_factory=AutosaveState)
     cutscene_active: bool = False
     paused: bool = False
     events: list[GameEvent] = Field(default_factory=list, max_length=64)
