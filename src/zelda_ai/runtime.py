@@ -90,6 +90,11 @@ TRAVERSAL_REPLAN_REASONS = frozenset({
 
 SEMANTIC_REPLAN_REASONS = TRAVERSAL_REPLAN_REASONS | frozenset({
     "checkpoint_repeat_blocked",
+    "offmesh_link_lost",
+    "offmesh_takeoff_not_reached",
+    "offmesh_jump_fell",
+    "offmesh_jump_not_triggered",
+    "offmesh_jump_timeout",
 })
 
 
