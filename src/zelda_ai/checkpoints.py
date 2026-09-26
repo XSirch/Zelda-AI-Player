@@ -162,12 +162,17 @@ def checkpoint_blocks_decision(game: GameState, decision: Decision, checkpoint: 
         return None
     if decision.skill not in {"talk_to_actor", "interact_with_actor", "approach_actor", "follow_actor"}:
         return None
-    if decision.args.target_actor_id is None:
+    if decision.args.target_actor_id is None and decision.args.target_actor_uid is None:
         return None
 
     actor = next((row for row in game.room_actors
-        if row.actor_id == decision.args.target_actor_id and
-        (decision.args.target_actor_params is None or row.params == decision.args.target_actor_params)), None)
+        if ((decision.args.target_actor_uid is not None and
+             row.actor_uid == decision.args.target_actor_uid) or
+            (decision.args.target_actor_uid is None and
+             decision.args.target_actor_id is not None and
+             row.actor_id == decision.args.target_actor_id and
+             (decision.args.target_actor_params is None or
+              row.params == decision.args.target_actor_params)))), None)
     if actor is None:
         return None
 
