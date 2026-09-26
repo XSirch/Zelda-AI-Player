@@ -551,6 +551,9 @@ json NavigationGapLinks(Player* player) {
         // water surface. Reject only floors actually submerged under that surface.
         return waterY <= floorY + 5.0f;
     };
+    if (!floorIsAboveWater(origin.x, origin.z, originFloor)) {
+        return result;
+    }
 
     struct Link {
         Vec3f takeoff{};
@@ -590,9 +593,10 @@ json NavigationGapLinks(Player* player) {
             const float z = origin.z + dirZ * radius;
             float floorY = 0.0f;
             const bool found = floorAt(x, z, std::max(originFloor, takeoffY) + 180.0f, floorY);
+            const bool supportedFloor = found && floorIsAboveWater(x, z, floorY);
 
             if (!inGap) {
-                if (found && std::abs(floorY - takeoffY) <= 24.0f) {
+                if (supportedFloor && std::abs(floorY - takeoffY) <= 24.0f) {
                     takeoffRadius = radius;
                     takeoffY = floorY;
                     haveTakeoff = true;
@@ -600,7 +604,7 @@ json NavigationGapLinks(Player* player) {
                 }
 
                 const bool deepBelow = found && floorY < takeoffY - GAP_FLOOR_DROP;
-                if (haveTakeoff && (!found || deepBelow)) {
+                if (haveTakeoff && (!supportedFloor || deepBelow)) {
                     // When Link is already standing at the edge, the first 35u
                     // sample can be the gap. In that case the native floor under
                     // Link itself is the takeoff support (takeoffRadius == 0).
@@ -615,7 +619,7 @@ json NavigationGapLinks(Player* player) {
 
             const float gapDistance = radius - takeoffRadius;
             if (gapDistance > MAX_GAP) break;
-            if (!found) continue;
+            if (!supportedFloor) continue;
 
             const float heightDelta = floorY - takeoffY;
             if (gapDistance < MIN_GAP ||
