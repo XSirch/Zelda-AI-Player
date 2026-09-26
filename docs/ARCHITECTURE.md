@@ -21,7 +21,7 @@ SoH custom build -- UDP 127.0.0.1:8766 --> Bridge Python
 
 ## Decisão, estado e cadência
 
-`models.py` define o contrato Autonomy v2 (`state-v9/skills-v11/trajectory-v3/prompt-v14`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
+`models.py` define o contrato Autonomy v2 (`state-v10/skills-v11/trajectory-v3/prompt-v15`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
 
 Primitives motoras continuam curtas e limitadas. Controladores compostos locais executam navegação até posição/ator, follow, conversa/interação, exploração, manipulação, mira, facing/escudo, combate genérico, equipamento, ocarina, diálogo linear e game-over sem uma chamada de modelo por frame. O planner escolhe subobjetivos e estratégias; sucesso de interação/combate exige evidência observável.
 
@@ -61,3 +61,12 @@ HTTP aceita apenas hosts locais. Mutação exige nonce de sessão, e origens web
 ### Integridade do aprendizado de transições
 
 Saídas de cena são opacas ao modelo até serem atravessadas. IDs nativos permanecem apenas em controle/UI. O runtime confirma o `SceneExitIndex` do floor poly sob Link no último estado anterior à mudança de cena antes de associar uma surface selecionada ao destino. Se outra porta/warp/script causar a transição, a aresta usa a posição real observada e não a surface planejada. `memory_note` livre do modelo não é persistido; topologia persistente vem exclusivamente de evidência estruturada (`known_world_edges`, trajetórias confirmadas e eventos nativos).
+
+
+### Quest checkpoint layer
+
+`checkpoints.py` derives a deterministic opening plan from `progress.story_flags`, owned/equipped gear and scene observations. The model receives one active checkpoint plus completed/upcoming steps and `do_not_repeat` constraints. This is high-level quest ordering only; physical route discovery remains the responsibility of NavMesh, traversal affordances and learned world edges.
+
+### Scene autosave
+
+Bridge v2.10 tracks real scene transitions. On a non-initial `OnSceneInit` it schedules an autosave and later performs `Play_PerformSave` from `OnGameFrameUpdate` only after the destination scene is stable and save-safe. Autosave telemetry is part of the slow/full state.
