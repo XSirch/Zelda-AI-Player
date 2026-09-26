@@ -282,6 +282,7 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "GameInteractor::OnGameFrameUpdate" in native
     assert "TrySceneAutosave" in native
     assert "ScheduleSceneAutosaveLocked" in native
+    assert "if (!bridge.socket || bridge.token.empty()) return;" in native
     assert "ScheduleSceneAutosaveLocked(bridge, bridge.lastScene, scene)" in native
     assert "ScheduleSceneAutosaveLocked(bridge, previous, scene)" in native
     assert "Play_PerformSave(gPlayState)" in native
