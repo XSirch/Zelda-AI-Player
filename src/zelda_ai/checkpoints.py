@@ -155,11 +155,12 @@ def checkpoint_blocks_decision(game: GameState, decision: Decision, checkpoint: 
             "checkpoint": current_id,
             "skill": decision.skill,
         }
-    if _flag(game, "showed_mido_sword_shield") and "mido" in label and current_id != "pass_mido":
+    if "mido" in label and current_id != "pass_mido":
         return {
             "status": "failed",
             "reason": "checkpoint_repeat_blocked",
-            "blocked": "mido_gate_already_cleared",
+            "blocked": ("mido_gate_already_cleared" if _flag(game, "showed_mido_sword_shield")
+                        else "mido_not_current_checkpoint"),
             "checkpoint": current_id,
             "skill": decision.skill,
         }
