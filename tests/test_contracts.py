@@ -611,3 +611,9 @@ def test_traverse_is_documented_as_automatic_vertical_navpath():
     assert "You do NOT need to manually walk" in SYSTEM_PROMPT
     assert "Use traverse(down/up) as the default high-level action" in SYSTEM_PROMPT
     assert "Use traverse_to only when multiple observed vertical routes exist" in SYSTEM_PROMPT
+
+
+def test_system_prompt_prioritizes_checkpoint_plan_without_leaking_routes():
+    assert "checkpoint_plan is a deterministic high-level quest sequencer" in SYSTEM_PROMPT
+    assert "Do not deliberately repeat checkpoint_plan.completed steps" in SYSTEM_PROMPT
+    assert "does not reveal hidden physical routes" in SYSTEM_PROMPT
