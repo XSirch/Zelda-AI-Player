@@ -287,6 +287,8 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "Play_PerformSave(gPlayState)" in native
     assert "scene_autosave_pending" in native
     assert "scene_autosave_completed" in native
+    assert "bridge.sceneAutosaveTarget = -1" in native
+    assert 'bridge.scheduler.Release("game_not_ready")' in native
 
 
 
