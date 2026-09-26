@@ -105,3 +105,15 @@ def test_decision_panel_shows_automatic_vertical_navpath():
     assert 'selected_affordance?.kind' in main
     assert 'auto_navpath?: boolean' in types
     assert 'controller_skill?: string' in types
+
+
+def test_progress_panel_shows_checkpoint_plan_and_autosave():
+    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    types = Path('web/src/types.ts').read_text(encoding='utf-8')
+    assert 'PLANO / CHECKPOINT' in main
+    assert 'ETAPA ATIVA' in main
+    assert 'NÃO REPETIR' in main
+    assert 'AUTOSAVE' in main
+    assert 'checkpoint_plan?: QuestCheckpointPlan | null' in types
+    assert 'AutosaveState' in types
+    assert 'story_flags: Record<string, boolean>' in types
