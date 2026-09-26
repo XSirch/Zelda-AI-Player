@@ -69,3 +69,13 @@ The LLM sees compact summaries of visible learned enemy profiles at decision tim
 - The opening plan is strategic only. It never supplies hidden coordinates or transition destinations.
 - The native bridge schedules `scene_autosave_v1` only when the scene number actually changes after the initial load. It waits for a valid save file, >=60 gameplay frames, non-paused/non-cutscene gameplay and the same safety exclusions used by Shipwright's autosave before calling `Play_PerformSave`.
 - Room-only changes remain logical checkpoints/events but do not write the save file.
+
+
+## Quest checkpoints and scene autosave (v2.10)
+
+- The native bridge publishes a small set of opening story flags plus observable equipment state.
+- The Python checkpoint planner reconstructs the vanilla opening stage from that state. It never encodes physical paths.
+- The active checkpoint is injected into inference; completed checkpoints and explicit do-not-repeat constraints prevent loops such as repeatedly talking to Saria.
+- The checkpoint sequence is: leave Link's House -> complete Saria's greeting once -> obtain Kokiri Sword -> obtain Deku Shield -> equip both -> pass Mido -> meet Great Deku Tree -> enter the Deku Tree.
+- `scene_autosave_v1` schedules one native `Play_PerformSave` after a real scene change and only when the destination scene is stable and safe to save. Room-only changes do not save. The initial scene load does not save.
+- Autosave uses the same basic safety exclusions as Shipwright's own QoL autosave (valid file, >=60 gameplay frames, not paused/cutscene, no Chamber of Sages/cutscene map, and the Ocarina-of-Time/Song-of-Time edge case).
