@@ -541,6 +541,16 @@ json NavigationGapLinks(Player* player) {
             &gPlayState->colCtx, &start, &end, &hit, &poly,
             true, false, false, true, &bgId) != 0;
     };
+    auto floorIsAboveWater = [&](float x, float z, float floorY) -> bool {
+        float waterY = 0.0f;
+        WaterBox* waterBox = nullptr;
+        if (!WaterBox_GetSurface1(gPlayState, &gPlayState->colCtx, x, z, &waterY, &waterBox)) {
+            return true;
+        }
+        // A stepping stone may sit inside a water box, but its top is above the
+        // water surface. Reject only floors actually submerged under that surface.
+        return waterY <= floorY + 5.0f;
+    };
 
     struct Link {
         Vec3f takeoff{};
@@ -635,6 +645,9 @@ json NavigationGapLinks(Player* player) {
                 landingInsetY,
                 origin.z + dirZ * landingInset,
             };
+            if (!floorIsAboveWater(landing.x, landing.z, landing.y)) {
+                break;
+            }
 
             // The jump arc must not have a wall at torso/head height.
             Vec3f torsoStart{takeoff.x, takeoff.y + BODY_HEIGHT, takeoff.z};
@@ -652,7 +665,9 @@ json NavigationGapLinks(Player* player) {
             if (!floorAt(landing.x + sideX, landing.z + sideZ, landing.y + 100.0f, leftY) ||
                 !floorAt(landing.x - sideX, landing.z - sideZ, landing.y + 100.0f, rightY) ||
                 std::abs(leftY - landing.y) > 24.0f ||
-                std::abs(rightY - landing.y) > 24.0f) {
+                std::abs(rightY - landing.y) > 24.0f ||
+                !floorIsAboveWater(landing.x + sideX, landing.z + sideZ, leftY) ||
+                !floorIsAboveWater(landing.x - sideX, landing.z - sideZ, rightY)) {
                 break;
             }
 
