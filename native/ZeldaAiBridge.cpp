@@ -130,6 +130,7 @@ struct BridgeData {
     int16_t lastAutosaveScene = -1;
     uint64_t autosaveCount = 0;
     int64_t lastAutosaveAtMs = 0;
+    int64_t lastPeerSeenMs = 0;
     uint16_t doAction = DO_ACTION_NONE;
     std::deque<json> events;
     zelda_ai::InputScheduler scheduler;
@@ -162,6 +163,7 @@ struct BridgeData {
                 auto data = json::parse(packet->data, packet->data + packet->len);
                 if (data.at("protocol") != 2 || data.at("token") != token || data.at("instance_id") != instance)
                     continue;
+                lastPeerSeenMs = NowMs();
                 auto number = [&](const char* name) -> uint64_t {
                     const auto& v = data.at(name);
                     if (!v.is_number_unsigned()) throw std::runtime_error("invalid sequence");
@@ -237,7 +239,9 @@ void Event(const char* kind, const std::string& detail) {
 void ScheduleSceneAutosaveLocked(BridgeData& bridge, int16_t previousScene, int16_t nextScene) {
     // The custom autosave belongs to an active Zelda AI bridge session. Merely
     // compiling the adapter into SoH must not change standalone save behavior.
-    if (!bridge.socket || bridge.token.empty()) return;
+    constexpr int64_t PEER_LIVENESS_MS = 15000;
+    if (!bridge.socket || bridge.token.empty() || bridge.lastPeerSeenMs <= 0 ||
+        NowMs() - bridge.lastPeerSeenMs > PEER_LIVENESS_MS) return;
     if (previousScene < 0 || previousScene == nextScene) return;
     if (bridge.sceneAutosavePending && bridge.sceneAutosaveTarget == nextScene) return;
     bridge.sceneAutosavePending = true;
@@ -283,6 +287,14 @@ void TrySceneAutosave() {
     {
         std::scoped_lock lock(bridge.mutex);
         if (!bridge.sceneAutosavePending) return;
+        constexpr int64_t PEER_LIVENESS_MS = 15000;
+        if (bridge.lastPeerSeenMs <= 0 || NowMs() - bridge.lastPeerSeenMs > PEER_LIVENESS_MS) {
+            bridge.sceneAutosavePending = false;
+            bridge.sceneAutosaveTarget = -1;
+            PushEventLocked(bridge, "scene_autosave_cancelled", "backend_not_connected");
+            bridge.forceFull = true;
+            return;
+        }
         targetScene = bridge.sceneAutosaveTarget;
     }
     if (!gPlayState || gPlayState->sceneNum != targetScene || !SceneAutosaveCanSave()) return;
