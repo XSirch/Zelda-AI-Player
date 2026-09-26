@@ -124,6 +124,166 @@ def _resolve_scene_exit(game: GameState, target_position: list[float] | tuple[fl
     return nearest if math.dist(nearest.position, target) <= tolerance else None
 
 
+def _gap_target_score(point: tuple[float, float, float],
+                      target: tuple[float, float, float] | list[float]) -> float:
+    return (math.hypot(point[0] - float(target[0]), point[2] - float(target[2])) +
+            abs(point[1] - float(target[1])) * 0.5)
+
+
+def _best_gap_link(game: GameState, target: tuple[float, float, float] | list[float]):
+    """Pick a reachable off-mesh link that makes meaningful target progress."""
+    if not game.player or not game.navigation_links:
+        return None
+    current_score = _gap_target_score(game.player.position, target)
+    step = game.navmesh.step if game.navmesh.available else 70.0
+    candidates = []
+    for link in game.navigation_links:
+        landing_score = _gap_target_score(link.landing_position, target)
+        if landing_score >= current_score - max(25.0, step * 0.35):
+            continue
+
+        takeoff_xz = math.hypot(
+            link.takeoff_position[0] - game.player.position[0],
+            link.takeoff_position[2] - game.player.position[2],
+        )
+        takeoff_y = abs(link.takeoff_position[1] - game.player.position[1])
+        if takeoff_xz <= 45.0 and takeoff_y <= 24.0:
+            approach_cost = 0.0
+        elif game.navmesh.available:
+            plan = plan_navmesh(game, link.takeoff_position)
+            if not plan or not plan.exact_goal_reachable:
+                continue
+            if plan.target_distance > max(75.0, step * 1.1):
+                continue
+            approach_cost = plan.cost + plan.target_distance
+        else:
+            continue
+
+        # Prefer short, level gaps and meaningful progress toward the real target.
+        score = (approach_cost + link.gap_distance * 1.5 +
+                 abs(link.height_delta) * 0.5 + landing_score)
+        candidates.append((score, link))
+    return min(candidates, key=lambda row: row[0])[1] if candidates else None
+
+
+def _refresh_gap_link(game: GameState, original):
+    if not game.navigation_links:
+        return None
+    candidates = [row for row in game.navigation_links if row.kind == original.kind]
+    if not candidates:
+        return None
+    best = min(candidates, key=lambda row: (
+        math.dist(row.takeoff_position, original.takeoff_position) +
+        math.dist(row.landing_position, original.landing_position)))
+    if (math.dist(best.takeoff_position, original.takeoff_position) <= 80.0 and
+            math.dist(best.landing_position, original.landing_position) <= 100.0):
+        return best
+    return None
+
+
+async def _execute_gap_link(bridge: Bridge, observation: GameState, original, skill: str) -> dict:
+    """Run toward a native-observed landing and let OoT trigger its own auto-jump."""
+    current = bridge.state
+    if not current or not current.player:
+        return {"status": "failed", "reason": "player_state_unavailable",
+            "acknowledged": False}
+    link = _refresh_gap_link(current, original)
+    if link is None:
+        return {"status": "failed", "reason": "offmesh_link_lost",
+            "acknowledged": False}
+
+    takeoff_distance = math.hypot(
+        link.takeoff_position[0] - current.player.position[0],
+        link.takeoff_position[2] - current.player.position[2],
+    )
+    if takeoff_distance > 85.0 or abs(link.takeoff_position[1] - current.player.position[1]) > 30.0:
+        return {"status": "failed", "reason": "offmesh_takeoff_not_reached",
+            "acknowledged": False}
+
+    start = current.player.position
+    start_health = current.player.health
+    seen_jump = False
+    seen_air = False
+    acknowledged = False
+    first_command = None
+    deadline = time.monotonic() + 2.4
+
+    bridge.set_navigation_debug(
+        skill=skill, status="gap_link_takeoff",
+        target_position=list(link.landing_position),
+        waypoint=list(link.takeoff_position),
+        path_cells=0, probe_safe=True, navmesh_used=True,
+        target_distance=_gap_target_score(current.player.position, link.landing_position),
+        offmesh_kind=link.kind, offmesh_gap=link.gap_distance)
+
+    try:
+        while time.monotonic() < deadline:
+            current = bridge.state
+            if not current or not current.player or not bridge.connected:
+                return {"status": "failed", "reason": "bridge_disconnected",
+                    "acknowledged": acknowledged}
+            if (current.instance_id, current.scene_epoch) != (
+                    observation.instance_id, observation.scene_epoch):
+                return {"status": "interrupted", "reason": "world_changed",
+                    "acknowledged": acknowledged}
+            if (current.paused or current.dialogue.active or current.cutscene_active or
+                    current.game_over_state or not current.in_game):
+                return {"status": "interrupted", "reason": "game_not_ready",
+                    "acknowledged": acknowledged}
+
+            jumping = bool(current.player.state_flags_1 & (1 << 18))
+            freefall = bool(current.player.state_flags_1 & (1 << 19))
+            seen_jump |= jumping
+            seen_air |= jumping or freefall
+
+            landing_xz = math.hypot(
+                current.player.position[0] - link.landing_position[0],
+                current.player.position[2] - link.landing_position[2],
+            )
+            landing_y = abs(current.player.position[1] - link.landing_position[1])
+            if seen_jump and landing_xz <= 45.0 and landing_y <= 45.0 and not (jumping or freefall):
+                bridge.set_navigation_debug(
+                    skill=skill, status="gap_link_landed",
+                    target_position=list(link.landing_position), waypoint=None,
+                    path_cells=0, probe_safe=True, navmesh_used=True,
+                    target_distance=landing_xz, offmesh_kind=link.kind,
+                    offmesh_gap=link.gap_distance)
+                return {"status": "completed", "reason": "offmesh_jump_landed",
+                    "acknowledged": acknowledged,
+                    "distance": math.dist(start, current.player.position),
+                    "health_lost": max(0, start_health - current.player.health)}
+
+            if current.player.position[1] < link.landing_position[1] - 110.0:
+                return {"status": "failed", "reason": "offmesh_jump_fell",
+                    "acknowledged": acknowledged,
+                    "distance": math.dist(start, current.player.position)}
+
+            stick_x, stick_y, _ = _steer_to(current, link.landing_position, 1.0)
+            command = bridge.send(stick_x=stick_x, stick_y=stick_y, lease_ms=180)
+            if first_command is None:
+                first_command = command
+            sample = await feedback(bridge, current, .10)
+            acknowledged |= consumed(bridge, command)
+            if sample and sample.player:
+                jumping_sample = bool(sample.player.state_flags_1 & (1 << 18))
+                freefall_sample = bool(sample.player.state_flags_1 & (1 << 19))
+                seen_jump |= jumping_sample
+                seen_air |= jumping_sample or freefall_sample
+
+            if (not seen_air and time.monotonic() > deadline - 1.1 and
+                    math.dist(start, current.player.position) < 20.0):
+                return {"status": "failed", "reason": "offmesh_jump_not_triggered",
+                    "acknowledged": acknowledged}
+    finally:
+        bridge.release()
+
+    return {"status": "failed",
+        "reason": "offmesh_jump_timeout" if seen_air else "offmesh_jump_not_triggered",
+        "acknowledged": acknowledged,
+        "distance": math.dist(start, bridge.state.player.position)
+            if bridge.state and bridge.state.player else None}
+
+
 async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameState,
                           *, actor_mode: bool, talk: bool = False, interact: bool = False,
                           exit_mode: bool = False) -> dict:
