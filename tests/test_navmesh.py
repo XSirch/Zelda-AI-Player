@@ -245,7 +245,7 @@ def test_navmesh_contract_rejects_duplicate_cells(state):
 
 def test_native_bridge_exposes_navmesh_only_as_slow_state():
     native = (Path(__file__).parents[1] / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
-    assert 'BRIDGE_BUILD = "rt-input-v2.9"' in native
+    assert 'BRIDGE_BUILD = "rt-input-v2.10"' in native
     assert '"forward", "forward_left", "left", "back_left"' in native
     assert '"back", "back_right", "right", "forward_right"' in native
     assert '"local_navmesh"' in native
@@ -265,6 +265,8 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "DIRECT_FLOOR_SAMPLES = 4" in native
     assert '"direct_reachable"' in native
     assert '"traversal_affordances_v1"' in native
+    assert '"story_progress_v1"' in native
+    assert '"scene_autosave_v1"' in native
     assert "json TraversalAffordances(Player* player)" in native
     assert "DIRECTION_COUNT = 16" in native
     assert "MAX_RADIUS = 280.0f" in native
@@ -273,7 +275,15 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "WALL_FLAG_CLIMBABLE" in native
     assert '"stairs_or_slope_down"' in native
     assert '"climbable_wall_up"' in native
+    assert "Flags_GetInfTable(INFTABLE_GREETED_BY_SARIA)" in native
+    assert "Flags_GetEventChkInf(EVENTCHKINF_SHOWED_MIDO_SWORD_SHIELD)" in native
+    assert "GameInteractor::OnGameFrameUpdate" in native
+    assert "TrySceneAutosave" in native
+    assert "Play_PerformSave(gPlayState)" in native
+    assert "scene_autosave_pending" in native
+    assert "scene_autosave_completed" in native
 
 
-    assert '"nearby_actors", "traversal_affordances", "scene_exits", "navmesh"' in native
+
+    assert '"nearby_actors", "traversal_affordances", "scene_exits", "navmesh", "autosave"' in native
     assert 'state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}' in native
