@@ -55,63 +55,72 @@ def opening_checkpoint_plan(game: GameState) -> dict:
     showed_mido = _flag(game, "showed_mido_sword_shield")
     met_deku_tree = _flag(game, "met_deku_tree")
     tree_open = _flag(game, "deku_tree_opened_mouth")
+    inside_tree = _inside_deku_tree(game)
+    terminal_opening = has_emerald
+    passed_mido = showed_mido or tree_open or met_deku_tree or inside_tree or terminal_opening
+    greeted_done = greeted_saria or passed_mido
+    sword_done = has_sword or passed_mido
+    shield_done = has_shield or passed_mido
+    equipment_done = (sword_equipped and shield_equipped) or passed_mido
+    tree_met_done = met_deku_tree or tree_open or inside_tree or terminal_opening
+    tree_entered_done = inside_tree or terminal_opening
 
     steps = [
         {
             "id": "leave_links_house",
-            "title": "Leave Link's House",
-            "instruction": "Leave the house through the observed scene-exit surface. Do not wait for a door actor.",
-            "done": game.scene_name != "Link's House",
-            "completion": "scene changes away from Link's House",
+            "title": "Sair da Casa do Link",
+            "instruction": "Saia da casa pela superfície de transição observada. Não espere existir um ator de porta.",
+            "done": game.scene_name != "Link's House" or passed_mido,
+            "completion": "A cena muda para fora da Casa do Link",
         },
         {
             "id": "greet_saria_once",
-            "title": "Complete Saria's opening greeting once",
-            "instruction": "Finish the initial Saria greeting/dialogue once. After the native greeted flag is set, do not talk to Saria again for this opening plan.",
-            "done": greeted_saria,
-            "completion": "native story flag greeted_by_saria",
+            "title": "Concluir uma vez a saudação inicial da Saria",
+            "instruction": "Conclua uma vez a saudação/diálogo inicial da Saria. Depois que o progresso nativo registrar isso, não fale com Saria novamente neste plano inicial.",
+            "done": greeted_done,
+            "completion": "O save registra que Saria já cumprimentou Link",
         },
         {
             "id": "obtain_kokiri_sword",
-            "title": "Obtain the Kokiri Sword",
-            "instruction": "Explore Kokiri Forest specifically for the Kokiri Sword. Do not pursue Mido yet and do not return to Saria. If straight NavMesh is blocked by water or disconnected platforms, treat that as a route-discovery problem instead of repeating navigate_to.",
-            "done": has_sword,
-            "completion": "Kokiri Sword appears in owned equipment",
+            "title": "Obter a Kokiri Sword",
+            "instruction": "Explore Kokiri Forest especificamente para obter a Kokiri Sword. Não persiga Mido ainda e não volte para Saria. Se o NavMesh direto estiver bloqueado por água ou plataformas desconectadas, trate isso como descoberta de rota em vez de repetir navigate_to.",
+            "done": sword_done,
+            "completion": "Kokiri Sword aparece entre os equipamentos possuídos",
         },
         {
             "id": "obtain_deku_shield",
-            "title": "Obtain the Deku Shield",
-            "instruction": "Acquire the Deku Shield. Gather rupees as needed and use the Kokiri Shop when discovered. Do not approach Mido until both required items are owned.",
-            "done": has_shield,
-            "completion": "Deku Shield appears in owned equipment",
+            "title": "Obter o Deku Shield",
+            "instruction": "Adquira o Deku Shield. Junte rupias conforme necessário e use a Kokiri Shop quando ela for descoberta. Não se aproxime de Mido até possuir os dois equipamentos exigidos.",
+            "done": shield_done,
+            "completion": "Deku Shield aparece entre os equipamentos possuídos",
         },
         {
             "id": "equip_sword_and_shield",
-            "title": "Equip Kokiri Sword and Deku Shield",
-            "instruction": "Equip both the Kokiri Sword and Deku Shield using the equipment controller. Do not seek Mido until both are equipped.",
-            "done": (sword_equipped and shield_equipped) or showed_mido,
-            "completion": "both equipment entries are equipped",
+            "title": "Equipar Kokiri Sword e Deku Shield",
+            "instruction": "Equipe Kokiri Sword e Deku Shield usando o controlador de equipamento. Não procure Mido até os dois estarem equipados.",
+            "done": equipment_done,
+            "completion": "Os dois equipamentos estão equipados",
         },
         {
             "id": "pass_mido",
-            "title": "Pass Mido's equipment gate",
-            "instruction": "Now find Mido on the route toward the Deku Tree and interact once with the required sword and shield equipped. Do not return to Saria.",
-            "done": showed_mido or tree_open or met_deku_tree,
-            "completion": "native story flag showed_mido_sword_shield or later tree progress",
+            "title": "Passar pelo bloqueio de equipamento do Mido",
+            "instruction": "Agora encontre Mido no caminho para a Great Deku Tree e interaja uma vez com espada e escudo exigidos equipados. Não volte para Saria.",
+            "done": passed_mido,
+            "completion": "O save registra que Mido verificou espada/escudo ou progresso posterior da árvore",
         },
         {
             "id": "meet_deku_tree",
-            "title": "Meet the Great Deku Tree",
-            "instruction": "Continue to the Great Deku Tree and complete the initial interaction that opens the dungeon entrance.",
-            "done": met_deku_tree or tree_open or _inside_deku_tree(game),
-            "completion": "native met/open-tree flag or dungeon scene observed",
+            "title": "Encontrar a Great Deku Tree",
+            "instruction": "Continue até a Great Deku Tree e conclua a interação inicial que libera a entrada da dungeon.",
+            "done": tree_met_done,
+            "completion": "O save registra o encontro/abertura da árvore ou a cena interna é observada",
         },
         {
             "id": "enter_deku_tree",
-            "title": "Enter the Deku Tree",
-            "instruction": "Enter the newly available Deku Tree interior and continue the main quest.",
-            "done": _inside_deku_tree(game) or has_emerald,
-            "completion": "Inside the Deku Tree scene observed",
+            "title": "Entrar na Deku Tree",
+            "instruction": "Entre no interior agora disponível da Deku Tree e continue a missão principal.",
+            "done": tree_entered_done,
+            "completion": "A cena interna da Deku Tree é observada ou o Kokiri Emerald já foi obtido",
         },
     ]
 
@@ -127,11 +136,11 @@ def opening_checkpoint_plan(game: GameState) -> dict:
 
     blocked = []
     if greeted_saria:
-        blocked.append("Do not talk to Saria again during this opening plan unless a future checkpoint explicitly requires it.")
+        blocked.append("Não fale com Saria novamente durante este plano inicial, salvo se um checkpoint futuro exigir explicitamente.")
     if not (has_sword and has_shield and sword_equipped and shield_equipped):
-        blocked.append("Do not make Mido the active goal before Kokiri Sword and Deku Shield are owned and equipped.")
+        blocked.append("Não torne Mido o objetivo ativo antes de possuir e equipar Kokiri Sword e Deku Shield.")
     if showed_mido:
-        blocked.append("Do not repeat the Mido equipment-gate conversation after it is cleared.")
+        blocked.append("Não repita a conversa do bloqueio de equipamento do Mido depois que ela for concluída.")
 
     return {
         "plan_id": PLAN_ID,
