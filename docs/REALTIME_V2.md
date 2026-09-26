@@ -1,4 +1,4 @@
-# Realtime input foundation (v2.9)
+# Realtime input foundation (v2.10)
 
 ## Delivered scope
 
@@ -17,7 +17,7 @@ This change implements the input/observation foundation plus the local Navigatio
 - Movement uses new feedback rather than a fixed 100/140 ms sleep in the updated controllers. Stuck windows do not become shorter merely because sampling is faster. RT retreat uses observed short floor probes; missing floor stops that recovery instead of blindly reversing over a ledge.
 - Full snapshots also carry `traversal_affordances`: a 16-direction, 280-unit local collision scan at full-snapshot cadence. It identifies stairs/slopes, safe-looking descent candidates, ladder top/base walls and climbable walls with approach/target positions. `traverse(up/down)` is now the high-level automatic path: when no immediate ladder/ledge/stair evidence is under Link, the controller selects the best NavMesh-reachable affordance in that direction and internally performs the same A* approach/revalidation flow. `traverse_to` remains an explicit route override. This does not run in the fast safety loop.
 - Full snapshots also carry a compact 9×9 moving NavMesh generated from SoH floor/wall collision. Reciprocal links require walk-safe height, multiple floor-continuity samples along each edge, no corner cutting and a body-width corridor. Python A* chooses local waypoints; fast 70-unit probes can veto a stale waypoint immediately. The raw mesh is not sent to the model prompt. The same collision sampling exposes currently loaded `scene_exits` when a floor polygon has non-zero `SceneExitIndex`. Bridge v2.8 derives the target from the actual collision triangle vertices and pushes it toward that triangle's centroid, so `traverse_exit` aims inside the trigger instead of the nearest boundary sample. It also waits on native `floor_exit_index` contact before considering the threshold crossed. Native exit/entrance IDs remain local diagnostics; the model sees only the physical exit position. Destination topology is learned only after an observed scene/room transition and then exposed through `known_world_edges`.
-- Bridge v2.9 advertises `probe_yaw_v2`: navigation-probe labels now match OoT `PlayerStickDirection` exactly (positive relative yaw = left). The Python controller retains a legacy label mapping when connected to v2.5 so mixed-version startup fails safely instead of checking the wrong side.
+- Bridge v2.10 advertises `probe_yaw_v2`: navigation-probe labels now match OoT `PlayerStickDirection` exactly (positive relative yaw = left). The Python controller retains a legacy label mapping when connected to v2.5 so mixed-version startup fails safely instead of checking the wrong side.
 - Local skill implementations moved from the monolithic runtime into `skills/`. Compatibility exports remain. Natural-language summary/goal strings no longer change the selected executable skill.
 - The learning contract is versioned separately. Failed/intervened traces are not promoted as autonomous routes. Unsolicited replay before the planner is disabled; prior experience remains stored.
 
@@ -29,7 +29,7 @@ This change implements the input/observation foundation plus the local Navigatio
    The installer recognizes the verified original or the previous hook, validates the reconstructed upstream file, backs up files outside the CMake source glob, and installs every required header. It does not reset the checkout or touch game assets.
 4. Reconfigure and rebuild the pinned Shipwright C++ project. **An existing soh.exe does not change when adapter source changes.**
 5. Run `npm install` and `npm run build` in `web`, then restart `uv run zelda-ai serve` and the newly built game.
-6. The panel must report `rt-input-v2.9`, protocol 2, `local_navmesh`, `scene_exit_surfaces`, `traversal_affordances_v1` and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
+6. The panel must report `rt-input-v2.10`, protocol 2, `local_navmesh`, `scene_exit_surfaces`, `traversal_affordances_v1` and consumed receipts. An old game remains visibly legacy (protocol 1); it does not silently gain low-latency capability.
 
 A new backend is compatible with the old V1 bridge for rollback/testing, but V1 acknowledgment means acceptance only. The new V2 native bridge requires this backend. To fully roll back, restore both the previous backend and game binary/adapter from the preserved backup.
 
@@ -61,3 +61,11 @@ Validate pause/unpause, scene transitions, human handoff with held buttons, repe
 In Adaptive mode the runtime maintains a separate combat policy per enemy class inside the model+effort namespace. The policy is a small interpretable state/action table, not a universal hard-coded fight script. State buckets combine range, immediate threat, target lock and disabled/frozen observations. Safe available actions are scored with accumulated reward plus bounded exploration, so repeated encounters can converge on different tactics for different enemies.
 
 The LLM sees compact summaries of visible learned enemy profiles at decision time. It chooses high-level intent such as whether to fight, equip or disengage; once `fight_enemy` begins, the opponent-specific local policy executes at the bridge feedback rate without per-hit model calls.
+
+
+## Quest checkpoints and scene autosave
+
+- Full snapshots expose a compact curated `progress.story_flags` set for the vanilla opening (Saria/Mido/Deku Tree) plus already-observed equipment. The runtime derives a single active checkpoint and injects it separately as `checkpoint_plan`; completed steps are not repeated.
+- The opening plan is strategic only. It never supplies hidden coordinates or transition destinations.
+- The native bridge schedules `scene_autosave_v1` only when the scene number actually changes after the initial load. It waits for a valid save file, >=60 gameplay frames, non-paused/non-cutscene gameplay and the same safety exclusions used by Shipwright's autosave before calling `Play_PerformSave`.
+- Room-only changes remain logical checkpoints/events but do not write the save file.
