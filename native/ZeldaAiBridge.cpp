@@ -133,6 +133,7 @@ struct BridgeData {
     int64_t lastPeerSeenMs = 0;
     uint64_t peerContactSeq = 0;
     uint64_t sceneAutosaveScheduledPeerSeq = 0;
+    int64_t sceneAutosaveScheduledAtMs = 0;
     uint16_t doAction = DO_ACTION_NONE;
     std::deque<json> events;
     zelda_ai::InputScheduler scheduler;
@@ -242,14 +243,13 @@ void Event(const char* kind, const std::string& detail) {
 void ScheduleSceneAutosaveLocked(BridgeData& bridge, int16_t previousScene, int16_t nextScene) {
     // The custom autosave belongs to an active Zelda AI bridge session. Merely
     // compiling the adapter into SoH must not change standalone save behavior.
-    constexpr int64_t PEER_LIVENESS_MS = 15000;
-    if (!bridge.socket || bridge.token.empty() || bridge.lastPeerSeenMs <= 0 ||
-        NowMs() - bridge.lastPeerSeenMs > PEER_LIVENESS_MS) return;
+    if (!bridge.socket || bridge.token.empty()) return;
     if (previousScene < 0 || previousScene == nextScene) return;
     if (bridge.sceneAutosavePending && bridge.sceneAutosaveTarget == nextScene) return;
     bridge.sceneAutosavePending = true;
     bridge.sceneAutosaveTarget = nextScene;
     bridge.sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq;
+    bridge.sceneAutosaveScheduledAtMs = NowMs();
     PushEventLocked(bridge, "scene_autosave_pending", std::to_string(nextScene));
 }
 
@@ -292,17 +292,23 @@ void TrySceneAutosave() {
         std::scoped_lock lock(bridge.mutex);
         if (!bridge.sceneAutosavePending) return;
         constexpr int64_t PEER_LIVENESS_MS = 15000;
-        if (bridge.lastPeerSeenMs <= 0 || NowMs() - bridge.lastPeerSeenMs > PEER_LIVENESS_MS) {
-            bridge.sceneAutosavePending = false;
-            bridge.sceneAutosaveTarget = -1;
-            PushEventLocked(bridge, "scene_autosave_cancelled", "backend_not_connected");
-            bridge.forceFull = true;
+        constexpr int64_t PEER_CONFIRM_TIMEOUT_MS = 5000;
+        const int64_t nowMs = NowMs();
+        const bool confirmedAfterSchedule =
+            bridge.peerContactSeq > bridge.sceneAutosaveScheduledPeerSeq;
+        const bool peerFresh =
+            bridge.lastPeerSeenMs > 0 && nowMs - bridge.lastPeerSeenMs <= PEER_LIVENESS_MS;
+        if (!confirmedAfterSchedule || !peerFresh) {
+            if (bridge.sceneAutosaveScheduledAtMs > 0 &&
+                nowMs - bridge.sceneAutosaveScheduledAtMs > PEER_CONFIRM_TIMEOUT_MS) {
+                bridge.sceneAutosavePending = false;
+                bridge.sceneAutosaveTarget = -1;
+                bridge.sceneAutosaveScheduledAtMs = 0;
+                PushEventLocked(bridge, "scene_autosave_cancelled", "backend_not_confirmed");
+                bridge.forceFull = true;
+            }
             return;
         }
-        // Require at least one authenticated packet after the scene-change
-        // scheduling point. This prevents a stale socket/token from authorizing
-        // writes after the backend has disappeared.
-        if (bridge.peerContactSeq <= bridge.sceneAutosaveScheduledPeerSeq) return;
         targetScene = bridge.sceneAutosaveTarget;
     }
     if (!gPlayState || gPlayState->sceneNum != targetScene || !SceneAutosaveCanSave()) return;
@@ -314,6 +320,7 @@ void TrySceneAutosave() {
     bridge.sceneAutosavePending = false;
     bridge.sceneAutosaveTarget = -1;
     bridge.sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq;
+    bridge.sceneAutosaveScheduledAtMs = 0;
     bridge.lastAutosaveScene = targetScene;
     bridge.autosaveCount++;
     bridge.lastAutosaveAtMs = NowMs();
@@ -1237,6 +1244,7 @@ void Snapshot() {
         bridge.lastScene = bridge.lastRoom = -1;
         bridge.sceneAutosavePending = false;
         bridge.sceneAutosaveTarget = -1;
+        bridge.sceneAutosaveScheduledAtMs = 0;
     }
     if (mode != bridge.previousMode) {
         ++bridge.contextEpoch;
