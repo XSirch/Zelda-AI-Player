@@ -12,14 +12,14 @@ from .models import Decision, GameState
 PLAN_ID = "vanilla_child_opening_v1"
 
 
-def _has_equipment(game: GameState, name: str) -> bool:
-    needle = name.casefold()
-    return any(needle == row.name.casefold() for row in game.progress.equipment)
+def _has_equipment_value(game: GameState, equipment_type: str, value: int) -> bool:
+    return any(row.equipment_type == equipment_type and row.value == value
+               for row in game.progress.equipment)
 
 
-def _equipped(game: GameState, name: str) -> bool:
-    needle = name.casefold()
-    return any(needle == row.name.casefold() and row.equipped for row in game.progress.equipment)
+def _equipped_value(game: GameState, equipment_type: str, value: int) -> bool:
+    return any(row.equipment_type == equipment_type and row.value == value and row.equipped
+               for row in game.progress.equipment)
 
 
 def _flag(game: GameState, name: str) -> bool:
@@ -46,11 +46,11 @@ def opening_checkpoint_plan(game: GameState) -> dict:
             "upcoming": [],
             "do_not_repeat": [],
         }
-    has_sword = _has_equipment(game, "Kokiri Sword")
-    has_shield = _has_equipment(game, "Deku Shield")
-    has_emerald = any("kokiri emerald" == item.casefold() for item in game.progress.quest_items)
-    sword_equipped = _equipped(game, "Kokiri Sword")
-    shield_equipped = _equipped(game, "Deku Shield")
+    has_sword = _has_equipment_value(game, "sword", 1)
+    has_shield = _has_equipment_value(game, "shield", 1)
+    has_emerald = _flag(game, "obtained_kokiri_emerald")
+    sword_equipped = _equipped_value(game, "sword", 1)
+    shield_equipped = _equipped_value(game, "shield", 1)
     greeted_saria = _flag(game, "greeted_by_saria")
     showed_mido = _flag(game, "showed_mido_sword_shield")
     met_deku_tree = _flag(game, "met_deku_tree")
