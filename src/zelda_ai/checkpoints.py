@@ -33,6 +33,19 @@ def _inside_deku_tree(game: GameState) -> bool:
 
 def opening_checkpoint_plan(game: GameState) -> dict:
     """Return the observable child-opening plan and its single active checkpoint."""
+    if game.source == "soh" and "story_progress_v1" not in game.capabilities:
+        return {
+            "plan_id": PLAN_ID,
+            "available": False,
+            "reason": "story_progress_bridge_upgrade_required",
+            "active": False,
+            "completed_count": 0,
+            "total": 8,
+            "completed": [],
+            "current": None,
+            "upcoming": [],
+            "do_not_repeat": [],
+        }
     has_sword = _has_equipment(game, "Kokiri Sword")
     has_shield = _has_equipment(game, "Deku Shield")
     has_emerald = any("kokiri emerald" == item.casefold() for item in game.progress.quest_items)
@@ -122,6 +135,8 @@ def opening_checkpoint_plan(game: GameState) -> dict:
 
     return {
         "plan_id": PLAN_ID,
+        "available": True,
+        "reason": "",
         "active": current is not None,
         "completed_count": len(completed),
         "total": len(steps),
