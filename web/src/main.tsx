@@ -59,12 +59,14 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
   const capabilities = game.capabilities ?? [];
   const mesh = game.navmesh;
   const affordances = game.traversal_affordances ?? [];
+  const navLinks = game.navigation_links ?? [];
   const sceneExits = game.scene_exits ?? [];
   const nav = bridge?.navigation;
   const navCapable = capabilities.includes('local_navmesh');
   const probeYawV2 = capabilities.includes('probe_yaw_v2');
   const exitSurfaces = capabilities.includes('scene_exit_surfaces');
   const traversalScan = capabilities.includes('traversal_affordances_v1');
+  const offmeshLinks = capabilities.includes('offmesh_jump_links_v1');
   const meshActive = navCapable && !!mesh?.step && (mesh?.cells?.length ?? 0) > 0;
   const expectedBridge = game.source === 'simulator' || (
     game.bridge_build.startsWith('rt-input-v2.') && navCapable && probeYawV2
@@ -87,6 +89,10 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
       TRAVERSAL SCAN INDISPONÍVEL — para descobrir escadas, descidas, ladders e paredes escaláveis
       fora das sondas imediatas, use <code>rt-input-v2.9</code> ou superior e recompile o SoH.
     </div>}
+    {navCapable && !offmeshLinks && bridge?.connected && <div className="notice">
+      OFF-MESH JUMP LINKS INDISPONÍVEIS — para cruzar gaps/plataformas automaticamente,
+      use <code>rt-input-v2.11</code> ou superior e recompile o SoH.
+    </div>}
     <section className="panel">
       <div className="section-head"><span>NAVIGATION V2 / A*</span><span className="muted">{navState}</span></div>
       <div className="telemetry">
@@ -99,6 +105,7 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>PROBE YAW</span><strong>{probeYawV2 ? 'v2' : 'legacy / ausente'}</strong></div>
         <div><span>EXIT SURFACES</span><strong>{exitSurfaces ? 'v2.7+' : 'indisponível'}</strong></div>
         <div><span>TRAVERSAL SCAN</span><strong>{traversalScan ? `${affordances.length} candidato(s)` : 'indisponível'}</strong></div>
+        <div><span>OFF-MESH LINKS</span><strong>{offmeshLinks ? `${navLinks.length} gap(s)` : 'indisponível'}</strong></div>
         <div><span>SCENE EXITS</span><strong>{sceneExits.length ? `${sceneExits.length} observada(s)` : 'nenhuma'}</strong></div>
         <div><span>A*</span><strong>{nav?.status ? nav.status.toUpperCase().replaceAll('_', ' ') : (navCapable ? 'IDLE' : 'OFF')}</strong></div>
         <div><span>SKILL</span><strong>{nav?.skill ?? '—'}</strong></div>
@@ -110,6 +117,15 @@ function TerrainPanel({ game, bridge }: { game: GameState | null; bridge: Snapsh
         <div><span>EXIT ATUAL</span><strong>{nav?.exit_index == null ? '—' : `EXIT ${nav.exit_index} · ENTRANCE 0x${hex16(nav.entrance_index ?? -1)}`}</strong></div>
       </div>
     </section>
+    {navLinks.length > 0 && <section className="panel actors-panel">
+      <div className="section-head"><span>OFF-MESH JUMP LINKS</span><span className="muted">AUTO-JUMP</span></div>
+      <div className="actors-grid">{navLinks.map((link, index) =>
+        <div className="actor-item" key={`${link.kind}-${index}`}>
+          <span>AUTO JUMP GAP · {number(link.gap_distance)}u</span>
+          <strong>TAKEOFF {vector(link.takeoff_position)} · LANDING {vector(link.landing_position)} · ΔY {number(link.height_delta)}</strong>
+        </div>)}
+      </div>
+    </section>}
     {affordances.length > 0 && <section className="panel actors-panel">
       <div className="section-head"><span>ROTAS VERTICAIS OBSERVADAS</span><span className="muted">TRAVERSAL AFFORDANCES</span></div>
       <div className="actors-grid">{affordances.map((item, index) =>

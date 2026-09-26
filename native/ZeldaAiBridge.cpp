@@ -40,7 +40,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.10";
+constexpr const char* BRIDGE_BUILD = "rt-input-v2.11";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -505,6 +505,198 @@ json NavigationProbes(Player* player) {
                 {"wall_flags", wallFlags},
             });
         }
+    }
+    return result;
+}
+
+json NavigationGapLinks(Player* player) {
+    constexpr int DIRECTION_COUNT = 32;
+    constexpr float STEP = 35.0f;
+    constexpr float MAX_RADIUS = 245.0f;
+    constexpr float GAP_FLOOR_DROP = 80.0f;
+    constexpr float MIN_GAP = 55.0f;
+    constexpr float MAX_GAP = 145.0f;
+    constexpr float MAX_LANDING_UP = 20.0f;
+    constexpr float MAX_LANDING_DOWN = 55.0f;
+    constexpr float BODY_HEIGHT = 26.0f;
+
+    json result = json::array();
+    if (!player || !(player->actor.bgCheckFlags & BGCHECKFLAG_GROUND)) return result;
+
+    const Vec3f origin = player->actor.world.pos;
+    const float originFloor = player->actor.floorHeight;
+
+    auto floorAt = [&](float x, float z, float startY, float& floorY) -> bool {
+        Vec3f pos{x, startY, z};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        floorY = BgCheck_EntityRaycastFloor3(&gPlayState->colCtx, &poly, &bgId, &pos);
+        return poly != nullptr && floorY > BGCHECK_Y_MIN + 1.0f;
+    };
+    auto lineBlocked = [&](Vec3f start, Vec3f end) -> bool {
+        Vec3f hit{};
+        CollisionPoly* poly = nullptr;
+        s32 bgId = BGCHECK_SCENE;
+        return BgCheck_EntityLineTest1(
+            &gPlayState->colCtx, &start, &end, &hit, &poly,
+            true, false, false, true, &bgId) != 0;
+    };
+    auto floorIsAboveWater = [&](float x, float z, float floorY) -> bool {
+        float waterY = 0.0f;
+        WaterBox* waterBox = nullptr;
+        if (!WaterBox_GetSurface1(gPlayState, &gPlayState->colCtx, x, z, &waterY, &waterBox)) {
+            return true;
+        }
+        // A stepping stone may sit inside a water box, but its top is above the
+        // water surface. Reject only floors actually submerged under that surface.
+        return waterY <= floorY + 5.0f;
+    };
+    if (!floorIsAboveWater(origin.x, origin.z, originFloor)) {
+        return result;
+    }
+
+    struct Link {
+        Vec3f takeoff{};
+        Vec3f landing{};
+        float gap = 0.0f;
+        float heightDelta = 0.0f;
+    };
+    std::vector<Link> links;
+
+    auto addLink = [&](const Link& link) {
+        for (const auto& existing : links) {
+            const float tx = existing.takeoff.x - link.takeoff.x;
+            const float tz = existing.takeoff.z - link.takeoff.z;
+            const float lx = existing.landing.x - link.landing.x;
+            const float lz = existing.landing.z - link.landing.z;
+            if (tx * tx + tz * tz < 45.0f * 45.0f &&
+                lx * lx + lz * lz < 45.0f * 45.0f) {
+                return;
+            }
+        }
+        links.push_back(link);
+    };
+
+    for (int directionIndex = 0; directionIndex < DIRECTION_COUNT; ++directionIndex) {
+        const float angle = static_cast<float>(directionIndex) *
+            (2.0f * 3.14159265358979323846f / static_cast<float>(DIRECTION_COUNT));
+        const float dirX = std::sin(angle);
+        const float dirZ = std::cos(angle);
+
+        bool haveTakeoff = true;
+        bool inGap = false;
+        float takeoffRadius = 0.0f;
+        float takeoffY = originFloor;
+
+        for (float radius = STEP; radius <= MAX_RADIUS; radius += STEP) {
+            const float x = origin.x + dirX * radius;
+            const float z = origin.z + dirZ * radius;
+            float floorY = 0.0f;
+            const bool found = floorAt(x, z, std::max(originFloor, takeoffY) + 180.0f, floorY);
+            const bool supportedFloor = found && floorIsAboveWater(x, z, floorY);
+
+            if (!inGap) {
+                if (supportedFloor && std::abs(floorY - takeoffY) <= 24.0f) {
+                    takeoffRadius = radius;
+                    takeoffY = floorY;
+                    haveTakeoff = true;
+                    continue;
+                }
+
+                const bool deepBelow = found && floorY < takeoffY - GAP_FLOOR_DROP;
+                if (haveTakeoff && (!supportedFloor || deepBelow)) {
+                    // When Link is already standing at the edge, the first 35u
+                    // sample can be the gap. In that case the native floor under
+                    // Link itself is the takeoff support (takeoffRadius == 0).
+                    inGap = true;
+                    continue;
+                }
+
+                // A normal wall/slope/step is not an off-mesh gap.
+                haveTakeoff = false;
+                break;
+            }
+
+            const float gapDistance = radius - takeoffRadius;
+            if (gapDistance > MAX_GAP) break;
+            if (!supportedFloor) continue;
+
+            const float heightDelta = floorY - takeoffY;
+            if (gapDistance < MIN_GAP ||
+                heightDelta > MAX_LANDING_UP ||
+                heightDelta < -MAX_LANDING_DOWN) {
+                continue;
+            }
+
+            // Move both points slightly into their supporting surfaces. This
+            // gives the controller a runway and a landing target away from edges.
+            const float takeoffInset = std::max(0.0f, takeoffRadius - 18.0f);
+            const float landingInset = radius + 18.0f;
+            Vec3f takeoff{
+                origin.x + dirX * takeoffInset,
+                takeoffY,
+                origin.z + dirZ * takeoffInset,
+            };
+            float landingInsetY = floorY;
+            if (!floorAt(origin.x + dirX * landingInset,
+                         origin.z + dirZ * landingInset,
+                         floorY + 120.0f, landingInsetY) ||
+                std::abs(landingInsetY - floorY) > 24.0f) {
+                break;
+            }
+            Vec3f landing{
+                origin.x + dirX * landingInset,
+                landingInsetY,
+                origin.z + dirZ * landingInset,
+            };
+            if (!floorIsAboveWater(landing.x, landing.z, landing.y)) {
+                break;
+            }
+
+            // The jump arc must not have a wall at torso/head height.
+            Vec3f torsoStart{takeoff.x, takeoff.y + BODY_HEIGHT, takeoff.z};
+            Vec3f torsoEnd{landing.x, landing.y + BODY_HEIGHT, landing.z};
+            Vec3f headStart{takeoff.x, takeoff.y + 55.0f, takeoff.z};
+            Vec3f headEnd{landing.x, landing.y + 55.0f, landing.z};
+            if (lineBlocked(torsoStart, torsoEnd) || lineBlocked(headStart, headEnd)) break;
+
+            // Require a little lateral landing support so a single tiny triangle
+            // edge does not become an advertised jump target.
+            const float sideX = -dirZ * 10.0f;
+            const float sideZ = dirX * 10.0f;
+            float leftY = 0.0f;
+            float rightY = 0.0f;
+            if (!floorAt(landing.x + sideX, landing.z + sideZ, landing.y + 100.0f, leftY) ||
+                !floorAt(landing.x - sideX, landing.z - sideZ, landing.y + 100.0f, rightY) ||
+                std::abs(leftY - landing.y) > 24.0f ||
+                std::abs(rightY - landing.y) > 24.0f ||
+                !floorIsAboveWater(landing.x + sideX, landing.z + sideZ, leftY) ||
+                !floorIsAboveWater(landing.x - sideX, landing.z - sideZ, rightY)) {
+                break;
+            }
+
+            addLink({takeoff, landing, gapDistance, landing.y - takeoff.y});
+            break;
+        }
+    }
+
+    std::sort(links.begin(), links.end(), [&](const Link& a, const Link& b) {
+        const float adx = a.takeoff.x - origin.x;
+        const float adz = a.takeoff.z - origin.z;
+        const float bdx = b.takeoff.x - origin.x;
+        const float bdz = b.takeoff.z - origin.z;
+        return adx * adx + adz * adz < bdx * bdx + bdz * bdz;
+    });
+    constexpr size_t MAX_LINKS = 16;
+    for (size_t i = 0; i < links.size() && i < MAX_LINKS; ++i) {
+        const auto& link = links[i];
+        result.push_back({
+            {"kind", "auto_jump_gap"},
+            {"takeoff_position", {link.takeoff.x, link.takeoff.y, link.takeoff.z}},
+            {"landing_position", {link.landing.x, link.landing.y, link.landing.z}},
+            {"gap_distance", link.gap},
+            {"height_delta", link.heightDelta},
+        });
     }
     return result;
 }
@@ -1297,7 +1489,7 @@ void Snapshot() {
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "combat_learning_state",
                           "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces",
-                          "traversal_affordances_v1", "story_progress_v1", "scene_autosave_v1"}},
+                          "traversal_affordances_v1", "offmesh_jump_links_v1", "story_progress_v1", "scene_autosave_v1"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -1336,6 +1528,7 @@ void Snapshot() {
         {"room_actors_truncated", false},
         {"navigation_probes", json::array()},
         {"traversal_affordances", json::array()},
+        {"navigation_links", json::array()},
         {"scene_exits", json::array()},
         {"navmesh", {{"origin", {0.0f, 0.0f, 0.0f}}, {"step", 0.0f}, {"half_extent", 0}, {"cells", json::array()}}},
         {"autosave", {
@@ -1455,6 +1648,7 @@ void Snapshot() {
             if (full && !state["paused"].get<bool>() && !state["cutscene_active"].get<bool>() &&
                 state["game_over_state"].get<int>() == 0 && !state["dialogue"]["active"].get<bool>()) {
                 state["traversal_affordances"] = TraversalAffordances(player);
+                state["navigation_links"] = NavigationGapLinks(player);
                 auto navigation = NavigationMesh(player);
                 state["scene_exits"] = navigation["scene_exits"];
                 navigation.erase("scene_exits");
@@ -1484,7 +1678,7 @@ void Snapshot() {
         static const char* slowFields[] = {"bridge_build", "capabilities", "upstream_revision",
             "scene_name", "entrance_index", "day_time", "is_night", "inventory", "inventory_named",
             "equipped", "progress", "pause_menu", "message_id", "ocarina_action", "last_played_song",
-            "nearby_actors", "traversal_affordances", "scene_exits", "navmesh", "autosave"};
+            "nearby_actors", "traversal_affordances", "navigation_links", "scene_exits", "navmesh", "autosave"};
         for (const char* field : slowFields) state.erase(field);
     }
     std::string serialized = state.dump();
@@ -1501,6 +1695,10 @@ void Snapshot() {
     }
     if (full && serialized.size() > 59000) {
         state["traversal_affordances"] = json::array();
+        serialized = state.dump();
+    }
+    if (full && serialized.size() > 59000) {
+        state["navigation_links"] = json::array();
         serialized = state.dump();
     }
     while (serialized.size() > 59000 && state["room_actors"].is_array() && !state["room_actors"].empty()) {

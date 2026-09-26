@@ -245,7 +245,7 @@ def test_navmesh_contract_rejects_duplicate_cells(state):
 
 def test_native_bridge_exposes_navmesh_only_as_slow_state():
     native = (Path(__file__).parents[1] / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
-    assert 'BRIDGE_BUILD = "rt-input-v2.10"' in native
+    assert 'BRIDGE_BUILD = "rt-input-v2.11"' in native
     assert '"forward", "forward_left", "left", "back_left"' in native
     assert '"back", "back_right", "right", "forward_right"' in native
     assert '"local_navmesh"' in native
@@ -267,6 +267,24 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert '"traversal_affordances_v1"' in native
     assert '"story_progress_v1"' in native
     assert '"scene_autosave_v1"' in native
+    assert '"offmesh_jump_links_v1"' in native
+    assert "json NavigationGapLinks(Player* player)" in native
+    gap_start = native.index("json NavigationGapLinks(Player* player)")
+    gap_end = native.index("json TraversalAffordances(Player* player)", gap_start)
+    gap_scan = native[gap_start:gap_end]
+    assert "DIRECTION_COUNT = 32" in gap_scan
+    assert "BGCHECKFLAG_GROUND" in gap_scan
+    assert "takeoffRadius == 0" in gap_scan
+    assert "WaterBox_GetSurface1" in gap_scan
+    assert "floorIsAboveWater" in gap_scan
+    assert "waterY <= floorY + 5.0f" in gap_scan
+    assert "supportedFloor = found && floorIsAboveWater" in gap_scan
+    assert "if (!supportedFloor) continue;" in gap_scan
+    assert '"auto_jump_gap"' in native
+    assert "MIN_GAP = 55.0f" in native
+    assert "MAX_GAP = 145.0f" in native
+    assert 'state["navigation_links"] = NavigationGapLinks(player);' in native
+
     assert "json TraversalAffordances(Player* player)" in native
     assert "DIRECTION_COUNT = 16" in native
     assert "MAX_RADIUS = 280.0f" in native
@@ -302,5 +320,5 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
 
 
 
-    assert '"nearby_actors", "traversal_affordances", "scene_exits", "navmesh", "autosave"' in native
+    assert '"nearby_actors", "traversal_affordances", "navigation_links", "scene_exits", "navmesh", "autosave"' in native
     assert 'state["navmesh"] = {{"origin", {0.0f, 0.0f, 0.0f}}' in native

@@ -2,7 +2,7 @@ from zelda_ai.models import Decision, SkillArgs
 from zelda_ai.skills.common import _dodge_direction_safe, _player_relative_stick, _probe_stick, _rotate_stick_quadrants, _world_yaw_stick
 import zelda_ai.skills.interactions as interactions
 from zelda_ai.runtime import _aim_error, _aim_stick, _best_climb_surface_probe, _best_traversal_probe, _door_intent_actor, _equipment_point, _inventory_slot, _matching_actor, _menu_grid_directions, _recovery_inputs, _steer_to, _traversal_intent_direction, controller_input
-from zelda_ai.skills.navigation import _resolve_scene_exit
+from zelda_ai.skills.navigation import _resolve_scene_exit, _best_gap_link, _refresh_gap_link, _execute_gap_link
 from zelda_ai.skills.traversal import (
     _resolve_traversal_affordance, _refresh_traversal_affordance,
     _local_traversal_evidence, _fast_revalidation_matches_original,
@@ -908,3 +908,110 @@ def test_traverse_auto_preserves_legacy_local_behavior_without_affordance_capabi
     assert result["status"] == "completed"
     assert result["auto_navpath"] is False
     assert result["navpath_mode"] == "legacy_local"
+
+
+def test_gap_link_selection_requires_reachable_takeoff_and_target_progress(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "local_navmesh", "offmesh_jump_links_v1"],
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [
+                [0, 0, 0, 4],
+                [1, 0, 0, 64],
+            ],
+        },
+        "navigation_links": [
+            {
+                "kind": "auto_jump_gap",
+                "takeoff_position": [70, 0, 0],
+                "landing_position": [175, 0, 0],
+                "gap_distance": 105,
+                "height_delta": 0,
+            },
+            {
+                "kind": "auto_jump_gap",
+                "takeoff_position": [-210, 0, 0],
+                "landing_position": [-105, 0, 0],
+                "gap_distance": 105,
+                "height_delta": 0,
+            },
+        ],
+    })
+    chosen = _best_gap_link(game, [350, 0, 0])
+    assert chosen is not None
+    assert chosen.takeoff_position == (70.0, 0.0, 0.0)
+    assert chosen.landing_position == (175.0, 0.0, 0.0)
+
+
+def test_gap_link_selection_rejects_link_that_does_not_improve_target(state):
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": [*state.capabilities, "local_navmesh", "offmesh_jump_links_v1"],
+        "navmesh": {
+            "origin": [0, 0, 0], "step": 70, "half_extent": 4,
+            "cells": [[0, 0, 0, 0]],
+        },
+        "navigation_links": [{
+            "kind": "auto_jump_gap",
+            "takeoff_position": [10, 0, 0],
+            "landing_position": [-100, 0, 0],
+            "gap_distance": 110,
+            "height_delta": 0,
+        }],
+    })
+    assert _best_gap_link(game, [300, 0, 0]) is None
+
+
+def test_gap_link_refresh_matches_recentered_geometry(state):
+    original_game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_links": [{
+            "kind": "auto_jump_gap",
+            "takeoff_position": [70, 0, 0],
+            "landing_position": [175, 0, 0],
+            "gap_distance": 105,
+            "height_delta": 0,
+        }],
+    })
+    original = original_game.navigation_links[0]
+    refreshed_game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_links": [{
+            "kind": "auto_jump_gap",
+            "takeoff_position": [82, 0, 4],
+            "landing_position": [185, 0, 5],
+            "gap_distance": 103,
+            "height_delta": 0,
+        }],
+    })
+    refreshed = _refresh_gap_link(refreshed_game, original)
+    assert refreshed is not None
+    assert refreshed.landing_position == (185.0, 0.0, 5.0)
+
+
+def test_gap_executor_respects_outer_hard_deadline(state):
+    import asyncio
+    import time
+
+    game = type(state).model_validate({
+        **state.model_dump(),
+        "navigation_links": [{
+            "kind": "auto_jump_gap",
+            "takeoff_position": [0, 0, 0],
+            "landing_position": [105, 0, 0],
+            "gap_distance": 105,
+            "height_delta": 0,
+        }],
+    })
+
+    class FakeBridge:
+        def __init__(self, current):
+            self.state = current
+
+    result = asyncio.run(_execute_gap_link(
+        FakeBridge(game), game, game.navigation_links[0], "navigate_to",
+        hard_deadline=time.monotonic() + 0.1,
+    ))
+    assert result["status"] == "failed"
+    assert result["reason"] == "offmesh_jump_deadline"

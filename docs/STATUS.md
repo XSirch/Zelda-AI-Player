@@ -1,4 +1,4 @@
-# Implementation status — realtime-input foundation v2.10 + Navigation V2
+# Implementation status — realtime-input foundation v2.11 + Navigation V2
 
 Current branch of record: `main`.  
 SoH target: `HarbourMasters/Shipwright@d30fc192f2eb01ceea45bd1e12de61636cafbf86`.
@@ -91,3 +91,5 @@ Combat-learning benchmark integrity: a human hint or a pause/take-control opport
 
 - opening checkpoint planner derived from native save/equipment state, with Saria/Mido repeat guards;
 - native scene autosave on scene transitions via Play_PerformSave; room-only transitions do not save.
+
+- local off-mesh `auto_jump_gap` discovery/execution is implemented for short collision gaps; in-game acceptance remains pending.

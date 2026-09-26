@@ -77,7 +77,7 @@ from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_p
 from .skills.traversal import _traverse_auto as _traverse_auto
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v10/skills-v11/trajectory-v3/prompt-v15"
+CONTRACT_VERSION = "state-v11/skills-v11/trajectory-v3/prompt-v16"
 
 TRAVERSAL_REPLAN_REASONS = frozenset({
     "no_traversal_affordance_observed",
@@ -90,6 +90,12 @@ TRAVERSAL_REPLAN_REASONS = frozenset({
 
 SEMANTIC_REPLAN_REASONS = TRAVERSAL_REPLAN_REASONS | frozenset({
     "checkpoint_repeat_blocked",
+    "offmesh_link_lost",
+    "offmesh_takeoff_not_reached",
+    "offmesh_jump_fell",
+    "offmesh_jump_not_triggered",
+    "offmesh_jump_timeout",
+    "offmesh_jump_deadline",
 })
 
 
@@ -156,7 +162,7 @@ def _model_state_payload(game: GameState) -> dict:
     payload = game.model_dump(exclude={"events", "upstream_revision", "last_command_seq",
         "input_receipts", "last_received_seq", "last_applied_command_seq", "owner_epoch",
         "capture_tick", "input_tick", "event_floor", "event_seq", "full_seq", "navmesh",
-        "scene_exits", "entrance_index", "autosave"})
+        "scene_exits", "navigation_links", "entrance_index", "autosave"})
     payload["scene_exits"] = [{"position": list(row.position)} for row in game.scene_exits]
     if isinstance(payload.get("progress"), dict):
         payload["progress"].pop("story_flags", None)
@@ -1016,6 +1022,7 @@ class Runtime:
                         "cells": len(game.navmesh.cells),
                         "step": game.navmesh.step if game.navmesh.available else None,
                         "radius": game.navmesh.step * game.navmesh.half_extent if game.navmesh.available else None,
+                        "offmesh_jump_links": len(game.navigation_links),
                     },
                     "checkpoint_plan": self.checkpoint_plan or opening_checkpoint_plan(game),
                     "stuck_score": self.stuck_score,

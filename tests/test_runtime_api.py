@@ -171,3 +171,18 @@ def test_snapshot_hides_checkpoint_when_bridge_disconnected(store, state):
     runtime = Runtime(bridge, store, {})
     runtime.checkpoint_plan = {"plan_id": "stale", "current": {"id": "stale"}}
     assert runtime.snapshot()["checkpoint_plan"] is None
+
+
+def test_offmesh_jump_failure_is_semantic_replan_not_stuck(store, state):
+    from zelda_ai.models import Decision, SkillArgs
+    runtime = Runtime(Bridge("x" * 32, True), store, {})
+    runtime.stuck_score = 6
+    decision = Decision(goal="cross gap", summary="cross gap", skill="navigate_to",
+        args=SkillArgs(direction=None, duration_ms=8000, strength=.8,
+            slot=None, choice_index=None, song=None, target_actor_id=None,
+            target_actor_uid=None, target_actor_params=None,
+            target_position=[300.0, 0.0, 0.0], stop_distance=35.0, item_id=None),
+        memory_note=None)
+    runtime._update_stuck(decision, {"status": "failed", "reason": "offmesh_jump_not_triggered"})
+    assert runtime.stuck_score == 4
+    assert not any(row["kind"] == "stuck_detected" for row in runtime.recent)

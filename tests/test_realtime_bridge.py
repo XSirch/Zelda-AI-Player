@@ -86,6 +86,13 @@ def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
         "approach_position": [0, 0, 70], "target_position": [0, -40, 140],
         "distance": 70, "height_delta": -40, "wall_flags": 0,
     }]
+    nav_links = [{
+        "kind": "auto_jump_gap",
+        "takeoff_position": [70, 0, 0],
+        "landing_position": [175, 0, 0],
+        "gap_distance": 105,
+        "height_delta": 0,
+    }]
     progress = {
         **state.progress.model_dump(),
         "story_flags": {"greeted_by_saria": True},
@@ -95,13 +102,15 @@ def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
         "count": 2, "last_saved_at_ms": 1234,
     }
     feed(bridge, full(state, navmesh=mesh, scene_exits=exits,
-        traversal_affordances=affordances, progress=progress, autosave=autosave,
+        traversal_affordances=affordances, navigation_links=nav_links,
+        progress=progress, autosave=autosave,
         capabilities=["fast_state", "input_sequence", "consumed_receipts",
                       "local_navmesh", "scene_exit_surfaces", "traversal_affordances_v1",
-                      "story_progress_v1", "scene_autosave_v1"]))
+                      "offmesh_jump_links_v1", "story_progress_v1", "scene_autosave_v1"]))
     assert bridge.state.navmesh.available
     assert bridge.state.scene_exits[0].entrance_index == 0x211
     assert bridge.state.traversal_affordances[0].kind == "stairs_or_slope_down"
+    assert bridge.state.navigation_links[0].kind == "auto_jump_gap"
     assert bridge.state.progress.story_flags["greeted_by_saria"] is True
     assert bridge.state.autosave.count == 2
     feed(bridge, fast(state, player={**state.player.model_dump(), "position": [0, 0, 8]}))
@@ -109,6 +118,7 @@ def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
     assert bridge.state.navmesh.cells == [(0, 0, 0.0, 1), (0, 1, 0.0, 16)]
     assert bridge.state.scene_exits[0].position == (0.0, 0.0, 70.0)
     assert bridge.state.traversal_affordances[0].approach_position == (0.0, 0.0, 70.0)
+    assert bridge.state.navigation_links[0].landing_position == (175.0, 0.0, 0.0)
     assert bridge.state.progress.story_flags["greeted_by_saria"] is True
     assert bridge.state.autosave.last_scene == 85
 

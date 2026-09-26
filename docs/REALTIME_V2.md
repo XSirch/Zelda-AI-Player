@@ -1,4 +1,4 @@
-# Realtime input foundation (v2.10)
+# Realtime input foundation (v2.11)
 
 ## Delivered scope
 
@@ -17,7 +17,7 @@ This change implements the input/observation foundation plus the local Navigatio
 - Movement uses new feedback rather than a fixed 100/140 ms sleep in the updated controllers. Stuck windows do not become shorter merely because sampling is faster. RT retreat uses observed short floor probes; missing floor stops that recovery instead of blindly reversing over a ledge.
 - Full snapshots also carry `traversal_affordances`: a 16-direction, 280-unit local collision scan at full-snapshot cadence. It identifies stairs/slopes, safe-looking descent candidates, ladder top/base walls and climbable walls with approach/target positions. `traverse(up/down)` is now the high-level automatic path: when no immediate ladder/ledge/stair evidence is under Link, the controller selects the best NavMesh-reachable affordance in that direction and internally performs the same A* approach/revalidation flow. `traverse_to` remains an explicit route override. This does not run in the fast safety loop.
 - Full snapshots also carry a compact 9×9 moving NavMesh generated from SoH floor/wall collision. Reciprocal links require walk-safe height, multiple floor-continuity samples along each edge, no corner cutting and a body-width corridor. Python A* chooses local waypoints; fast 70-unit probes can veto a stale waypoint immediately. The raw mesh is not sent to the model prompt. The same collision sampling exposes currently loaded `scene_exits` when a floor polygon has non-zero `SceneExitIndex`. Bridge v2.8 derives the target from the actual collision triangle vertices and pushes it toward that triangle's centroid, so `traverse_exit` aims inside the trigger instead of the nearest boundary sample. It also waits on native `floor_exit_index` contact before considering the threshold crossed. Native exit/entrance IDs remain local diagnostics; the model sees only the physical exit position. Destination topology is learned only after an observed scene/room transition and then exposed through `known_world_edges`.
-- Bridge v2.10 advertises `probe_yaw_v2`: navigation-probe labels now match OoT `PlayerStickDirection` exactly (positive relative yaw = left). The Python controller retains a legacy label mapping when connected to v2.5 so mixed-version startup fails safely instead of checking the wrong side.
+- Bridge v2.11 advertises `probe_yaw_v2`: navigation-probe labels now match OoT `PlayerStickDirection` exactly (positive relative yaw = left). The Python controller retains a legacy label mapping when connected to v2.5 so mixed-version startup fails safely instead of checking the wrong side.
 - Local skill implementations moved from the monolithic runtime into `skills/`. Compatibility exports remain. Natural-language summary/goal strings no longer change the selected executable skill.
 - The learning contract is versioned separately. Failed/intervened traces are not promoted as autonomous routes. Unsolicited replay before the planner is disabled; prior experience remains stored.
 
@@ -79,3 +79,12 @@ The LLM sees compact summaries of visible learned enemy profiles at decision tim
 - The checkpoint sequence is: leave Link's House -> complete Saria's greeting once -> obtain Kokiri Sword -> obtain Deku Shield -> equip both -> pass Mido -> meet Great Deku Tree -> enter the Deku Tree.
 - `scene_autosave_v1` schedules one native `Play_PerformSave` after a real scene change and only when the destination scene is stable and safe to save. Room-only changes do not save. The initial scene load does not save.
 - Autosave uses the same basic safety exclusions as Shipwright's own QoL autosave (valid file, >=60 gameplay frames, not paused/cutscene, no Chamber of Sages/cutscene map, and the Ocarina-of-Time/Song-of-Time edge case).
+
+
+## Off-mesh auto-jump links (v2.11)
+
+- Full snapshots scan currently loaded collision in 16 radial directions for a supported floor -> short gap/deep drop -> supported landing pattern.
+- Accepted links are conservative: gap 55-145 units, landing no more than +20/-55 units from takeoff, clear torso/head ray, and lateral landing support.
+- The raw link contains `takeoff_position`, `landing_position`, `gap_distance`, and `height_delta`; it remains local to the motor controller.
+- When normal A* cannot exactly reach a requested target, navigation can select a beneficial reachable gap link, A* to the takeoff, run toward the landing until OoT's native `BGCHECKFLAG_GROUND_LEAVE` auto-jump fires, verify `PLAYER_STATE1_JUMPING` and landing, then replan.
+- Interaction controllers do not press A across a disconnected gap merely because an actor is within interaction radius.

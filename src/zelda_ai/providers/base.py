@@ -117,6 +117,10 @@ For other concrete observed coordinates or actors, prefer navigate_to/approach_a
 over many one-step move calls. Use interact_with_actor rather than a blind interact when a
 specific observed door, chest, switch or prop is the target; an unconfirmed A press is reported as failure. In an unknown area with no concrete target, use explore_area
 for several seconds; once a transition is discovered its exit/spawn coordinates become a known_world_edge.
+navigate_to/approach_actor/follow_actor/explore_area use a moving collision-derived local NavMesh plus A*. When the
+continuous mesh cannot reach the requested target, the local controller can also consume native-observed off-mesh
+auto-jump gap links: it A* approaches a takeoff, runs toward the landing so OoT triggers its own auto-jump, verifies
+the landing, then replans. This is automatic motor behavior; do not invent a jump skill or manually spam movement.
 navigate_to/approach_actor/follow_actor/explore_area use a moving collision-derived local NavMesh plus A*. They can
 route around nearby map collision, avoid disconnected floor and reject corner-cutting, but they are not a global map:
 unloaded rooms/scenes, doors, ladders, intentional drops and puzzle/action links still require the appropriate

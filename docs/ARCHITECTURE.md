@@ -21,7 +21,7 @@ SoH custom build -- UDP 127.0.0.1:8766 --> Bridge Python
 
 ## Decisão, estado e cadência
 
-`models.py` define o contrato Autonomy v2 (`state-v10/skills-v11/trajectory-v3/prompt-v15`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
+`models.py` define o contrato Autonomy v2 (`state-v11/skills-v11/trajectory-v3/prompt-v16`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
 
 Primitives motoras continuam curtas e limitadas. Controladores compostos locais executam navegação até posição/ator, follow, conversa/interação, exploração, manipulação, mira, facing/escudo, combate genérico, equipamento, ocarina, diálogo linear e game-over sem uma chamada de modelo por frame. O planner escolhe subobjetivos e estratégias; sucesso de interação/combate exige evidência observável.
 
@@ -77,3 +77,8 @@ Bridge v2.10 tracks real scene transitions. On a non-initial `OnSceneInit` it sc
 The quest checkpoint layer sits above skills/navigation and below model planning. It derives a single active opening objective from native save/progress evidence, exposes the next few milestones, and blocks obvious completed-NPC loops. It deliberately does not encode world-space routes; route discovery remains the responsibility of collision/NavMesh/actors/learned edges.
 
 Scene autosave is native-side and independent of the LLM. Scene changes schedule a deferred `Play_PerformSave` once the destination is stable; room changes remain logical checkpoints only.
+
+
+### Off-mesh jump links
+
+The continuous NavMesh intentionally excludes missing-floor gaps. A separate local scan now emits conservative `auto_jump_gap` edges. Navigation owns these links automatically: the high-level model keeps issuing ordinary `navigate_to`/actor skills while the motor chooses a reachable takeoff, runs the native auto-jump, validates landing, and replans. Raw link geometry is excluded from model-facing state; only a summary count is exposed.

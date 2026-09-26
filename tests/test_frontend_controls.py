@@ -117,3 +117,16 @@ def test_progress_panel_shows_checkpoint_plan_and_autosave():
     assert 'checkpoint_plan?: QuestCheckpointPlan | null' in types
     assert 'AutosaveState' in types
     assert 'story_flags: Record<string, boolean>' in types
+
+
+def test_terrain_panel_exposes_offmesh_jump_links():
+    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
+    types = Path('web/src/types.ts').read_text(encoding='utf-8')
+    assert 'OFF-MESH JUMP LINKS' in main
+    assert 'AUTO-JUMP' in main
+    assert 'OFF-MESH LINKS' in main
+    assert "capabilities.includes('offmesh_jump_links_v1')" in main
+    assert 'rt-input-v2.11' in main
+    assert 'NavigationLinkObservation' in types
+    assert 'navigation_links: NavigationLinkObservation[]' in types
+    assert "use <code>rt-input-v2.11</code> ou superior e recompile o SoH.\n    </div>}" in main
