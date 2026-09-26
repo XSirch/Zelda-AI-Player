@@ -16,6 +16,7 @@ def _game(state, *, scene_name="Kokiri Forest", story_flags=None, equipment=None
           room_actors=None, autosave=None):
     return type(state).model_validate({
         **state.model_dump(),
+        "capabilities": [*state.capabilities, "story_progress_v1", "scene_autosave_v1"],
         "scene_name": scene_name,
         "progress": {
             **state.progress.model_dump(),
@@ -156,3 +157,14 @@ def test_autosave_and_story_flags_contract(state):
     assert game.progress.story_flags["greeted_by_saria"] is True
     assert game.autosave.count == 3
     assert game.autosave.last_scene == 85
+
+
+def test_checkpoint_plan_is_unavailable_on_old_bridge(state):
+    old = type(state).model_validate({
+        **state.model_dump(),
+        "capabilities": ["local_navmesh"],
+        "scene_name": "Kokiri Forest",
+    })
+    plan = opening_checkpoint_plan(old)
+    assert plan["available"] is False
+    assert plan["current"] is None
