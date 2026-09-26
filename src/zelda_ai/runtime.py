@@ -19,6 +19,7 @@ from .combat_learning import compact_profile, enemy_key
 from .providers.base import ProviderFailure
 from .providers.openrouter import reserve_cost
 from .store import Store
+from .checkpoints import checkpoint_blocks_decision, opening_checkpoint_plan
 from .navmesh import plan_navmesh
 from .skills.catalog import BUTTONS, NAVIGATION_SKILLS
 from .skills.common import _matching_actor, _pulse
@@ -76,7 +77,7 @@ from .skills.traversal import _best_climb_surface_probe as _best_climb_surface_p
 from .skills.traversal import _traverse_auto as _traverse_auto
 from .skills.traversal import _traverse_local as _traverse_local
 
-CONTRACT_VERSION = "state-v9/skills-v11/trajectory-v3/prompt-v14"
+CONTRACT_VERSION = "state-v10/skills-v11/trajectory-v3/prompt-v15"
 
 TRAVERSAL_REPLAN_REASONS = frozenset({
     "no_traversal_affordance_observed",
@@ -250,6 +251,34 @@ class Runtime:
         self.combat_profiles_cache: list[dict] | None = None
         self.combat_profiles_at = 0.0
         self.combat_learning_tainted = False
+        self.checkpoint_plan: dict | None = None
+        self.checkpoint_id: str | None = None
+
+    def _refresh_checkpoint(self, game: GameState, *, emit: bool = True):
+        plan = opening_checkpoint_plan(game)
+        current = plan.get("current") or {}
+        new_id = current.get("id") or "opening_plan_complete"
+        old_id = self.checkpoint_id
+        self.checkpoint_plan = plan
+        self.checkpoint_id = new_id
+        if not emit or not self.run_id or new_id == old_id:
+            return
+        if old_id and old_id != "opening_plan_complete":
+            self.log("checkpoint_completed", {
+                "checkpoint": old_id,
+                "next": new_id,
+                "scene": game.scene,
+                "scene_name": game.scene_name,
+            })
+        if current:
+            self.log("checkpoint_activated", {
+                "checkpoint": new_id,
+                "title": current.get("title"),
+                "scene": game.scene,
+                "scene_name": game.scene_name,
+            })
+        else:
+            self.log("checkpoint_plan_completed", {"plan_id": plan.get("plan_id")})
 
     def publish(self, force=False):
         if not force and time.monotonic() - self.last_publish < 0.2:
@@ -438,6 +467,7 @@ class Runtime:
     def on_state(self, state: GameState, old: GameState | None):
         self._learn_transition(state, old)
         if self.run_id and self.state in {"running", "paused"}:
+            self._refresh_checkpoint(state)
             if old and old.instance_id != state.instance_id:
                 self.log("game_instance_changed")
                 self.bridge.release()
@@ -724,6 +754,8 @@ class Runtime:
             self.config, self.selected_model = config, info
             self.combat_profiles_cache = None
             self.combat_learning_tainted = False
+            self.checkpoint_plan = None
+            self.checkpoint_id = None
             fingerprint = hashlib.sha256(json.dumps({"contract": CONTRACT_VERSION,
                 "revision": game.upstream_revision, "initial": game.model_dump(exclude={"seq", "events", "last_command_seq"}),
                 "checkpoint_label": config.checkpoint_label}, sort_keys=True).encode()).hexdigest()
@@ -746,6 +778,7 @@ class Runtime:
             self.started = time.monotonic()
             self.state, self.reason = "running", ""
             self.log("run_started", {"contract": CONTRACT_VERSION, "checkpoint_certified": False})
+            self._refresh_checkpoint(game)
             self.bridge.enable_control()
             self.task = asyncio.create_task(self.loop(self.lifecycle))
 
@@ -973,6 +1006,7 @@ class Runtime:
                         "step": game.navmesh.step if game.navmesh.available else None,
                         "radius": game.navmesh.step * game.navmesh.half_extent if game.navmesh.available else None,
                     },
+                    "checkpoint_plan": self.checkpoint_plan or opening_checkpoint_plan(game),
                     "stuck_score": self.stuck_score,
                     "human_hints": list(self.hints)}
                 prompt = json.dumps(observation, separators=(",", ":"), ensure_ascii=False)
@@ -1014,8 +1048,18 @@ class Runtime:
                 self.log("decision", {"summary": decision.summary, "skill": decision.skill})
                 self._record_trajectory_action(decision, game)
                 combat_profile, combat_enemy = self._combat_profile_for_decision(game, decision)
-                self.last_result = await execute_skill(self.bridge, decision, game,
-                    combat_profile=combat_profile)
+                checkpoint = self.checkpoint_plan or opening_checkpoint_plan(game)
+                blocked = checkpoint_blocks_decision(game, decision, checkpoint)
+                if blocked:
+                    self.last_result = blocked
+                    self.log("checkpoint_repeat_blocked", {
+                        "skill": decision.skill,
+                        "checkpoint": (checkpoint.get("current") or {}).get("id"),
+                        "blocked": blocked.get("blocked"),
+                    })
+                else:
+                    self.last_result = await execute_skill(self.bridge, decision, game,
+                        combat_profile=combat_profile)
                 if decision.memory_note:
                     if _model_memory_note_persistent(decision):
                         self.store.remember(self.namespace, game.scene, decision.memory_note)
@@ -1078,6 +1122,7 @@ class Runtime:
             "last_decision": self.last_decision, "last_result": self.last_result,
             "diagnostic": self.last_diagnostic, "diagnostic_active": self.diagnostic_active,
             "combat_learning_tainted": self.combat_learning_tainted,
+            "checkpoint_plan": self.checkpoint_plan,
             "events": list(self.recent), "dialogue_transcript": list(self.dialogue_transcript),
             "bridge": self.bridge.status(), "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
             "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],
