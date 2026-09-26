@@ -277,6 +277,8 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert '"climbable_wall_up"' in native
     assert "Flags_GetInfTable(INFTABLE_GREETED_BY_SARIA)" in native
     assert "Flags_GetEventChkInf(EVENTCHKINF_SHOWED_MIDO_SWORD_SHIELD)" in native
+    assert '"obtained_kokiri_emerald"' in native
+    assert "CHECK_QUEST_ITEM(QUEST_KOKIRI_EMERALD)" in native
     assert "GameInteractor::OnGameFrameUpdate" in native
     assert "TrySceneAutosave" in native
     assert "ScheduleSceneAutosaveLocked" in native
