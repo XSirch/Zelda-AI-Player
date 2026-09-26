@@ -191,3 +191,27 @@ def test_checkpoint_copy_is_portuguese(state):
     assert plan["current"]["title"] == "Obter a Kokiri Sword"
     assert "Explore Kokiri Forest" in plan["current"]["instruction"]
     assert all(not row.startswith("Do not") for row in plan["do_not_repeat"])
+
+
+def test_checkpoint_guard_also_blocks_actor_uid_targeting(state, decision):
+    saria = {
+        "actor_uid": "saria-uid", "actor_id": 100, "name": "Saria", "description": "Saria",
+        "category": 4, "category_name": "npc", "room": 0, "params": 0,
+        "position": [20, 0, 0], "focus_position": [20, 20, 0], "distance": 20,
+        "targeted": False, "drawn": True, "text_id": 0,
+    }
+    game = _game(state, story_flags={"greeted_by_saria": True}, room_actors=[saria])
+    plan = opening_checkpoint_plan(game)
+    by_uid = Decision.model_validate({
+        **decision.model_dump(),
+        "skill": "approach_actor",
+        "args": {
+            **decision.args.model_dump(),
+            "duration_ms": 5000,
+            "target_actor_id": None,
+            "target_actor_uid": "saria-uid",
+            "target_actor_params": None,
+        },
+    })
+    blocked = checkpoint_blocks_decision(game, by_uid, plan)
+    assert blocked and blocked["blocked"] == "saria_already_greeted"
