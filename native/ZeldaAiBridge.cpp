@@ -382,6 +382,7 @@ json ProgressJson() {
             {"showed_mido_sword_shield", Flags_GetEventChkInf(EVENTCHKINF_SHOWED_MIDO_SWORD_SHIELD) != 0},
             {"deku_tree_opened_mouth", Flags_GetEventChkInf(EVENTCHKINF_DEKU_TREE_OPENED_MOUTH) != 0},
             {"met_deku_tree", Flags_GetEventChkInf(EVENTCHKINF_MET_DEKU_TREE) != 0},
+            {"obtained_kokiri_emerald", CHECK_QUEST_ITEM(QUEST_KOKIRI_EMERALD) != 0},
         }},
     };
 }
