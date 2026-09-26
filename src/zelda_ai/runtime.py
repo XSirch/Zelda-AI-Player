@@ -1106,6 +1106,9 @@ class Runtime:
             self.publish(True)
 
     def snapshot(self) -> dict:
+        game = self.bridge.state
+        checkpoint_plan = self.checkpoint_plan or (
+            opening_checkpoint_plan(game) if game and game.player else None)
         if self.run_id and (self.metrics_cache is None or time.monotonic() - self.metrics_at >= 1):
             self.metrics_cache = self.store.metrics(self.run_id)
             self.metrics_at = time.monotonic()
@@ -1122,7 +1125,7 @@ class Runtime:
             "last_decision": self.last_decision, "last_result": self.last_result,
             "diagnostic": self.last_diagnostic, "diagnostic_active": self.diagnostic_active,
             "combat_learning_tainted": self.combat_learning_tainted,
-            "checkpoint_plan": self.checkpoint_plan,
+            "checkpoint_plan": checkpoint_plan,
             "events": list(self.recent), "dialogue_transcript": list(self.dialogue_transcript),
             "bridge": self.bridge.status(), "memory": self.store.recall(self.namespace, limit=30) if self.namespace else [],
             "trajectories": self.store.list_trajectories(self.namespace, limit=30) if self.namespace else [],
