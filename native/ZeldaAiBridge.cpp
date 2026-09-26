@@ -234,6 +234,15 @@ void Event(const char* kind, const std::string& detail) {
     PushEventLocked(bridge, kind, detail);
 }
 
+void ScheduleSceneAutosaveLocked(BridgeData& bridge, int16_t previousScene, int16_t nextScene) {
+    if (previousScene < 0 || previousScene == nextScene) return;
+    if (bridge.sceneAutosavePending && bridge.sceneAutosaveTarget == nextScene) return;
+    bridge.sceneAutosavePending = true;
+    bridge.sceneAutosaveTarget = nextScene;
+    PushEventLocked(bridge, "scene_autosave_pending", std::to_string(nextScene));
+}
+
+
 bool ItemUsesAmmo(int item) {
     switch (item) {
         case ITEM_STICK:
@@ -1181,10 +1190,12 @@ void Snapshot() {
         const int16_t scene = gPlayState->sceneNum;
         const int16_t room = gPlayState->roomCtx.curRoom.num;
         if (bridge.lastScene != scene || bridge.lastRoom != room) {
-            if (bridge.lastScene >= 0 && bridge.lastScene != scene)
+            if (bridge.lastScene >= 0 && bridge.lastScene != scene) {
+                ScheduleSceneAutosaveLocked(bridge, bridge.lastScene, scene);
                 PushEventLocked(bridge, "scene_changed", std::to_string(bridge.lastScene) + "->" + std::to_string(scene));
-            else if (bridge.lastRoom >= 0 && bridge.lastRoom != room)
+            } else if (bridge.lastRoom >= 0 && bridge.lastRoom != room) {
                 PushEventLocked(bridge, "room_changed", std::to_string(bridge.lastRoom) + "->" + std::to_string(room));
+            }
             ++bridge.sceneEpoch;
             bridge.lastScene = scene;
             bridge.lastRoom = room;
@@ -1488,11 +1499,7 @@ void RegisterZeldaAiBridge() {
         bridge.actors.Clear();
         bridge.lastScene = scene;
         bridge.lastRoom = -1;
-        if (previous >= 0 && previous != scene) {
-            bridge.sceneAutosavePending = true;
-            bridge.sceneAutosaveTarget = scene;
-            PushEventLocked(bridge, "scene_autosave_pending", std::to_string(scene));
-        }
+        ScheduleSceneAutosaveLocked(bridge, previous, scene);
         PushEventLocked(bridge, "scene_changed",
             std::to_string(previous) + "->" + std::to_string(scene));
     });
