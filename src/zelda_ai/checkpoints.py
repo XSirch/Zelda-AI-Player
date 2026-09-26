@@ -35,6 +35,7 @@ def opening_checkpoint_plan(game: GameState) -> dict:
     """Return the observable child-opening plan and its single active checkpoint."""
     has_sword = _has_equipment(game, "Kokiri Sword")
     has_shield = _has_equipment(game, "Deku Shield")
+    has_emerald = any("kokiri emerald" == item.casefold() for item in game.progress.quest_items)
     sword_equipped = _equipped(game, "Kokiri Sword")
     shield_equipped = _equipped(game, "Deku Shield")
     greeted_saria = _flag(game, "greeted_by_saria")
@@ -96,7 +97,7 @@ def opening_checkpoint_plan(game: GameState) -> dict:
             "id": "enter_deku_tree",
             "title": "Enter the Deku Tree",
             "instruction": "Enter the newly available Deku Tree interior and continue the main quest.",
-            "done": _inside_deku_tree(game),
+            "done": _inside_deku_tree(game) or has_emerald,
             "completion": "Inside the Deku Tree scene observed",
         },
     ]
