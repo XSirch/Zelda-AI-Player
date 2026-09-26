@@ -286,6 +286,10 @@ def test_native_bridge_exposes_navmesh_only_as_slow_state():
     assert "lastPeerSeenMs = NowMs()" in native
     assert "++peerContactSeq" in native
     assert "sceneAutosaveScheduledPeerSeq = bridge.peerContactSeq" in native
+    assert "sceneAutosaveScheduledAtMs = NowMs()" in native
+    assert "PEER_CONFIRM_TIMEOUT_MS = 5000" in native
+    assert "bridge.peerContactSeq > bridge.sceneAutosaveScheduledPeerSeq" in native
+    assert '"backend_not_confirmed"' in native
     assert "bridge.peerContactSeq <= bridge.sceneAutosaveScheduledPeerSeq" in native
     assert '"scene_autosave_cancelled"' in native
     assert "ScheduleSceneAutosaveLocked(bridge, bridge.lastScene, scene)" in native
