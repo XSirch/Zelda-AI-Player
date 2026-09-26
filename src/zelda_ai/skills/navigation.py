@@ -306,8 +306,10 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
         selected_exit_index = None
         selected_entrance_index = None
 
+    skill_started = time.monotonic()
     max_window = 12.0 if "offmesh_jump_links_v1" in before.capabilities else 8.0
-    deadline = time.monotonic() + min(max_window, max(0.25, decision.args.duration_ms / 1000))
+    hard_deadline = skill_started + max_window
+    deadline = skill_started + min(max_window, max(0.25, decision.args.duration_ms / 1000))
     start_position = before.player.position
     stop_distance = 4.0 if exit_mode else decision.args.stop_distance
     interaction_mode = talk or interact
@@ -474,6 +476,7 @@ async def _navigate_local(bridge: Bridge, decision: Decision, observation: GameS
                         (plan is None or not plan.exact_goal_reachable)):
                     gap_link = _best_gap_link(current, target)
                     if gap_link is not None:
+                        deadline = min(hard_deadline, max(deadline, time.monotonic() + 4.0))
                         takeoff_distance = math.hypot(
                             gap_link.takeoff_position[0] - current.player.position[0],
                             gap_link.takeoff_position[2] - current.player.position[2],
