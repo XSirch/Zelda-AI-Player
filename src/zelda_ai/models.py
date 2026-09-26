@@ -92,6 +92,22 @@ class TraversalAffordanceObservation(StrictModel):
         return value
 
 
+class NavigationLinkObservation(StrictModel):
+    """Local off-mesh movement edge inferred from currently loaded collision."""
+    kind: Literal["auto_jump_gap"]
+    takeoff_position: tuple[float, float, float]
+    landing_position: tuple[float, float, float]
+    gap_distance: float = Field(ge=0, le=250)
+    height_delta: float = Field(ge=-150, le=50)
+
+    @field_validator("takeoff_position", "landing_position")
+    @classmethod
+    def finite_link_positions(cls, value):
+        if not all(math.isfinite(v) for v in value):
+            raise ValueError("Non-finite navigation link position")
+        return value
+
+
 class SceneExitObservation(StrictModel):
     """Currently observed collision surface that triggers a scene/entrance transition."""
     exit_index: int = Field(ge=1, le=31)
@@ -317,6 +333,7 @@ class GameState(StrictModel):
     room_actors_truncated: bool = False
     navigation_probes: list[NavigationProbe] = Field(default_factory=list, max_length=16)
     traversal_affordances: list[TraversalAffordanceObservation] = Field(default_factory=list, max_length=24)
+    navigation_links: list[NavigationLinkObservation] = Field(default_factory=list, max_length=16)
     scene_exits: list[SceneExitObservation] = Field(default_factory=list, max_length=31)
     navmesh: NavigationMeshSnapshot = Field(default_factory=NavigationMeshSnapshot)
     autosave: AutosaveState = Field(default_factory=AutosaveState)
