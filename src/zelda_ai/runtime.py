@@ -257,13 +257,17 @@ class Runtime:
     def _refresh_checkpoint(self, game: GameState, *, emit: bool = True):
         plan = opening_checkpoint_plan(game)
         current = plan.get("current") or {}
-        new_id = current.get("id") or "opening_plan_complete"
+        available = plan.get("available", True)
+        new_id = (current.get("id") or "opening_plan_complete") if available else "checkpoint_unavailable"
         old_id = self.checkpoint_id
         self.checkpoint_plan = plan
         self.checkpoint_id = new_id
         if not emit or not self.run_id or new_id == old_id:
             return
-        if old_id and old_id != "opening_plan_complete":
+        if not available:
+            self.log("checkpoint_unavailable", {"reason": plan.get("reason", "unknown")})
+            return
+        if old_id and old_id not in {"opening_plan_complete", "checkpoint_unavailable"}:
             self.log("checkpoint_completed", {
                 "checkpoint": old_id,
                 "next": new_id,
