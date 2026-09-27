@@ -70,7 +70,7 @@ npm run build
 cd ..
 ```
 
-## Bridge SoH
+## Native Bridge v3.0 (SoH)
 
 Revisão Shipwright fixada:
 
@@ -78,6 +78,8 @@ Revisão Shipwright fixada:
 HarbourMasters/Shipwright
 d30fc192f2eb01ceea45bd1e12de61636cafbf86
 ```
+
+A Autonomy V3 usa **Native Bridge v3.0 / Adapter v3.0** com wire protocol `3`.
 
 Instale/atualize a bridge:
 
@@ -159,6 +161,6 @@ A arquitetura de aprendizado contínuo está implementada, mas uma política PPO
 Documentação:
 
 - [Arquitetura](docs/ARCHITECTURE.md)
-- [Bridge realtime](docs/REALTIME_V2.md)
+- [Bridge realtime v3](docs/REALTIME_V3.md)
 - [Status](docs/STATUS.md)
 - [Instruções para agentes](AGENTS.md)
