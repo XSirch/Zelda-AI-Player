@@ -157,8 +157,8 @@ class OnlinePPO:
                 self.actor_rnd.load_state_dict(self.learner_rnd.state_dict())
                 self.actor_rnd_target.load_state_dict(self.learner_rnd_target.state_dict())
 
-    def _tensor(self, observation: list[float]):
-        return torch.tensor(observation, dtype=torch.float32, device=self.learner_device)
+    def _actor_tensor(self, observation: list[float]):
+        return torch.tensor(observation, dtype=torch.float32, device=self.actor_device)
 
     def sample(self, observation: list[float]) -> dict:
         with self.actor_lock, torch.inference_mode():
@@ -331,7 +331,11 @@ class OnlinePPO:
         temporary.replace(self.checkpoint)
 
     def _load(self):
-        payload = torch.load(self.checkpoint, map_location=self.device, weights_only=False)
+        payload = torch.load(
+            self.checkpoint,
+            map_location=self.learner_device,
+            weights_only=False,
+        )
         if payload.get("feature_dim") != FEATURE_DIM:
             raise RuntimeError(
                 f"ML checkpoint feature dimension {payload.get('feature_dim')} does not match {FEATURE_DIM}"
