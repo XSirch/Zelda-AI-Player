@@ -68,6 +68,7 @@ class RewardTracker:
             intent.target_actor_params,
             intent.target_actor_uid,
             tuple(intent.target_position) if intent.target_position is not None else None,
+            intent.target_item_id,
             intent.direction,
             intent.choice_index,
         )
