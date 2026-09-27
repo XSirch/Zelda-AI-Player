@@ -55,6 +55,9 @@ class AutonomyRuntime:
         self.usage_task: asyncio.Task | None = None
         self.settling_controller: asyncio.Task | None = None
         self.subscribers: set[asyncio.Queue] = set()
+        self.persist_tasks: set[asyncio.Task] = set()
+        self.persistence_error = ""
+        self.closed = False
         self.last_publish = 0.0
 
         self.controller: ContinuousController | None = None
@@ -79,6 +82,52 @@ class AutonomyRuntime:
 
         self.bridge.on_state = self.on_state
 
+    @staticmethod
+    def _empty_metrics() -> dict:
+        return {
+            "calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "cached_input_tokens": 0,
+            "reasoning_output_tokens": 0,
+            "total_tokens": 0,
+            "unknown_usage_calls": 0,
+            "unknown_cost_calls": 0,
+            "known_cost_usd": 0.0,
+            "cost_usd": None,
+            "mean_latency_ms": None,
+            "deaths": 0,
+            "boss_events": 0,
+            "game_completions": 0,
+            "interventions": 0,
+            "vision_calls": 0,
+        }
+
+    def _persist(self, func, *args, **kwargs):
+        if self.closed:
+            return
+        async def worker():
+            try:
+                await asyncio.to_thread(func, *args, **kwargs)
+            except Exception as exc:
+                self.persistence_error = f"{type(exc).__name__}: {str(exc)[:180]}"
+        task = asyncio.create_task(worker())
+        self.persist_tasks.add(task)
+        task.add_done_callback(self.persist_tasks.discard)
+
+    async def _refresh_metrics(self):
+        if not self.run_id:
+            self.metrics_cache = None
+            return
+        self.metrics_cache = await asyncio.to_thread(self.store.metrics, self.run_id)
+        self.metrics_at = time.monotonic()
+
+    async def close(self):
+        self.closed = True
+        tasks = list(self.persist_tasks)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     def publish(self, force: bool = False):
         now = time.monotonic()
         if not force and now - self.last_publish < 0.05:
@@ -95,7 +144,7 @@ class AutonomyRuntime:
         row = {"kind": kind, "data": data or {}, "at": time.time()}
         self.recent.append(row)
         if self.run_id:
-            self.store.event(self.run_id, kind, data or {})
+            self._persist(self.store.event, self.run_id, kind, data or {})
         self.publish(True)
 
     @staticmethod
@@ -145,9 +194,9 @@ class AutonomyRuntime:
             state.room,
             state.scene_epoch,
         ):
-            edge_id = None
             if old.player and state.player:
-                edge_id = self.store.learn_world_edge(
+                self._persist(
+                    self.store.learn_world_edge,
                     self.namespace,
                     {
                         "scene": old.scene,
@@ -170,7 +219,6 @@ class AutonomyRuntime:
                     "from_room": old.room,
                     "to_scene": state.scene,
                     "to_room": state.room,
-                    "edge_id": edge_id,
                 },
             )
 
@@ -191,7 +239,8 @@ class AutonomyRuntime:
                 dialogue_evidence = state.dialogue.text.strip()[:220] or (
                     f"text_id={state.dialogue.text_id}"
                 )
-                self.store.remember(
+                self._persist(
+                    self.store.remember,
                     self.namespace,
                     state.scene,
                     f"Observed dialogue with {speaker_label} in "
@@ -232,12 +281,13 @@ class AutonomyRuntime:
                 if acquired_equipment:
                     evidence.append("equipment=" + ", ".join(acquired_equipment[:8]))
                 note = "Observed durable progress: " + "; ".join(evidence)
-                self.store.remember(self.namespace, state.scene, note)
+                self._persist(self.store.remember, self.namespace, state.scene, note)
                 self.log("durable_progress_observed", {"evidence": evidence})
 
             if old.player and state.player and old.player.health > 0 and state.player.health == 0:
                 self.log("player_died", {"scene": state.scene, "room": state.room})
-                self.store.remember(
+                self._persist(
+                    self.store.remember,
                     self.namespace,
                     state.scene,
                     f"Death observed in {state.scene_name or state.scene}/room {state.room}.",
@@ -277,7 +327,7 @@ class AutonomyRuntime:
     def _budget_reason(self, prompt: str) -> str | None:
         if not self.config or not self.run_id:
             return None
-        metrics = self.store.metrics(self.run_id)
+        metrics = self.metrics_cache or self._empty_metrics()
         reserve = None
         if self.config.provider == "openrouter" and self.selected_model is not None:
             reserve = lambda: reserve_cost(
@@ -318,8 +368,8 @@ class AutonomyRuntime:
             self.reason = ""
             self.config = config
             self.selected_model = None
-            self.metrics_cache = None
-            self.metrics_at = 0.0
+            self.metrics_cache = self._empty_metrics()
+            self.metrics_at = time.monotonic()
             self.provider_usage = {"available": False, "windows": []}
             self.provider_usage_at = 0.0
             self.game_instance = game.instance_id
@@ -738,12 +788,6 @@ class AutonomyRuntime:
             },
             "learning": {},
         }
-        if self.run_id and (
-            self.metrics_cache is None or time.monotonic() - self.metrics_at >= 1.0
-        ):
-            self.metrics_cache = self.store.metrics(self.run_id)
-            self.metrics_at = time.monotonic()
-
         realtime = bridge_status.get("realtime") or {}
         return {
             "status": self.state,
