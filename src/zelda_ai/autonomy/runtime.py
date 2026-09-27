@@ -49,6 +49,10 @@ class AutonomyRuntime:
         self.lock = asyncio.Lock()
         self.tasks: set[asyncio.Task] = set()
         self.retired_tasks: set[asyncio.Task] = set()
+        self.controller_task: asyncio.Task | None = None
+        self.cognition_task: asyncio.Task | None = None
+        self.watchdog_task: asyncio.Task | None = None
+        self.settling_controller: asyncio.Task | None = None
         self.subscribers: set[asyncio.Queue] = set()
         self.last_publish = 0.0
 
@@ -121,10 +125,11 @@ class AutonomyRuntime:
             return
 
         if old and old.instance_id != state.instance_id:
+            # Revoke synchronously; lifecycle/task cleanup can safely happen on
+            # the event loop without allowing one more controller lease.
             self.bridge.revoke()
-            self.state = "paused"
-            self.reason = "game_instance_changed"
             self.log("game_instance_changed")
+            asyncio.create_task(self.halt("paused", "game_instance_changed"))
             return
 
         if old and old.instance_id == state.instance_id and (
@@ -236,7 +241,18 @@ class AutonomyRuntime:
             reserve=reserve,
         )
 
+    async def _settle_previous_controller(self):
+        task = self.settling_controller
+        if task is None:
+            return
+        if not task.done():
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await asyncio.shield(task)
+        if self.settling_controller is task:
+            self.settling_controller = None
+
     async def start(self, config: RunConfig):
+        await self._settle_previous_controller()
         async with self.lock:
             if self.state in {"running", "starting", "paused"}:
                 raise ValueError("Stop the current run before starting another")
@@ -303,14 +319,14 @@ class AutonomyRuntime:
     def _spawn_tasks(self):
         generation = self.lifecycle
         assert self.controller is not None
-        self._spawn(
+        self.controller_task = self._spawn(
             self.controller.run(
                 lambda: generation == self.lifecycle and self.state == "running",
                 self.publish,
             )
         )
-        self._spawn(self._cognition_loop(generation))
-        self._spawn(self._runtime_watchdog(generation))
+        self.cognition_task = self._spawn(self._cognition_loop(generation))
+        self.watchdog_task = self._spawn(self._runtime_watchdog(generation))
 
     async def _runtime_watchdog(self, generation: int):
         while generation == self.lifecycle and self.state == "running":
@@ -481,11 +497,26 @@ class AutonomyRuntime:
                 self.store.update_run(self.run_id, status=state, reason=reason)
                 if state in {"stopped", "completed"}:
                     self.store.end_segments(self.run_id)
-            tasks = [task for task in self.tasks if task is not asyncio.current_task()]
-            for task in tasks:
-                task.cancel()
-                self.retired_tasks.add(task)
-                task.add_done_callback(self.retired_tasks.discard)
+            current = asyncio.current_task()
+
+            # Controller exits from its active() predicate and is intentionally
+            # not cancelled: an in-flight PPO worker must finish its atomic
+            # checkpoint after controller input has already been revoked.
+            controller_task = self.controller_task
+            if controller_task and controller_task is not current and not controller_task.done():
+                self.settling_controller = controller_task
+                self.retired_tasks.add(controller_task)
+                controller_task.add_done_callback(self.retired_tasks.discard)
+
+            for task in (self.cognition_task, self.watchdog_task):
+                if task and task is not current and not task.done():
+                    task.cancel()
+                    self.retired_tasks.add(task)
+                    task.add_done_callback(self.retired_tasks.discard)
+
+            self.controller_task = None
+            self.cognition_task = None
+            self.watchdog_task = None
             self.tasks.clear()
             self.log("run_" + state, {"reason": reason})
             self.publish(True)
@@ -502,6 +533,7 @@ class AutonomyRuntime:
             await self.halt("paused", action)
             return
 
+        await self._settle_previous_controller()
         async with self.lock:
             if self.state != "paused" or not self.run_id:
                 raise ValueError("No paused run to resume")
