@@ -76,10 +76,46 @@ export interface Snapshot {
   input: InputState;
   learning: Record<string, unknown>;
   metrics: Record<string, unknown> | null;
+  usage: UsageSnapshot;
   usage: UsageState;
   bridge: {
     connected: boolean;
     last_seen_age_s: number | null;
     realtime: Record<string, unknown>;
   };
+}
+
+export interface QuotaWindow {
+  limit_id: string | null;
+  limit_name: string | null;
+  slot: string;
+  used_percent: number;
+  remaining_percent: number;
+  window_duration_mins: number | null;
+  resets_at: number | null;
+}
+
+export interface ProviderQuota {
+  available: boolean;
+  connected?: boolean;
+  plan?: string | null;
+  windows: QuotaWindow[];
+  credits?: { has_credits: boolean; unlimited: boolean; balance: string | number | null } | null;
+  individual_limit?: { limit: number | null; used: number | null; remaining_percent: number | null; resets_at: number | null } | null;
+  rate_limit_reached_type?: string | null;
+  error?: string | null;
+}
+
+export interface UsageSnapshot {
+  provider: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  reasoning_output_tokens: number;
+  total_tokens: number;
+  cost_usd: number | null;
+  known_cost_usd: number;
+  quota: ProviderQuota;
+  quota_updated_at: number | null;
 }
