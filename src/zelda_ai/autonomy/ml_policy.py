@@ -132,11 +132,27 @@ class OnlinePPO:
         self.rnd_optimizer = torch.optim.AdamW(self.learner_rnd.parameters(), lr=rnd_learning_rate)
         self.updates = 0
         self.samples_trained = 0
-        self.intrinsic_scale = 1.0
+        self.intrinsic_scale: float | None = None
         self.last_stats: dict = {}
 
+        self.load_error = ""
         if self.checkpoint.is_file():
-            self._load()
+            try:
+                self._load()
+            except Exception as exc:
+                # A truncated local checkpoint must not prevent autonomous play.
+                # Preserve it for inspection and start a fresh learner.
+                corrupt = self.checkpoint.with_suffix(
+                    self.checkpoint.suffix + f".corrupt-{int(__import__('time').time())}"
+                )
+                try:
+                    self.checkpoint.replace(corrupt)
+                except OSError:
+                    pass
+                self.load_error = f"{type(exc).__name__}: {str(exc)[:180]}"
+                self.actor.load_state_dict(self.learner.state_dict())
+                self.actor_rnd.load_state_dict(self.learner_rnd.state_dict())
+                self.actor_rnd_target.load_state_dict(self.learner_rnd_target.state_dict())
 
     def _tensor(self, observation: list[float]):
         return torch.tensor(observation, dtype=torch.float32, device=self.device)
@@ -168,7 +184,10 @@ class OnlinePPO:
             target = self.actor_rnd_target(obs)
             prediction = self.actor_rnd(obs)
             error = torch.nn.functional.mse_loss(prediction, target).item()
-        self.intrinsic_scale = 0.995 * self.intrinsic_scale + 0.005 * max(error, 1e-6)
+        if self.intrinsic_scale is None:
+            self.intrinsic_scale = max(error, 1e-6)
+        else:
+            self.intrinsic_scale = 0.995 * self.intrinsic_scale + 0.005 * max(error, 1e-6)
         normalized = error / max(self.intrinsic_scale, 1e-6)
         return max(0.0, min(3.0, normalized)) / 3.0
 
@@ -297,7 +316,9 @@ class OnlinePPO:
             "updates": self.updates,
             "samples_trained": self.samples_trained,
         }
-        torch.save(payload, self.checkpoint)
+        temporary = self.checkpoint.with_suffix(self.checkpoint.suffix + ".tmp")
+        torch.save(payload, temporary)
+        temporary.replace(self.checkpoint)
 
     def _load(self):
         payload = torch.load(self.checkpoint, map_location=self.device, weights_only=False)
@@ -325,5 +346,6 @@ class OnlinePPO:
             "device": str(self.device),
             "updates": self.updates,
             "samples_trained": self.samples_trained,
+            "checkpoint_load_error": self.load_error,
             **self.last_stats,
         }
