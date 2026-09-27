@@ -478,12 +478,33 @@ class AutonomyRuntime:
                 if generation != self.lifecycle or self.state != "running":
                     return
 
+            telemetry = self.controller.telemetry()
+            learning = telemetry.get("learning", {})
+            compact_learning = {
+                key: learning.get(key)
+                for key in (
+                    "updates",
+                    "samples_trained",
+                    "last_reward",
+                    "total_reward",
+                    "reward_breakdown",
+                )
+                if key in learning
+            }
+            recent_for_model = [
+                row for row in self.recent
+                if row.get("kind") not in {"intent_updated", "provider_rerouted"}
+            ][-8:]
             observation = build_cognition_observation(
                 game=game,
                 objective=self.config.goal,
                 current_intent=self.controller.intent,
-                motor=self.controller.telemetry(),
-                ml_learning=self.controller.telemetry().get("learning", {}),
+                motor={
+                    "summary": telemetry.get("motor"),
+                    "setpoint": telemetry.get("setpoint"),
+                    "actions_sampled": telemetry.get("actions_sampled"),
+                },
+                ml_learning=compact_learning,
                 world_edges=self.store.world_neighbors(
                     self.namespace, game.scene, game.room
                 ),
@@ -491,7 +512,7 @@ class AutonomyRuntime:
                     row["note"]
                     for row in self.store.recall(self.namespace, limit=12)
                 ],
-                recent_events=list(self.recent),
+                recent_events=recent_for_model,
                 dialogue_transcript=list(self.dialogue_transcript),
             )
             prompt = json.dumps(observation, ensure_ascii=False, separators=(",", ":"))
