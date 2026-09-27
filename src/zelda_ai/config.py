@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     codex_command: str = "codex"
     openrouter_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="OPENROUTER_API_KEY")
     decision_timeout_s: float = Field(default=180, ge=5, le=600)
+    agent_provider: str = "codex"
+    agent_model: str = "gpt-6-astra"
+    agent_effort: str | None = None
     database_url: str | None = None
     allow_simulator: bool = False
 
