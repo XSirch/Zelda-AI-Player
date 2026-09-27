@@ -220,7 +220,7 @@ class Bridge(asyncio.DatagramProtocol):
         except (ValueError, TypeError, AttributeError, ValidationError, UnicodeError):
             self.rejected_packets += 1
 
-    def status(self) -> dict:
+    def telemetry(self) -> dict:
         def percentile(values, fraction):
             ordered = sorted(values)
             if not ordered:
@@ -244,8 +244,13 @@ class Bridge(asyncio.DatagramProtocol):
                 "last_receipt": last_consumed.model_dump() if last_consumed else None,
                 "dropped_samples": self.dropped_samples, "event_gaps": self.event_gaps,
                 "fast_base_misses": self.fast_base_misses,
-                "ack_semantics": "input_consumer_delivery" if self.realtime else "accepted_only_legacy"},
-            "state": self.state.model_dump() if self.state else None}
+                "ack_semantics": "input_consumer_delivery" if self.realtime else "accepted_only_legacy"}}
+
+    def status(self) -> dict:
+        return {
+            **self.telemetry(),
+            "state": self.state.model_dump() if self.state else None,
+        }
 
     async def next_state(self, after_seq: int, *, timeout: float = .35) -> GameState:
         deadline = time.monotonic() + timeout
