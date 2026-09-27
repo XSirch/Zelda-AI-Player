@@ -66,3 +66,14 @@ def test_frontend_contract_is_compact():
 def test_legacy_dashboard_components_are_removed():
     assert not Path("web/src/RealtimePanel.tsx").exists()
     assert not Path("web/src/RunBudgetFields.tsx").exists()
+
+
+def test_panel_keeps_tokens_cost_and_codex_quota_visible():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    for label in ["TOKENS RUN", "CACHE / REASONING", "CUSTO API", "COTA RESTANTE"]:
+        assert label in main
+    assert "remaining_percent" in main
+    assert "window_duration_mins" in main
+    assert "UsageSnapshot" in types
+    assert "QuotaWindow" in types
