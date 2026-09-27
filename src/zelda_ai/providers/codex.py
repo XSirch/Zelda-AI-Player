@@ -41,20 +41,38 @@ def parse_usage(params: dict, model: str) -> Usage:
 def summarize_rate_limits(payload: dict | None) -> dict:
     """Normalize supported Codex app-server quota snapshots for the UI."""
     if not isinstance(payload, dict):
-        return {"available": False, "windows": [], "credits": None, "individual_limit": None}
+        return {
+            "available": False,
+            "ordinary_usage_allowed": None,
+            "windows": [],
+            "credits": None,
+            "individual_limit": None,
+        }
 
-    snapshots: list[dict] = []
-    primary = payload.get("rateLimits")
-    if isinstance(primary, dict):
-        snapshots.append(primary)
     by_id = payload.get("rateLimitsByLimitId")
+    snapshots: list[tuple[str | None, dict]] = []
     if isinstance(by_id, dict):
-        snapshots.extend(row for row in by_id.values() if isinstance(row, dict))
+        codex = by_id.get("codex")
+        if isinstance(codex, dict):
+            snapshots.append(("codex", codex))
+        for limit_id, row in by_id.items():
+            if limit_id == "codex" or not isinstance(row, dict):
+                continue
+            snapshots.append((str(limit_id), row))
+
+    legacy = payload.get("rateLimits")
+    if isinstance(legacy, dict):
+        legacy_id = legacy.get("limitId")
+        if not any(
+            (limit_id == legacy_id or (limit_id == "codex" and legacy_id in {None, "codex"}))
+            for limit_id, _ in snapshots
+        ):
+            snapshots.append((legacy_id, legacy))
 
     windows: list[dict] = []
     seen: set[tuple] = set()
-    for snapshot in snapshots:
-        limit_id = snapshot.get("limitId")
+    for fallback_id, snapshot in snapshots:
+        limit_id = snapshot.get("limitId") or fallback_id
         limit_name = snapshot.get("limitName")
         for slot in ("primary", "secondary"):
             window = snapshot.get(slot)
@@ -81,16 +99,27 @@ def summarize_rate_limits(payload: dict | None) -> dict:
             })
 
     windows.sort(key=lambda row: (
+        row["limit_id"] != "codex",
         row["window_duration_mins"] is None,
         row["window_duration_mins"] or 10**12,
         row["limit_name"] or row["limit_id"] or "",
     ))
 
-    snapshot = primary if isinstance(primary, dict) else (snapshots[0] if snapshots else {})
-    credits = snapshot.get("credits") if isinstance(snapshot, dict) else None
-    individual = snapshot.get("individualLimit") if isinstance(snapshot, dict) else None
+    primary_snapshot = next(
+        (row for limit_id, row in snapshots if limit_id == "codex"),
+        legacy if isinstance(legacy, dict) else (snapshots[0][1] if snapshots else {}),
+    )
+    credits = primary_snapshot.get("credits") if isinstance(primary_snapshot, dict) else None
+    individual = primary_snapshot.get("individualLimit") if isinstance(primary_snapshot, dict) else None
+    reset_credits = payload.get("rateLimitResetCredits")
     return {
-        "available": bool(windows or isinstance(credits, dict) or isinstance(individual, dict)),
+        "available": bool(
+            windows
+            or isinstance(credits, dict)
+            or isinstance(individual, dict)
+            or isinstance(reset_credits, dict)
+        ),
+        "ordinary_usage_allowed": payload.get("ordinaryUsageAllowed"),
         "windows": windows,
         "credits": {
             "has_credits": bool(credits.get("hasCredits")),
@@ -103,9 +132,13 @@ def summarize_rate_limits(payload: dict | None) -> dict:
             "remaining_percent": individual.get("remainingPercent"),
             "resets_at": individual.get("resetsAt"),
         } if isinstance(individual, dict) else None,
-        "rate_limit_reached_type": snapshot.get("rateLimitReachedType")
-            if isinstance(snapshot, dict) else None,
-        "plan_type": snapshot.get("planType") if isinstance(snapshot, dict) else None,
+        "reset_credits": {
+            "available_count": reset_credits.get("availableCount"),
+        } if isinstance(reset_credits, dict) else None,
+        "rate_limit_reached_type": primary_snapshot.get("rateLimitReachedType")
+            if isinstance(primary_snapshot, dict) else None,
+        "plan_type": primary_snapshot.get("planType")
+            if isinstance(primary_snapshot, dict) else None,
     }
 
 
