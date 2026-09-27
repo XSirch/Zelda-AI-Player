@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from zelda_ai.autonomy.models import AgentIntent
+from zelda_ai.config import Settings
 from zelda_ai.models import GameState, PlayerState, RunConfig, Usage
 
 
@@ -149,3 +150,9 @@ def test_zero_budgets_mean_unlimited_harness_limits():
     assert config.max_tokens == 0
     assert config.max_cost_usd == 0
     assert config.max_runtime_s == 0
+
+
+def test_blank_agent_effort_is_treated_as_unset(monkeypatch):
+    monkeypatch.setenv("ZELDA_AGENT_EFFORT", "")
+    settings = Settings(_env_file=None)
+    assert settings.agent_effort is None
