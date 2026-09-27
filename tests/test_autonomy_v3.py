@@ -151,6 +151,7 @@ def test_consumable_reacquisition_does_not_farm_objective_score(state):
 
 def test_native_game_completed_event_ends_episode_and_scores_achievement(state):
     tracker = RewardTracker()
+    tracker.step(state, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
     completed = state.model_copy(deep=True)
     completed.events = [GameEvent(id="1", kind="game_completed", detail="final_ganon_defeated")]
     result = tracker.step(completed, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
