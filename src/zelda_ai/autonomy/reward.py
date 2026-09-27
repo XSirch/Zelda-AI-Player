@@ -26,6 +26,9 @@ class RewardTracker:
         self.visited_cells: set[tuple[int, int, int, int]] = set()
         self.seen_actors: set[tuple[int, int, str | None, int, int]] = set()
         self.seen_events: set[str] = set()
+        self.seen_dialogue: set[tuple[int, int | None, str]] = set()
+        self.seen_contexts: set[tuple[int, int, int, str | None]] = set()
+        self.seen_transitions: set[tuple[int, int, int, int]] = set()
         self.previous: dict | None = None
 
     @staticmethod
@@ -107,6 +110,28 @@ class RewardTracker:
                 self.seen_actors.add(key)
                 b["new_actor"] = b.get("new_actor", 0.0) + 0.05
 
+        if game.dialogue.active:
+            dialogue_key = (
+                game.scene,
+                game.dialogue.text_id,
+                game.dialogue.text.strip()[:160],
+            )
+            if dialogue_key not in self.seen_dialogue:
+                self.seen_dialogue.add(dialogue_key)
+                b["new_dialogue"] = 0.3
+
+        if game.context_action.label != "none":
+            actor_uid = game.context_actor.actor_uid if game.context_actor else None
+            context_key = (
+                game.scene,
+                game.room,
+                game.context_action.code,
+                actor_uid,
+            )
+            if context_key not in self.seen_contexts:
+                self.seen_contexts.add(context_key)
+                b["new_context"] = 0.06
+
         for event in game.events:
             key = f"{game.instance_id}:{event.id}"
             if key not in self.seen_events:
@@ -126,19 +151,19 @@ class RewardTracker:
             if (previous["scene"], previous["room"], previous["scene_epoch"]) != (
                 current["scene"], current["room"], current["scene_epoch"]
             ):
-                b["world_transition"] = 0.8
-
-            if previous["dialogue"] != current["dialogue"]:
-                b["dialogue_change"] = 0.25
-            if previous["context"] != current["context"]:
-                b["context_change"] = 0.08
+                edge = (
+                    previous["scene"],
+                    previous["room"],
+                    current["scene"],
+                    current["room"],
+                )
+                if edge not in self.seen_transitions:
+                    self.seen_transitions.add(edge)
+                    b["new_world_transition"] = 0.8
+                else:
+                    b["repeated_transition"] = 0.01
             if previous["progress"] != current["progress"]:
                 b["durable_progress"] = 2.0
-
-            if previous["position"] and current["position"]:
-                moved = math.dist(previous["position"], current["position"])
-                if moved >= 4.0:
-                    b["movement"] = min(0.008, moved / 6000.0)
 
             if current["health"] < previous["health"]:
                 b["damage_taken"] = -min(1.2, (previous["health"] - current["health"]) / 16.0 * 0.25)
