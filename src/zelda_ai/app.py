@@ -59,8 +59,6 @@ def default_run_config(settings: Settings) -> RunConfig:
         model=settings.agent_model,
         effort=settings.agent_effort,
         goal="Play Ocarina of Time autonomously, discover how to control Link, learn from experience, and progress as far as possible.",
-        memory_mode="adaptive",
-        checkpoint_label="autonomy-v3-ml",
     )
 
 
