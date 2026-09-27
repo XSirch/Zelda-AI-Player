@@ -83,6 +83,52 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
   </section>;
 }
 
+
+const compact = (value: number) => new Intl.NumberFormat('pt-BR', {
+  notation: value >= 10_000 ? 'compact' : 'standard',
+  maximumFractionDigits: 1,
+}).format(value);
+
+function windowLabel(minutes: number | null) {
+  if (minutes == null) return 'JANELA';
+  if (minutes % 1440 === 0) return `${minutes / 1440}D`;
+  if (minutes % 60 === 0) return `${minutes / 60}H`;
+  return `${minutes}MIN`;
+}
+
+function UsageStrip({ snapshot }: { snapshot: Snapshot | null }) {
+  const usage = snapshot?.usage;
+  const windows = usage?.quota?.windows ?? [];
+  const cost = usage?.cost_usd;
+  return <section className="usage-strip">
+    <div className="usage-cell">
+      <span>TOKENS RUN</span>
+      <strong>{compact(usage?.total_tokens ?? 0)}</strong>
+      <small>{compact(usage?.input_tokens ?? 0)} in · {compact(usage?.output_tokens ?? 0)} out</small>
+    </div>
+    <div className="usage-cell">
+      <span>CACHE / REASONING</span>
+      <strong>{compact(usage?.cached_input_tokens ?? 0)} / {compact(usage?.reasoning_output_tokens ?? 0)}</strong>
+      <small>tokens observados</small>
+    </div>
+    <div className="usage-cell">
+      <span>CUSTO API</span>
+      <strong>{cost == null ? '—' : `${cost.toFixed(4)}`}</strong>
+      <small>{usage?.provider === 'codex' ? 'ChatGPT · sem custo USD reportado' : 'custo reportado pelo provider'}</small>
+    </div>
+    <div className="usage-cell quota-cell">
+      <span>COTA RESTANTE</span>
+      {windows.length ? <div className="quota-windows">{windows.slice(0, 3).map((window, index) =>
+        <div className="quota-window" key={`${window.limit_id ?? 'default'}-${window.slot}-${index}`}>
+          <strong>{window.remaining_percent}%</strong>
+          <small>{window.limit_name || windowLabel(window.window_duration_mins)}</small>
+        </div>
+      )}</div> : <strong>—</strong>}
+      {!windows.length && <small>{usage?.quota?.error || 'cota não anunciada pelo Codex'}</small>}
+    </div>
+  </section>;
+}
+
 function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [socketOnline, setSocketOnline] = useState(false);
@@ -173,6 +219,8 @@ function App() {
         detail={snapshot?.connection.ai_error || snapshot?.connection.ai_state}
       />
     </section>
+
+    <UsageStrip snapshot={snapshot} />
 
     {error && <div className="error" role="alert">{error}</div>}
     {snapshot?.reason && snapshot.status !== 'running' && <div className="notice">{snapshot.reason}</div>}
