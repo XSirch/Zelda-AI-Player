@@ -94,6 +94,7 @@ export interface LearningSnapshot {
   total_reward?: number;
   recent_mean_reward?: number;
   positive_reward_rate?: number;
+  useful_progress_rate?: number;
   objective_score?: number;
   achievements?: LearningAchievement[];
   exploration?: {
