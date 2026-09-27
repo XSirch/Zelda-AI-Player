@@ -489,6 +489,8 @@ class AutonomyRuntime:
                 return
             self.lifecycle += 1
             self.bridge.revoke()
+            if self.controller:
+                self.controller.neutralize(reason)
             self.state = state
             self.reason = reason
             self.cognition_state = "idle" if state in {"stopped", "completed"} else "paused"
