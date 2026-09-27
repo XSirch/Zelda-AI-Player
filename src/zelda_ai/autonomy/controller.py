@@ -49,12 +49,14 @@ class ContinuousController:
         checkpoint: Path,
         *,
         rollout_size: int = 256,
+        on_achievement: Callable[[dict], None] | None = None,
     ):
         self.bridge = bridge
         self.policy = OnlinePPO(checkpoint)
         self.starting_updates = self.policy.updates
         self.starting_samples_trained = self.policy.samples_trained
         self.rollout_size = rollout_size
+        self.on_achievement = on_achievement
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
@@ -162,10 +164,13 @@ class ContinuousController:
         self.reward_window.append(reward.reward)
         self.last_reward_breakdown = reward.breakdown
         for achievement in reward.achievements:
-            self.achievements.append({
+            row = {
                 **achievement,
                 "action_index": self.actions_sampled + 1,
-            })
+            }
+            self.achievements.append(row)
+            if self.on_achievement is not None:
+                self.on_achievement(dict(row))
 
         if self.pending is not None:
             transition = {
