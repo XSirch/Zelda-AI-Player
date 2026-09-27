@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 
 from ..bridge import Bridge
-from .features import BUTTON_NAMES, encode_state
+from .features import BUTTON_NAMES, encode_state, stack_frames
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .reward import RewardTracker
@@ -55,6 +56,7 @@ class ContinuousController:
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
+        self.feature_history = deque(maxlen=4)
         self.training_queue: asyncio.Queue = asyncio.Queue(maxsize=2)
 
         self.last_setpoint = Setpoint()
@@ -73,6 +75,7 @@ class ContinuousController:
 
     def reset_episode_state(self):
         self.reward_tracker = RewardTracker()
+        self.feature_history.clear()
         self.pending = None
         self.rollout = []
         self.tick = 0
@@ -122,12 +125,14 @@ class ContinuousController:
         self.training_queue.put_nowait(batch)
 
     def _ml_step(self, game) -> Setpoint:
-        observation = encode_state(
+        base_observation = encode_state(
             game,
             self.intent,
             last_stick=self.last_stick,
             last_buttons=self.last_buttons,
         )
+        self.feature_history.append(base_observation)
+        observation = stack_frames(list(self.feature_history))
 
         intrinsic = self.policy.intrinsic_reward(observation)
         reward = self.reward_tracker.step(
