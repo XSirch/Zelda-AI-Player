@@ -4,7 +4,7 @@ import json
 import time
 import uuid
 
-from .autonomy import AgentIntent
+from .autonomy.models import AgentIntent
 from .models import Decision, ModelInfo, SkillArgs, Usage
 from .providers.base import InferenceResult
 
