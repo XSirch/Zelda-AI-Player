@@ -692,8 +692,10 @@ class AutonomyRuntime:
                 self.cognition_state = "error"
                 self.cognition_error = str(exc)[:240]
                 self.thought = (
-                    "Cognition failed. The ML motor actor keeps playing with the "
-                    "last intent; stop and start the run to explicitly retry the provider."
+                    "Cognition failed: "
+                    + self.cognition_error
+                    + " The ML motor actor keeps playing with the last intent; "
+                    "stop and start the run to explicitly retry the provider."
                 )
                 self.publish(True)
                 return
