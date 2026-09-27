@@ -156,3 +156,11 @@ def test_blank_agent_effort_is_treated_as_unset(monkeypatch):
     monkeypatch.setenv("ZELDA_AGENT_EFFORT", "")
     settings = Settings(_env_file=None)
     assert settings.agent_effort is None
+
+
+def test_default_cognition_is_luna_xhigh(monkeypatch):
+    monkeypatch.delenv("ZELDA_AGENT_MODEL", raising=False)
+    monkeypatch.delenv("ZELDA_AGENT_EFFORT", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.agent_model == "gpt-6-luna"
+    assert settings.agent_effort == "xhigh"
