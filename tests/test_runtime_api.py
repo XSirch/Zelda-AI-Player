@@ -65,7 +65,9 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
             if client.get("/api/status").json()["connection"]["game"]:
                 break
             time.sleep(.02)
-        assert client.get("/api/status").json()["connection"]["game"]
+        status_before = client.get("/api/status").json()
+        assert status_before["connection"]["game"]
+        assert status_before["connection"]["source"] == "simulator"
 
         started = client.post("/api/start", json={}, headers=headers)
         assert started.status_code == 200, started.text
