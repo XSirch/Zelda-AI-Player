@@ -27,6 +27,19 @@ Não existe roteiro hard-coded de Zelda no reward. Os sinais são observáveis:
 
 Memórias persistentes são criadas somente a partir de evidência observada, como diálogo realmente recebido, item/equipamento adquirido, morte e transições realmente atravessadas.
 
+### Pontos de conquista vs reward PPO
+
+Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento.
+
+O painel diferencia:
+- pontos de conquista da run;
+- updates PPO e amostras treinadas **nesta run**;
+- totais persistidos no checkpoint;
+- reward acumulado e média recente;
+- conquistas concretas como equipamento, itens, story flags, transições novas, dano causado, inimigos e bosses derrotados.
+
+Progresso que já existia no save ao iniciar a run é tratado como baseline e não gera conquista retroativa.
+
 ## Painel
 
 A interface principal mostra somente:
