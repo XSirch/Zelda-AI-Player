@@ -5,7 +5,7 @@ import math
 from ..models import ActorObservation, GameState
 from .models import AgentIntent
 
-BASE_FEATURE_DIM = 192
+BASE_FEATURE_DIM = 208
 STACK_FRAMES = 4
 FEATURE_DIM = BASE_FEATURE_DIM * STACK_FRAMES
 BUTTON_NAMES = ("A", "B", "Z", "START", "R", "C_UP", "C_LEFT", "C_DOWN", "C_RIGHT")
@@ -68,6 +68,21 @@ def encode_state(
 ) -> list[float]:
     f: list[float] = []
     player = game.player
+
+    # Absolute scene-local context lets the persistent network learn specific
+    # routes instead of only generic obstacle avoidance.
+    day_angle = game.day_time * (2.0 * math.pi / 65536.0)
+    f.extend([
+        _squash(game.scene, 128.0),
+        _squash(game.room, 16.0),
+        _squash(game.entrance_index, 1024.0),
+        math.sin(day_angle),
+        math.cos(day_angle),
+        1.0 if game.is_night else 0.0,
+        _squash(player.position[0], 2000.0) if player else 0.0,
+        _squash(player.position[1], 1000.0) if player else 0.0,
+        _squash(player.position[2], 2000.0) if player else 0.0,
+    ])
 
     # Intent is context, not an action command.  The policy still emits raw controls.
     f.extend(1.0 if intent.mode == name else 0.0 for name in MODE_NAMES)
