@@ -253,7 +253,7 @@ class GameEvent(StrictModel):
 
 
 class GameState(StrictModel):
-    protocol: Literal[1, 2] = 1
+    protocol: Literal[1, 3] = 1
     kind: Literal["full"] = "full"
     capabilities: list[str] = Field(default_factory=list, max_length=16)
     bridge_build: str = Field(default="legacy", max_length=80)
@@ -324,7 +324,7 @@ class GameState(StrictModel):
 
 
 class RealtimeState(StrictModel):
-    protocol: Literal[2]
+    protocol: Literal[3]
     kind: Literal["fast"]
     source: Literal["soh"]
     instance_id: str = Field(min_length=1, max_length=80)
