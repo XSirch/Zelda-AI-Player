@@ -864,6 +864,7 @@ class AutonomyRuntime:
             "elapsed_s": round(time.monotonic() - self.started, 1) if self.run_id else 0.0,
             "connection": {
                 "game": bool(bridge_status.get("connected")),
+                "source": bridge_status.get("source"),
                 "realtime": bool(realtime.get("enabled")),
                 "state_hz": realtime.get("state_hz"),
                 "ai": bool(
