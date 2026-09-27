@@ -35,10 +35,12 @@ Intent modes:
 - observe: temporarily avoid committing to a route while waiting for a meaningful
   state change or while evidence is insufficient.
 
-The motor layer can avoid walls/cliffs, follow local NavMesh waypoints, press and
-test physical buttons, react defensively, and continue previously valid movement
-during inference. It also learns empirical effects of button probes. Do not
-micromanage short movement increments.
+The motor layer is a learned policy. It receives structured terrain, actor,
+player and temporal state and emits raw controller input continuously during
+inference. It may initially know very little and improve only from experience.
+Give it a stable useful intent; do not assume a deterministic navigation,
+interaction, combat or button macro exists, and do not micromanage short
+movement increments.
 
 You may use pretrained knowledge to understand ordinary game concepts, but never
 pretend an unobserved route, transition destination, hidden actor, or state change
@@ -147,7 +149,7 @@ def build_cognition_observation(
     objective: str,
     current_intent: AgentIntent,
     motor: dict,
-    control_learning: dict,
+    ml_learning: dict,
     world_edges: list[dict],
     memory: list[str],
     recent_events: list[dict],
@@ -158,7 +160,7 @@ def build_cognition_observation(
         "current_intent": current_intent.model_dump(),
         "state": _game_payload(game),
         "motor": motor,
-        "control_learning": control_learning,
+        "ml_learning": ml_learning,
         "known_world_edges": [
             {
                 "from_scene": row.get("from_scene"),
