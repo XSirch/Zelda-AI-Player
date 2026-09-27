@@ -54,14 +54,14 @@ The cognition prompt can use structured game state, dialogue, observed actors, c
 
 ## Reward
 
-`autonomy/reward.py` uses only observable evidence: intrinsic RND novelty, new spatial cells/actors/events, scene transitions, durable game progress, dialogue/context changes, target-distance progress, enemy health deltas, damage/death and a small button-activity penalty.
+`autonomy/reward.py` uses observable evidence: surprise-gated RND novelty, new spatial cells/actors, scene transitions, durable game progress, explicit observed objective milestones, dialogue/context changes, target-distance progress, enemy health deltas, damage/death, stagnation and button-activity penalties. Generic native events do not earn reward.
 
-There is no scripted Kokiri/Saria/Mido quest sequence in the reward or runtime.
+There is no forced Kokiri/Saria/Mido route. Milestones such as Kokiri Sword or story flags can carry larger bounded training bonuses when observed, independent of order.
 
 ## Persistence
 
 - SQLAlchemy stores runs, calls, events, memories and empirically observed world edges.
-- ML weights/optimizer/RND state persist in `.local/ml/raw-controller-ppo-rnd-v1.pt`.
+- ML weights/optimizer/RND state persist in `.local/ml/raw-controller-ppo-rnd-v2.pt`.
 - Checkpoint writes use temporary-file replacement.
 - Existing SQLite tables from older versions may remain in an old database, but Autonomy V3 code no longer reads/writes skill trajectories or heuristic combat profiles.
 

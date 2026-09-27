@@ -436,6 +436,22 @@ h1 {
   border-left: 1px solid var(--line);
   background: #0d130f;
 }
+.reward-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+.reward-breakdown code {
+  border: 1px solid #344139;
+  padding: 5px 6px;
+  color: #87938b;
+  background: #111813;
+  font: 8px/1 ui-monospace, monospace;
+}
+.reward-breakdown code.positive { color: var(--signal); border-color: #566b42; }
+.reward-breakdown code.negative { color: var(--danger); border-color: #65443f; }
+
 .learning-note p {
   margin: 0;
   color: #88958c;

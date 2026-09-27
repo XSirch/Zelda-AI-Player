@@ -48,7 +48,7 @@ class RewardTracker:
     """
 
     def __init__(self):
-        self.visited_cells: set[tuple[int, int, int, int]] = set()
+        self.visited_cells: set[tuple[int, int, int, int, int]] = set()
         self.seen_actors: set[tuple[int, int, str | None, int, int]] = set()
         self.seen_events: set[str] = set()
         self.seen_dialogue: set[tuple[int, int | None, str]] = set()
@@ -57,6 +57,7 @@ class RewardTracker:
         self.objective_score = 0
         self.combat_contact = False
         self.seen_inventory_items: set[int] = set()
+        self.stagnation_steps = 0
         self.previous: dict | None = None
 
     def break_causal_chain(self):
@@ -183,8 +184,11 @@ class RewardTracker:
         achievements: list[dict] = []
         done = False
 
-        # RND curiosity is the core exploration signal.
-        b["curiosity"] = max(0.0, min(1.0, intrinsic)) * 0.35
+        # RND is only a weak tie-breaker for genuinely surprising states.
+        # Useful game progress must dominate intrinsic exploration.
+        curiosity = max(0.0, min(1.0, intrinsic)) * 0.08
+        if curiosity > 0:
+            b["curiosity"] = curiosity
 
         player = game.player
         if player:
@@ -192,6 +196,7 @@ class RewardTracker:
                 game.scene,
                 game.room,
                 round(player.position[0] / 100.0),
+                round(player.position[1] / 80.0),
                 round(player.position[2] / 100.0),
             )
             if cell not in self.visited_cells:
@@ -237,6 +242,13 @@ class RewardTracker:
                 self.seen_contexts.add(context_key)
                 b["new_context"] = 0.06
 
+        if self.previous is None:
+            # Events already present at the first observation predate this run
+            # and must not become free achievements.
+            self.seen_events.update(
+                f"{game.instance_id}:{event.id}" for event in game.events
+            )
+
         for event in game.events:
             key = f"{game.instance_id}:{event.id}"
             if key in self.seen_events:
@@ -246,8 +258,9 @@ class RewardTracker:
                 "enemy_defeated": 1.0,
                 "boss_defeated": 2.5,
                 "game_completed": 5.0,
-            }.get(event.kind, 0.12)
-            b["native_event"] = b.get("native_event", 0.0) + event_reward
+            }.get(event.kind, 0.0)
+            if event_reward > 0:
+                b["native_event"] = b.get("native_event", 0.0) + event_reward
             if event.kind == "enemy_defeated":
                 achievements.append(self._achievement(
                     key=f"enemy:{event.id}",
@@ -308,7 +321,9 @@ class RewardTracker:
                         training_reward=0.8,
                     ))
                 else:
-                    b["repeated_transition"] = 0.01
+                    # Backtracking may be necessary, but a known edge must not
+                    # become a repeatable reward farm.
+                    b["repeated_transition"] = 0.0
 
             if previous["progress"] != current["progress"]:
                 b["durable_progress"] = 2.0
@@ -470,10 +485,39 @@ class RewardTracker:
                 improvement = max(-100.0, min(100.0, old_dist - new_dist))
                 b["intent_progress"] = improvement / 500.0
 
-        # Small efficiency cost discourages random button mashing after the policy
-        # has learned that it does not create useful state changes.
+        if previous and previous["position"] is not None and current["position"] is not None:
+            dx = current["position"][0] - previous["position"][0]
+            dy = current["position"][1] - previous["position"][1]
+            dz = current["position"][2] - previous["position"][2]
+            moved = math.sqrt(dx * dx + dy * dy + dz * dz) >= 4.0
+            useful_keys = {
+                "new_space",
+                "new_dialogue",
+                "new_context",
+                "new_world_transition",
+                "durable_progress",
+                "objective_milestone",
+                "enemy_damage",
+                "native_event",
+            }
+            useful = any(b.get(key, 0.0) > 0 for key in useful_keys)
+            useful = useful or b.get("intent_progress", 0.0) > 0.01
+            if moved or useful:
+                self.stagnation_steps = 0
+            else:
+                self.stagnation_steps += 1
+                if self.stagnation_steps >= 15:
+                    b["stagnation"] = -min(
+                        0.08,
+                        0.005 * (self.stagnation_steps - 14),
+                    )
+        else:
+            self.stagnation_steps = 0
+
+        # Small efficiency cost discourages random button mashing. With the RND
+        # baseline removed, ineffective button combinations become net-negative.
         if pressed_buttons:
-            b["button_cost"] = -0.003 * pressed_buttons.bit_count()
+            b["button_cost"] = -0.004 * pressed_buttons.bit_count()
 
         self.previous = current
         total = max(-5.0, min(5.0, sum(b.values())))

@@ -139,8 +139,12 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const objectiveScore = learning?.objective_score ?? 0;
   const totalReward = learning?.total_reward ?? 0;
   const recentReward = learning?.recent_mean_reward ?? 0;
-  const positiveRate = learning?.positive_reward_rate ?? 0;
+  const usefulProgressRate = learning?.useful_progress_rate ?? 0;
   const exploration = learning?.exploration;
+  const rewardBreakdown = Object.entries(learning?.reward_breakdown ?? {})
+    .filter(([, value]) => value !== 0)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .slice(0, 7);
   const trainingState = updates > 0
     ? 'TREINANDO'
     : snapshot?.status === 'running'
@@ -157,7 +161,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
       <div><span>UPDATES PPO · RUN</span><strong>{compact(updates)}</strong><small>{compact(lifetimeUpdates)} no checkpoint</small></div>
       <div><span>AMOSTRAS · RUN</span><strong>{compact(samples)}</strong><small>{compact(lifetimeSamples)} treinadas no total</small></div>
       <div><span>REWARD DA RUN</span><strong>{totalReward.toFixed(2)}</strong><small>última média: {recentReward.toFixed(3)}</small></div>
-      <div><span>SINAIS POSITIVOS</span><strong>{Math.round(positiveRate * 100)}%</strong><small>janela das últimas ações</small></div>
+      <div><span>PASSOS COM PROGRESSO</span><strong>{Math.round(usefulProgressRate * 100)}%</strong><small>ignora curiosidade pura</small></div>
     </div>
     <div className="learning-body">
       <div className="achievements">
@@ -183,10 +187,18 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
         </div>}
       </div>
       <div className="learning-note">
+        <span>REWARD AGORA</span>
+        <div className="reward-breakdown">
+          {rewardBreakdown.length ? rewardBreakdown.map(([key, value]) =>
+            <code key={key} className={value > 0 ? 'positive' : 'negative'}>
+              {key} {value > 0 ? '+' : ''}{value.toFixed(3)}
+            </code>
+          ) : <code>sem sinal</code>}
+        </div>
         <span>COMO LER</span>
         <p>
           Conquistas mostram resultados concretos no jogo. Updates e amostras confirmam que a rede foi treinada.
-          Reward crescente ajuda, mas sozinho não prova que a política ficou melhor.
+          Curiosidade pura não conta como progresso útil e reward crescente, sozinho, não prova melhora.
         </p>
       </div>
     </div>

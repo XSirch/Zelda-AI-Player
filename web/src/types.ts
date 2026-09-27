@@ -94,6 +94,7 @@ export interface LearningSnapshot {
   total_reward?: number;
   recent_mean_reward?: number;
   positive_reward_rate?: number;
+  useful_progress_rate?: number;
   objective_score?: number;
   achievements?: LearningAchievement[];
   exploration?: {
@@ -104,6 +105,9 @@ export interface LearningSnapshot {
   reward_breakdown?: Record<string, number>;
   last_update?: Record<string, unknown>;
   checkpoint_load_error?: string;
+  rnd_error_ema?: number | null;
+  rnd_last_error?: number;
+  rnd_last_novelty?: number;
 }
 
 export interface Snapshot {

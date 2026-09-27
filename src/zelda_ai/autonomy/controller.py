@@ -76,6 +76,7 @@ class ContinuousController:
         self.last_reward = 0.0
         self.last_reward_breakdown: dict[str, float] = {}
         self.reward_window = deque(maxlen=200)
+        self.useful_progress_window = deque(maxlen=200)
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
@@ -93,6 +94,7 @@ class ContinuousController:
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
         self.reward_window.clear()
+        self.useful_progress_window.clear()
         self.achievements.clear()
 
     def set_intent(self, intent: AgentIntent):
@@ -163,6 +165,19 @@ class ContinuousController:
         self.total_reward += reward.reward
         self.reward_window.append(reward.reward)
         self.last_reward_breakdown = reward.breakdown
+        useful_keys = {
+            "new_space",
+            "new_dialogue",
+            "new_context",
+            "new_world_transition",
+            "durable_progress",
+            "objective_milestone",
+            "enemy_damage",
+            "native_event",
+        }
+        useful = any(reward.breakdown.get(key, 0.0) > 0 for key in useful_keys)
+        useful = useful or reward.breakdown.get("intent_progress", 0.0) > 0.01
+        self.useful_progress_window.append(bool(useful))
         for achievement in reward.achievements:
             row = {
                 **achievement,
@@ -338,6 +353,11 @@ class ContinuousController:
                     sum(1 for value in self.reward_window if value > 0) / len(self.reward_window),
                     4,
                 ) if self.reward_window else 0.0,
+                "useful_progress_rate": round(
+                    sum(1 for value in self.useful_progress_window if value)
+                    / len(self.useful_progress_window),
+                    4,
+                ) if self.useful_progress_window else 0.0,
                 "objective_score": self.reward_tracker.objective_score,
                 "achievements": list(self.achievements),
                 "exploration": {
