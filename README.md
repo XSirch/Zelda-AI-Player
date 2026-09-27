@@ -10,7 +10,7 @@ Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
 - **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor.
 
-A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto, permitindo aprender timing e rotas específicas. O checkpoint persistente fica em `.local/ml/raw-controller-ppo-rnd-v1.pt`.
+A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto, permitindo aprender timing e rotas específicas. O checkpoint persistente fica em `.local/ml/raw-controller-ppo-rnd-v2.pt`.
 
 ## Reward
 
@@ -29,7 +29,7 @@ Memórias persistentes são criadas somente a partir de evidência observada, co
 
 ### Pontos de conquista vs reward PPO
 
-Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento.
+Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v2, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
 
 O painel diferencia:
 - pontos de conquista da run;
