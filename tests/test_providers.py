@@ -84,6 +84,7 @@ for line in sys.stdin:
     print(json.dumps({"id":req["id"],"result":result}),flush=True)
     if method=="turn/start":
         events=[("thread/tokenUsage/updated",{"tokenUsage":{"total":{"inputTokens":100,"cachedInputTokens":60,"outputTokens":40,"reasoningOutputTokens":20}}}),
+        ("error",{"turnId":"turn-test","willRetry":True,"error":{"message":"temporary retry"}}),
         ("item/completed",{"item":{"type":"reasoning","content":"NEVER_STORE_THIS"}}),
         ("item/completed",{"item":{"type":"agentMessage","text":''' + repr(output) + '''}}),
         ("turn/completed",{"turn":{"id":"turn-test","status":"completed"}})]
@@ -103,6 +104,36 @@ for line in sys.stdin:
         assert result.usage.total_tokens == 140 and result.usage.cost_usd is None
         assert result.text == output and "NEVER_STORE_THIS" not in result.text
         assert provider.rpc.notifications.empty()
+    finally:
+        await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_codex_surfaces_terminal_turn_error_message(tmp_path, monkeypatch):
+    script = tmp_path / "fake_codex_failure.py"
+    script.write_text(r'''import json, sys
+for line in sys.stdin:
+    req=json.loads(line)
+    if "id" not in req: continue
+    method=req["method"]
+    result={}
+    if method=="account/read": result={"account":{"type":"chatgpt","planType":"test"}}
+    if method=="thread/start": result={"thread":{"id":"thread-fail"}}
+    if method=="turn/start": result={"turn":{"id":"turn-fail","status":"inProgress"}}
+    print(json.dumps({"id":req["id"],"result":result}),flush=True)
+    if method=="turn/start":
+        error={"message":"The 'gpt-6-astra' model requires a newer version of Codex."}
+        print(json.dumps({"method":"error","params":{"threadId":"thread-fail","turnId":"turn-fail","willRetry":False,"error":error}}),flush=True)
+        print(json.dumps({"method":"turn/completed","params":{"threadId":"thread-fail","turn":{"id":"turn-fail","status":"failed","error":error}}}),flush=True)
+''', encoding="utf-8")
+    original = asyncio.create_subprocess_exec
+    async def fake_exec(*args, **kwargs):
+        return await original(sys.executable, str(script), **kwargs)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_exec)
+    provider = CodexProvider(sys.executable, tmp_path / "codex", timeout=5)
+    try:
+        with pytest.raises(ProviderFailure, match="requires a newer version of Codex"):
+            await provider.think(RunConfig(provider="codex", model="gpt-6-astra"), "{}")
     finally:
         await provider.close()
 
