@@ -48,7 +48,7 @@ class RewardTracker:
     """
 
     def __init__(self):
-        self.visited_cells: set[tuple[int, int, int, int]] = set()
+        self.visited_cells: set[tuple[int, int, int, int, int]] = set()
         self.seen_actors: set[tuple[int, int, str | None, int, int]] = set()
         self.seen_events: set[str] = set()
         self.seen_dialogue: set[tuple[int, int | None, str]] = set()
@@ -196,6 +196,7 @@ class RewardTracker:
                 game.scene,
                 game.room,
                 round(player.position[0] / 100.0),
+                round(player.position[1] / 80.0),
                 round(player.position[2] / 100.0),
             )
             if cell not in self.visited_cells:
@@ -486,8 +487,9 @@ class RewardTracker:
 
         if previous and previous["position"] is not None and current["position"] is not None:
             dx = current["position"][0] - previous["position"][0]
+            dy = current["position"][1] - previous["position"][1]
             dz = current["position"][2] - previous["position"][2]
-            moved = math.hypot(dx, dz) >= 4.0
+            moved = math.sqrt(dx * dx + dy * dy + dz * dz) >= 4.0
             useful_keys = {
                 "new_space",
                 "new_dialogue",
