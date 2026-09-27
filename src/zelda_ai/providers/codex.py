@@ -9,6 +9,7 @@ import re
 import shutil
 from pathlib import Path
 
+from ..autonomy import AUTONOMY_SYSTEM_PROMPT, AgentIntent
 from ..models import Decision, ModelInfo, RunConfig, Usage
 from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
 
@@ -141,6 +142,58 @@ class JsonRpcProcess:
             for future in list(self.pending.values()):
                 if not future.done():
                     future.set_exception(ProviderFailure("Codex app-server disconnected."))
+
+
+    async def think(self, config: RunConfig, prompt: str) -> InferenceResult:
+        """Return a high-level intent while the local motor loop keeps running."""
+        async with self.lock:
+            await self.rpc.start()
+            account = await self.rpc.request("account/read", {"refreshToken": False})
+            if (account.get("account") or {}).get("type") != "chatgpt":
+                raise ProviderFailure("This provider requires ChatGPT login; API-key billing is not substituted.")
+            while not self.rpc.notifications.empty():
+                self.rpc.notifications.get_nowait()
+            thread = await self.rpc.request("thread/start", {"model": config.model, "modelProvider": "openai",
+                "ephemeral": True, "approvalPolicy": "never", "sandbox": "read-only",
+                "baseInstructions": AUTONOMY_SYSTEM_PROMPT})
+            thread_id = thread["thread"]["id"]
+            turn_id = None
+            text, usage = "", Usage(actual_model=config.model)
+            try:
+                params = {"threadId": thread_id, "model": config.model,
+                    "input": [{"type": "text", "text": prompt}],
+                    "outputSchema": AgentIntent.model_json_schema()}
+                if config.effort:
+                    params["effort"] = config.effort
+                response = await self.rpc.request("turn/start", params)
+                turn_id = response["turn"]["id"]
+                async with asyncio.timeout(self.timeout):
+                    while True:
+                        event = await self.rpc.notifications.get()
+                        data = event.get("params", {})
+                        if data.get("threadId") != thread_id:
+                            continue
+                        if event["method"] == "thread/tokenUsage/updated":
+                            usage = parse_usage(data, usage.actual_model or config.model)
+                        elif event["method"] == "model/rerouted":
+                            usage.actual_model = data.get("toModel", config.model)
+                        elif event["method"] == "item/completed":
+                            item = data.get("item") or {}
+                            if item.get("type") == "agentMessage":
+                                text = item.get("text", "")
+                        elif event["method"] == "turn/completed" and data.get("turn", {}).get("id") == turn_id:
+                            if data["turn"].get("status") != "completed":
+                                raise ProviderFailure("Codex turn failed or was interrupted.", usage)
+                            return InferenceResult(text, usage)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                if turn_id:
+                    with contextlib.suppress(Exception):
+                        await asyncio.shield(self.rpc.request("turn/interrupt", {
+                            "threadId": thread_id, "turnId": turn_id}, timeout=5))
+                raise
+            finally:
+                with contextlib.suppress(Exception):
+                    await self.rpc.request("thread/unsubscribe", {"threadId": thread_id}, timeout=5)
 
     async def close(self):
         if self.process and self.process.returncode is None:
