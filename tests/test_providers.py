@@ -79,7 +79,12 @@ for line in sys.stdin:
         result={"thread":{"id":"thread-test"}}
     if method=="turn/start":
         assert req["params"]["effort"]=="high"
-        assert req["params"]["outputSchema"]["additionalProperties"] is False
+        schema=req["params"]["outputSchema"]
+        assert schema["additionalProperties"] is False
+        target=schema["properties"]["target_position"]["anyOf"][0]
+        assert target["items"]=={"type":"number"}
+        assert target["minItems"]==3 and target["maxItems"]==3
+        assert "prefixItems" not in target
         result={"turn":{"id":"turn-test"}}
     print(json.dumps({"id":req["id"],"result":result}),flush=True)
     if method=="turn/start":

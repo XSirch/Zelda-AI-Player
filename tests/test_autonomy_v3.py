@@ -15,6 +15,11 @@ def test_agent_intent_schema_is_strict_and_not_a_skill_contract():
     assert "skill" not in schema["properties"]
     assert "buttons" not in schema["properties"]
     assert "stick_x" not in schema["properties"]
+    target = schema["properties"]["target_position"]["anyOf"][0]
+    assert target["type"] == "array"
+    assert target["items"] == {"type": "number"}
+    assert target["minItems"] == target["maxItems"] == 3
+    assert "prefixItems" not in target
 
 
 def test_structured_state_is_stacked_for_temporal_policy(state):

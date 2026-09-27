@@ -55,8 +55,8 @@ Configuração padrão da cognição:
 
 ```text
 ZELDA_AGENT_PROVIDER=codex
-ZELDA_AGENT_MODEL=gpt-6-astra
-ZELDA_AGENT_EFFORT=
+ZELDA_AGENT_MODEL=gpt-6-luna
+ZELDA_AGENT_EFFORT=xhigh
 ```
 
 Altere esses valores no `.env` quando necessário.
