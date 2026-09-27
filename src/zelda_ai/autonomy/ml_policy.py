@@ -214,6 +214,11 @@ class OnlinePPO:
         observations = torch.tensor(
             [row["observation"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
+        novelty_observations = torch.tensor(
+            [row.get("novelty_observation", row["observation"]) for row in rollout],
+            dtype=torch.float32,
+            device=self.learner_device,
+        )
         sticks = torch.tensor(
             [row["stick"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
@@ -284,8 +289,8 @@ class OnlinePPO:
                 last_entropy = float(entropy_mean.detach().item())
 
         with torch.no_grad():
-            rnd_target = self.learner_rnd_target(observations)
-        rnd_prediction = self.learner_rnd(observations)
+            rnd_target = self.learner_rnd_target(novelty_observations)
+        rnd_prediction = self.learner_rnd(novelty_observations)
         rnd_loss = torch.nn.functional.mse_loss(rnd_prediction, rnd_target)
         self.rnd_optimizer.zero_grad(set_to_none=True)
         rnd_loss.backward()
