@@ -50,20 +50,9 @@ class Bridge(asyncio.DatagramProtocol):
         self.dropped_samples = 0
         self._last_resync = 0.0
         self._last_heartbeat = 0.0
-        self.navigation_debug: dict | None = None
 
     def connection_made(self, transport):
         self.transport = transport
-
-    def set_navigation_debug(self, **values):
-        state = self.state
-        self.navigation_debug = {
-            "scene_epoch": state.scene_epoch if state else None,
-            "scene": state.scene if state else None,
-            "room": state.room if state else None,
-            "seq": state.seq if state else None,
-            **values,
-        }
 
     @property
     def connected(self) -> bool:
@@ -184,7 +173,6 @@ class Bridge(asyncio.DatagramProtocol):
             now = time.monotonic()
             if bootstrap:
                 self.receipts.clear()
-                self.navigation_debug = None
                 self._observer_state = None
                 self._intervals.clear()
                 self._apply_latencies.clear()
@@ -195,8 +183,7 @@ class Bridge(asyncio.DatagramProtocol):
                     self.authority.revoke()
             elif self.last_seen:
                 if previous and state.scene_epoch != previous.scene_epoch:
-                    self.navigation_debug = None
-                ticks = state.input_tick - previous.input_tick
+                    ticks = state.input_tick - previous.input_tick
                 if ticks > 0:
                     measured = (now-self.last_seen)*1000/ticks
                     if 5 <= measured <= 200:
@@ -259,7 +246,6 @@ class Bridge(asyncio.DatagramProtocol):
                 "dropped_samples": self.dropped_samples, "event_gaps": self.event_gaps,
                 "fast_base_misses": self.fast_base_misses,
                 "ack_semantics": "input_consumer_delivery" if self.realtime else "accepted_only_legacy"},
-            "navigation": self.navigation_debug,
             "state": self.state.model_dump() if self.state else None}
 
     async def next_state(self, after_seq: int, *, timeout: float = .35) -> GameState:
