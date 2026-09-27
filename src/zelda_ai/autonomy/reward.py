@@ -31,6 +31,10 @@ class RewardTracker:
         self.seen_transitions: set[tuple[int, int, int, int]] = set()
         self.previous: dict | None = None
 
+    def break_causal_chain(self):
+        """Drop only the previous transition; keep novelty history for the run."""
+        self.previous = None
+
     @staticmethod
     def _progress_fingerprint(game: GameState):
         return (
