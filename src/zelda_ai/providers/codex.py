@@ -38,6 +38,21 @@ def parse_usage(params: dict, model: str) -> Usage:
         actual_model=model, cost_usd=None)
 
 
+def codex_turn_error(turn: dict, notification_error: str | None = None) -> str:
+    """Extract only the public app-server error message, never raw provider/auth payloads."""
+    error = turn.get("error")
+    message = error.get("message") if isinstance(error, dict) else None
+    if not isinstance(message, str) or not message.strip():
+        message = notification_error
+    if isinstance(message, str) and message.strip():
+        compact = " ".join(message.split())
+        return compact[:500]
+    status = turn.get("status")
+    if status == "interrupted":
+        return "Codex turn was interrupted."
+    return f"Codex turn ended with status {status or 'unknown'}."
+
+
 def summarize_rate_limits(payload: dict | None) -> dict:
     """Normalize supported Codex app-server quota snapshots for the UI."""
     if not isinstance(payload, dict):
@@ -241,7 +256,7 @@ class JsonRpcProcess:
                 else:
                     method = message.get("method", "")
                     # Never retain raw reasoning or auth payloads in the gameplay event queue.
-                    if method in {"turn/completed", "thread/tokenUsage/updated", "item/completed", "model/rerouted"}:
+                    if method in {"turn/completed", "thread/tokenUsage/updated", "item/completed", "model/rerouted", "error"}:
                         if method == "item/completed" and message.get("params", {}).get("item", {}).get("type") != "agentMessage":
                             continue
                         await self.notifications.put(message)
@@ -363,6 +378,7 @@ class CodexProvider:
             thread_id = thread["thread"]["id"]
             turn_id = None
             text, usage = "", Usage(actual_model=config.model)
+            terminal_error: str | None = None
             try:
                 params = {
                     "threadId": thread_id,
@@ -388,9 +404,20 @@ class CodexProvider:
                             item = data.get("item") or {}
                             if item.get("type") == "agentMessage":
                                 text = item.get("text", "")
+                        elif event["method"] == "error" and data.get("turnId") == turn_id:
+                            error = data.get("error") or {}
+                            message = error.get("message") if isinstance(error, dict) else None
+                            if not data.get("willRetry") and isinstance(message, str) and message.strip():
+                                terminal_error = " ".join(message.split())[:500]
                         elif event["method"] == "turn/completed" and data.get("turn", {}).get("id") == turn_id:
-                            if data["turn"].get("status") != "completed":
-                                raise ProviderFailure("Codex turn failed or was interrupted.", usage)
+                            turn = data["turn"]
+                            if turn.get("status") != "completed":
+                                raise ProviderFailure(codex_turn_error(turn, terminal_error), usage)
+                            if not text.strip():
+                                raise ProviderFailure(
+                                    "Codex completed the turn without an agent message.",
+                                    usage,
+                                )
                             return InferenceResult(text, usage)
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 if turn_id:
