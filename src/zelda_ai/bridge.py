@@ -60,7 +60,7 @@ class Bridge(asyncio.DatagramProtocol):
 
     @property
     def realtime(self) -> bool:
-        return bool(self.state and self.state.protocol == 2 and
+        return bool(self.state and self.state.protocol == 3 and
                     "input_sequence" in self.state.capabilities)
 
     def _diagnostic(self, exc: ValidationError):
@@ -79,7 +79,7 @@ class Bridge(asyncio.DatagramProtocol):
             return
         if request_full:
             self._last_resync = time.monotonic()
-        self.transport.sendto(json.dumps({"protocol": 2, "kind": "observe_ack", "token": self.token,
+        self.transport.sendto(json.dumps({"protocol": 3, "kind": "observe_ack", "token": self.token,
             "instance_id": instance or self.state.instance_id, "event_cursor": self._event_cursor,
             "request_full": request_full}, separators=(",", ":")).encode(), peer or self.peer)
 
@@ -167,7 +167,7 @@ class Bridge(asyncio.DatagramProtocol):
             else:
                 state = incoming
                 full = True
-                if state.protocol == 2 and state.full_seq != state.seq:
+                if state.protocol == 3 and state.full_seq != state.seq:
                     raise ValueError("Full snapshot sequence mismatch")
                 self._full = state
             now = time.monotonic()
@@ -190,11 +190,11 @@ class Bridge(asyncio.DatagramProtocol):
                 self._intervals.append((now - self.last_seen) * 1000)
                 self.dropped_samples += max(0, state.seq - previous.seq - 1)
             self.peer = addr
-            if state.protocol == 2 and now - self._last_heartbeat >= 1.0:
+            if state.protocol == 3 and now - self._last_heartbeat >= 1.0:
                 self._observe_ack(instance=state.instance_id, peer=addr)
                 self._last_heartbeat = now
             events_changed = self._ingest_events(state, bootstrap)
-            if state.protocol == 2:
+            if state.protocol == 3:
                 state = state.model_copy(update={"events": list(self._events)})
             for receipt in state.input_receipts:
                 self.receipts[receipt.seq] = receipt
