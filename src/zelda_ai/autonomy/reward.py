@@ -241,6 +241,13 @@ class RewardTracker:
                 self.seen_contexts.add(context_key)
                 b["new_context"] = 0.06
 
+        if self.previous is None:
+            # Events already present at the first observation predate this run
+            # and must not become free achievements.
+            self.seen_events.update(
+                f"{game.instance_id}:{event.id}" for event in game.events
+            )
+
         for event in game.events:
             key = f"{game.instance_id}:{event.id}"
             if key in self.seen_events:
