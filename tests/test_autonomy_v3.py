@@ -120,3 +120,21 @@ def test_repeated_world_edge_is_not_a_progress_farm(state):
     repeated = tracker.step(again, intent, intrinsic=0.0, pressed_buttons=0)
     assert repeated.breakdown.get("repeated_transition") == 0.01
     assert "new_world_transition" not in repeated.breakdown
+
+
+def test_policy_features_include_menu_and_camera_state(state):
+    state.camera_input_yaw = 1234
+    state.inventory = [1, 2, 0xFF]
+    state.equipped = [3, 4, 0xFF, 0xFF]
+    state.pause_menu.active = True
+    state.pause_menu.page_index = 2
+    state.pause_menu.cursor_point = [3, 0, 0, 0, 0]
+    state.pause_menu.cursor_item = [2, 0xFF, 0xFF, 0xFF]
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "menu",
+        "target_item_id": 2,
+        "choice_index": 1,
+    })
+    frame = encode_state(state, intent)
+    assert len(frame) == BASE_FEATURE_DIM
+    assert any(value != 0.0 for value in frame)
