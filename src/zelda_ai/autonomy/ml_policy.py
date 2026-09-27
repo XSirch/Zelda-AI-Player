@@ -103,7 +103,10 @@ class OnlinePPO:
         require_torch()
         self.checkpoint = Path(checkpoint)
         self.checkpoint.parent.mkdir(parents=True, exist_ok=True)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.learner_device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # Controller inference stays on CPU so CUDA backprop cannot starve the
+        # 10 Hz action sampler. The networks are intentionally small.
+        self.actor_device = torch.device("cpu")
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.clip_ratio = clip_ratio
@@ -113,12 +116,12 @@ class OnlinePPO:
         self.minibatch_size = minibatch_size
         self.actor_lock = threading.Lock()
 
-        self.learner = HybridActorCritic().to(self.device)
-        self.actor = HybridActorCritic().to(self.device)
-        self.learner_rnd = RNDNetwork().to(self.device)
-        self.actor_rnd = RNDNetwork().to(self.device)
-        self.learner_rnd_target = RNDNetwork().to(self.device)
-        self.actor_rnd_target = RNDNetwork().to(self.device)
+        self.learner = HybridActorCritic().to(self.learner_device)
+        self.actor = HybridActorCritic().to(self.actor_device)
+        self.learner_rnd = RNDNetwork().to(self.learner_device)
+        self.actor_rnd = RNDNetwork().to(self.actor_device)
+        self.learner_rnd_target = RNDNetwork().to(self.learner_device)
+        self.actor_rnd_target = RNDNetwork().to(self.actor_device)
         for parameter in self.learner_rnd_target.parameters():
             parameter.requires_grad_(False)
         for parameter in self.actor_rnd_target.parameters():
@@ -155,11 +158,11 @@ class OnlinePPO:
                 self.actor_rnd_target.load_state_dict(self.learner_rnd_target.state_dict())
 
     def _tensor(self, observation: list[float]):
-        return torch.tensor(observation, dtype=torch.float32, device=self.device)
+        return torch.tensor(observation, dtype=torch.float32, device=self.learner_device)
 
     def sample(self, observation: list[float]) -> dict:
         with self.actor_lock, torch.inference_mode():
-            obs = self._tensor(observation).unsqueeze(0)
+            obs = self._actor_tensor(observation).unsqueeze(0)
             stick_dist, button_dist, value, _ = self.actor.distributions(obs)
             sampled01 = stick_dist.sample()
             buttons = button_dist.sample()
@@ -181,13 +184,13 @@ class OnlinePPO:
 
     def actor_value(self, observation: list[float]) -> float:
         with self.actor_lock, torch.inference_mode():
-            obs = self._tensor(observation).unsqueeze(0)
+            obs = self._actor_tensor(observation).unsqueeze(0)
             _, _, value, _ = self.actor.distributions(obs)
             return float(value.item())
 
     def intrinsic_reward(self, observation: list[float]) -> float:
         with self.actor_lock, torch.inference_mode():
-            obs = self._tensor(observation).unsqueeze(0)
+            obs = self._actor_tensor(observation).unsqueeze(0)
             target = self.actor_rnd_target(obs)
             prediction = self.actor_rnd(obs)
             error = torch.nn.functional.mse_loss(prediction, target).item()
@@ -209,35 +212,35 @@ class OnlinePPO:
             return {}
 
         observations = torch.tensor(
-            [row["observation"] for row in rollout], dtype=torch.float32, device=self.device
+            [row["observation"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
         sticks = torch.tensor(
-            [row["stick"] for row in rollout], dtype=torch.float32, device=self.device
+            [row["stick"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
         buttons = torch.tensor(
-            [row["buttons"] for row in rollout], dtype=torch.float32, device=self.device
+            [row["buttons"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
         old_log_probs = torch.tensor(
-            [row["log_prob"] for row in rollout], dtype=torch.float32, device=self.device
+            [row["log_prob"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
         old_values = torch.tensor(
-            [row["value"] for row in rollout], dtype=torch.float32, device=self.device
+            [row["value"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
         rewards = torch.tensor(
-            [row["reward"] for row in rollout], dtype=torch.float32, device=self.device
+            [row["reward"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
         dones = torch.tensor(
             [1.0 if row["done"] else 0.0 for row in rollout],
             dtype=torch.float32,
-            device=self.device,
+            device=self.learner_device,
         )
 
         advantages = torch.zeros_like(rewards)
-        gae = torch.tensor(0.0, device=self.device)
+        gae = torch.tensor(0.0, device=self.learner_device)
         next_value = torch.tensor(
             0.0 if bootstrap_done else bootstrap_value,
             dtype=torch.float32,
-            device=self.device,
+            device=self.learner_device,
         )
         for index in range(len(rollout) - 1, -1, -1):
             nonterminal = 1.0 - dones[index]
@@ -251,7 +254,7 @@ class OnlinePPO:
         count = len(rollout)
         last_policy_loss = last_value_loss = last_entropy = 0.0
         for _ in range(self.epochs):
-            permutation = torch.randperm(count, device=self.device)
+            permutation = torch.randperm(count, device=self.learner_device)
             for start in range(0, count, self.minibatch_size):
                 batch = permutation[start:start + self.minibatch_size]
                 new_log_probs, entropy, values, button_logits = self.learner.evaluate(
@@ -350,7 +353,8 @@ class OnlinePPO:
 
     def stats(self) -> dict:
         return {
-            "device": str(self.device),
+            "learner_device": str(self.learner_device),
+            "actor_device": str(self.actor_device),
             "updates": self.updates,
             "samples_trained": self.samples_trained,
             "checkpoint_load_error": self.load_error,
