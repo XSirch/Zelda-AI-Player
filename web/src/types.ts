@@ -19,6 +19,40 @@ export interface InputState {
   reason: string;
 }
 
+export interface QuotaWindow {
+  limit_id: string | null;
+  limit_name: string | null;
+  slot: string;
+  used_percent: number;
+  remaining_percent: number;
+  window_duration_mins: number | null;
+  resets_at: number | null;
+}
+
+export interface UsageState {
+  provider: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  reasoning_output_tokens: number;
+  total_tokens: number;
+  cost_usd: number | null;
+  known_cost_usd: number;
+  quota: {
+    available?: boolean;
+    connected?: boolean;
+    plan?: string | null;
+    windows?: QuotaWindow[];
+    credits?: { has_credits: boolean; unlimited: boolean; balance: string | null } | null;
+    individual_limit?: { limit: string | null; used: string | null; remaining_percent: number | null; resets_at: number | null } | null;
+    limit?: number | null;
+    limit_remaining?: number | null;
+    error?: string;
+  };
+  quota_updated_at: number | null;
+}
+
 export interface Snapshot {
   status: string;
   reason: string;
@@ -42,6 +76,7 @@ export interface Snapshot {
   input: InputState;
   learning: Record<string, unknown>;
   metrics: Record<string, unknown> | null;
+  usage: UsageState;
   bridge: {
     connected: boolean;
     last_seen_age_s: number | null;
