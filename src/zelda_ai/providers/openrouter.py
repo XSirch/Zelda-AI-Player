@@ -7,8 +7,8 @@ import httpx
 
 from ..autonomy.models import AgentIntent
 from ..autonomy.prompt import AUTONOMY_SYSTEM_PROMPT
-from ..models import Decision, ModelInfo, RunConfig, Usage
-from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
+from ..models import ModelInfo, RunConfig, Usage
+from .base import InferenceResult, ProviderFailure
 
 GATEWAY_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -43,7 +43,7 @@ def reserve_cost(
     prompt: str,
     output_limit: int,
     *,
-    system_prompt: str = SYSTEM_PROMPT,
+    system_prompt: str = AUTONOMY_SYSTEM_PROMPT,
     output_schema: dict | None = None,
 ) -> float:
     """Conservative preflight estimate, not an assertion of a provider-enforced hard cap."""
@@ -55,7 +55,7 @@ def reserve_cost(
     except (KeyError, ValueError, TypeError):
         raise ProviderFailure("Model has no usable pricing; a dollar budget cannot be checked.") from None
     # Byte count deliberately overestimates normal text tokenization. Schema and system are included.
-    schema = output_schema if output_schema is not None else Decision.model_json_schema()
+    schema = output_schema if output_schema is not None else AgentIntent.model_json_schema()
     text_bytes = len((system_prompt + prompt + json.dumps(schema)).encode("utf-8"))
     return (prices[0] * (text_bytes + 1024) + prices[1] * output_limit + request) * 1.25
 
@@ -88,34 +88,6 @@ class OpenRouterProvider:
             return [model_info(row) for row in response.json()["data"]]
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             raise ProviderFailure(f"OpenRouter catalog unavailable ({type(exc).__name__}).") from None
-
-    async def decide(self, config: RunConfig, prompt: str) -> InferenceResult:
-        if not self.api_key:
-            raise ProviderFailure("OpenRouter is not authenticated.")
-        body = {"model": config.model, "messages": [{"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}], "stream": False,
-            "max_tokens": config.max_output_tokens,
-            "provider": {"require_parameters": True, "allow_fallbacks": False},
-            "response_format": {"type": "json_schema", "json_schema": {
-                "name": "zelda_decision", "strict": True, "schema": Decision.model_json_schema()}}}
-        if config.effort:
-            body["reasoning"] = {"effort": config.effort, "exclude": True}
-        try:
-            response = await self.client.post("chat/completions", json=body, headers=self.headers())
-            response.raise_for_status()
-            data = response.json()
-            usage = parse_usage(data)
-            choice = data.get("choices", [{}])[0]
-            content = (choice.get("message") or {}).get("content")
-            if choice.get("finish_reason") != "stop" or not isinstance(content, str) or not content.strip():
-                raise ProviderFailure("No complete decision returned; usage was recorded. Try a larger output budget "
-                    "or lower effort. No automatic paid retry was made.", usage)
-            return InferenceResult(content, usage)
-        except httpx.HTTPStatusError as exc:
-            raise ProviderFailure(f"OpenRouter HTTP {exc.response.status_code}; no automatic retry.") from None
-        except (httpx.RequestError, ValueError, KeyError) as exc:
-            raise ProviderFailure(f"OpenRouter request failed ({type(exc).__name__}); billing may be incomplete.") from None
-
 
     async def think(self, config: RunConfig, prompt: str) -> InferenceResult:
         """Infer high-level intent; realtime input is produced outside this request."""
