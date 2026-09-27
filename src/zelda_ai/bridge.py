@@ -228,7 +228,7 @@ class Bridge(asyncio.DatagramProtocol):
             index = min(len(ordered)-1, max(0, math.ceil(len(ordered)*fraction)-1))
             return round(ordered[index], 2)
         last_consumed = next((row for row in reversed(list(self.receipts.values())) if row.first_tick > 0), None)
-        return {"connected": self.connected, "last_seen_age_s": round(time.monotonic()-self.last_seen, 3)
+        return {"connected": self.connected, "source": self.state.source if self.state else None, "last_seen_age_s": round(time.monotonic()-self.last_seen, 3)
             if self.last_seen else None, "rejected_packets": self.rejected_packets,
             "last_validation_error": self.last_validation_error,
             "realtime": {"enabled": self.realtime, "owner": self.authority.label,
