@@ -249,14 +249,32 @@ class ContinuousController:
                 await asyncio.sleep(self.tick_s)
         finally:
             self.bridge.release()
-            # Do not cancel an asyncio.to_thread PPO update: cancelling the awaiter
-            # does not stop the worker thread. Drop queued future batches, then let
-            # the one update already running finish and checkpoint serially.
-            while not self.training_queue.empty():
-                with contextlib.suppress(asyncio.QueueEmpty):
-                    self.training_queue.get_nowait()
+            # Let queued/in-flight batches finish after input authority is gone.
+            # This cannot move Link because the controller loop has already ended.
             with contextlib.suppress(asyncio.CancelledError):
                 await asyncio.shield(learner)
+
+            # A short play session may stop before rollout_size. Preserve useful
+            # experience instead of discarding it; the newest pending action has
+            # no observed reward yet and is deliberately excluded.
+            if len(self.rollout) >= 16:
+                game = self.bridge.state
+                if game is not None and self.feature_history:
+                    observation = stack_frames(list(self.feature_history))
+                    bootstrap = self.policy.actor_value(observation)
+                    try:
+                        self.last_training_stats = await asyncio.to_thread(
+                            self.policy.train_rollout,
+                            self.rollout,
+                            bootstrap_value=bootstrap,
+                            bootstrap_done=False,
+                        )
+                    except Exception as exc:
+                        self.last_training_stats = {
+                            "error": f"{type(exc).__name__}: {str(exc)[:180]}"
+                        }
+                    self.rollout = []
+                    publish()
 
     def telemetry(self) -> dict:
         return {
