@@ -52,6 +52,8 @@ class ContinuousController:
     ):
         self.bridge = bridge
         self.policy = OnlinePPO(checkpoint)
+        self.starting_updates = self.policy.updates
+        self.starting_samples_trained = self.policy.samples_trained
         self.rollout_size = rollout_size
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
@@ -316,6 +318,10 @@ class ContinuousController:
             },
             "learning": {
                 **self.policy.stats(),
+                "run_updates": max(0, self.policy.updates - self.starting_updates),
+                "run_samples_trained": max(
+                    0, self.policy.samples_trained - self.starting_samples_trained
+                ),
                 "rollout_steps": len(self.rollout),
                 "queued_rollouts": self.training_queue.qsize(),
                 "last_reward": round(self.last_reward, 6),
