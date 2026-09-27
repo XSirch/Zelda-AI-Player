@@ -56,6 +56,7 @@ class AutonomyRuntime:
         self.settling_controller: asyncio.Task | None = None
         self.subscribers: set[asyncio.Queue] = set()
         self.persist_tasks: set[asyncio.Task] = set()
+        self.persistence_lock = asyncio.Lock()
         self.persistence_error = ""
         self.closed = False
         self.last_publish = 0.0
@@ -103,17 +104,26 @@ class AutonomyRuntime:
             "vision_calls": 0,
         }
 
+    async def _db_write(self, func, *args, **kwargs):
+        async with self.persistence_lock:
+            return await asyncio.to_thread(func, *args, **kwargs)
+
     def _persist(self, func, *args, **kwargs):
         if self.closed:
             return
         async def worker():
             try:
-                await asyncio.to_thread(func, *args, **kwargs)
+                await self._db_write(func, *args, **kwargs)
             except Exception as exc:
                 self.persistence_error = f"{type(exc).__name__}: {str(exc)[:180]}"
         task = asyncio.create_task(worker())
         self.persist_tasks.add(task)
         task.add_done_callback(self.persist_tasks.discard)
+
+    async def _drain_persistence(self):
+        while self.persist_tasks:
+            tasks = list(self.persist_tasks)
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _refresh_metrics(self, run_id: str | None = None):
         target_run = run_id or self.run_id
@@ -127,14 +137,19 @@ class AutonomyRuntime:
             self.metrics_at = time.monotonic()
 
     async def _finish_call(self, run_id: str, call_id: str, **values):
-        await asyncio.to_thread(self.store.finish_call, call_id, **values)
+        await self._db_write(self.store.finish_call, call_id, **values)
         await self._refresh_metrics(run_id)
 
     async def close(self):
         self.closed = True
-        tasks = list(self.persist_tasks)
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        await self._drain_persistence()
+        retired = [task for task in self.retired_tasks if not task.done()]
+        if retired:
+            done, pending = await asyncio.wait(retired, timeout=6.0)
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
 
     def publish(self, force: bool = False):
         now = time.monotonic()
@@ -364,6 +379,7 @@ class AutonomyRuntime:
 
     async def start(self, config: RunConfig):
         await self._settle_previous_controller()
+        await self._drain_persistence()
         async with self.lock:
             if self.state in {"running", "starting", "paused"}:
                 raise ValueError("Stop the current run before starting another")
@@ -587,7 +603,7 @@ class AutonomyRuntime:
 
             call_run_id = self.run_id
             call_segment_id = self.segment_id
-            begin_task = asyncio.create_task(asyncio.to_thread(
+            begin_task = asyncio.create_task(self._db_write(
                 self.store.begin_call,
                 call_run_id,
                 call_segment_id,
@@ -683,7 +699,7 @@ class AutonomyRuntime:
                 return
 
             if result.usage.actual_model and result.usage.actual_model != self.config.model:
-                await asyncio.to_thread(self.store.update_run, self.run_id, mixed=True)
+                await self._db_write(self.store.update_run, self.run_id, mixed=True)
                 self.log(
                     "provider_rerouted",
                     {
@@ -726,10 +742,11 @@ class AutonomyRuntime:
             self.reason = reason
             self.cognition_state = "idle" if state in {"stopped", "completed"} else "paused"
             self.pending_switch = None
+            await self._drain_persistence()
             if self.run_id:
-                self.store.update_run(self.run_id, status=state, reason=reason)
+                await self._db_write(self.store.update_run, self.run_id, status=state, reason=reason)
                 if state in {"stopped", "completed"}:
-                    self.store.end_segments(self.run_id)
+                    await self._db_write(self.store.end_segments, self.run_id)
             current = asyncio.current_task()
 
             # Controller exits from its active() predicate and is intentionally
@@ -763,7 +780,7 @@ class AutonomyRuntime:
             return
         if action in {"pause", "take_control"}:
             if action == "take_control" and self.run_id:
-                self.store.update_run(self.run_id, assisted=True)
+                await self._db_write(self.store.update_run, self.run_id, assisted=True)
             await self.halt("paused", action)
             return
 
@@ -783,7 +800,7 @@ class AutonomyRuntime:
                     self.model_dir / "raw-controller-ppo-rnd-v1.pt",
                 )
             self.controller.reset_episode_state()
-            self.store.update_run(self.run_id, status="running", reason="")
+            await self._db_write(self.store.update_run, self.run_id, status="running", reason="")
             self._spawn_tasks()
             self.publish(True)
 
