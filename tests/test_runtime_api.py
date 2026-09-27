@@ -62,39 +62,69 @@ async def test_model_switch_queued_between_decisions(store, state):
 
 
 def test_api_controls_security_and_end_to_end_demo(tmp_path):
-    settings = Settings(data_dir=tmp_path, bridge_port=free_udp_port(), allow_simulator=True,
-        codex_command="codex-test-not-installed", openrouter_api_key="")
+    settings = Settings(
+        data_dir=tmp_path,
+        bridge_port=free_udp_port(),
+        allow_simulator=True,
+        codex_command="codex-test-not-installed",
+        openrouter_api_key="",
+        agent_provider="demo",
+        agent_model="deterministic-demo",
+    )
     with TestClient(create_app(settings), base_url="http://127.0.0.1:8787") as client:
         boot = client.get("/api/bootstrap").json()
         headers = {"X-Zelda-Session": boot["session_token"]}
-        assert client.post("/api/control/pause", json={}).status_code == 403
-        assert client.post("/api/diagnostics/input", json={"action": "tap_a"}).status_code == 403
-        assert client.get("/api/status", headers={"Origin": "https://attacker.invalid"}).status_code == 403
-        assert client.get("/api/status", headers={"Host": "attacker.invalid"}).status_code == 400
-        for _ in range(30):
-            if client.get("/api/status").json()["bridge"]["connected"]: break
-            time.sleep(.02)
-        assert client.get("/api/status").json()["bridge"]["connected"]
-        legacy_diag = client.post("/api/diagnostics/input", json={"action": "tap_a"}, headers=headers)
-        assert legacy_diag.status_code == 400 and "BRIDGE V2" in legacy_diag.text
-        payload = RunConfig(provider="demo", model="deterministic-demo", max_calls=2).model_dump()
-        start = client.post("/api/runs", json=payload, headers=headers)
-        assert start.status_code == 200, start.text
-        run_id = start.json()["run_id"]
-        for _ in range(100):
-            status = client.get("/api/status").json()
-            if status["status"] == "paused": break
-            time.sleep(.05)
-        assert status["reason"] == "call_budget_reached", status
-        detail = client.get(f"/api/runs/{run_id}").json()
-        assert detail["source"] == "simulator" and detail["metrics"]["calls"] == 2
-        assert all(c["status"] == "completed" for c in detail["calls"])
-        assert detail["metrics"]["known_cost_usd"] == 0
-        assert any(e["kind"] == "skill_result" for e in detail["events"])
-        assert client.post("/api/hints", json={"text": "Try right"}, headers=headers).status_code == 200
-        assert client.get(f"/api/runs/{run_id}").json()["assisted"]
-        assert client.post("/api/control/stop", json={}, headers=headers).status_code == 200
 
+        # Local write boundary still protects the one-click controls.
+        assert client.post("/api/start", json={}).status_code == 403
+        assert client.get(
+            "/api/status", headers={"Origin": "https://attacker.invalid"}
+        ).status_code == 403
+        assert client.get(
+            "/api/status", headers={"Host": "attacker.invalid"}
+        ).status_code == 400
+
+        for _ in range(50):
+            if client.get("/api/status").json()["connection"]["game"]:
+                break
+            time.sleep(.02)
+        assert client.get("/api/status").json()["connection"]["game"]
+
+        started = client.post("/api/start", json={}, headers=headers)
+        assert started.status_code == 200, started.text
+        run_id = started.json()["run_id"]
+
+        status = started.json()
+        for _ in range(80):
+            status = client.get("/api/status").json()
+            if status["thought"]["state"] in {"acting", "thinking"} and status["input"]["reason"] == "ml_policy":
+                break
+            time.sleep(.05)
+
+        assert status["status"] == "running"
+        assert status["input"]["reason"] == "ml_policy"
+        assert isinstance(status["input"]["stick_x"], int)
+        assert isinstance(status["input"]["stick_y"], int)
+        assert "button_names" in status["input"]
+        assert status["thought"]["state"] in {"acting", "thinking"}
+        assert "learning" in status
+
+        detail = client.get(f"/api/runs/{run_id}").json()
+        assert detail["source"] == "simulator"
+        assert any(event["kind"] == "run_started" for event in detail["events"])
+
+        stopped = client.post("/api/stop", json={}, headers=headers)
+        assert stopped.status_code == 200
+        assert stopped.json()["status"] == "stopped"
+        assert stopped.json()["input"]["reason"] in {"ml_policy", "bridge_wait", "idle", "cutscene"}
+
+        # Legacy manual diagnostics/hints are not part of the minimal Autonomy V3 API.
+        assert client.post(
+            "/api/diagnostics/input", json={"action": "tap_a"}, headers=headers
+        ).status_code == 404
+        assert client.post(
+            "/api/hints", json={"text": "Try right"}, headers=headers
+        ).status_code == 404
 
 def test_semantic_traversal_failure_does_not_increase_stuck_score(store, state):
     from zelda_ai.models import Decision, SkillArgs
