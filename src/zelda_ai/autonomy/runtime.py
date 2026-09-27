@@ -16,7 +16,7 @@ from ..providers.base import ProviderFailure
 from ..providers.openrouter import reserve_cost
 from .controller import ContinuousController
 from .models import AgentIntent
-from .prompt import build_cognition_observation
+from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
 CONTRACT_VERSION = "autonomy-v3/raw-controller-v1/ppo-rnd-v1"
@@ -235,7 +235,11 @@ class AutonomyRuntime:
         reserve = None
         if self.config.provider == "openrouter" and self.selected_model is not None:
             reserve = lambda: reserve_cost(
-                self.selected_model, prompt, self.config.max_output_tokens
+                self.selected_model,
+                prompt,
+                self.config.max_output_tokens,
+                system_prompt=AUTONOMY_SYSTEM_PROMPT,
+                output_schema=AgentIntent.model_json_schema(),
             )
         return budget_reason(
             self.config,
