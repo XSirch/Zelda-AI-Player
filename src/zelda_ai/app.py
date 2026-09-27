@@ -302,6 +302,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             runtime.subscribers.discard(queue)
 
+    @app.api_route(
+        "/api/{path:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        include_in_schema=False,
+    )
+    async def unknown_api(path: str):
+        raise HTTPException(404, "API route not found")
+
     dist = Path(__file__).resolve().parents[2] / "web" / "dist"
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="panel")
