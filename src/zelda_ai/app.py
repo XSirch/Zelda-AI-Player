@@ -113,6 +113,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             runtime = getattr(app.state, "runtime", None)
             if runtime and runtime.state in {"running", "paused", "starting"}:
                 await runtime.halt("stopped", "server_shutdown")
+            if runtime:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await runtime._settle_previous_controller()
             bridge.close()
             if simulator_task:
                 simulator_task.cancel()
