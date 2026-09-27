@@ -158,6 +158,38 @@ def test_native_game_completed_event_ends_episode_and_scores_achievement(state):
     assert any(row["points"] == 5000 for row in result.achievements)
 
 
+
+def test_static_state_does_not_keep_earning_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+    last = None
+    for _ in range(20):
+        last = tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+    assert last is not None
+    assert last.reward < 0
+    assert last.breakdown.get("stagnation", 0) < 0
+
+
+def test_generic_native_event_does_not_pay_ppo_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+    changed = state.model_copy(deep=True)
+    changed.events = [
+        GameEvent(id="99", kind="context_action_changed", detail="none->open")
+    ]
+    result = tracker.step(changed, intent, intrinsic=0.0, pressed_buttons=0)
+    assert result.breakdown.get("native_event", 0) == 0
+
+
+def test_rnd_relative_novelty_has_zero_familiar_baseline(tmp_path):
+    policy = OnlinePPO(tmp_path / "rnd-policy.pt", epochs=1, minibatch_size=8)
+    values = [policy._relative_novelty(1.0) for _ in range(40)]
+    assert max(values) == 0.0
+    assert policy._relative_novelty(2.0) > 0.0
+
+
 def test_repeated_dialogue_does_not_farm_reward(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap()
@@ -199,7 +231,7 @@ def test_repeated_world_edge_is_not_a_progress_farm(state):
     again.seq += 3
     again.scene_epoch += 3
     repeated = tracker.step(again, intent, intrinsic=0.0, pressed_buttons=0)
-    assert repeated.breakdown.get("repeated_transition") == 0.01
+    assert repeated.breakdown.get("repeated_transition") == 0.0
     assert "new_world_transition" not in repeated.breakdown
 
 
