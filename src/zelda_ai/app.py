@@ -208,11 +208,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/runs")
     async def list_runs():
-        return app.state.store.list_runs()
+        await app.state.runtime._drain_persistence()
+        return await asyncio.to_thread(app.state.store.list_runs)
 
     @app.get("/api/runs/{run_id}")
     async def run_detail(run_id: str):
-        result = app.state.store.detail(run_id)
+        await app.state.runtime._drain_persistence()
+        result = await asyncio.to_thread(app.state.store.detail, run_id)
         if result is None:
             raise HTTPException(404, "Run not found")
         return result
