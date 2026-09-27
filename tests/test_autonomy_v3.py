@@ -160,6 +160,23 @@ def test_native_game_completed_event_ends_episode_and_scores_achievement(state):
 
 
 
+
+def test_vertical_movement_counts_as_new_space(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+
+    lower_floor = state.model_copy(deep=True)
+    lower_floor.player.position = (
+        state.player.position[0],
+        state.player.position[1] - 90.0,
+        state.player.position[2],
+    )
+    result = tracker.step(lower_floor, intent, intrinsic=0.0, pressed_buttons=0)
+    assert result.breakdown.get("new_space", 0) > 0
+    assert "stagnation" not in result.breakdown
+
+
 def test_static_state_does_not_keep_earning_reward(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap()
