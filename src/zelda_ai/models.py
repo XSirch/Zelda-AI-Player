@@ -8,17 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 ProviderId = Literal["codex", "openrouter", "demo"]
 Effort = str  # Actual accepted values are validated against the provider catalog.
-Skill = Literal[
-    "move", "turn", "interact", "attack", "defend", "target", "use_item", "wait",
-    "advance_dialogue", "choose_dialogue", "camera_center", "roll", "backflip",
-    "sidestep", "jump_attack", "pause_toggle", "menu_move", "menu_confirm",
-    "menu_cancel", "menu_assign", "continue_gameover", "play_song",
-    "navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
-    "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-    "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_to", "traverse_exit",
-]
-
-
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
@@ -374,97 +363,6 @@ class RealtimeState(StrictModel):
     events: list[GameEvent] = Field(max_length=64)
     event_floor: int = Field(ge=0)
     event_seq: int = Field(ge=0)
-
-
-class SkillArgs(StrictModel):
-    # Required nullable keys keep the schema compatible with strict JSON outputs.
-    direction: Literal["forward", "back", "left", "right", "up", "down"] | None
-    duration_ms: int = Field(ge=50, le=12000)
-    strength: float = Field(ge=0, le=1)
-    slot: Literal["left", "down", "right"] | None
-    choice_index: int | None = Field(ge=0, le=2)
-    song: Literal["minuet", "bolero", "serenade", "requiem", "nocturne", "prelude",
-        "sarias", "eponas", "lullaby", "suns", "time", "storms"] | None
-    target_actor_id: int | None = Field(ge=-32768, le=32767)
-    target_actor_uid: str | None = Field(default=None, max_length=96)
-    target_actor_params: int | None = Field(ge=-32768, le=32767)
-    target_position: list[float] | None = Field(min_length=3, max_length=3)
-    stop_distance: float | None = Field(ge=12, le=600)
-    item_id: int | None = Field(ge=0, le=255)
-
-    @field_validator("target_position")
-    @classmethod
-    def finite_target_position(cls, value):
-        if value is not None and not all(math.isfinite(v) for v in value):
-            raise ValueError("Non-finite target position")
-        return value
-
-
-class Decision(StrictModel):
-    goal: str = Field(min_length=1, max_length=200)
-    summary: str = Field(min_length=1, max_length=280)
-    skill: Skill
-    args: SkillArgs
-    memory_note: str | None = Field(max_length=400)
-
-    @classmethod
-    def model_json_schema(cls, *args, **kwargs):
-        schema = super().model_json_schema(*args, **kwargs)
-        # Providers require nullable fields to be present, while old persisted decisions omit the new UID.
-        args_schema = schema.get("$defs", {}).get("SkillArgs", {})
-        properties = args_schema.get("properties", {})
-        if properties:
-            args_schema["required"] = list(properties)
-            for value in properties.values():
-                value.pop("default", None)
-        return schema
-
-    @model_validator(mode="after")
-    def skill_arguments(self):
-        if self.skill in {"move", "turn", "sidestep", "menu_move", "traverse", "traverse_to"} and self.args.direction is None:
-            raise ValueError(f"{self.skill} requires direction")
-        if self.skill == "move" and self.args.direction not in {"forward", "back", "left", "right"}:
-            raise ValueError("move requires forward, back, left or right")
-        if self.skill in {"traverse", "traverse_to"} and self.args.direction not in {"up", "down"}:
-            raise ValueError(f"{self.skill} requires up or down")
-        if self.skill in {"turn", "sidestep"} and self.args.direction not in {"left", "right"}:
-            raise ValueError(f"{self.skill} requires left or right")
-        if self.skill == "menu_move" and self.args.direction not in {"up", "down", "left", "right"}:
-            raise ValueError("menu_move requires up, down, left or right")
-        if self.skill == "use_item" and self.args.slot is None:
-            raise ValueError("use_item requires an equipped C-button slot")
-        if self.skill == "choose_dialogue" and self.args.choice_index is None:
-            raise ValueError("choose_dialogue requires choice_index")
-        if self.skill == "menu_assign" and self.args.slot is None:
-            raise ValueError("menu_assign requires a C-button slot")
-        if self.skill not in {"navigate_to", "approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor",
-                              "equip_item", "equip_gear", "aim_at", "face_target", "shield_face",
-                              "fight_enemy", "explore_area", "manipulate_object", "traverse", "traverse_to", "traverse_exit"} and self.args.duration_ms > 2000:
-            raise ValueError("primitive skills are limited to 2000 ms")
-        if self.skill == "play_song" and self.args.song is None:
-            raise ValueError("play_song requires song")
-        if self.skill == "navigate_to" and self.args.target_position is None:
-            raise ValueError("navigate_to requires target_position")
-        if self.skill == "traverse_to" and self.args.target_position is None:
-            raise ValueError("traverse_to requires traversal_affordance approach_position")
-        if self.skill == "traverse_exit" and self.args.target_position is None:
-            raise ValueError("traverse_exit requires an observed scene-exit target_position")
-        if self.skill in {"approach_actor", "follow_actor", "talk_to_actor", "interact_with_actor", "fight_enemy",
-                           "manipulate_object"} and self.args.target_actor_id is None:
-            raise ValueError(f"{self.skill} requires target_actor_id")
-        if self.skill == "equip_item" and (self.args.item_id is None or self.args.slot is None):
-            raise ValueError("equip_item requires item_id and C-button slot")
-        if self.skill == "equip_gear" and self.args.item_id is None:
-            raise ValueError("equip_gear requires item_id")
-        if self.skill == "aim_at" and (self.args.slot is None or
-                (self.args.target_actor_id is None and self.args.target_position is None)):
-            raise ValueError("aim_at requires a C-button slot and actor or position target")
-        if self.skill in {"face_target", "shield_face"} and (
-                self.args.target_actor_id is None and self.args.target_position is None):
-            raise ValueError(f"{self.skill} requires actor or position target")
-        if self.skill == "manipulate_object" and self.args.direction not in {"forward", "back"}:
-            raise ValueError("manipulate_object requires forward or back direction")
-        return self
 
 
 class Usage(StrictModel):
