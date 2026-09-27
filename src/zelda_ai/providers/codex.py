@@ -9,8 +9,10 @@ import re
 import shutil
 from pathlib import Path
 
-from ..models import Decision, ModelInfo, RunConfig, Usage
-from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
+from ..autonomy.models import AgentIntent
+from ..autonomy.prompt import AUTONOMY_SYSTEM_PROMPT
+from ..models import ModelInfo, RunConfig, Usage
+from .base import InferenceResult, ProviderFailure
 
 
 ASTRA_MIN_CODEX_VERSION = (0, 153, 0)
@@ -34,6 +36,114 @@ def parse_usage(params: dict, model: str) -> Usage:
     return Usage(input_tokens=counts.get("inputTokens"), cached_input_tokens=counts.get("cachedInputTokens"),
         output_tokens=counts.get("outputTokens"), reasoning_output_tokens=counts.get("reasoningOutputTokens"),
         actual_model=model, cost_usd=None)
+
+
+def summarize_rate_limits(payload: dict | None) -> dict:
+    """Normalize supported Codex app-server quota snapshots for the UI."""
+    if not isinstance(payload, dict):
+        return {
+            "available": False,
+            "ordinary_usage_allowed": None,
+            "windows": [],
+            "credits": None,
+            "individual_limit": None,
+        }
+
+    by_id = payload.get("rateLimitsByLimitId")
+    snapshots: list[tuple[str | None, dict]] = []
+    if isinstance(by_id, dict):
+        codex = by_id.get("codex")
+        if isinstance(codex, dict):
+            snapshots.append(("codex", codex))
+        for limit_id, row in by_id.items():
+            if limit_id == "codex" or not isinstance(row, dict):
+                continue
+            snapshots.append((str(limit_id), row))
+
+    legacy = payload.get("rateLimits")
+    if isinstance(legacy, dict):
+        snapshots.append((legacy.get("limitId"), legacy))
+
+    windows: list[dict] = []
+    seen: set[tuple] = set()
+    for fallback_id, snapshot in snapshots:
+        limit_id = snapshot.get("limitId") or fallback_id
+        limit_name = snapshot.get("limitName")
+        for slot in ("primary", "secondary"):
+            window = snapshot.get(slot)
+            if not isinstance(window, dict):
+                continue
+            used = window.get("usedPercent")
+            if not isinstance(used, (int, float)):
+                continue
+            duration = window.get("windowDurationMins")
+            resets_at = window.get("resetsAt")
+            used_percent = max(0, min(100, int(round(float(used)))))
+            key = (limit_id, slot, duration, used_percent)
+            if key in seen:
+                continue
+            seen.add(key)
+            windows.append({
+                "limit_id": limit_id,
+                "limit_name": limit_name,
+                "slot": slot,
+                "used_percent": used_percent,
+                "remaining_percent": max(0, 100 - used_percent),
+                "window_duration_mins": duration if isinstance(duration, (int, float)) else None,
+                "resets_at": resets_at if isinstance(resets_at, (int, float)) else None,
+            })
+
+    windows.sort(key=lambda row: (
+        row["limit_id"] != "codex",
+        row["window_duration_mins"] is None,
+        row["window_duration_mins"] or 10**12,
+        row["limit_name"] or row["limit_id"] or "",
+    ))
+
+    primary_snapshot = next(
+        (row for limit_id, row in snapshots if limit_id == "codex"),
+        legacy if isinstance(legacy, dict) else (snapshots[0][1] if snapshots else {}),
+    )
+    credits = primary_snapshot.get("credits") if isinstance(primary_snapshot, dict) else None
+    individual = primary_snapshot.get("individualLimit") if isinstance(primary_snapshot, dict) else None
+    if isinstance(legacy, dict):
+        credits = credits if isinstance(credits, dict) else legacy.get("credits")
+        individual = individual if isinstance(individual, dict) else legacy.get("individualLimit")
+    reset_credits = payload.get("rateLimitResetCredits")
+    return {
+        "available": bool(
+            windows
+            or isinstance(credits, dict)
+            or isinstance(individual, dict)
+            or isinstance(reset_credits, dict)
+        ),
+        "ordinary_usage_allowed": payload.get("ordinaryUsageAllowed"),
+        "windows": windows,
+        "credits": {
+            "has_credits": bool(credits.get("hasCredits")),
+            "unlimited": bool(credits.get("unlimited")),
+            "balance": credits.get("balance"),
+        } if isinstance(credits, dict) else None,
+        "individual_limit": {
+            "limit": individual.get("limit"),
+            "used": individual.get("used"),
+            "remaining_percent": individual.get("remainingPercent"),
+            "resets_at": individual.get("resetsAt"),
+        } if isinstance(individual, dict) else None,
+        "reset_credits": {
+            "available_count": reset_credits.get("availableCount"),
+        } if isinstance(reset_credits, dict) else None,
+        "rate_limit_reached_type": (
+            primary_snapshot.get("rateLimitReachedType")
+            if isinstance(primary_snapshot, dict)
+            else None
+        ) or (legacy.get("rateLimitReachedType") if isinstance(legacy, dict) else None),
+        "plan_type": (
+            primary_snapshot.get("planType")
+            if isinstance(primary_snapshot, dict)
+            else None
+        ) or (legacy.get("planType") if isinstance(legacy, dict) else None),
+    }
 
 
 def executable_prefix(command: str) -> list[str]:
@@ -142,6 +252,7 @@ class JsonRpcProcess:
                 if not future.done():
                     future.set_exception(ProviderFailure("Codex app-server disconnected."))
 
+
     async def close(self):
         if self.process and self.process.returncode is None:
             self.process.terminate()
@@ -185,13 +296,29 @@ class CodexProvider:
             else:
                 message = "Conecte a conta ChatGPT pelo painel."
             return {"connected": connected, "auth_type": account.get("type"),
-                "plan": account.get("planType"), "limits": limits, "cli_version": version_text,
+                "plan": account.get("planType"), "limits": limits,
+                "quota": summarize_rate_limits(limits),
+                "cli_version": version_text,
                 "astra_cli_ready": astra_cli_ready, "message": message}
         except (ProviderFailure, asyncio.TimeoutError) as exc:
             version_text, version = parse_codex_version(self.rpc.server_version)
             return {"connected": False, "cli_version": version_text,
                 "astra_cli_ready": version is not None and version >= ASTRA_MIN_CODEX_VERSION,
                 "message": str(exc) or "Codex timed out."}
+
+    async def quota(self) -> dict:
+        """Read supported ChatGPT/Codex quota state without starting a model turn."""
+        await self.rpc.start()
+        account_result = await self.rpc.request("account/read", {"refreshToken": False})
+        account = account_result.get("account") or {}
+        if account.get("type") != "chatgpt":
+            return {"available": False, "connected": False, "windows": []}
+        limits = await self.rpc.request("account/rateLimits/read")
+        return {
+            "connected": True,
+            "plan": account.get("planType"),
+            **summarize_rate_limits(limits),
+        }
 
     async def login(self, device: bool = False) -> dict:
         await self.rpc.start()
@@ -216,7 +343,8 @@ class CodexProvider:
                 return result
         raise ProviderFailure("Codex model catalog exceeded pagination limit.")
 
-    async def decide(self, config: RunConfig, prompt: str) -> InferenceResult:
+    async def think(self, config: RunConfig, prompt: str) -> InferenceResult:
+        """Return a high-level intent while the local motor loop keeps running."""
         async with self.lock:
             await self.rpc.start()
             account = await self.rpc.request("account/read", {"refreshToken": False})
@@ -224,16 +352,24 @@ class CodexProvider:
                 raise ProviderFailure("This provider requires ChatGPT login; API-key billing is not substituted.")
             while not self.rpc.notifications.empty():
                 self.rpc.notifications.get_nowait()
-            thread = await self.rpc.request("thread/start", {"model": config.model, "modelProvider": "openai",
-                "ephemeral": True, "approvalPolicy": "never", "sandbox": "read-only",
-                "baseInstructions": SYSTEM_PROMPT})
+            thread = await self.rpc.request("thread/start", {
+                "model": config.model,
+                "modelProvider": "openai",
+                "ephemeral": True,
+                "approvalPolicy": "never",
+                "sandbox": "read-only",
+                "baseInstructions": AUTONOMY_SYSTEM_PROMPT,
+            })
             thread_id = thread["thread"]["id"]
             turn_id = None
             text, usage = "", Usage(actual_model=config.model)
             try:
-                params = {"threadId": thread_id, "model": config.model,
+                params = {
+                    "threadId": thread_id,
+                    "model": config.model,
                     "input": [{"type": "text", "text": prompt}],
-                    "outputSchema": Decision.model_json_schema()}
+                    "outputSchema": AgentIntent.model_json_schema(),
+                }
                 if config.effort:
                     params["effort"] = config.effort
                 response = await self.rpc.request("turn/start", params)
@@ -259,11 +395,13 @@ class CodexProvider:
             except (asyncio.TimeoutError, asyncio.CancelledError):
                 if turn_id:
                     with contextlib.suppress(Exception):
-                        await asyncio.shield(self.rpc.request("turn/interrupt", {
-                            "threadId": thread_id, "turnId": turn_id}, timeout=5))
+                        await asyncio.shield(self.rpc.request(
+                            "turn/interrupt",
+                            {"threadId": thread_id, "turnId": turn_id},
+                            timeout=5,
+                        ))
                 raise
             finally:
-                # Unsubscribe; the app-server manages ephemeral thread cleanup.
                 with contextlib.suppress(Exception):
                     await self.rpc.request("thread/unsubscribe", {"threadId": thread_id}, timeout=5)
 

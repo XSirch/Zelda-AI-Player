@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "zelda-ai-player"
-version = "0.1.0"
-description = "Local, state-driven agent laboratory for Ship of Harkinian"
+version = "0.3.0"
+description = "Continuous ML player for Ship of Harkinian"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.128.2,<1", "uvicorn>=0.34,<1", "pydantic>=2.12,<3",
   "pydantic-settings>=2.10,<3", "httpx>=0.28,<1", "sqlalchemy>=2.0.40,<3",
   "websockets>=15,<17",
+  "torch>=2.5,<3",
 ]
 
 [project.scripts]
@@ -32,3 +33,12 @@ line-length = 110
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I"]
+
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true

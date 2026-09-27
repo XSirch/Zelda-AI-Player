@@ -1,79 +1,84 @@
-# Arquitetura 0.1
+# Arquitetura — Autonomy V3
+
+## Objetivo
+
+Ao clicar **INICIAR**, Link deve continuar recebendo inputs enquanto percepção, cognição e treinamento acontecem em paralelo. Não existe catálogo de skills na arquitetura ativa.
+
+## Fluxo
 
 ```text
-SoH custom build -- UDP 127.0.0.1:8766 --> Bridge Python
-     ^                                      |
-     | input com lease                      v
-     +------------------------ Runtime / skills / SQLAlchemy
-                                           |
-                         +-----------------+----------------+
-                         |                                  |
-                 Codex app-server                    OpenRouter HTTP
-                 ChatGPT auth                        API key
-                         |                                  |
-                         +------ JSON Decision validado ----+
-                                           |
-                              FastAPI HTTP + WebSocket
-                                           |
-                                   React / TypeScript
-                              vídeo local separado do prompt
+Ship of Harkinian
+      │ structured state / events
+      ▼
+Authenticated UDP Bridge
+      │
+      ├──────────────► Cognition loop (Codex/OpenRouter)
+      │                    │ AgentIntent only
+      │                    ▼
+      │              current high-level intent
+      │
+      ▼
+ML Actor (10 Hz action sampling / 20 Hz lease renewal)
+      │ raw stick_x / stick_y / physical button bits
+      ▼
+SoH input consumer
+
+Experience ──► reward + RND curiosity ──► PPO learner thread
+                                      │
+                                      └── atomic weight publish ──► ML Actor
 ```
 
-## Decisão, estado e cadência
+## ML actor
 
-`models.py` define o contrato Autonomy v2 (`state-v10/skills-v11/trajectory-v3/prompt-v15`). O bridge envia snapshots limitados a 5 Hz; esses pacotes não são chamadas de IA. Cada inferência recebe um estado compacto, objetivo, último resultado, cinco eventos e até oito memórias relevantes. Um único modelo/uma única skill opera por vez. Não enviamos todo o histórico de jogo nem screenshots.
+`autonomy/ml_policy.py` implements a hybrid actor-critic:
 
-Primitives motoras continuam curtas e limitadas. Controladores compostos locais executam navegação até posição/ator, follow, conversa/interação, exploração, manipulação, mira, facing/escudo, combate genérico, equipamento, ocarina, diálogo linear e game-over sem uma chamada de modelo por frame. O planner escolhe subobjetivos e estratégias; sucesso de interação/combate exige evidência observável.
+- two continuous stick dimensions through Beta distributions;
+- nine independent Bernoulli physical-button outputs;
+- critic/value head;
+- PPO updates with GAE;
+- RND predictor/target networks for intrinsic novelty reward.
 
-Dados expostos: posição/orientação/colisão/água, vida/magia/rupias, inventário/equipamento/progresso, câmera, cena/sala/entrance/dia-noite, diálogo, ação contextual, target, `room_actors` (até 64, inclusive off-camera), `nearby_actors` como subconjunto renderizado e telemetria de travessia do player (`wall_flags`, ladder/ledge/can_climb/can_down). `navigation_probes` faz 16 amostras locais (8 direções × 70/140 unidades) e publica piso/`delta_y`/parede para segurança em tempo real. Separadamente, `traversal_affordances` roda apenas no snapshot completo e varre 16 direções até 280u para produzir candidatos compactos de subida/descida (`stairs_or_slope_*`, `ledge_down`, `ladder_*`, `climbable_wall_up`) com `approach_position`; `traverse(up/down)` usa automaticamente esses affordances: quando não há evidência imediata de travessia sob Link, seleciona localmente o melhor candidato alcançável, navega por A* até `approach_position`, revalida a geometria e entrega para o controlador de travessia. `traverse_to` fica reservado para escolha explícita de uma rota específica. A cada snapshot completo, o bridge também deriva uma NavMesh móvel 9×9 diretamente da colisão do SoH: células exigem piso, margem para o corpo e conexões com desnível caminhável, múltiplas amostras de piso ao longo de cada aresta e corredor livre. O controlador Python executa A* sobre links recíprocos e usa as sondas rápidas como veto final antes do input. A malha bruta não entra no prompt do modelo; só um resumo de disponibilidade/tamanho é enviado. `scene_exits` expõe apenas surfaces de colisão atualmente carregadas cujo `SceneExitIndex` é não-zero, com um ponto amostrado garantidamente sobre o trigger; `traverse_exit` usa esse ponto para cruzar transições sem ator de porta. No estado interno/UI permanecem `exit_index`/`entrance_index` para diagnóstico, mas o payload do modelo recebe somente `scene_exits:[{position}]`. O destino não é inferido por nome/ID; somente uma mudança real de scene/room promove a aresta observada para `known_world_edges`. Não há navmesh global entre salas descarregadas, escrita direta em estado de jogo nem eventChkInf/flags ocultos de roteiro deliberadamente expostos.
+The policy receives four structured frames, left-padded at episode start. It is not told semantic button meanings.
 
-## Controle nativo
+## Concurrency
 
-O instalador insere `ZeldaAiBridge_ConsumeInput` no ponto consumidor de `padmgr.c`, apenas no controle 0. A duração usa relógio monotônico real, não frames de renderização. Uma lease expira em até 500 ms; perda de conexão devolve o input original ao jogador.
+`autonomy/controller.py` renews short native input leases every 50 ms and samples a new ML action every two ticks. The learner trains a private network copy in `asyncio.to_thread`; only completed updates publish weights to the actor. A slow LLM call therefore does not create a movement pause.
 
-Pacotes precisam conter token, instance_id, scene_epoch, base_seq e seq. Comandos de mundos diferentes, antigos ou repetidos são descartados. Mudança observada de scene ou room incrementa o epoch de controle, libera a lease vigente e gera evento de replanejamento. O token usa loopback; não exponha a porta como serviço remoto. A lista de eventos nativos é uma janela de 16 entradas com IDs e deduplicação, não um transporte lossless para auditoria de conclusão do jogo.
+Stopping revokes bridge authority first. An already-running gradient update may finish and atomically checkpoint, but cannot keep sending controller input.
 
-## Providers
+## Cognition
 
-O OpenRouter recebe `response_format=json_schema` com o mesmo contrato do Codex `turn/start.outputSchema`. O Codex usa uma thread efêmera por decisão para limitar o histórico; a memória útil é externa. Seu perfil isolado usa login oficial e não lê `auth.json` na aplicação.
+`AgentIntent` contains objective, short spectator summary, mode, optional observed actor/coordinate target, optional direction/choice and a bounded horizon. It contains no skill name and no raw controller action.
 
-Reasoning bruto não é armazenado nem mostrado. `summary` é uma explicação operacional curta solicitada no JSON e seus tokens contam na saída. `Usage` admite null; não substituímos custo/tokens desconhecidos por medição zero. Cancelamentos podem impedir contabilização final e pausam futuras chamadas.
+The cognition prompt can use structured game state, dialogue, observed actors, current ML telemetry, learned world edges and recent events. Unknown transitions remain unknown until observed.
 
-Modelos podem conhecer Zelda do pré-treino; memória vazia não implica desconhecimento do jogo. Comparações são exploratórias até que versão de skills, saves, RNG, modalidade de estado e critérios de vitória sejam certificados.
+## Reward
 
-## Persistência e segurança
+`autonomy/reward.py` uses only observable evidence: intrinsic RND novelty, new spatial cells/actors/events, scene transitions, durable game progress, dialogue/context changes, target-distance progress, enemy health deltas, damage/death and a small button-activity penalty.
 
-SQLite local com WAL; SQLAlchemy permite uma URL alternativa com o driver instalado pelo operador. Não requer PostgreSQL ou Docker para começar. Tabelas: runs, segments, calls, events, memories, trajectories e world_edges. Reiniciar o backend marca runs anteriores como interrompidas; não retoma inferências pagas automaticamente.
+There is no scripted Kokiri/Saria/Mido quest sequence in the reward or runtime.
 
-HTTP aceita apenas hosts locais. Mutação exige nonce de sessão, e origens web externas são rejeitadas. WebSocket autentica pela primeira mensagem, não por segredo em URL. Chave OpenRouter digitada no painel é mantida apenas em memória. Arquivos locais de credenciais, saves, ROMs e banco ficam fora do Git.
+## Persistence
 
-## Fontes técnicas usadas
+- SQLAlchemy stores runs, calls, events, memories and empirically observed world edges.
+- ML weights/optimizer/RND state persist in `.local/ml/raw-controller-ppo-rnd-v1.pt`.
+- Checkpoint writes use temporary-file replacement.
+- Existing SQLite tables from older versions may remain in an old database, but Autonomy V3 code no longer reads/writes skill trajectories or heuristic combat profiles.
 
-- [Codex App Server](https://developers.openai.com/codex/app-server/): JSON-RPC, autenticação, models e eventos de tokens.
-- [Codex auth](https://developers.openai.com/codex/auth/).
-- [Codex config reference](https://developers.openai.com/codex/config-reference/).
-- [OpenRouter reasoning](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens).
-- [OpenRouter usage](https://openrouter.ai/docs/cookbook/administration/usage-accounting).
-- [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
-- [Shipwright fixado](https://github.com/HarbourMasters/Shipwright/tree/d30fc192f2eb01ceea45bd1e12de61636cafbf86): GameInteractor_HookTable.h, ShipInit.hpp, padmgr.c e CMakeLists.txt.
+## Providers and usage
 
+Codex/ChatGPT uses the official isolated Codex app-server profile. Token usage comes from `thread/tokenUsage/updated`. Quota is polled separately via `account/rateLimits/read`, so quota refresh neither invokes a model nor stops the motor loop. OpenRouter keeps its API usage/cost accounting.
 
-### Integridade do aprendizado de transições
+## UI
 
-Saídas de cena são opacas ao modelo até serem atravessadas. IDs nativos permanecem apenas em controle/UI. O runtime confirma o `SceneExitIndex` do floor poly sob Link no último estado anterior à mudança de cena antes de associar uma surface selecionada ao destino. Se outra porta/warp/script causar a transição, a aresta usa a posição real observada e não a surface planejada. `memory_note` livre do modelo não é persistido; topologia persistente vem exclusivamente de evidência estruturada (`known_world_edges`, trajetórias confirmadas e eventos nativos).
+The React panel intentionally exposes only:
 
+- SoH/bridge/cognition connection;
+- operational thought/intention;
+- raw stick and currently pressed physical buttons;
+- run tokens/cache/reasoning;
+- API cost when the provider reports USD;
+- Codex quota windows actually returned by the app-server;
+- start/stop.
 
-### Quest checkpoint layer
-
-`checkpoints.py` derives a deterministic opening plan from `progress.story_flags`, owned/equipped gear and scene observations. The model receives one active checkpoint plus completed/upcoming steps and `do_not_repeat` constraints. This is high-level quest ordering only; physical route discovery remains the responsibility of NavMesh, traversal affordances and learned world edges.
-
-### Scene autosave
-
-Bridge v2.10 tracks real scene transitions. On a non-initial `OnSceneInit` it schedules an autosave and later performs `Play_PerformSave` from `OnGameFrameUpdate` only after the destination scene is stable and save-safe. Autosave telemetry is part of the slow/full state.
-
-
-### Checkpoint layer
-
-The quest checkpoint layer sits above skills/navigation and below model planning. It derives a single active opening objective from native save/progress evidence, exposes the next few milestones, and blocks obvious completed-NPC loops. It deliberately does not encode world-space routes; route discovery remains the responsibility of collision/NavMesh/actors/learned edges.
-
-Scene autosave is native-side and independent of the LLM. Scene changes schedule a deferred `Play_PerformSave` once the destination is stable; room changes remain logical checkpoints only.
+Advanced run records remain accessible through backend API endpoints, not the primary gameplay screen.

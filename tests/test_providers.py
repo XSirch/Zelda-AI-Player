@@ -6,22 +6,25 @@ from pathlib import Path
 import httpx
 import pytest
 
+from zelda_ai.autonomy.models import AgentIntent
+from zelda_ai.autonomy.prompt import AUTONOMY_SYSTEM_PROMPT
 from zelda_ai.models import RunConfig
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.providers.codex import CodexProvider, parse_codex_version
+from zelda_ai.providers.codex import CodexProvider, parse_codex_version, summarize_rate_limits
 from zelda_ai.providers.openrouter import OpenRouterProvider
 
 
 @pytest.mark.asyncio
-async def test_openrouter_valid_decision_and_effort(decision):
+async def test_openrouter_valid_intent_and_effort():
+    intent = AgentIntent.bootstrap()
     bodies = []
     def respond(request):
         bodies.append(json.loads(request.content))
         return httpx.Response(200, json={"id": "gen", "model": "test/m", "usage": {
             "prompt_tokens": 50, "completion_tokens": 20, "cost": .01},
-            "choices": [{"finish_reason": "stop", "message": {"content": decision.model_dump_json()}}]})
+            "choices": [{"finish_reason": "stop", "message": {"content": intent.model_dump_json()}}]})
     provider = OpenRouterProvider("secret", httpx.MockTransport(respond))
-    result = await provider.decide(RunConfig(provider="openrouter", model="test/m", effort="high"), "{}")
+    result = await provider.think(RunConfig(provider="openrouter", model="test/m", effort="high"), "{}")
     assert result.usage.cost_usd == .01
     assert bodies[0]["reasoning"] == {"effort": "high", "exclude": True}
     assert bodies[0]["response_format"]["json_schema"]["strict"] is True
@@ -39,7 +42,7 @@ async def test_billable_incomplete_result_preserves_usage():
             "choices": [{"finish_reason": "length", "message": {"content": ""}}]})
     provider = OpenRouterProvider("secret", httpx.MockTransport(respond))
     with pytest.raises(ProviderFailure) as error:
-        await provider.decide(RunConfig(provider="openrouter", model="test"), "{}")
+        await provider.think(RunConfig(provider="openrouter", model="test"), "{}")
     assert error.value.usage.cost_usd == .2 and count == 1
     await provider.close()
 
@@ -53,16 +56,16 @@ async def test_http_failure_no_retry_or_key_leak():
         return httpx.Response(429, json={"error": "secret must not appear"})
     provider = OpenRouterProvider("very-secret", httpx.MockTransport(respond))
     with pytest.raises(ProviderFailure) as error:
-        await provider.decide(RunConfig(provider="openrouter", model="test"), "{}")
+        await provider.think(RunConfig(provider="openrouter", model="test"), "{}")
     assert count == 1 and "429" in str(error.value) and "secret" not in str(error.value)
     assert error.value.usage.cost_usd is None
     await provider.close()
 
 
 @pytest.mark.asyncio
-async def test_codex_jsonrpc_protocol(tmp_path, decision, monkeypatch):
+async def test_codex_jsonrpc_protocol(tmp_path, monkeypatch):
     script = tmp_path / "fake_codex.py"
-    output = decision.model_dump_json()
+    output = AgentIntent.bootstrap().model_dump_json()
     script.write_text('''import json, sys
 for line in sys.stdin:
     req=json.loads(line)
@@ -96,7 +99,7 @@ for line in sys.stdin:
     try:
         assert (await provider.status())["connected"]
         assert (await provider.models())[0].efforts == ["high"]
-        result = await provider.decide(RunConfig(provider="codex", model="test", effort="high"), "{}")
+        result = await provider.think(RunConfig(provider="codex", model="test", effort="high"), "{}")
         assert result.usage.total_tokens == 140 and result.usage.cost_usd is None
         assert result.text == output and "NEVER_STORE_THIS" not in result.text
         assert provider.rpc.notifications.empty()
@@ -121,8 +124,60 @@ def test_parse_codex_version_for_astra_era():
     assert parse_codex_version("unknown") == (None, None)
 
 
-def test_system_prompt_explains_enemy_learning_as_fallible_experience():
-    from zelda_ai.providers.base import SYSTEM_PROMPT
-    assert "enemy_learning" in SYSTEM_PROMPT
-    assert "fallible learned experience" in SYSTEM_PROMPT
-    assert "fight_enemy learns a separate local policy" in SYSTEM_PROMPT
+def test_autonomy_prompt_never_exposes_skill_or_raw_button_selection():
+    assert "You do NOT choose controller skills." in AUTONOMY_SYSTEM_PROMPT
+    assert "You do NOT choose raw N64 buttons." in AUTONOMY_SYSTEM_PROMPT
+    assert "fight_enemy" not in AUTONOMY_SYSTEM_PROMPT
+    assert "navigate_to" not in AUTONOMY_SYSTEM_PROMPT
+
+
+def test_codex_quota_normalizes_used_to_remaining_without_assuming_slots():
+    payload = {
+        "rateLimits": {
+            "limitId": "codex",
+            "planType": "plus",
+            "primary": {
+                "usedPercent": 31,
+                "windowDurationMins": 10080,
+                "resetsAt": 1790000000,
+            },
+            "secondary": None,
+            "credits": {
+                "hasCredits": False,
+                "unlimited": False,
+                "balance": "0",
+            },
+        },
+        "rateLimitsByLimitId": {
+            "codex": {
+                "limitId": "codex",
+                "limitName": "Codex",
+                "primary": {
+                    "usedPercent": 31,
+                    "windowDurationMins": 10080,
+                    "resetsAt": 1790000000,
+                },
+                "secondary": None,
+            }
+        },
+    }
+    quota = summarize_rate_limits(payload)
+    assert quota["available"] is True
+    assert len(quota["windows"]) == 1
+    assert quota["windows"][0]["used_percent"] == 31
+    assert quota["windows"][0]["remaining_percent"] == 69
+    assert quota["windows"][0]["window_duration_mins"] == 10080
+    assert quota["credits"]["balance"] == "0"
+
+
+def test_codex_quota_keeps_multiple_duration_windows_when_returned():
+    payload = {
+        "rateLimits": {
+            "limitId": "codex",
+            "primary": {"usedPercent": 25, "windowDurationMins": 300},
+            "secondary": {"usedPercent": 18, "windowDurationMins": 10080},
+        }
+    }
+    quota = summarize_rate_limits(payload)
+    assert [row["window_duration_mins"] for row in quota["windows"]] == [300, 10080]
+    assert [row["remaining_percent"] for row in quota["windows"]] == [75, 82]

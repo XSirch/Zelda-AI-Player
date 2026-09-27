@@ -50,20 +50,9 @@ class Bridge(asyncio.DatagramProtocol):
         self.dropped_samples = 0
         self._last_resync = 0.0
         self._last_heartbeat = 0.0
-        self.navigation_debug: dict | None = None
 
     def connection_made(self, transport):
         self.transport = transport
-
-    def set_navigation_debug(self, **values):
-        state = self.state
-        self.navigation_debug = {
-            "scene_epoch": state.scene_epoch if state else None,
-            "scene": state.scene if state else None,
-            "room": state.room if state else None,
-            "seq": state.seq if state else None,
-            **values,
-        }
 
     @property
     def connected(self) -> bool:
@@ -184,7 +173,6 @@ class Bridge(asyncio.DatagramProtocol):
             now = time.monotonic()
             if bootstrap:
                 self.receipts.clear()
-                self.navigation_debug = None
                 self._observer_state = None
                 self._intervals.clear()
                 self._apply_latencies.clear()
@@ -194,8 +182,6 @@ class Bridge(asyncio.DatagramProtocol):
                 if previous is not None:
                     self.authority.revoke()
             elif self.last_seen:
-                if previous and state.scene_epoch != previous.scene_epoch:
-                    self.navigation_debug = None
                 ticks = state.input_tick - previous.input_tick
                 if ticks > 0:
                     measured = (now-self.last_seen)*1000/ticks
@@ -234,7 +220,7 @@ class Bridge(asyncio.DatagramProtocol):
         except (ValueError, TypeError, AttributeError, ValidationError, UnicodeError):
             self.rejected_packets += 1
 
-    def status(self) -> dict:
+    def telemetry(self) -> dict:
         def percentile(values, fraction):
             ordered = sorted(values)
             if not ordered:
@@ -242,7 +228,7 @@ class Bridge(asyncio.DatagramProtocol):
             index = min(len(ordered)-1, max(0, math.ceil(len(ordered)*fraction)-1))
             return round(ordered[index], 2)
         last_consumed = next((row for row in reversed(list(self.receipts.values())) if row.first_tick > 0), None)
-        return {"connected": self.connected, "last_seen_age_s": round(time.monotonic()-self.last_seen, 3)
+        return {"connected": self.connected, "source": self.state.source if self.state else None, "last_seen_age_s": round(time.monotonic()-self.last_seen, 3)
             if self.last_seen else None, "rejected_packets": self.rejected_packets,
             "last_validation_error": self.last_validation_error,
             "realtime": {"enabled": self.realtime, "owner": self.authority.label,
@@ -258,9 +244,13 @@ class Bridge(asyncio.DatagramProtocol):
                 "last_receipt": last_consumed.model_dump() if last_consumed else None,
                 "dropped_samples": self.dropped_samples, "event_gaps": self.event_gaps,
                 "fast_base_misses": self.fast_base_misses,
-                "ack_semantics": "input_consumer_delivery" if self.realtime else "accepted_only_legacy"},
-            "navigation": self.navigation_debug,
-            "state": self.state.model_dump() if self.state else None}
+                "ack_semantics": "input_consumer_delivery" if self.realtime else "accepted_only_legacy"}}
+
+    def status(self) -> dict:
+        return {
+            **self.telemetry(),
+            "state": self.state.model_dump() if self.state else None,
+        }
 
     async def next_state(self, after_seq: int, *, timeout: float = .35) -> GameState:
         deadline = time.monotonic() + timeout

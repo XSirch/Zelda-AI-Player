@@ -99,11 +99,11 @@ def test_native_traversal_state_and_terrain_probes_are_exposed():
     assert '{"wall_flags", wallFlags}' in source
 
 
-def test_native_combat_learning_state_is_exposed():
+def test_native_ml_combat_state_is_exposed():
     root = Path(__file__).resolve().parents[1]
     source = (root / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
     for marker in [
-        '"combat_learning_state"',
+        '"ml_combat_state"',
         'result["velocity"]',
         'result["collision_health_hint"]',
         '{"melee_weapon_state", player->meleeWeaponState}',

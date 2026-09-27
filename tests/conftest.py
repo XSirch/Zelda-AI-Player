@@ -3,7 +3,7 @@ import socket
 
 import pytest
 
-from zelda_ai.models import Decision, GameState
+from zelda_ai.models import GameState
 from zelda_ai.store import Store
 
 
@@ -12,13 +12,6 @@ def state():
     return GameState(source="soh", instance_id="test-game", seq=10, scene_epoch=1,
         scene=85, room=0, in_game=True, player={"position": [0, 0, 0], "yaw": 0,
         "health": 48, "max_health": 48, "rupees": 0})
-
-
-@pytest.fixture
-def decision():
-    return Decision(goal="Explore", summary="Move toward an untested direction.", skill="move",
-        args={"direction": "forward", "duration_ms": 100, "strength": 0.5, "slot": None, "choice_index": None, "song": None, "target_actor_id": None,
-            "target_actor_params": None, "target_position": None, "stop_distance": None, "item_id": None}, memory_note=None)
 
 
 @pytest.fixture

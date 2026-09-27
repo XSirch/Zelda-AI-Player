@@ -4,7 +4,8 @@ import json
 import time
 import uuid
 
-from .models import Decision, ModelInfo, SkillArgs, Usage
+from .autonomy.models import AgentIntent
+from .models import ModelInfo, Usage
 from .providers.base import InferenceResult
 
 
@@ -15,16 +16,22 @@ class DemoProvider:
     async def models(self):
         return [ModelInfo(id="deterministic-demo", name="Teste local — não é um modelo de IA")]
 
-    async def decide(self, config, prompt):
+    async def think(self, config, prompt):
         await asyncio.sleep(0.1)
         data = json.loads(prompt)
-        direction = "right" if (data.get("last_result") or {}).get("status") == "failed" else "forward"
-        decision = Decision(goal="Testar o ciclo de controle", summary="Movimento sintético para validar a integração.",
-            skill="move", args=SkillArgs(direction=direction, duration_ms=500, strength=0.5, slot=None, choice_index=None, song=None,
-                target_actor_id=None, target_actor_params=None, target_position=None, stop_distance=None, item_id=None),
-            memory_note=None)
-        return InferenceResult(decision.model_dump_json(), Usage(input_tokens=0, output_tokens=0,
-            cached_input_tokens=0, reasoning_output_tokens=0, cost_usd=0, actual_model="deterministic-demo"))
+        state = data.get("state") or {}
+        player = state.get("player") or {}
+        position = player.get("position") or [0, 0, 0]
+        intent = AgentIntent(
+            objective="Exercise the continuous autonomous control loop.",
+            summary="Exploring continuously while the simulator validates cognition/motor concurrency.",
+            mode="explore",
+            direction="forward" if position[2] < 50 else "right",
+            horizon_ms=1500,
+        )
+        return InferenceResult(intent.model_dump_json(), Usage(
+            input_tokens=0, output_tokens=0, cached_input_tokens=0,
+            reasoning_output_tokens=0, cost_usd=0, actual_model="deterministic-demo"))
 
     async def close(self):
         pass

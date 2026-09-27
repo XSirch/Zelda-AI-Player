@@ -1,119 +1,87 @@
 from pathlib import Path
 
 
-def test_budget_ui_matches_backend_ranges():
-    text = Path('web/src/RunBudgetFields.tsx').read_text(encoding='utf-8')
-    for field in ['max_calls', 'max_tokens', 'max_runtime_s', 'max_cost_usd']:
-        row = next(line for line in text.splitlines() if f"id: '{field}'" in line)
-        assert 'min: 0' in row
-    assert "id: 'max_output_tokens'" in text and 'min: 256' in text
-    assert "text !== ''" in text
-    assert 'Sem limite' in text
-
-
-def test_stop_control_does_not_share_provider_busy():
-    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    stop = next(line for line in text.splitlines() if '>Encerrar</button>' in line)
-    assert 'disabled' not in stop
-    assert 'action(' not in stop
-    assert 'control_generation' in text
-
-
-def test_realtime_panel_has_local_diagnostics_without_model_controls():
-    text = Path('web/src/RealtimePanel.tsx').read_text(encoding='utf-8')
-    assert 'DIAGNÓSTICO LOCAL' in text
-    assert 'SEM MODELO · SEM BENCHMARK' in text
-    for label in ['Frente 1 s', 'Ré 1 s', 'Backflip', 'A ×20', 'B ×20']:
+def test_panel_is_minimal_autonomy_instrument():
+    text = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    for label in [
+        "AUTONOMOUS ML",
+        "SHIP OF HARKINIAN",
+        "BRIDGE REALTIME",
+        "COGNIÇÃO IA",
+        "PENSAMENTO OPERACIONAL",
+        "CONTROLE AO VIVO",
+        "INICIAR",
+        "PARAR",
+    ]:
         assert label in text
 
-
-def test_diagnostic_panel_has_emergency_handoff():
-    text = Path('web/src/RealtimePanel.tsx').read_text(encoding='utf-8')
-    assert 'LIBERAR CONTROLE' in text
-    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    assert '/diagnostics/release' in main
-    assert 'diagnostic_active' in main
-
-
-def test_live_dashboard_uses_tabs_instead_of_stacked_panels():
-    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    for label in ['CONTROLE', 'COMBATE', 'TERRENO', 'ATORES', 'PROGRESSO', 'ESTADO', 'DECISÃO']:
-        assert label in text
-    assert 'className="live-tabs"' in text
-    assert 'CombatLearningPanel' in text
-    # Events and human intervention moved into the decision tab; the old always-visible bottom grid is gone.
-    live_start = text.index("{tab === 'AO VIVO'")
-    live_end = text.index("{(tab === 'BENCHMARKS'", live_start)
-    assert 'bottom-grid' not in text[live_start:live_end]
+    # Legacy laboratory surfaces are intentionally gone from the user-facing panel.
+    for legacy in [
+        "BENCHMARKS",
+        "EXECUÇÕES",
+        "SKILLS",
+        "MEMÓRIA",
+        "NAVIGATION V2 / A*",
+        "INTERVENÇÃO HUMANA",
+        "DIAGNÓSTICO LOCAL",
+    ]:
+        assert legacy not in text
 
 
-def test_navigation_v2_dashboard_exposes_build_mesh_and_astar():
-    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    for label in ['NAVIGATION V2 / A*', 'BRIDGE BUILD', 'NAVMESH', 'CELLS', 'RAIO LOCAL',
-                  'PROBE YAW', 'WAYPOINT', 'CUSTO A*', 'NAVIGATION V2 NÃO CONFIRMADO']:
-        assert label in text
-    assert "game.bridge_build.startsWith('rt-input-v2.')" in text
-    assert "capabilities.includes('local_navmesh')" in text
-    assert "capabilities.includes('probe_yaw_v2')" in text
-    assert "Conectado · ${game?.bridge_build" in text
+def test_panel_renders_raw_physical_controls_only():
+    text = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    for button in ["A", "B", "Z", "R", "START", "C_UP", "C_LEFT", "C_DOWN", "C_RIGHT"]:
+        assert button in text
+    assert "stick_x" in text
+    assert "stick_y" in text
+    assert "button_names" in text
+
+    # No skill selector or semantic movement macro is exposed.
+    assert "navigate_to" not in text
+    assert "fight_enemy" not in text
+    assert "explore_area" not in text
 
 
-def test_dashboard_types_include_navigation_debug_contract():
-    text = Path('web/src/types.ts').read_text(encoding='utf-8')
-    assert 'NavigationMeshSnapshot' in text
-    assert 'NavigationDebugTelemetry' in text
-    assert 'bridge_build: string' in text
-    assert 'capabilities: string[]' in text
-    assert 'navigation?: NavigationDebugTelemetry | null' in text
-    assert 'SceneExitObservation' in text
-    assert 'scene_exits: SceneExitObservation[]' in text
-    assert 'TraversalAffordanceObservation' in text
-    assert 'traversal_affordances: TraversalAffordanceObservation[]' in text
+def test_panel_uses_realtime_websocket_and_simple_start_stop():
+    text = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    assert "new WebSocket" in text
+    assert "/api/events" in text
+    assert "socket.onmessage" in text
+    assert "api<Snapshot>(path, {})" in text
+    assert "'/start' | '/stop'" in text
 
 
+def test_frontend_contract_is_compact():
+    text = Path("web/src/types.ts").read_text(encoding="utf-8")
+    assert "interface Snapshot" in text
+    assert "interface InputState" in text
+    assert "interface AgentIntent" in text
+    assert "button_names: string[]" in text
+    assert "stick_x: number" in text
+    assert "stick_y: number" in text
+    assert "GameState" not in text
+    assert "Skill" not in text
 
 
-def test_terrain_panel_exposes_scene_exit_surfaces():
-    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    assert 'SAÍDAS DE CENA OBSERVADAS' in text
-    assert 'SCENE EXITS' in text
-    assert 'use traverse_exit' in text
-    assert 'exit.exit_index' in text
-    assert 'exit.entrance_index' in text
-    assert "capabilities.includes('scene_exit_surfaces')" in text
-    assert 'SCENE EXIT SURFACES INDISPONÍVEIS' in text
-    assert 'rt-input-v2.7' in text
-    assert "(value & 0xFFFF).toString(16)" in text
-    assert "hex16(exit.entrance_index)" in text
+def test_legacy_dashboard_components_are_removed():
+    assert not Path("web/src/RealtimePanel.tsx").exists()
+    assert not Path("web/src/RunBudgetFields.tsx").exists()
 
 
-
-def test_terrain_panel_exposes_vertical_route_candidates():
-    text = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    assert 'ROTAS VERTICAIS OBSERVADAS' in text
-    assert 'TRAVERSAL AFFORDANCES' in text
-    assert 'TRAVERSAL SCAN' in text
-    assert 'use traverse_to' in text
-    assert "capabilities.includes('traversal_affordances_v1')" in text
-    assert 'rt-input-v2.9' in text
-
-
-def test_decision_panel_shows_automatic_vertical_navpath():
-    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    types = Path('web/src/types.ts').read_text(encoding='utf-8')
-    assert 'AUTO NAVPATH' in main
-    assert 'selected_affordance?.kind' in main
-    assert 'auto_navpath?: boolean' in types
-    assert 'controller_skill?: string' in types
+def test_panel_keeps_tokens_cost_and_codex_quota_visible():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    for label in ["TOKENS RUN", "CACHE / REASONING", "CUSTO API", "COTA RESTANTE"]:
+        assert label in main
+    assert "remaining_percent" in main
+    assert "window_duration_mins" in main
+    assert "UsageSnapshot" in types
+    assert "QuotaWindow" in types
 
 
-def test_progress_panel_shows_checkpoint_plan_and_autosave():
-    main = Path('web/src/main.tsx').read_text(encoding='utf-8')
-    types = Path('web/src/types.ts').read_text(encoding='utf-8')
-    assert 'PLANO / CHECKPOINT' in main
-    assert 'ETAPA ATIVA' in main
-    assert 'NÃO REPETIR' in main
-    assert 'AUTOSAVE' in main
-    assert 'checkpoint_plan?: QuestCheckpointPlan | null' in types
-    assert 'AutosaveState' in types
-    assert 'story_flags: Record<string, boolean>' in types
+def test_panel_labels_simulator_and_stops_paused_runs():
+    text = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    assert "SIMULADOR · NÃO É GAMEPLAY REAL" in text
+    assert "MODO SIMULADOR" in text
+    assert "snapshot?.status === 'paused'" in text
+    assert "activeRun ? '/stop' : '/start'" in text

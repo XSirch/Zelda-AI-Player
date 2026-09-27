@@ -1,31 +1,102 @@
-export interface ModelInfo { id: string; name: string; efforts: string[]; default_effort: string | null; structured_output: boolean; effort_source: string }
-export interface ProviderInfo { id: string; connected: boolean; message: string; plan?: string; limits?: unknown; cli_version?: string | null; astra_cli_ready?: boolean }
-export interface Metrics { calls: number; input_tokens: number; output_tokens: number; cached_input_tokens: number; reasoning_output_tokens: number; total_tokens: number; known_cost_usd: number; cost_usd: number | null; unknown_cost_calls: number; unknown_usage_calls: number; mean_latency_ms: number | null; deaths: number; boss_events: number; game_completions: number; skill_failures: number; interventions: number; trajectories_learned: number; trajectory_replays: number; trajectory_replay_successes: number }
-export interface RunConfig { provider: string; model: string; effort: string | null; goal: string; memory_mode: string; max_calls: number; max_tokens: number; max_cost_usd: number; max_output_tokens: number; max_runtime_s: number; checkpoint_label: string }
-export interface ActorObservation { actor_uid?: string | null; yaw?: number | null; actor_id: number; name: string; description: string; category: number; category_name: string; room: number; params: number; position: number[]; focus_position: number[] | null; velocity?: number[]; speed_xz?: number; xz_distance?: number; collision_health_hint?: number | null; freeze_timer?: number; color_filter_timer?: number; actor_flags?: number; distance: number; targeted: boolean; drawn: boolean; text_id: number | null }
-export interface DialogueState { active: boolean; text_id: number | null; text: string; state: string; state_code: number; message_mode: number; can_advance: boolean; choice_count: number; choice_index: number; choices: string[]; speaker: ActorObservation | null }
-export interface EquipmentObservation { item_id: number; name: string; equipment_type: 'sword' | 'shield' | 'tunic' | 'boots'; value: number; equipped: boolean }
-export interface ProgressState { quest_items: string[]; owned_equipment: string[]; equipment: EquipmentObservation[]; upgrade_levels: Record<string, number>; heart_pieces: number; skull_tokens: number; magic_acquired: boolean; double_magic: boolean; double_defense: boolean; map_index: number; dungeon_items: string[]; small_keys: number; story_flags: Record<string, boolean> }
-export interface ContextAction { code: number; label: string }
-export interface PauseMenuState { active: boolean; ready: boolean; state: number; transition_state: number; page_index: number; cursor_special_pos: number; cursor_point: number[]; cursor_item: number[]; cursor_slot: number[]; named_item: number | null; prompt_choice: number }
-export interface InventoryObservation { slot: number; item_id: number; name: string; ammo: number | null }
-export interface NavigationProbe { direction: 'forward' | 'forward_right' | 'right' | 'back_right' | 'back' | 'back_left' | 'left' | 'forward_left'; distance: number; floor_found: boolean; floor_y: number | null; delta_y: number | null; floor_type: number | null; wall_hit: boolean; wall_distance: number | null; wall_flags: number }
-export interface TraversalAffordanceObservation { kind: 'stairs_or_slope_up' | 'stairs_or_slope_down' | 'ledge_down' | 'ladder_up' | 'ladder_down' | 'climbable_wall_up'; direction: 'up' | 'down'; approach_position: number[]; target_position: number[]; distance: number; height_delta: number; wall_flags: number }
-export interface SceneExitObservation { exit_index: number; entrance_index: number; position: number[]; samples: number; direct_reachable: boolean }
-export interface NavigationMeshSnapshot { origin: number[]; step: number; half_extent: number; cells: Array<[number, number, number, number]> }
-export interface AutosaveState { pending: boolean; target_scene: number; last_scene: number; count: number; last_saved_at_ms: number }
-export interface QuestCheckpointStep { id: string; title: string; instruction?: string; completion?: string }
-export interface QuestCheckpointPlan { plan_id: string; available: boolean; reason: string; active: boolean; completed_count: number; total: number; completed: QuestCheckpointStep[]; current: QuestCheckpointStep | null; upcoming: QuestCheckpointStep[]; do_not_repeat: string[] }
-export interface NavigationDebugTelemetry { scene_epoch: number | null; scene: number | null; room: number | null; seq: number | null; skill: string; status: string; target_position: number[] | null; waypoint: number[] | null; path_cells: number; probe_safe: boolean | null; navmesh_used: boolean; target_distance: number | null; plan_target_distance?: number | null; plan_cost?: number | null; exact_goal_reachable?: boolean; exit_index?: number | null; entrance_index?: number | null }
-export interface GameState { protocol: number; capabilities: string[]; bridge_build: string; source: string; seq: number; scene_epoch: number; scene: number; scene_name: string; room: number; entrance_index: number; day_time: number; is_night: boolean; in_game: boolean; paused: boolean; cutscene_active: boolean; game_over_state: number; ocarina_mode: number; ocarina_action: number; last_played_song: number; player: { health: number; max_health: number; rupees: number; magic: number; position: number[]; yaw: number; speed_xz: number; floor_height: number; wall_yaw: number; bg_check_flags: number; wall_flags: number; state_flags_1: number; state_flags_2: number; z_target_active_timer?: number; melee_weapon_animation?: number; melee_weapon_state?: number; invincibility_timer?: number; control_stick_direction: number; hop_direction: number | null; climbing_ladder: boolean; hanging_ledge: boolean; climbing_ledge: boolean; can_climb: boolean; can_down: boolean; y_dist_to_water: number; age: string } | null; inventory: number[]; inventory_named: InventoryObservation[]; message_id: number | null; dialogue: DialogueState; progress: ProgressState; context_action: ContextAction; context_actor: ActorObservation | null; pause_menu: PauseMenuState; target_actor: ActorObservation | null; nearby_actors: ActorObservation[]; room_actors: ActorObservation[]; room_actor_count: number; room_actors_truncated: boolean; navigation_probes: NavigationProbe[]; traversal_affordances: TraversalAffordanceObservation[]; scene_exits: SceneExitObservation[]; navmesh: NavigationMeshSnapshot; autosave: AutosaveState; camera_input_yaw?: number | null; mirrored_world?: boolean }
-export interface CombatProfile { id: string; enemy_key: string; actor_id: number; enemy_name: string; category: number; encounters: number; wins: number; losses: number; incomplete: number; damage_taken: number; best_by_state: Record<string, {action: string; mean: number; samples: number}>; updated_at: number }
-export interface Trajectory { id: string; from_scene: number; from_room: number; to_scene: number; to_room: number; actions: Array<{skill: string; args: Record<string, unknown>}>; successes: number; failures: number; updated_at: number }
-export interface WorldEdge { id: string; from_scene: number; from_scene_name: string; from_room: number; from_position: number[]; to_scene: number; to_scene_name: string; to_room: number; to_position: number[]; entrance_index: number; traversals: number; updated_at: number }
-export interface Snapshot { control_generation?: number; status: string; reason: string; run_id: string | null; diagnostic_active?: boolean; config: RunConfig | null; pending_switch: RunConfig | null; metrics: Metrics | null; elapsed_s: number; last_decision: { goal: string; summary: string; skill: string } | null; last_result: { status: string; reason: string; distance: number | null; yaw_delta?: number | null; health_lost: number | null; auto_navpath?: boolean; controller_skill?: string; requested_skill?: string; selected_affordance?: { kind: string; direction: string; approach_position: number[]; target_position: number[] } } | null; diagnostic?: InputDiagnosticResult | null; checkpoint_plan?: QuestCheckpointPlan | null; events: Array<{kind: string; data: Record<string, unknown>; at: number}>; bridge: { realtime?: RealtimeTelemetry; navigation?: NavigationDebugTelemetry | null; connected: boolean; state: GameState | null; last_seen_age_s: number | null; rejected_packets?: number; last_validation_error?: {fields: string[]; types: string[]} | null }; memory: Array<{id: string; scene: number; note: string; created_at: number}>; trajectories: Trajectory[]; world_edges: WorldEdge[]; combat_profiles: CombatProfile[] }
-export interface RunRow { id: string; created_at: number; status: string; config: RunConfig; source: string; mixed: boolean; assisted: boolean; metrics: Metrics }
-export interface Skill { id: string; name: string; status: string; version: string | null }
+export interface AgentIntent {
+  objective: string;
+  summary: string;
+  mode: 'explore' | 'navigate' | 'interact' | 'combat' | 'dialogue' | 'menu' | 'observe';
+  target_actor_id: number | null;
+  target_actor_params: number | null;
+  target_actor_uid: string | null;
+  target_position: number[] | null;
+  target_item_id: number | null;
+  direction: 'forward' | 'back' | 'left' | 'right' | 'up' | 'down' | null;
+  choice_index: number | null;
+  horizon_ms: number;
+}
 
-export interface InputReceiptTelemetry { seq: number; owner_epoch: number; status: string; first_tick: number; last_tick: number; pressed: number; released: number; apply_latency_ms: number | null; client_to_consume_ms: number | null; reason: string }
-export interface RealtimeTelemetry { enabled: boolean; owner: string; state_hz: number | null; state_interval_p95_ms: number | null; native_apply_p50_ms: number | null; native_apply_p95_ms: number | null; native_apply_p99_ms: number | null; client_to_consume_p50_ms: number | null; client_to_consume_p95_ms: number | null; client_to_consume_p99_ms: number | null; last_receipt: InputReceiptTelemetry | null; dropped_samples: number; event_gaps: number; fast_base_misses: number; ack_semantics: string }
-export type InputDiagnosticAction = 'tap_a' | 'tap_b' | 'target' | 'forward' | 'back' | 'backflip' | 'stress_a' | 'stress_b';
-export interface InputDiagnosticResult { action: InputDiagnosticAction; status: string; reason: string; commands: number; consumed: number; completed: number; lost: number; expected_edges: number; presses: number; releases: number; duplicate_presses: number; duplicate_releases: number; latency_ms: { p50: number | null; p95: number | null; p99: number | null; min: number | null; max: number | null }; native_queue_ms: { p50: number | null; p95: number | null; p99: number | null }; duration_ms: number; effect_confirmed: boolean | null; hopping_seen: boolean; hop_direction: number | null; expected_hop_direction: number | null; max_distance: number; expected_distance: number; distance: number | null; stick_x?: number | null; stick_y?: number | null; control_stick_direction?: number | null; start_position: number[] | null; end_position: number[] | null }
+export interface InputState {
+  buttons: number;
+  button_names: string[];
+  stick_x: number;
+  stick_y: number;
+  reason: string;
+}
+
+export interface QuotaWindow {
+  limit_id: string | null;
+  limit_name: string | null;
+  slot: string;
+  used_percent: number;
+  remaining_percent: number;
+  window_duration_mins: number | null;
+  resets_at: number | null;
+}
+
+export interface ProviderQuota {
+  available: boolean;
+  connected?: boolean;
+  plan?: string | null;
+  plan_type?: string | null;
+  ordinary_usage_allowed?: boolean | null;
+  windows: QuotaWindow[];
+  credits?: {
+    has_credits: boolean;
+    unlimited: boolean;
+    balance: string | number | null;
+  } | null;
+  individual_limit?: {
+    limit: string | number | null;
+    used: string | number | null;
+    remaining_percent: number | null;
+    resets_at: number | null;
+  } | null;
+  reset_credits?: { available_count: number | null } | null;
+  rate_limit_reached_type?: string | null;
+  limit?: number | null;
+  limit_remaining?: number | null;
+  error?: string | null;
+}
+
+export interface UsageSnapshot {
+  provider: string | null;
+  model: string | null;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  reasoning_output_tokens: number;
+  total_tokens: number;
+  cost_usd: number | null;
+  known_cost_usd: number;
+  quota: ProviderQuota;
+  quota_updated_at: number | null;
+}
+
+export interface Snapshot {
+  status: string;
+  reason: string;
+  run_id: string | null;
+  elapsed_s: number;
+  connection: {
+    game: boolean;
+    source: 'soh' | 'simulator' | null;
+    realtime: boolean;
+    state_hz: number | null;
+    ai: boolean;
+    ai_state: string;
+    ai_error: string;
+  };
+  thought: {
+    summary: string;
+    state: string;
+    thinking_ms: number;
+    intent: AgentIntent | null;
+    motor: string;
+  };
+  input: InputState;
+  learning: Record<string, unknown>;
+  metrics: Record<string, unknown> | null;
+  usage: UsageSnapshot;
+  bridge: {
+    connected: boolean;
+    last_seen_age_s: number | null;
+    realtime: Record<string, unknown>;
+  };
+}

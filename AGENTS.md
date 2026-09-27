@@ -8,9 +8,9 @@ This is a game-agent laboratory, not a solved Zelda bot. Read README.md and docs
 - Unknown usage/cost is null. Cached/reasoning tokens are subsets. Record failures and paid output truncation; never retry paid requests without the operator choosing to do so.
 - Keep state and prompts bounded; video capture is local to the browser. No screenshots to models by default.
 - Keep Codex auth inside the official CLI profile. Do not read/exfiltrate OAuth tokens, commit credentials, or convert subscription tokens to API keys. Test real providers only with explicit operator authorization and a configured budget.
-- A gameplay model returns a typed decision; it does not get developer shell access. This does not restrict the development agent from editing code, building the project, or using worktrees normally.
+- The cognition model returns only a typed high-level `AgentIntent`; it never selects skills or raw buttons and does not get developer shell access. Raw N64 control belongs to the local ML policy. This does not restrict the development agent from editing code, building the project, or using worktrees normally.
 - Native input must expire, release on stop, reject stale/cross-scene packets, and remain limited to controller input. No teleports, HP writes, or hidden solution flags in observations.
 - Preserve SoH as a separate checkout pinned by the integration script. Do not hard-reset user source/assets or distribute ROMs, saves or copyrighted game data.
 - Capture actual validation in docs/STATUS.md. No claim of autonomous completion, learned aiming or reliable navigation before reproducing it in the game.
-- UI direction: functional laboratory cockpit, olive/graphite, compact telemetry, readable tables, operational Portuguese copy. No decorative fake graphs, scores, gradients or fantasy screenshots.
+- UI direction: minimal realtime instrument panel. Show connection, operational thought, raw stick/buttons, token usage/API cost when known, and provider quota. Do not reintroduce skill/debug/navigation tabs into the primary UI.
 - No GitHub Actions required. Prefer local checks; generate dependency lockfiles after an actual successful resolve and do not invent them.
