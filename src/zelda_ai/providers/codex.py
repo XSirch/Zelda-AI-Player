@@ -38,6 +38,77 @@ def parse_usage(params: dict, model: str) -> Usage:
         actual_model=model, cost_usd=None)
 
 
+def summarize_rate_limits(payload: dict | None) -> dict:
+    """Normalize supported Codex app-server quota snapshots for the UI."""
+    if not isinstance(payload, dict):
+        return {"available": False, "windows": [], "credits": None, "individual_limit": None}
+
+    snapshots: list[dict] = []
+    primary = payload.get("rateLimits")
+    if isinstance(primary, dict):
+        snapshots.append(primary)
+    by_id = payload.get("rateLimitsByLimitId")
+    if isinstance(by_id, dict):
+        snapshots.extend(row for row in by_id.values() if isinstance(row, dict))
+
+    windows: list[dict] = []
+    seen: set[tuple] = set()
+    for snapshot in snapshots:
+        limit_id = snapshot.get("limitId")
+        limit_name = snapshot.get("limitName")
+        for slot in ("primary", "secondary"):
+            window = snapshot.get(slot)
+            if not isinstance(window, dict):
+                continue
+            used = window.get("usedPercent")
+            if not isinstance(used, (int, float)):
+                continue
+            duration = window.get("windowDurationMins")
+            resets_at = window.get("resetsAt")
+            used_percent = max(0, min(100, int(round(float(used)))))
+            key = (limit_id, duration, resets_at, used_percent)
+            if key in seen:
+                continue
+            seen.add(key)
+            windows.append({
+                "limit_id": limit_id,
+                "limit_name": limit_name,
+                "slot": slot,
+                "used_percent": used_percent,
+                "remaining_percent": max(0, 100 - used_percent),
+                "window_duration_mins": duration if isinstance(duration, (int, float)) else None,
+                "resets_at": resets_at if isinstance(resets_at, (int, float)) else None,
+            })
+
+    windows.sort(key=lambda row: (
+        row["window_duration_mins"] is None,
+        row["window_duration_mins"] or 10**12,
+        row["limit_name"] or row["limit_id"] or "",
+    ))
+
+    snapshot = primary if isinstance(primary, dict) else (snapshots[0] if snapshots else {})
+    credits = snapshot.get("credits") if isinstance(snapshot, dict) else None
+    individual = snapshot.get("individualLimit") if isinstance(snapshot, dict) else None
+    return {
+        "available": bool(windows or isinstance(credits, dict) or isinstance(individual, dict)),
+        "windows": windows,
+        "credits": {
+            "has_credits": bool(credits.get("hasCredits")),
+            "unlimited": bool(credits.get("unlimited")),
+            "balance": credits.get("balance"),
+        } if isinstance(credits, dict) else None,
+        "individual_limit": {
+            "limit": individual.get("limit"),
+            "used": individual.get("used"),
+            "remaining_percent": individual.get("remainingPercent"),
+            "resets_at": individual.get("resetsAt"),
+        } if isinstance(individual, dict) else None,
+        "rate_limit_reached_type": snapshot.get("rateLimitReachedType")
+            if isinstance(snapshot, dict) else None,
+        "plan_type": snapshot.get("planType") if isinstance(snapshot, dict) else None,
+    }
+
+
 def executable_prefix(command: str) -> list[str]:
     executable = shutil.which(command) or (command if Path(command).is_file() else None)
     if not executable:
@@ -188,13 +259,29 @@ class CodexProvider:
             else:
                 message = "Conecte a conta ChatGPT pelo painel."
             return {"connected": connected, "auth_type": account.get("type"),
-                "plan": account.get("planType"), "limits": limits, "cli_version": version_text,
+                "plan": account.get("planType"), "limits": limits,
+                "quota": summarize_rate_limits(limits),
+                "cli_version": version_text,
                 "astra_cli_ready": astra_cli_ready, "message": message}
         except (ProviderFailure, asyncio.TimeoutError) as exc:
             version_text, version = parse_codex_version(self.rpc.server_version)
             return {"connected": False, "cli_version": version_text,
                 "astra_cli_ready": version is not None and version >= ASTRA_MIN_CODEX_VERSION,
                 "message": str(exc) or "Codex timed out."}
+
+    async def quota(self) -> dict:
+        """Read supported ChatGPT/Codex quota state without starting a model turn."""
+        await self.rpc.start()
+        account_result = await self.rpc.request("account/read", {"refreshToken": False})
+        account = account_result.get("account") or {}
+        if account.get("type") != "chatgpt":
+            return {"available": False, "connected": False, "windows": []}
+        limits = await self.rpc.request("account/rateLimits/read")
+        return {
+            "connected": True,
+            "plan": account.get("planType"),
+            **summarize_rate_limits(limits),
+        }
 
     async def login(self, device: bool = False) -> dict:
         await self.rpc.start()
