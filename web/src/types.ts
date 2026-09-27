@@ -105,6 +105,9 @@ export interface LearningSnapshot {
   reward_breakdown?: Record<string, number>;
   last_update?: Record<string, unknown>;
   checkpoint_load_error?: string;
+  rnd_error_ema?: number | null;
+  rnd_last_error?: number;
+  rnd_last_novelty?: number;
 }
 
 export interface Snapshot {
