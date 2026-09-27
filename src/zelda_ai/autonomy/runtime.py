@@ -183,6 +183,21 @@ class AutonomyRuntime:
                 }
                 self.dialogue_transcript.append(entry)
                 self.log("dialogue_started", entry)
+                speaker = state.dialogue.speaker
+                speaker_label = (
+                    (speaker.description or speaker.name or f"actor {speaker.actor_id}")
+                    if speaker else "unknown speaker"
+                )
+                dialogue_evidence = state.dialogue.text.strip()[:220] or (
+                    f"text_id={state.dialogue.text_id}"
+                )
+                self.store.remember(
+                    self.namespace,
+                    state.scene,
+                    f"Observed dialogue with {speaker_label} in "
+                    f"{state.scene_name or state.scene}/room {state.room}: "
+                    f"{dialogue_evidence}",
+                )
             elif state.dialogue.active and (
                 old.dialogue.text_id != state.dialogue.text_id
                 or old.dialogue.text != state.dialogue.text
@@ -195,8 +210,38 @@ class AutonomyRuntime:
                 if not self.dialogue_transcript or self.dialogue_transcript[-1] != entry:
                     self.dialogue_transcript.append(entry)
                 self.log("dialogue_changed", entry)
+            old_items = {row.item_id: row.name for row in old.inventory_named}
+            new_items = {row.item_id: row.name for row in state.inventory_named}
+            acquired_items = [
+                name for item_id, name in new_items.items() if item_id not in old_items
+            ]
+            acquired_quest = [
+                name for name in state.progress.quest_items
+                if name not in old.progress.quest_items
+            ]
+            acquired_equipment = [
+                name for name in state.progress.owned_equipment
+                if name not in old.progress.owned_equipment
+            ]
+            if acquired_items or acquired_quest or acquired_equipment:
+                evidence = []
+                if acquired_items:
+                    evidence.append("inventory=" + ", ".join(acquired_items[:8]))
+                if acquired_quest:
+                    evidence.append("quest=" + ", ".join(acquired_quest[:8]))
+                if acquired_equipment:
+                    evidence.append("equipment=" + ", ".join(acquired_equipment[:8]))
+                note = "Observed durable progress: " + "; ".join(evidence)
+                self.store.remember(self.namespace, state.scene, note)
+                self.log("durable_progress_observed", {"evidence": evidence})
+
             if old.player and state.player and old.player.health > 0 and state.player.health == 0:
                 self.log("player_died", {"scene": state.scene, "room": state.room})
+                self.store.remember(
+                    self.namespace,
+                    state.scene,
+                    f"Death observed in {state.scene_name or state.scene}/room {state.room}.",
+                )
 
         for event in state.events:
             key = f"{state.instance_id}:{event.id}"
