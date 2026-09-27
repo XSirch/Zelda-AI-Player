@@ -178,6 +178,8 @@ function App() {
   }, []);
 
   const running = snapshot?.status === 'running';
+  const activeRun = snapshot?.status === 'running' || snapshot?.status === 'paused' || snapshot?.status === 'starting';
+  const simulator = snapshot?.connection.source === 'simulator';
   const connectionDetail = useMemo(() => {
     const hz = snapshot?.connection.state_hz;
     return hz ? `${hz.toFixed(1)} Hz` : undefined;
@@ -202,16 +204,16 @@ function App() {
         <h1>AUTONOMOUS ML</h1>
       </div>
       <button
-        className={running ? 'stop' : 'start'}
-        disabled={busy || (!running && !snapshot?.connection.game)}
-        onClick={() => void control(running ? '/stop' : '/start')}
+        className={activeRun ? 'stop' : 'start'}
+        disabled={busy || (!activeRun && !snapshot?.connection.game)}
+        onClick={() => void control(activeRun ? '/stop' : '/start')}
       >
-        {busy ? '…' : running ? 'PARAR' : 'INICIAR'}
+        {busy ? '…' : activeRun ? 'PARAR' : 'INICIAR'}
       </button>
     </header>
 
     <section className="connections">
-      <Connection label="SHIP OF HARKINIAN" on={!!snapshot?.connection.game} />
+      <Connection label={simulator ? 'SIMULADOR · NÃO É GAMEPLAY REAL' : 'SHIP OF HARKINIAN'} on={!!snapshot?.connection.game} />
       <Connection label="BRIDGE REALTIME" on={!!snapshot?.connection.realtime && socketOnline} detail={connectionDetail} />
       <Connection
         label="COGNIÇÃO IA"
@@ -221,6 +223,7 @@ function App() {
     </section>
 
     <UsageStrip snapshot={snapshot} />
+    {simulator && <div className="notice">MODO SIMULADOR — gameplay, inputs e métricas desta sessão são sintéticos.</div>}
 
     {error && <div className="error" role="alert">{error}</div>}
     {snapshot?.reason && snapshot.status !== 'running' && <div className="notice">{snapshot.reason}</div>}
