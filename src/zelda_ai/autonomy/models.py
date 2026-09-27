@@ -35,6 +35,7 @@ class AgentIntent(BaseModel):
     target_actor_params: int | None = Field(default=None, ge=-32768, le=32767)
     target_actor_uid: str | None = Field(default=None, max_length=96)
     target_position: tuple[float, float, float] | None = None
+    target_item_id: int | None = Field(default=None, ge=0, le=255)
     direction: IntentDirection | None = None
     choice_index: int | None = Field(default=None, ge=0, le=2)
     horizon_ms: int = Field(default=15000, ge=2000, le=60000)
