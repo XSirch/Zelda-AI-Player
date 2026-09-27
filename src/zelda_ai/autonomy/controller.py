@@ -89,6 +89,12 @@ class ContinuousController:
         self.intent = intent
         self.intent_updated_at = time.monotonic()
 
+    def neutralize(self, reason: str = "stopped"):
+        self.last_setpoint = Setpoint(reason=reason)
+        self.last_stick = (0.0, 0.0)
+        self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+        self.last_motor_summary = "Controller input revoked; no buttons are being held."
+
     @staticmethod
     def _mask(buttons: list[float]) -> int:
         mask = 0
