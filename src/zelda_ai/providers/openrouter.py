@@ -38,7 +38,14 @@ def parse_usage(data: dict) -> Usage:
         upstream_provider=data.get("provider"))
 
 
-def reserve_cost(info: ModelInfo, prompt: str, output_limit: int) -> float:
+def reserve_cost(
+    info: ModelInfo,
+    prompt: str,
+    output_limit: int,
+    *,
+    system_prompt: str = SYSTEM_PROMPT,
+    output_schema: dict | None = None,
+) -> float:
     """Conservative preflight estimate, not an assertion of a provider-enforced hard cap."""
     try:
         prices = [float(info.pricing[k]) for k in ("prompt", "completion")]
@@ -48,7 +55,8 @@ def reserve_cost(info: ModelInfo, prompt: str, output_limit: int) -> float:
     except (KeyError, ValueError, TypeError):
         raise ProviderFailure("Model has no usable pricing; a dollar budget cannot be checked.") from None
     # Byte count deliberately overestimates normal text tokenization. Schema and system are included.
-    text_bytes = len((SYSTEM_PROMPT + prompt + json.dumps(Decision.model_json_schema())).encode("utf-8"))
+    schema = output_schema if output_schema is not None else Decision.model_json_schema()
+    text_bytes = len((system_prompt + prompt + json.dumps(schema)).encode("utf-8"))
     return (prices[0] * (text_bytes + 1024) + prices[1] * output_limit + request) * 1.25
 
 
