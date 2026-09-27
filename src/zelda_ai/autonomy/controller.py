@@ -225,7 +225,13 @@ class ContinuousController:
                 self.tick += 1
 
                 if not self.bridge.connected or game is None or not game.in_game or game.player is None:
+                    self.pending = None
+                    self.feature_history.clear()
+                    self.novelty_history.clear()
+                    self.reward_tracker.break_causal_chain()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
+                    self.last_stick = (0.0, 0.0)
+                    self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
                     self.last_motor_summary = "Waiting for a playable realtime bridge state."
                     self.bridge.release()
                     publish()
