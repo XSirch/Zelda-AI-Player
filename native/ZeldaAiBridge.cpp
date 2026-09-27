@@ -40,7 +40,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v2.10";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.0";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -164,7 +164,7 @@ struct BridgeData {
                 packet->len > 8192) continue;
             try {
                 auto data = json::parse(packet->data, packet->data + packet->len);
-                if (data.at("protocol") != 2 || data.at("token") != token || data.at("instance_id") != instance)
+                if (data.at("protocol") != 3 || data.at("token") != token || data.at("instance_id") != instance)
                     continue;
                 lastPeerSeenMs = NowMs();
                 ++peerContactSeq;
@@ -1281,7 +1281,7 @@ void Snapshot() {
         : std::stoull(bridge.events.front().at("id").get<std::string>());
 
     json state = {
-        {"protocol", 2},
+        {"protocol", 3},
         {"kind", full ? "full" : "fast"},
         {"full_seq", bridge.fullSeq},
         {"capture_tick", bridge.captureTick},
