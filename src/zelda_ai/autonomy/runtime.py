@@ -196,7 +196,7 @@ class AutonomyRuntime:
             self.cognition_signature = signature
             self.cognition_trigger.set()
 
-        if not self.run_id or self.state not in {"running", "paused"}:
+        if not self.run_id or self.state != "running":
             self.publish()
             return
 
