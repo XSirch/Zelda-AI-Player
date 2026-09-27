@@ -5,6 +5,7 @@ import math
 
 import httpx
 
+from ..autonomy import AUTONOMY_SYSTEM_PROMPT, AgentIntent
 from ..models import Decision, ModelInfo, RunConfig, Usage
 from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
 
@@ -105,6 +106,38 @@ class OpenRouterProvider:
             raise ProviderFailure(f"OpenRouter HTTP {exc.response.status_code}; no automatic retry.") from None
         except (httpx.RequestError, ValueError, KeyError) as exc:
             raise ProviderFailure(f"OpenRouter request failed ({type(exc).__name__}); billing may be incomplete.") from None
+
+
+    async def think(self, config: RunConfig, prompt: str) -> InferenceResult:
+        """Infer high-level intent; realtime input is produced outside this request."""
+        if not self.api_key:
+            raise ProviderFailure("OpenRouter is not authenticated.")
+        body = {"model": config.model, "messages": [
+                {"role": "system", "content": AUTONOMY_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt}],
+            "stream": False, "max_tokens": config.max_output_tokens,
+            "provider": {"require_parameters": True, "allow_fallbacks": False},
+            "response_format": {"type": "json_schema", "json_schema": {
+                "name": "zelda_intent", "strict": True, "schema": AgentIntent.model_json_schema()}}}
+        if config.effort:
+            body["reasoning"] = {"effort": config.effort, "exclude": True}
+        try:
+            response = await self.client.post("chat/completions", json=body, headers=self.headers())
+            response.raise_for_status()
+            data = response.json()
+            usage = parse_usage(data)
+            choice = data.get("choices", [{}])[0]
+            content = (choice.get("message") or {}).get("content")
+            if choice.get("finish_reason") != "stop" or not isinstance(content, str) or not content.strip():
+                raise ProviderFailure(
+                    "No complete autonomy intent returned; usage was recorded. No automatic paid retry was made.",
+                    usage)
+            return InferenceResult(content, usage)
+        except httpx.HTTPStatusError as exc:
+            raise ProviderFailure(f"OpenRouter HTTP {exc.response.status_code}; no automatic retry.") from None
+        except (httpx.RequestError, ValueError, KeyError) as exc:
+            raise ProviderFailure(
+                f"OpenRouter request failed ({type(exc).__name__}); billing may be incomplete.") from None
 
     async def close(self):
         await self.client.aclose()
