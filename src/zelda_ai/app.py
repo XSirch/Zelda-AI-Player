@@ -7,7 +7,6 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
-from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -16,14 +15,18 @@ from pydantic import BaseModel, Field, SecretStr
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import __version__
+from .autonomy.runtime import AutonomyRuntime
 from .bridge import Bridge, bind_bridge
 from .config import Settings
 from .models import RunConfig, SwitchConfig
 from .providers import CodexProvider, OpenRouterProvider, ProviderFailure
-from .runtime import Runtime, SKILL_CATALOG
 from .store import Store
 
-ALLOWED_ORIGINS = {f"http://{host}:{port}" for host in ("localhost", "127.0.0.1") for port in (8787, 5173)}
+ALLOWED_ORIGINS = {
+    f"http://{host}:{port}"
+    for host in ("localhost", "127.0.0.1")
+    for port in (8787, 5173)
+}
 
 
 def bridge_secret(settings: Settings) -> str:
@@ -50,12 +53,15 @@ class LoginInput(BaseModel):
     device: bool = False
 
 
-class HintInput(BaseModel):
-    text: str = Field(min_length=1, max_length=400)
-
-
-class InputDiagnosticRequest(BaseModel):
-    action: Literal["tap_a", "tap_b", "target", "forward", "back", "backflip", "stress_a", "stress_b"]
+def default_run_config(settings: Settings) -> RunConfig:
+    return RunConfig(
+        provider=settings.agent_provider,
+        model=settings.agent_model,
+        effort=settings.agent_effort,
+        goal="Play Ocarina of Time autonomously, discover how to control Link, learn from experience, and progress as far as possible.",
+        memory_mode="adaptive",
+        checkpoint_label="autonomy-v3-ml",
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -67,24 +73,45 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         token = bridge_secret(settings)
         store = Store(settings.db_url)
         bridge = Bridge(token, settings.allow_simulator)
-        providers = {"codex": CodexProvider(settings.codex_command, settings.codex_home, settings.decision_timeout_s),
-            "openrouter": OpenRouterProvider(settings.openrouter_api_key.get_secret_value())}
+        providers = {
+            "codex": CodexProvider(
+                settings.codex_command,
+                settings.codex_home,
+                settings.decision_timeout_s,
+            ),
+            "openrouter": OpenRouterProvider(
+                settings.openrouter_api_key.get_secret_value()
+            ),
+        }
         simulator_task = simulator_transport = None
         try:
             await bind_bridge(bridge, settings.bridge_port)
             if settings.allow_simulator:
                 from .simulator import DemoProvider, Simulator
+
                 providers["demo"] = DemoProvider()
                 simulator = Simulator(settings.bridge_port, token)
-                simulator_transport, _ = await asyncio.get_running_loop().create_datagram_endpoint(
-                    lambda: simulator, local_addr=("127.0.0.1", 0))
+                simulator_transport, _ = (
+                    await asyncio.get_running_loop().create_datagram_endpoint(
+                        lambda: simulator, local_addr=("127.0.0.1", 0)
+                    )
+                )
                 simulator_task = asyncio.create_task(simulator.run())
-            runtime = Runtime(bridge, store, providers)
-            app.state.runtime, app.state.providers, app.state.store = runtime, providers, store
+
+            runtime = AutonomyRuntime(
+                bridge,
+                store,
+                providers,
+                settings.data_dir.resolve() / "ml",
+            )
+            app.state.runtime = runtime
+            app.state.providers = providers
+            app.state.store = store
+            app.state.settings = settings
             yield
         finally:
             runtime = getattr(app.state, "runtime", None)
-            if runtime and runtime.state in {"running", "paused"}:
+            if runtime and runtime.state in {"running", "paused", "starting"}:
                 await runtime.halt("stopped", "server_shutdown")
             bridge.close()
             if simulator_task:
@@ -98,17 +125,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             store.close()
 
     app = FastAPI(title="Zelda AI Player", version=__version__, lifespan=lifespan)
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"])
+    app.add_middleware(
+        TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1"]
+    )
 
     @app.middleware("http")
     async def local_control_boundary(request: Request, call_next):
         origin = request.headers.get("origin")
         if origin and origin not in ALLOWED_ORIGINS:
-            return JSONResponse({"detail": "Untrusted browser origin"}, status_code=403)
+            return JSONResponse(
+                {"detail": "Untrusted browser origin"}, status_code=403
+            )
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
             supplied = request.headers.get("x-zelda-session", "")
             if not hmac.compare_digest(supplied, session_token):
-                return JSONResponse({"detail": "Reload the local panel to renew its session"}, status_code=403)
+                return JSONResponse(
+                    {"detail": "Reload the local panel to renew its session"},
+                    status_code=403,
+                )
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -126,48 +160,34 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/bootstrap")
     async def bootstrap():
-        return {"session_token": session_token, "version": __version__, "simulator": settings.allow_simulator,
-            "bridge_port": settings.bridge_port}
+        config = default_run_config(settings)
+        return {
+            "session_token": session_token,
+            "version": __version__,
+            "bridge_port": settings.bridge_port,
+            "agent": {
+                "provider": config.provider,
+                "model": config.model,
+                "effort": config.effort,
+            },
+        }
 
     @app.get("/api/status")
     async def status():
         return app.state.runtime.snapshot()
 
-    @app.get("/api/providers")
-    async def provider_status():
-        names = list(app.state.providers)
-        results = await asyncio.gather(*(app.state.providers[name].status() for name in names))
-        return [{"id": name, **result} for name, result in zip(names, results)]
+    @app.post("/api/start")
+    async def start():
+        await app.state.runtime.start(default_run_config(app.state.settings))
+        return app.state.runtime.snapshot()
 
-    @app.get("/api/models/{provider}")
-    async def models(provider: str):
-        if provider not in app.state.providers:
-            raise HTTPException(404, "Unknown provider")
-        return [row.model_dump() for row in await app.state.providers[provider].models()]
+    @app.post("/api/stop")
+    async def stop():
+        await app.state.runtime.control("stop")
+        return app.state.runtime.snapshot()
 
-    @app.post("/api/auth/codex")
-    async def login(body: LoginInput):
-        result = await app.state.providers["codex"].login(body.device)
-        for key in ("authUrl", "verificationUrl"):
-            if result.get(key):
-                url = urlparse(result[key])
-                if url.scheme != "https" or url.hostname not in {"auth.openai.com", "chatgpt.com", "auth.chatgpt.com"}:
-                    raise HTTPException(502, "Codex returned an unexpected login URL")
-        return result
-
-    @app.post("/api/auth/openrouter")
-    async def connect_openrouter(body: KeyInput):
-        provider = app.state.providers["openrouter"]
-        if app.state.runtime.state == "running":
-            raise ValueError("Pause the agent before replacing a provider credential")
-        old_key = provider.api_key
-        provider.api_key = body.key.get_secret_value()
-        result = await provider.status()
-        if not result["connected"]:
-            provider.api_key = old_key
-            raise HTTPException(400, result["message"])
-        return {"connected": True, "persistence": "process_memory_only"}
-
+    # Advanced/API compatibility endpoints remain available but are not exposed
+    # in the minimal realtime panel.
     @app.post("/api/runs")
     async def start_run(config: RunConfig):
         await app.state.runtime.start(config)
@@ -178,25 +198,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await app.state.runtime.control(action)
         return app.state.runtime.snapshot()
 
-    @app.post("/api/diagnostics/input")
-    async def input_diagnostic(body: InputDiagnosticRequest):
-        result = await app.state.runtime.input_diagnostic(body.action)
-        return {"result": result, "snapshot": app.state.runtime.snapshot()}
-
-    @app.post("/api/diagnostics/release")
-    async def release_input_diagnostic():
-        result = app.state.runtime.release_diagnostic_control()
-        return {"result": result, "snapshot": app.state.runtime.snapshot()}
-
     @app.post("/api/model")
     async def switch_model(config: SwitchConfig):
         await app.state.runtime.switch(config)
         return app.state.runtime.snapshot()
-
-    @app.post("/api/hints")
-    async def hint(body: HintInput):
-        app.state.runtime.hint(body.text)
-        return {"queued": True, "run_is_assisted": True}
 
     @app.get("/api/runs")
     async def list_runs():
@@ -209,9 +214,58 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(404, "Run not found")
         return result
 
-    @app.get("/api/skills")
-    async def skills():
-        return SKILL_CATALOG
+    @app.get("/api/providers")
+    async def provider_status():
+        names = list(app.state.providers)
+        results = await asyncio.gather(
+            *(app.state.providers[name].status() for name in names)
+        )
+        return [
+            {"id": name, **result}
+            for name, result in zip(names, results)
+        ]
+
+    @app.get("/api/models/{provider}")
+    async def models(provider: str):
+        if provider not in app.state.providers:
+            raise HTTPException(404, "Unknown provider")
+        return [
+            row.model_dump()
+            for row in await app.state.providers[provider].models()
+        ]
+
+    @app.post("/api/auth/codex")
+    async def login(body: LoginInput):
+        result = await app.state.providers["codex"].login(body.device)
+        for key in ("authUrl", "verificationUrl"):
+            if result.get(key):
+                url = urlparse(result[key])
+                if (
+                    url.scheme != "https"
+                    or url.hostname
+                    not in {
+                        "auth.openai.com",
+                        "chatgpt.com",
+                        "auth.chatgpt.com",
+                    }
+                ):
+                    raise HTTPException(
+                        502, "Codex returned an unexpected login URL"
+                    )
+        return result
+
+    @app.post("/api/auth/openrouter")
+    async def connect_openrouter(body: KeyInput):
+        provider = app.state.providers["openrouter"]
+        if app.state.runtime.state == "running":
+            raise ValueError("Stop autonomous play before replacing credentials")
+        old_key = provider.api_key
+        provider.api_key = body.key.get_secret_value()
+        result = await provider.status()
+        if not result["connected"]:
+            provider.api_key = old_key
+            raise HTTPException(400, result["message"])
+        return {"connected": True, "persistence": "process_memory_only"}
 
     @app.websocket("/api/events")
     async def live_events(websocket: WebSocket):
@@ -221,12 +275,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await websocket.accept()
         try:
             auth = await asyncio.wait_for(websocket.receive_json(), 5)
-            if not hmac.compare_digest(str(auth.get("token", "")), session_token):
+            if not hmac.compare_digest(
+                str(auth.get("token", "")), session_token
+            ):
                 await websocket.close(code=1008)
                 return
         except (ValueError, asyncio.TimeoutError, WebSocketDisconnect):
             await websocket.close()
             return
+
         queue = asyncio.Queue(maxsize=1)
         runtime = app.state.runtime
         runtime.subscribers.add(queue)
@@ -241,12 +298,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             runtime.subscribers.discard(queue)
 
     dist = Path(__file__).resolve().parents[2] / "web" / "dist"
-    # src/zelda_ai -> project root is parents[2].
     if dist.is_dir():
         app.mount("/", StaticFiles(directory=dist, html=True), name="panel")
     else:
+
         @app.get("/")
         async def frontend_missing():
-            return JSONResponse({"message": "Backend ativo. Em web/, execute npm install e npm run dev; "
-                "ou npm run build para servir o painel nesta porta."})
+            return JSONResponse(
+                {
+                    "message": (
+                        "Backend active. In web/, run npm install and npm run dev; "
+                        "or npm run build so this server can serve the realtime panel."
+                    )
+                }
+            )
+
     return app
