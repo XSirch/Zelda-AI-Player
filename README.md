@@ -124,7 +124,7 @@ Terminal 2:
 
 ```powershell
 cd C:\Projetos\Zelda-AI-Player
-uv run zelda-ai launch-soh "C:\Projetos\Shipwright-AI\build\x64\Release\soh.exe"
+uv run zelda-ai launch-soh "C:\Projetos\Shipwright-AI\x64\Release\soh.exe"
 ```
 
 Abra **http://127.0.0.1:8787**, carregue um save jogável e clique **INICIAR**.
