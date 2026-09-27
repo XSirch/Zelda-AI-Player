@@ -587,12 +587,30 @@ class AutonomyRuntime:
 
             call_run_id = self.run_id
             call_segment_id = self.segment_id
-            call_id = await asyncio.to_thread(
+            begin_task = asyncio.create_task(asyncio.to_thread(
                 self.store.begin_call,
                 call_run_id,
                 call_segment_id,
                 observation,
-            )
+            ))
+            try:
+                call_id = await asyncio.shield(begin_task)
+            except asyncio.CancelledError:
+                async def cleanup_pending_call():
+                    try:
+                        pending_id = await begin_task
+                        await self._finish_call(
+                            call_run_id,
+                            pending_id,
+                            status="cancelled",
+                            error="Run stopped while the call record was being created.",
+                        )
+                    except Exception:
+                        pass
+                cleanup = asyncio.create_task(cleanup_pending_call())
+                self.retired_tasks.add(cleanup)
+                cleanup.add_done_callback(self.retired_tasks.discard)
+                raise
             if generation != self.lifecycle or self.state != "running":
                 await self._finish_call(
                     call_run_id,
