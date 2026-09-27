@@ -29,7 +29,32 @@ export interface QuotaWindow {
   resets_at: number | null;
 }
 
-export interface UsageState {
+export interface ProviderQuota {
+  available: boolean;
+  connected?: boolean;
+  plan?: string | null;
+  plan_type?: string | null;
+  ordinary_usage_allowed?: boolean | null;
+  windows: QuotaWindow[];
+  credits?: {
+    has_credits: boolean;
+    unlimited: boolean;
+    balance: string | number | null;
+  } | null;
+  individual_limit?: {
+    limit: string | number | null;
+    used: string | number | null;
+    remaining_percent: number | null;
+    resets_at: number | null;
+  } | null;
+  reset_credits?: { available_count: number | null } | null;
+  rate_limit_reached_type?: string | null;
+  limit?: number | null;
+  limit_remaining?: number | null;
+  error?: string | null;
+}
+
+export interface UsageSnapshot {
   provider: string | null;
   model: string | null;
   input_tokens: number;
@@ -39,17 +64,7 @@ export interface UsageState {
   total_tokens: number;
   cost_usd: number | null;
   known_cost_usd: number;
-  quota: {
-    available?: boolean;
-    connected?: boolean;
-    plan?: string | null;
-    windows?: QuotaWindow[];
-    credits?: { has_credits: boolean; unlimited: boolean; balance: string | null } | null;
-    individual_limit?: { limit: string | null; used: string | null; remaining_percent: number | null; resets_at: number | null } | null;
-    limit?: number | null;
-    limit_remaining?: number | null;
-    error?: string;
-  };
+  quota: ProviderQuota;
   quota_updated_at: number | null;
 }
 
@@ -77,45 +92,9 @@ export interface Snapshot {
   learning: Record<string, unknown>;
   metrics: Record<string, unknown> | null;
   usage: UsageSnapshot;
-  usage: UsageState;
   bridge: {
     connected: boolean;
     last_seen_age_s: number | null;
     realtime: Record<string, unknown>;
   };
-}
-
-export interface QuotaWindow {
-  limit_id: string | null;
-  limit_name: string | null;
-  slot: string;
-  used_percent: number;
-  remaining_percent: number;
-  window_duration_mins: number | null;
-  resets_at: number | null;
-}
-
-export interface ProviderQuota {
-  available: boolean;
-  connected?: boolean;
-  plan?: string | null;
-  windows: QuotaWindow[];
-  credits?: { has_credits: boolean; unlimited: boolean; balance: string | number | null } | null;
-  individual_limit?: { limit: string | number | null; used: string | number | null; remaining_percent: number | null; resets_at: number | null } | null;
-  rate_limit_reached_type?: string | null;
-  error?: string | null;
-}
-
-export interface UsageSnapshot {
-  provider: string | null;
-  model: string | null;
-  input_tokens: number;
-  output_tokens: number;
-  cached_input_tokens: number;
-  reasoning_output_tokens: number;
-  total_tokens: number;
-  cost_usd: number | null;
-  known_cost_usd: number;
-  quota: ProviderQuota;
-  quota_updated_at: number | null;
 }
