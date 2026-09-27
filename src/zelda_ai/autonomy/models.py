@@ -39,6 +39,18 @@ class AgentIntent(BaseModel):
     choice_index: int | None = Field(default=None, ge=0, le=2)
     horizon_ms: int = Field(default=3000, ge=500, le=15000)
 
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs):
+        schema = super().model_json_schema(*args, **kwargs)
+        properties = schema.get("properties", {})
+        if properties:
+            # OpenAI/OpenRouter strict structured output requires every property
+            # to be present. Nullable fields remain nullable, but are not omitted.
+            schema["required"] = list(properties)
+            for value in properties.values():
+                value.pop("default", None)
+        return schema
+
     @field_validator("target_position")
     @classmethod
     def finite_target(cls, value):
