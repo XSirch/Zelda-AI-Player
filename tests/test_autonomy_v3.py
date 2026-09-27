@@ -75,3 +75,48 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     assert stats["updates"] == 1
     assert stats["samples_trained"] == 16
     assert (tmp_path / "policy.pt").is_file()
+
+
+def test_repeated_dialogue_does_not_farm_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    dialogue = state.model_copy(deep=True)
+    dialogue.dialogue.active = True
+    dialogue.dialogue.text_id = 77
+    dialogue.dialogue.text = "Same observed dialogue"
+
+    first = tracker.step(dialogue, intent, intrinsic=0.0, pressed_buttons=0)
+    assert first.breakdown.get("new_dialogue", 0) > 0
+
+    closed = dialogue.model_copy(deep=True)
+    closed.dialogue.active = False
+    tracker.step(closed, intent, intrinsic=0.0, pressed_buttons=0)
+
+    repeated = dialogue.model_copy(deep=True)
+    again = tracker.step(repeated, intent, intrinsic=0.0, pressed_buttons=0)
+    assert "new_dialogue" not in again.breakdown
+
+
+def test_repeated_world_edge_is_not_a_progress_farm(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+
+    next_room = state.model_copy(deep=True)
+    next_room.seq += 1
+    next_room.room = 1
+    next_room.scene_epoch += 1
+    first = tracker.step(next_room, intent, intrinsic=0.0, pressed_buttons=0)
+    assert first.breakdown.get("new_world_transition", 0) > 0
+
+    back = state.model_copy(deep=True)
+    back.seq += 2
+    back.scene_epoch += 2
+    tracker.step(back, intent, intrinsic=0.0, pressed_buttons=0)
+
+    again = next_room.model_copy(deep=True)
+    again.seq += 3
+    again.scene_epoch += 3
+    repeated = tracker.step(again, intent, intrinsic=0.0, pressed_buttons=0)
+    assert repeated.breakdown.get("repeated_transition") == 0.01
+    assert "new_world_transition" not in repeated.breakdown
