@@ -114,6 +114,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if runtime:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await runtime._settle_previous_controller()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await runtime.close()
             bridge.close()
             if simulator_task:
                 simulator_task.cancel()
