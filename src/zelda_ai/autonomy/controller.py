@@ -243,12 +243,14 @@ class ContinuousController:
                 await asyncio.sleep(self.tick_s)
         finally:
             self.bridge.release()
-            learner.cancel()
+            # Do not cancel an asyncio.to_thread PPO update: cancelling the awaiter
+            # does not stop the worker thread. Drop queued future batches, then let
+            # the one update already running finish and checkpoint serially.
+            while not self.training_queue.empty():
+                with contextlib.suppress(asyncio.QueueEmpty):
+                    self.training_queue.get_nowait()
             with contextlib.suppress(asyncio.CancelledError):
-                await learner
-            # Completed learner updates checkpoint themselves in their worker thread.
-            # Do not start a second concurrent checkpoint write while cancellation
-            # of an in-flight training worker is still propagating.
+                await asyncio.shield(learner)
 
     def telemetry(self) -> dict:
         return {
