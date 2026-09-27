@@ -9,7 +9,8 @@ import re
 import shutil
 from pathlib import Path
 
-from ..autonomy import AUTONOMY_SYSTEM_PROMPT, AgentIntent
+from ..autonomy.models import AgentIntent
+from ..autonomy.prompt import AUTONOMY_SYSTEM_PROMPT
 from ..models import Decision, ModelInfo, RunConfig, Usage
 from .base import InferenceResult, ProviderFailure, SYSTEM_PROMPT
 
