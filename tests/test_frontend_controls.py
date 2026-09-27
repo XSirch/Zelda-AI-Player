@@ -85,3 +85,21 @@ def test_panel_labels_simulator_and_stops_paused_runs():
     assert "MODO SIMULADOR" in text
     assert "snapshot?.status === 'paused'" in text
     assert "activeRun ? '/stop' : '/start'" in text
+
+
+def test_panel_shows_ml_learning_and_objective_achievements():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    for label in [
+        "APRENDIZADO ML",
+        "PONTOS DE CONQUISTA",
+        "UPDATES PPO",
+        "AMOSTRAS TREINADAS",
+        "REWARD DA RUN",
+        "CONQUISTAS DA RUN",
+    ]:
+        assert label in main
+    assert "LearningAchievement" in types
+    assert "objective_score" in types
+    assert "achievements" in types
+    assert "reward PPO" in main
