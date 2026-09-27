@@ -111,7 +111,14 @@ class RewardTracker:
             key = f"{game.instance_id}:{event.id}"
             if key not in self.seen_events:
                 self.seen_events.add(key)
-                b["native_event"] = b.get("native_event", 0.0) + 0.15
+                event_reward = {
+                    "enemy_defeated": 1.0,
+                    "boss_defeated": 2.5,
+                    "game_completed": 5.0,
+                }.get(event.kind, 0.12)
+                b["native_event"] = b.get("native_event", 0.0) + event_reward
+                if event.kind == "game_completed":
+                    done = True
 
         done = False
         previous = self.previous
