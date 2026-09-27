@@ -152,10 +152,10 @@ def test_zero_budgets_mean_unlimited_harness_limits():
     assert config.max_runtime_s == 0
 
 
-def test_blank_agent_effort_is_treated_as_unset(monkeypatch):
+def test_blank_agent_effort_uses_configured_default(monkeypatch):
     monkeypatch.setenv("ZELDA_AGENT_EFFORT", "")
     settings = Settings(_env_file=None)
-    assert settings.agent_effort is None
+    assert settings.agent_effort == "xhigh"
 
 
 def test_default_cognition_is_luna_xhigh(monkeypatch):
