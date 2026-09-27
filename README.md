@@ -1,74 +1,86 @@
 # Zelda AI Player
 
-Harness local para agentes jogarem **The Legend of Zelda: Ocarina of Time** no **Ship of Harkinian (SoH)** usando estado estruturado do jogo, controle nativo, Codex/ChatGPT ou OpenRouter e painel administrativo web.
+Jogador autônomo para **The Legend of Zelda: Ocarina of Time** no **Ship of Harkinian (SoH)**.
 
-## Status atual
+## Autonomy V3
 
-**Realtime Input Foundation v2.10 + Navigation V2 está na `main`.** O projeto separa planejamento por modelo do controle motor local, possui observações rápidas, confirmação de consumo de input no engine, identidade por instância de ator, budgets independentes e navegação local por NavMesh/A*. Ainda **não está certificado como capaz de zerar OoT autonomamente**.
+O fluxo principal deixou de ser um LLM escolhendo `skills`. Ao clicar **INICIAR**, três loops independentes passam a trabalhar em paralelo:
 
-A navegação usa uma malha móvel derivada da colisão real do SoH e A* local para contornar paredes/quinas antes de aplicar input. Links globais entre salas descarregadas, travessias especiais de puzzle e obstáculos que existem apenas como actor collider continuam sendo refinamentos futuros. O combate aprende uma política separada para cada tipo de inimigo observado.
+- **ML actor:** PPO local em PyTorch emite diretamente o analógico N64 e os bits físicos dos botões. Ele não recebe `A = interact`, `B = attack`, `navigate_to`, `fight_enemy` ou macros equivalentes.
+- **Online learner:** PPO atualiza a política com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade para explorar estados novos. O learner usa uma cópia separada da rede; backprop não para os inputs do jogo.
+- **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas o objetivo/intenção de alto nível a partir do estado estruturado. Uma inferência lenta não interrompe o controle motor.
 
-Revisão SoH fixada:
+A política recebe quatro frames estruturados consecutivos (~400 ms no ritmo atual de decisão), permitindo aprender timing de movimento e combate. O checkpoint da rede fica em `.local/ml/raw-controller-ppo-rnd-v1.pt` e é reaproveitado entre runs.
+
+### Reward
+
+Não existe roteiro hard-coded de Zelda no reward. Os sinais vêm de observações verificáveis:
+
+- curiosidade RND;
+- nova região visitada;
+- novos atores/eventos;
+- mudança de scene/room;
+- mudança de diálogo/contexto;
+- progresso persistente de inventário/quest/equipamento;
+- progresso em direção a um alvo observado quando a cognição fornece um;
+- dano causado/recebido e morte;
+- pequeno custo por button-mashing.
+
+## Painel
+
+O painel foi reduzido ao que é útil durante uma run:
+
+- conexão do SoH, bridge realtime e cognição;
+- texto operacional do que a IA está tentando fazer;
+- analógico e botões físicos pressionados em tempo real;
+- tokens da run;
+- tokens de cache/reasoning;
+- custo API quando o provider realmente informa USD;
+- cota restante do Codex/ChatGPT, lida de `account/rateLimits/read`;
+- **INICIAR / PARAR**.
+
+Para Codex autenticado por ChatGPT, tokens são contabilizados pela telemetria do app-server, mas custo em USD fica como **—** quando o provider não reporta cobrança API. A cota mostra apenas as janelas efetivamente devolvidas pelo Codex; não presume que uma janela de 5 horas exista.
+
+## Primeira configuração
+
+```powershell
+cd C:\Projetos\Zelda-AI-Player
+uv sync
+uv run zelda-ai init
+uv run zelda-ai auth-codex
+```
+
+Depois, inicie backend e SoH:
+
+```powershell
+uv run zelda-ai serve
+uv run zelda-ai launch-soh "C:\Projetos\Shipwright-AI\build\x64\Release\soh.exe"
+```
+
+Abra **http://127.0.0.1:8787** e clique **INICIAR**.
+
+### Configuração da cognição
+
+Por padrão:
+
+```text
+ZELDA_AGENT_PROVIDER=codex
+ZELDA_AGENT_MODEL=gpt-6-astra
+ZELDA_AGENT_EFFORT=
+```
+
+Esses valores podem ser alterados no `.env`. O painel permanece deliberadamente sem seletor de skills/modelo.
+
+## Bridge SoH
+
+A bridge V2 continua sendo a camada de percepção e controle de baixa latência: UDP local autenticado, snapshots rápidos, journal de eventos, actor state, diálogo, inventário/progresso, probes de terreno, autosave e input scheduler nativo com lease/watchdog.
+
+Revisão Shipwright atualmente fixada:
 
 ```text
 HarbourMasters/Shipwright
 d30fc192f2eb01ceea45bd1e12de61636cafbf86
 ```
-
-Diretórios Windows atuais:
-
-```text
-C:\Projetos\Zelda-AI-Player
-C:\Projetos\Shipwright-AI
-```
-
-## Implementado
-
-- **Backend:** Python/FastAPI, SQLite/SQLAlchemy, WebSocket e histórico de runs, segmentos, chamadas, eventos, memória, trajetórias e grafo de mundo.
-- **Painel React/TypeScript:** provider/modelo/effort, budgets, iniciar/pausar/retomar/encerrar, assumir controle, skills, memória e benchmarks. O AO VIVO usa abas logo abaixo do vídeo para Controle, Combate, Terreno, Atores, Progresso, Estado e Decisão, evitando uma página vertical gigante.
-- **Providers:** Codex app-server com login ChatGPT isolado e OpenRouter por API. Não existe retry pago automático.
-- **Bridge V2:** UDP autenticado em localhost com snapshots rápidos para controle e snapshots completos aproximadamente a cada 200 ms para dados mais pesados.
-- **Input scheduler nativo:** setpoints contínuos separados de sequências discretas, deduplicação, owner epochs, watchdog monotônico e receipts de `accepted`, `consumed` e `completed`.
-- **Hook no consumo do controle:** sequências avançam nas leituras que efetivamente consomem `Input`, não em timers do Python nem em frames de renderização.
-- **Percepção estruturada:** pose, yaw, câmera, scene/room, colisão, terreno, diálogo, inventário, equipamento, targeting, atores da sala inclusive off-camera, game-over, cutscene e ocarina.
-- **Checkpoint Planner:** o opening vanilla agora é sequenciado por checkpoints observáveis reconstruídos do save: sair da casa → greeting inicial da Saria → Kokiri Sword → Deku Shield → equipar ambos → Mido → Great Deku Tree → entrar na dungeon. A etapa ativa entra no prompt e passos concluídos não devem ser repetidos; Saria/Mido têm guardas locais contra loops.
-- **Scene autosave v2.10:** toda mudança real de `scene` agenda `Play_PerformSave` nativo depois que o novo cenário fica jogável/seguro; mudanças só de `room` não gravam o arquivo. O primeiro load não dispara autosave.
-- **Navigation V2:** o bridge gera a cada snapshot completo uma grade walkable 9×9 centrada em Link a partir de `BgCheck`; cada aresta exige piso amostrado ao longo de toda a aresta, desnível caminhável, corredor sem parede e margem lateral para o corpo. O Python usa A* em links recíprocos, não corta quinas, recentra a malha conforme Link avança e valida o próximo heading novamente nas 16 sondas rápidas antes de enviar analógico. `navigate_to`, aproximação, follow e exploração usam a malha; a v2.9 também publica `traversal_affordances` em 16 direções até 280u para localizar escadas/rampas, descidas, ladders e paredes escaláveis, e `traverse(up/down)` agora é um Auto NavPath: se Link não estiver na travessia, o controlador escolhe a melhor rota vertical alcançável, faz A* até a aproximação, revalida a geometria e só então atravessa; `traverse_to` fica como override de rota específica; `traverse_exit` usa surfaces com `SceneExitIndex` para atravessar warps/thresholds sem ator de porta e agora mira um ponto interno do triângulo real de colisão, evitando parar na borda; para o modelo cada saída é opaca e expõe apenas a posição física — o destino só entra no `known_world_edges` após a transição ser realmente observada; `move` primitivo é recusado quando a sonda indica parede/vazio/desnível inseguro.
-- **Quest checkpoints:** o runtime mantém um plano observável de abertura do jogo com uma única etapa ativa por vez (sair da casa → greeting inicial → Kokiri Sword → Deku Shield → equipar → Mido → Deku Tree). Conclusões vêm de flags/equipamento do save, então reiniciar o backend não faz o agente repetir Saria/Mido. O plano não codifica a rota física até os objetivos.
-- **Scene autosave:** a bridge v2.10 agenda um save nativo quando a scene realmente muda, espera o novo cenário estar jogável/seguro e então chama `Play_PerformSave`. Mudanças apenas de room não gravam save.
-- **Actor UID:** inimigos iguais deixam de ser identificados apenas por `actor_id`; cada vida/spawn observado recebe identidade própria.
-- **Journal de eventos:** eventos não confirmados podem ser reenviados e gaps são explicitamente detectados.
-- **Skills locais:** navegação curta, porta, traverse/traverse_to, follow, interação, exploração, manipulação, mira, equipamento/menu e músicas.
-- **Aprendizado de combate por inimigo:** no modo Adaptive, cada modelo+effort mantém perfis isolados por classe de inimigo. O controlador aprende quais ações funcionam em estados como distância, aproximação/recuo do inimigo, orientação, dano recente, ameaça e lock, atualiza a política por tentativa e erro durante a luta e persiste encontros, vitórias, derrotas, dano recebido e melhores ações. O LLM recebe esse resumo nas decisões seguintes; o loop motor continua local para não introduzir latência de inferência em cada golpe. Pausa/intervenção humana/dica tainta a run para combate: a IA pode continuar usando perfis anteriores, mas novos episódios daquela run não são promovidos como aprendizado autônomo.
-- **Parada independente do provider:** stop/take-control revoga o input antes de aguardar cleanup de inferência ou validação de modelo.
-- **Diagnóstico local de input:** A/B, Z-target, frente, ré, backflip e stress A/B ×20 rodam sem provider, sem benchmark e sem memória; exibem latência Python→consumo P50/P95/P99, fila nativa e edges observados. Backflip/sidestep usam o camera input yaw nativo do OoT para converter direção relativa ao Link em analógico relativo à câmera, seguram Z + direção até o próprio Player_ProcessControlStick reportar a direção esperada, então geram o edge de A; verificam piso na direção Link-relative e só confirmam sucesso quando o engine reporta HOPPING com a direção esperada (backflip = 2, left = 1, right = 3). Movimento recusa quando o probe não comprova piso seguro.
-- **Aprendizado versionado:** dados anteriores são preservados; traces falhos/intervenções não são promovidos como experiência autônoma.
-
-> `consumed` significa que o input chegou ao consumidor do jogo. Não significa automaticamente que um golpe acertou, uma esquiva teve efeito ou uma animação terminou.
-
-## Budgets: `0 = sem limite`
-
-| Campo | Valor 0 |
-| --- | --- |
-| `max_calls` | sem teto de chamadas no harness |
-| `max_tokens` | sem teto acumulado de tokens no harness |
-| `max_cost_usd` | sem teto de USD do harness |
-| `max_runtime_s` | sem limite de duração da run |
-
-Exemplo sem tetos impostos pelo harness:
-
-```json
-{
-  "max_calls": 0,
-  "max_tokens": 0,
-  "max_cost_usd": 0,
-  "max_runtime_s": 0,
-  "max_output_tokens": 2048
-}
-```
-
-`max_output_tokens` é um limite **por resposta OpenRouter** e continua positivo. `max_cost_usd = 0` não torna o OpenRouter gratuito; apenas desativa o teto adicional do Zelda AI Player.
-
 ## Atualizar a main
 
 ```powershell
