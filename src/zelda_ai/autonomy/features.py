@@ -94,9 +94,12 @@ def encode_state(
     ])
 
     if player is None:
-        f.extend([0.0] * 21)
+        f.extend([0.0] * 27)
     else:
         yaw = player.yaw * math.pi / 32768.0
+        camera_raw = game.camera_input_yaw if game.camera_input_yaw is not None else player.yaw
+        camera_yaw = camera_raw * math.pi / 32768.0
+        relative_yaw = ((player.yaw - camera_raw + 32768) % 65536 - 32768) * math.pi / 32768.0
         f.extend([
             player.health / max(1.0, float(player.max_health)),
             player.magic / 255.0,
@@ -104,6 +107,12 @@ def encode_state(
             _squash(player.speed_xz, 8.0),
             math.sin(yaw),
             math.cos(yaw),
+            math.sin(camera_yaw),
+            math.cos(camera_yaw),
+            math.sin(relative_yaw),
+            math.cos(relative_yaw),
+            1.0 if game.camera_input_yaw is not None else 0.0,
+            1.0 if game.mirrored_world else 0.0,
             _squash(player.y_dist_to_water, 100.0),
             _squash(player.wall_yaw, 16384.0),
             1.0 if player.climbing_ladder else 0.0,
