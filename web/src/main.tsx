@@ -129,6 +129,70 @@ function UsageStrip({ snapshot }: { snapshot: Snapshot | null }) {
   </section>;
 }
 
+function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
+  const learning = snapshot?.learning;
+  const achievements = [...(learning?.achievements ?? [])].slice(-8).reverse();
+  const lifetimeUpdates = learning?.updates ?? 0;
+  const lifetimeSamples = learning?.samples_trained ?? 0;
+  const updates = learning?.run_updates ?? 0;
+  const samples = learning?.run_samples_trained ?? 0;
+  const objectiveScore = learning?.objective_score ?? 0;
+  const totalReward = learning?.total_reward ?? 0;
+  const recentReward = learning?.recent_mean_reward ?? 0;
+  const positiveRate = learning?.positive_reward_rate ?? 0;
+  const exploration = learning?.exploration;
+  const trainingState = updates > 0
+    ? 'TREINANDO'
+    : snapshot?.status === 'running'
+      ? 'COLETANDO EXPERIÊNCIA'
+      : 'AGUARDANDO';
+
+  return <section className="learning-panel">
+    <div className="section-label">
+      APRENDIZADO ML
+      <span className={updates > 0 ? 'learning-state active' : 'learning-state'}>{trainingState}</span>
+    </div>
+    <div className="learning-metrics">
+      <div><span>PONTOS DE CONQUISTA</span><strong>{compact(objectiveScore)}</strong><small>objetivos observados · não é reward PPO</small></div>
+      <div><span>UPDATES PPO · RUN</span><strong>{compact(updates)}</strong><small>{compact(lifetimeUpdates)} no checkpoint</small></div>
+      <div><span>AMOSTRAS · RUN</span><strong>{compact(samples)}</strong><small>{compact(lifetimeSamples)} treinadas no total</small></div>
+      <div><span>REWARD DA RUN</span><strong>{totalReward.toFixed(2)}</strong><small>última média: {recentReward.toFixed(3)}</small></div>
+      <div><span>SINAIS POSITIVOS</span><strong>{Math.round(positiveRate * 100)}%</strong><small>janela das últimas ações</small></div>
+    </div>
+    <div className="learning-body">
+      <div className="achievements">
+        <div className="learning-subhead">
+          <span>CONQUISTAS DA RUN</span>
+          <small>
+            {exploration
+              ? `${exploration.unique_spaces} regiões · ${exploration.unique_actors} atores · ${exploration.unique_transitions} transições`
+              : 'sem exploração registrada'}
+          </small>
+        </div>
+        {achievements.length ? achievements.map(achievement =>
+          <div className="achievement-row" key={`${achievement.id}-${achievement.action_index}`}>
+            <strong>+{achievement.points}</strong>
+            <div>
+              <b>{achievement.title}</b>
+              <small>{achievement.detail}</small>
+            </div>
+            <span>reward PPO +{achievement.training_reward.toFixed(2)}</span>
+          </div>
+        ) : <div className="achievement-empty">
+          Nenhuma conquista objetiva ainda. O ator pode estar coletando experiência antes do primeiro marco.
+        </div>}
+      </div>
+      <div className="learning-note">
+        <span>COMO LER</span>
+        <p>
+          Conquistas mostram resultados concretos no jogo. Updates e amostras confirmam que a rede foi treinada.
+          Reward crescente ajuda, mas sozinho não prova que a política ficou melhor.
+        </p>
+      </div>
+    </div>
+  </section>;
+}
+
 function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [socketOnline, setSocketOnline] = useState(false);
@@ -231,6 +295,8 @@ function App() {
       <Thought snapshot={snapshot} />
       <ControllerView snapshot={snapshot} />
     </div>
+
+    <LearningPanel snapshot={snapshot} />
 
     <footer>
       <span>{snapshot?.status?.toUpperCase() ?? 'OFFLINE'}</span>

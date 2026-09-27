@@ -49,10 +49,14 @@ class ContinuousController:
         checkpoint: Path,
         *,
         rollout_size: int = 256,
+        on_achievement: Callable[[dict], None] | None = None,
     ):
         self.bridge = bridge
         self.policy = OnlinePPO(checkpoint)
+        self.starting_updates = self.policy.updates
+        self.starting_samples_trained = self.policy.samples_trained
         self.rollout_size = rollout_size
+        self.on_achievement = on_achievement
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
@@ -71,6 +75,8 @@ class ContinuousController:
         self.total_reward = 0.0
         self.last_reward = 0.0
         self.last_reward_breakdown: dict[str, float] = {}
+        self.reward_window = deque(maxlen=200)
+        self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
@@ -86,6 +92,8 @@ class ContinuousController:
         self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
+        self.reward_window.clear()
+        self.achievements.clear()
 
     def set_intent(self, intent: AgentIntent):
         self.intent = intent
@@ -153,7 +161,16 @@ class ContinuousController:
         )
         self.last_reward = reward.reward
         self.total_reward += reward.reward
+        self.reward_window.append(reward.reward)
         self.last_reward_breakdown = reward.breakdown
+        for achievement in reward.achievements:
+            row = {
+                **achievement,
+                "action_index": self.actions_sampled + 1,
+            }
+            self.achievements.append(row)
+            if self.on_achievement is not None:
+                self.on_achievement(dict(row))
 
         if self.pending is not None:
             transition = {
@@ -306,10 +323,28 @@ class ContinuousController:
             },
             "learning": {
                 **self.policy.stats(),
+                "run_updates": max(0, self.policy.updates - self.starting_updates),
+                "run_samples_trained": max(
+                    0, self.policy.samples_trained - self.starting_samples_trained
+                ),
                 "rollout_steps": len(self.rollout),
                 "queued_rollouts": self.training_queue.qsize(),
                 "last_reward": round(self.last_reward, 6),
                 "total_reward": round(self.total_reward, 4),
+                "recent_mean_reward": round(
+                    sum(self.reward_window) / len(self.reward_window), 6
+                ) if self.reward_window else 0.0,
+                "positive_reward_rate": round(
+                    sum(1 for value in self.reward_window if value > 0) / len(self.reward_window),
+                    4,
+                ) if self.reward_window else 0.0,
+                "objective_score": self.reward_tracker.objective_score,
+                "achievements": list(self.achievements),
+                "exploration": {
+                    "unique_spaces": len(self.reward_tracker.visited_cells),
+                    "unique_actors": len(self.reward_tracker.seen_actors),
+                    "unique_transitions": len(self.reward_tracker.seen_transitions),
+                },
                 "reward_breakdown": self.last_reward_breakdown,
                 "last_update": self.last_training_stats,
             },

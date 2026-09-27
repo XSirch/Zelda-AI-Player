@@ -428,6 +428,9 @@ class AutonomyRuntime:
             self.controller = ContinuousController(
                 self.bridge,
                 self.model_dir / "raw-controller-ppo-rnd-v1.pt",
+                on_achievement=lambda achievement: self.log(
+                    "ml_achievement", achievement
+                ),
             )
             self.bridge.enable_control()
             self.state = "running"
@@ -562,6 +565,8 @@ class AutonomyRuntime:
                     "last_reward",
                     "total_reward",
                     "reward_breakdown",
+                    "objective_score",
+                    "achievements",
                 )
                 if key in learning
             }

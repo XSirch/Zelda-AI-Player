@@ -320,6 +320,128 @@ h1 {
 .error { border-color: var(--danger); background: #2a1715; color: #f0a49a; }
 .notice { border-color: #807d56; background: #242317; color: #c5c18f; }
 
+
+.learning-panel {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.learning-state {
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.learning-state.active { color: var(--signal); }
+
+.learning-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border-bottom: 1px solid var(--line);
+}
+.learning-metrics > div {
+  min-height: 88px;
+  padding: 15px 17px;
+  border-right: 1px solid var(--line);
+}
+.learning-metrics > div:last-child { border-right: 0; }
+.learning-metrics span,
+.learning-note > span {
+  display: block;
+  color: var(--muted);
+  font: 8px ui-monospace, monospace;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.learning-metrics strong {
+  display: block;
+  font: 18px/1 ui-monospace, monospace;
+  font-weight: 520;
+  color: var(--text);
+}
+.learning-metrics small {
+  display: block;
+  margin-top: 7px;
+  color: #66736a;
+  font: 8px/1.45 ui-monospace, monospace;
+}
+
+.learning-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.achievements { min-width: 0; }
+.learning-subhead {
+  min-height: 42px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+}
+.learning-subhead > span {
+  color: #bec8c0;
+  font: 9px ui-monospace, monospace;
+  letter-spacing: 1px;
+}
+.learning-subhead small {
+  color: var(--muted);
+  font: 8px ui-monospace, monospace;
+  text-align: right;
+}
+.achievement-row {
+  min-height: 58px;
+  padding: 10px 16px;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-bottom: 1px solid #27322b;
+}
+.achievement-row:last-child { border-bottom: 0; }
+.achievement-row > strong {
+  color: var(--signal);
+  font: 16px/1 ui-monospace, monospace;
+  font-weight: 520;
+}
+.achievement-row b {
+  display: block;
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--text);
+}
+.achievement-row div small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font: 8px/1.4 ui-monospace, monospace;
+  overflow-wrap: anywhere;
+}
+.achievement-row > span {
+  color: #748078;
+  font: 8px ui-monospace, monospace;
+  white-space: nowrap;
+}
+.achievement-empty {
+  min-height: 96px;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #6d7971;
+  font: 9px/1.5 ui-monospace, monospace;
+  text-align: center;
+}
+.learning-note {
+  padding: 18px;
+  border-left: 1px solid var(--line);
+  background: #0d130f;
+}
+.learning-note p {
+  margin: 0;
+  color: #88958c;
+  font: 9px/1.6 ui-monospace, monospace;
+}
+
 footer {
   display: flex;
   justify-content: space-between;
@@ -332,6 +454,12 @@ footer {
 
 @media (max-width: 900px) {
   .usage-strip { grid-template-columns: 1fr 1fr; }
+  .learning-metrics { grid-template-columns: 1fr 1fr; }
+  .learning-metrics > div { border-bottom: 1px solid var(--line); }
+  .learning-metrics > div:nth-child(even) { border-right: 0; }
+  .learning-metrics > div:last-child { grid-column: 1 / -1; border-bottom: 0; }
+  .learning-body { grid-template-columns: 1fr; }
+  .learning-note { border-left: 0; border-top: 1px solid var(--line); }
   .usage-cell:nth-child(2) { border-right: 0; }
   .usage-cell { border-bottom: 1px solid var(--line); }
   .usage-cell:nth-last-child(-n+2) { border-bottom: 0; }
@@ -346,6 +474,12 @@ footer {
 
 @media (max-width: 560px) {
   .usage-strip { grid-template-columns: 1fr; }
+  .learning-metrics { grid-template-columns: 1fr; }
+  .learning-metrics > div,
+  .learning-metrics > div:nth-child(even) { border-right: 0; }
+  .learning-metrics > div:last-child { grid-column: auto; }
+  .achievement-row { grid-template-columns: 52px minmax(0, 1fr); }
+  .achievement-row > span { grid-column: 2; }
   .usage-cell { border-right: 0; border-bottom: 1px solid var(--line) !important; }
   .usage-cell:last-child { border-bottom: 0 !important; }
   .topbar { align-items: center; }

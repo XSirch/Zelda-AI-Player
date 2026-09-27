@@ -69,6 +69,43 @@ export interface UsageSnapshot {
   quota_updated_at: number | null;
 }
 
+
+export interface LearningAchievement {
+  id: string;
+  kind: string;
+  title: string;
+  detail: string;
+  points: number;
+  training_reward: number;
+  score_after: number;
+  action_index: number;
+}
+
+export interface LearningSnapshot {
+  learner_device?: string;
+  actor_device?: string;
+  updates?: number;
+  samples_trained?: number;
+  run_updates?: number;
+  run_samples_trained?: number;
+  rollout_steps?: number;
+  queued_rollouts?: number;
+  last_reward?: number;
+  total_reward?: number;
+  recent_mean_reward?: number;
+  positive_reward_rate?: number;
+  objective_score?: number;
+  achievements?: LearningAchievement[];
+  exploration?: {
+    unique_spaces: number;
+    unique_actors: number;
+    unique_transitions: number;
+  };
+  reward_breakdown?: Record<string, number>;
+  last_update?: Record<string, unknown>;
+  checkpoint_load_error?: string;
+}
+
 export interface Snapshot {
   status: string;
   reason: string;
@@ -91,7 +128,7 @@ export interface Snapshot {
     motor: string;
   };
   input: InputState;
-  learning: Record<string, unknown>;
+  learning: LearningSnapshot;
   metrics: Record<string, unknown> | null;
   usage: UsageSnapshot;
   bridge: {
