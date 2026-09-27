@@ -56,6 +56,7 @@ class RewardTracker:
         self.seen_transitions: set[tuple[int, int, int, int]] = set()
         self.objective_score = 0
         self.combat_contact = False
+        self.seen_inventory_items: set[int] = set()
         self.previous: dict | None = None
 
     def break_causal_chain(self):
@@ -277,6 +278,11 @@ class RewardTracker:
                 done = True
 
         previous = self.previous
+        if previous is None:
+            # Progress already present when the run starts is baseline, not an
+            # autonomous achievement. Remember inventory IDs so depletion and
+            # later reacquisition cannot farm the same objective.
+            self.seen_inventory_items.update(current["inventory_items"])
         if previous and previous["instance"] == current["instance"]:
             if (previous["scene"], previous["room"], previous["scene_epoch"]) != (
                 current["scene"], current["room"], current["scene_epoch"]
@@ -326,6 +332,9 @@ class RewardTracker:
 
             new_inventory = set(current["inventory_items"]) - set(previous["inventory_items"])
             for item_id in sorted(new_inventory):
+                if item_id in self.seen_inventory_items:
+                    continue
+                self.seen_inventory_items.add(item_id)
                 name = current["inventory_items"][item_id]
                 training_reward = 1.2
                 b["objective_milestone"] = b.get("objective_milestone", 0.0) + training_reward
