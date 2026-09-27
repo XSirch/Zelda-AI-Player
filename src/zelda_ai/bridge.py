@@ -182,8 +182,7 @@ class Bridge(asyncio.DatagramProtocol):
                 if previous is not None:
                     self.authority.revoke()
             elif self.last_seen:
-                if previous and state.scene_epoch != previous.scene_epoch:
-                    ticks = state.input_tick - previous.input_tick
+                ticks = state.input_tick - previous.input_tick
                 if ticks > 0:
                     measured = (now-self.last_seen)*1000/ticks
                     if 5 <= measured <= 200:
