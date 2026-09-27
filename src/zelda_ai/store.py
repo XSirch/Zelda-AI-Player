@@ -59,12 +59,6 @@ combat_encounters = Table("combat_encounters", metadata,
     Column("created_at", Float), Column("outcome", String), Column("data", JSON, nullable=False))
 
 
-control_profiles = Table("control_profiles", metadata,
-    Column("namespace", String, primary_key=True),
-    Column("profile", JSON, nullable=False),
-    Column("updated_at", Float, nullable=False))
-
-
 def uid() -> str:
     return uuid.uuid4().hex
 
@@ -82,34 +76,6 @@ class Store:
             conn.execute(segments.update().where(segments.c.ended_at.is_(None)).values(ended_at=time.time()))
             conn.execute(calls.update().where(calls.c.status == "pending").values(
                 status="interrupted", error="Runtime restarted; provider usage may be incomplete."))
-
-    def control_profile(self, namespace: str) -> dict:
-        if not namespace:
-            return {}
-        with self.engine.connect() as conn:
-            row = conn.execute(select(control_profiles.c.profile).where(
-                control_profiles.c.namespace == namespace)).first()
-        if not row or not isinstance(row[0], dict):
-            return {}
-        # JSON columns are mutable Python values after deserialization; return a
-        # detached round-trip copy so the realtime controller cannot mutate SQLAlchemy state.
-        return json.loads(json.dumps(row[0]))
-
-    def save_control_profile(self, namespace: str, profile: dict):
-        if not namespace or not isinstance(profile, dict):
-            return
-        safe_profile = json.loads(json.dumps(profile))
-        now = time.time()
-        with self.engine.begin() as conn:
-            exists = conn.execute(select(control_profiles.c.namespace).where(
-                control_profiles.c.namespace == namespace)).first()
-            if exists:
-                conn.execute(control_profiles.update().where(
-                    control_profiles.c.namespace == namespace).values(
-                        profile=safe_profile, updated_at=now))
-            else:
-                conn.execute(control_profiles.insert().values(
-                    namespace=namespace, profile=safe_profile, updated_at=now))
 
     def close(self):
         self.engine.dispose()
