@@ -145,7 +145,7 @@ class AutonomyRuntime:
         await self._drain_persistence()
         retired = [task for task in self.retired_tasks if not task.done()]
         if retired:
-            done, pending = await asyncio.wait(retired, timeout=6.0)
+            _, pending = await asyncio.wait(retired, timeout=6.0)
             for task in pending:
                 task.cancel()
             if pending:
