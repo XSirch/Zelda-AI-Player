@@ -177,7 +177,6 @@ function App() {
     };
   }, []);
 
-  const running = snapshot?.status === 'running';
   const activeRun = snapshot?.status === 'running' || snapshot?.status === 'paused' || snapshot?.status === 'starting';
   const simulator = snapshot?.connection.source === 'simulator';
   const connectionDetail = useMemo(() => {
