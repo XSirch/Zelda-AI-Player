@@ -132,8 +132,10 @@ function UsageStrip({ snapshot }: { snapshot: Snapshot | null }) {
 function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const learning = snapshot?.learning;
   const achievements = [...(learning?.achievements ?? [])].slice(-8).reverse();
-  const updates = learning?.updates ?? 0;
-  const samples = learning?.samples_trained ?? 0;
+  const lifetimeUpdates = learning?.updates ?? 0;
+  const lifetimeSamples = learning?.samples_trained ?? 0;
+  const updates = learning?.run_updates ?? 0;
+  const samples = learning?.run_samples_trained ?? 0;
   const objectiveScore = learning?.objective_score ?? 0;
   const totalReward = learning?.total_reward ?? 0;
   const recentReward = learning?.recent_mean_reward ?? 0;
@@ -152,8 +154,8 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
     </div>
     <div className="learning-metrics">
       <div><span>PONTOS DE CONQUISTA</span><strong>{compact(objectiveScore)}</strong><small>objetivos observados · não é reward PPO</small></div>
-      <div><span>UPDATES PPO</span><strong>{compact(updates)}</strong><small>pesos publicados no ator</small></div>
-      <div><span>AMOSTRAS TREINADAS</span><strong>{compact(samples)}</strong><small>transições usadas no treino</small></div>
+      <div><span>UPDATES PPO · RUN</span><strong>{compact(updates)}</strong><small>{compact(lifetimeUpdates)} no checkpoint</small></div>
+      <div><span>AMOSTRAS · RUN</span><strong>{compact(samples)}</strong><small>{compact(lifetimeSamples)} treinadas no total</small></div>
       <div><span>REWARD DA RUN</span><strong>{totalReward.toFixed(2)}</strong><small>última média: {recentReward.toFixed(3)}</small></div>
       <div><span>SINAIS POSITIVOS</span><strong>{Math.round(positiveRate * 100)}%</strong><small>janela das últimas ações</small></div>
     </div>
