@@ -161,10 +161,17 @@ class OnlinePPO:
         with self.actor_lock, torch.inference_mode():
             obs = self._tensor(observation).unsqueeze(0)
             stick_dist, button_dist, value, _ = self.actor.distributions(obs)
-            stick01 = stick_dist.sample()
+            sampled01 = stick_dist.sample()
             buttons = button_dist.sample()
-            stick = stick01 * 2.0 - 1.0
-            log_prob = stick_dist.log_prob(stick01).sum(-1) + button_dist.log_prob(buttons).sum(-1)
+            sampled = sampled01 * 2.0 - 1.0
+            # Quantize first so PPO trains on the exact N64 stick values that
+            # Bridge.send will deliver, not on an unobservable pre-rounding action.
+            stick = torch.round(sampled * 80.0) / 80.0
+            executed01 = ((stick + 1.0) * 0.5).clamp(1e-5, 1.0 - 1e-5)
+            log_prob = (
+                stick_dist.log_prob(executed01).sum(-1)
+                + button_dist.log_prob(buttons).sum(-1)
+            )
             return {
                 "stick": [float(v) for v in stick.squeeze(0).detach().cpu().tolist()],
                 "buttons": [float(v) for v in buttons.squeeze(0).detach().cpu().tolist()],
