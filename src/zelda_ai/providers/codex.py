@@ -111,6 +111,9 @@ def summarize_rate_limits(payload: dict | None) -> dict:
     )
     credits = primary_snapshot.get("credits") if isinstance(primary_snapshot, dict) else None
     individual = primary_snapshot.get("individualLimit") if isinstance(primary_snapshot, dict) else None
+    if isinstance(legacy, dict):
+        credits = credits if isinstance(credits, dict) else legacy.get("credits")
+        individual = individual if isinstance(individual, dict) else legacy.get("individualLimit")
     reset_credits = payload.get("rateLimitResetCredits")
     return {
         "available": bool(
@@ -135,10 +138,16 @@ def summarize_rate_limits(payload: dict | None) -> dict:
         "reset_credits": {
             "available_count": reset_credits.get("availableCount"),
         } if isinstance(reset_credits, dict) else None,
-        "rate_limit_reached_type": primary_snapshot.get("rateLimitReachedType")
-            if isinstance(primary_snapshot, dict) else None,
-        "plan_type": primary_snapshot.get("planType")
-            if isinstance(primary_snapshot, dict) else None,
+        "rate_limit_reached_type": (
+            primary_snapshot.get("rateLimitReachedType")
+            if isinstance(primary_snapshot, dict)
+            else None
+        ) or (legacy.get("rateLimitReachedType") if isinstance(legacy, dict) else None),
+        "plan_type": (
+            primary_snapshot.get("planType")
+            if isinstance(primary_snapshot, dict)
+            else None
+        ) or (legacy.get("planType") if isinstance(legacy, dict) else None),
     }
 
 
