@@ -57,6 +57,18 @@ class RewardTracker:
         return result
 
     @staticmethod
+    def _intent_key(intent: AgentIntent):
+        return (
+            intent.mode,
+            intent.target_actor_id,
+            intent.target_actor_params,
+            intent.target_actor_uid,
+            tuple(intent.target_position) if intent.target_position is not None else None,
+            intent.direction,
+            intent.choice_index,
+        )
+
+    @staticmethod
     def _target_distance(game: GameState, intent: AgentIntent) -> float | None:
         if not game.player:
             return None
@@ -77,6 +89,7 @@ class RewardTracker:
             "dialogue": (game.dialogue.active, game.dialogue.text_id, game.dialogue.state_code),
             "context": (game.context_action.code, game.context_action.label),
             "progress": self._progress_fingerprint(game),
+            "intent_key": self._intent_key(intent),
             "target_distance": self._target_distance(game, intent),
             "enemy_health": self._enemy_health(game),
         }
@@ -178,7 +191,11 @@ class RewardTracker:
                         0.8, (old_health - new_health) * 0.08)
 
             old_dist, new_dist = previous["target_distance"], current["target_distance"]
-            if old_dist is not None and new_dist is not None:
+            if (
+                previous["intent_key"] == current["intent_key"]
+                and old_dist is not None
+                and new_dist is not None
+            ):
                 improvement = max(-100.0, min(100.0, old_dist - new_dist))
                 b["intent_progress"] = improvement / 500.0
 
