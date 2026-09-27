@@ -781,7 +781,11 @@ class AutonomyRuntime:
                 "cached_input_tokens": (self.metrics_cache or {}).get("cached_input_tokens", 0),
                 "reasoning_output_tokens": (self.metrics_cache or {}).get("reasoning_output_tokens", 0),
                 "total_tokens": (self.metrics_cache or {}).get("total_tokens", 0),
-                "cost_usd": (self.metrics_cache or {}).get("cost_usd"),
+                "cost_usd": (
+                    None
+                    if self.config and self.config.provider == "codex"
+                    else (self.metrics_cache or {}).get("cost_usd")
+                ),
                 "known_cost_usd": (self.metrics_cache or {}).get("known_cost_usd", 0),
                 "quota": self.provider_usage,
                 "quota_updated_at": self.provider_usage_at or None,
