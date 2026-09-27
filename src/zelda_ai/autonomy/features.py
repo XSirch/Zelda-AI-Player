@@ -5,7 +5,7 @@ import math
 from ..models import ActorObservation, GameState
 from .models import AgentIntent
 
-BASE_FEATURE_DIM = 208
+BASE_FEATURE_DIM = 288
 STACK_FRAMES = 4
 FEATURE_DIM = BASE_FEATURE_DIM * STACK_FRAMES
 BUTTON_NAMES = ("A", "B", "Z", "START", "R", "C_UP", "C_LEFT", "C_DOWN", "C_RIGHT")
@@ -23,6 +23,7 @@ _NOVELTY_INTENT = AgentIntent(
     target_actor_params=None,
     target_actor_uid=None,
     target_position=None,
+    target_item_id=None,
     direction=None,
     choice_index=None,
     horizon_ms=2000,
@@ -32,6 +33,12 @@ _NOVELTY_INTENT = AgentIntent(
 
 def _squash(value: float, scale: float) -> float:
     return math.tanh(float(value) / scale)
+
+
+def _item_feature(value: int | None) -> float:
+    if value is None or value == 0xFF:
+        return -1.0
+    return max(-1.0, min(1.0, float(value) / 127.0 - 1.0))
 
 
 def _relative(player, point):
@@ -105,6 +112,10 @@ def encode_state(
         1.0 if intent.direction == "up" else -1.0 if intent.direction == "down" else 0.0,
         1.0 if intent.direction == "forward" else -1.0 if intent.direction == "back" else 0.0,
         1.0 if intent.direction == "right" else -1.0 if intent.direction == "left" else 0.0,
+        1.0 if intent.choice_index is not None else 0.0,
+        (intent.choice_index / 2.0) if intent.choice_index is not None else 0.0,
+        1.0 if intent.target_item_id is not None else 0.0,
+        _item_feature(intent.target_item_id),
     ])
 
     if player is None:
@@ -160,6 +171,40 @@ def encode_state(
         _squash(game.ocarina_mode, 8.0),
         _squash(game.ocarina_action, 8.0),
     ])
+
+    raw_inventory = list(game.inventory[:32])
+    raw_inventory += [0xFF] * (32 - len(raw_inventory))
+    f.extend(_item_feature(item) for item in raw_inventory)
+
+    equipped = list(game.equipped[:8])
+    equipped += [0xFF] * (8 - len(equipped))
+    f.extend(_item_feature(item) for item in equipped)
+
+    gear = {kind: [] for kind in ("sword", "shield", "tunic", "boots")}
+    for row in game.progress.equipment:
+        gear[row.equipment_type].append(row)
+    for kind in ("sword", "shield", "tunic", "boots"):
+        rows = gear[kind]
+        equipped_value = next((row.value for row in rows if row.equipped), 0)
+        max_owned = max((row.value for row in rows), default=0)
+        f.extend([equipped_value / 4.0, max_owned / 4.0])
+
+    pause = game.pause_menu
+    f.extend([
+        _squash(pause.state, 32.0),
+        _squash(pause.transition_state, 16.0),
+        pause.page_index / 4.0,
+        _squash(pause.cursor_special_pos, 4.0),
+        _item_feature(pause.named_item),
+        _squash(pause.prompt_choice, 2.0),
+    ])
+    cursor_point = list(pause.cursor_point[:5]) + [0] * (5 - len(pause.cursor_point[:5]))
+    cursor_item = list(pause.cursor_item[:4]) + [0xFF] * (4 - len(pause.cursor_item[:4]))
+    cursor_slot = list(pause.cursor_slot[:4]) + [0] * (4 - len(pause.cursor_slot[:4]))
+    f.extend(_squash(value, 16.0) for value in cursor_point)
+    f.extend(_item_feature(value) for value in cursor_item)
+    f.extend(_squash(value, 16.0) for value in cursor_slot)
+    f.append(_squash(game.last_played_song, 12.0))
 
     target = target_point(game, intent)
     f.extend(_relative(player, target))
