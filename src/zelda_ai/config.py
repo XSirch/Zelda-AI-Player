@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ZELDA_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="ZELDA_", env_file=".env", env_ignore_empty=True, extra="ignore")
 
     data_dir: Path = Path(".local")
     bridge_port: int = Field(default=8766, ge=1024, le=65535)
