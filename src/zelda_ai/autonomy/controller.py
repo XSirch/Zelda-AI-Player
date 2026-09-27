@@ -9,7 +9,7 @@ from pathlib import Path
 from collections.abc import Callable
 
 from ..bridge import Bridge
-from .features import BUTTON_NAMES, encode_state, stack_frames
+from .features import BUTTON_NAMES, encode_novelty_state, encode_state, stack_frames
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .reward import RewardTracker
@@ -57,6 +57,7 @@ class ContinuousController:
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
         self.feature_history = deque(maxlen=4)
+        self.novelty_history = deque(maxlen=4)
         self.training_queue: asyncio.Queue = asyncio.Queue(maxsize=2)
 
         self.last_setpoint = Setpoint()
@@ -76,6 +77,7 @@ class ContinuousController:
     def reset_episode_state(self):
         self.reward_tracker = RewardTracker()
         self.feature_history.clear()
+        self.novelty_history.clear()
         self.pending = None
         self.rollout = []
         self.tick = 0
@@ -140,7 +142,9 @@ class ContinuousController:
         self.feature_history.append(base_observation)
         observation = stack_frames(list(self.feature_history))
 
-        intrinsic = self.policy.intrinsic_reward(observation)
+        self.novelty_history.append(encode_novelty_state(game))
+        novelty_observation = stack_frames(list(self.novelty_history))
+        intrinsic = self.policy.intrinsic_reward(novelty_observation)
         reward = self.reward_tracker.step(
             game,
             self.intent,
@@ -168,6 +172,7 @@ class ContinuousController:
         self.last_buttons = tuple(sample["buttons"])
         self.pending = {
             "observation": observation,
+            "novelty_observation": novelty_observation,
             "stick": list(sample["stick"]),
             "buttons": list(sample["buttons"]),
             "log_prob": sample["log_prob"],
