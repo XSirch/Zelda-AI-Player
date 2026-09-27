@@ -6,7 +6,7 @@ from zelda_ai.autonomy.features import BASE_FEATURE_DIM, FEATURE_DIM, STACK_FRAM
 from zelda_ai.autonomy.ml_policy import OnlinePPO
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.reward import RewardTracker
-from zelda_ai.models import EquipmentObservation, GameEvent
+from zelda_ai.models import EquipmentObservation, GameEvent, InventoryObservation
 
 
 def test_agent_intent_schema_is_strict_and_not_a_skill_contract():
@@ -125,6 +125,27 @@ def test_existing_save_progress_is_baseline_not_free_achievement(state):
     tracker = RewardTracker()
     first = tracker.step(sword, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
     assert first.achievements == []
+    assert tracker.objective_score == 0
+
+
+
+def test_consumable_reacquisition_does_not_farm_objective_score(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+
+    with_item = state.model_copy(deep=True)
+    with_item.inventory_named = [
+        InventoryObservation(slot=0, item_id=1, name="Deku Stick", ammo=1)
+    ]
+    tracker.step(with_item, intent, intrinsic=0.0, pressed_buttons=0)
+
+    depleted = with_item.model_copy(deep=True)
+    depleted.inventory_named = []
+    tracker.step(depleted, intent, intrinsic=0.0, pressed_buttons=0)
+
+    reacquired = with_item.model_copy(deep=True)
+    result = tracker.step(reacquired, intent, intrinsic=0.0, pressed_buttons=0)
+    assert not any(row["id"] == "item:1" for row in result.achievements)
     assert tracker.objective_score == 0
 
 
