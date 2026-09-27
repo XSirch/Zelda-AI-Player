@@ -62,12 +62,7 @@ def summarize_rate_limits(payload: dict | None) -> dict:
 
     legacy = payload.get("rateLimits")
     if isinstance(legacy, dict):
-        legacy_id = legacy.get("limitId")
-        if not any(
-            (limit_id == legacy_id or (limit_id == "codex" and legacy_id in {None, "codex"}))
-            for limit_id, _ in snapshots
-        ):
-            snapshots.append((legacy_id, legacy))
+        snapshots.append((legacy.get("limitId"), legacy))
 
     windows: list[dict] = []
     seen: set[tuple] = set()
@@ -84,7 +79,7 @@ def summarize_rate_limits(payload: dict | None) -> dict:
             duration = window.get("windowDurationMins")
             resets_at = window.get("resetsAt")
             used_percent = max(0, min(100, int(round(float(used)))))
-            key = (limit_id, duration, resets_at, used_percent)
+            key = (limit_id, slot, duration, used_percent)
             if key in seen:
                 continue
             seen.add(key)
