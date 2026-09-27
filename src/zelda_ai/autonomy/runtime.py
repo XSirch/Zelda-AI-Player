@@ -62,6 +62,7 @@ class AutonomyRuntime:
         self.cognition_error = ""
         self.thought = "Ready to start autonomous play."
         self.thinking_since: float | None = None
+        self.last_cognition_at = 0.0
         self.pending_switch: tuple[RunConfig, ModelInfo] | None = None
         self.switch_request = 0
 
@@ -282,6 +283,7 @@ class AutonomyRuntime:
             self.cognition_error = ""
             self.thought = "Starting ML actor immediately; cognition is connecting in parallel."
             self.thinking_since = None
+            self.last_cognition_at = 0.0
             self.recent.clear()
             self.dialogue_transcript.clear()
             self.seen_events = {f"{game.instance_id}:{event.id}" for event in game.events}
@@ -423,12 +425,20 @@ class AutonomyRuntime:
                     await asyncio.sleep(3.0)
                     continue
 
+            # High-level cognition is event-driven but rate-limited. The ML actor
+            # continues controlling Link during this debounce.
+            since_last = time.monotonic() - self.last_cognition_at
+            if since_last < 3.0:
+                await asyncio.sleep(3.0 - since_last)
+                if generation != self.lifecycle or self.state != "running":
+                    return
+
             observation = build_cognition_observation(
                 game=game,
                 objective=self.config.goal,
                 current_intent=self.controller.intent,
                 motor=self.controller.telemetry(),
-                control_learning=self.controller.telemetry().get("learning", {}),
+                ml_learning=self.controller.telemetry().get("learning", {}),
                 world_edges=self.store.world_neighbors(
                     self.namespace, game.scene, game.room
                 ),
@@ -516,6 +526,7 @@ class AutonomyRuntime:
                     },
                 )
 
+            self.last_cognition_at = time.monotonic()
             self.controller.set_intent(intent)
             self.thought = intent.summary
             self.cognition_state = "acting"
@@ -530,7 +541,7 @@ class AutonomyRuntime:
                 },
             )
 
-            timeout = max(0.5, min(5.0, intent.horizon_ms / 1000.0 * 0.6))
+            timeout = max(5.0, min(30.0, intent.horizon_ms / 1000.0))
             self.cognition_trigger.clear()
             try:
                 await asyncio.wait_for(self.cognition_trigger.wait(), timeout=timeout)
