@@ -18,6 +18,8 @@ else:
 
 from .features import BUTTON_NAMES, FEATURE_DIM
 
+CHECKPOINT_VERSION = 2
+
 
 def require_torch():
     if torch is None:
@@ -345,7 +347,7 @@ class OnlinePPO:
 
     def save(self):
         payload = {
-            "version": 1,
+            "version": CHECKPOINT_VERSION,
             "feature_dim": FEATURE_DIM,
             "button_names": BUTTON_NAMES,
             "learner": self.learner.state_dict(),
@@ -368,6 +370,11 @@ class OnlinePPO:
             map_location=self.learner_device,
             weights_only=False,
         )
+        if payload.get("version") != CHECKPOINT_VERSION:
+            raise RuntimeError(
+                f"Unsupported ML checkpoint version {payload.get('version')}; "
+                f"expected {CHECKPOINT_VERSION}"
+            )
         if payload.get("feature_dim") != FEATURE_DIM:
             raise RuntimeError(
                 f"ML checkpoint feature dimension {payload.get('feature_dim')} does not match {FEATURE_DIM}"
