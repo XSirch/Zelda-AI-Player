@@ -6,6 +6,7 @@ from zelda_ai.autonomy.features import BASE_FEATURE_DIM, FEATURE_DIM, STACK_FRAM
 from zelda_ai.autonomy.ml_policy import OnlinePPO
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.reward import RewardTracker
+from zelda_ai.models import EquipmentObservation, GameEvent
 
 
 def test_agent_intent_schema_is_strict_and_not_a_skill_contract():
@@ -80,6 +81,60 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     assert stats["updates"] == 1
     assert stats["samples_trained"] == 16
     assert (tmp_path / "policy.pt").is_file()
+
+
+
+def test_kokiri_sword_is_objective_score_not_unbounded_ppo_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+
+    sword = state.model_copy(deep=True)
+    sword.progress.equipment = [
+        EquipmentObservation(
+            item_id=59,
+            name="Kokiri Sword",
+            equipment_type="sword",
+            value=1,
+            equipped=True,
+        )
+    ]
+    sword.progress.owned_equipment = ["Kokiri Sword"]
+    result = tracker.step(sword, intent, intrinsic=0.0, pressed_buttons=0)
+
+    achievement = next(row for row in result.achievements if row["title"] == "Kokiri Sword")
+    assert achievement["points"] == 100
+    assert achievement["training_reward"] == 3.0
+    assert tracker.objective_score == 100
+    assert result.breakdown["objective_milestone"] == 3.0
+    assert result.reward <= 5.0
+
+
+def test_existing_save_progress_is_baseline_not_free_achievement(state):
+    sword = state.model_copy(deep=True)
+    sword.progress.equipment = [
+        EquipmentObservation(
+            item_id=59,
+            name="Kokiri Sword",
+            equipment_type="sword",
+            value=1,
+            equipped=True,
+        )
+    ]
+    sword.progress.owned_equipment = ["Kokiri Sword"]
+    tracker = RewardTracker()
+    first = tracker.step(sword, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
+    assert first.achievements == []
+    assert tracker.objective_score == 0
+
+
+def test_native_game_completed_event_ends_episode_and_scores_achievement(state):
+    tracker = RewardTracker()
+    completed = state.model_copy(deep=True)
+    completed.events = [GameEvent(id="1", kind="game_completed", detail="final_ganon_defeated")]
+    result = tracker.step(completed, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
+    assert result.done is True
+    assert any(row["points"] == 5000 for row in result.achievements)
 
 
 def test_repeated_dialogue_does_not_farm_reward(state):
