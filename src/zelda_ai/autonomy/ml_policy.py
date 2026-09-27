@@ -135,7 +135,10 @@ class OnlinePPO:
         self.rnd_optimizer = torch.optim.AdamW(self.learner_rnd.parameters(), lr=rnd_learning_rate)
         self.updates = 0
         self.samples_trained = 0
-        self.intrinsic_scale: float | None = None
+        self.rnd_error_ema: float | None = None
+        self.rnd_observations = 0
+        self.last_intrinsic_error = 0.0
+        self.last_intrinsic_reward = 0.0
         self.last_stats: dict = {}
 
         self.load_error = ""
@@ -188,18 +191,42 @@ class OnlinePPO:
             _, _, value, _ = self.actor.distributions(obs)
             return float(value.item())
 
+    def _relative_novelty(self, error: float) -> float:
+        """Pay only prediction error that is materially above the recent RND baseline.
+
+        Raw RND error is positive even for a static familiar state. Treating that
+        baseline as reward made every random action profitable. A short warmup
+        calibrates the baseline, then only >15% surprise earns intrinsic reward.
+        """
+        error = max(float(error), 1e-9)
+        baseline = self.rnd_error_ema
+        self.last_intrinsic_error = error
+        if baseline is None:
+            self.rnd_error_ema = error
+            self.rnd_observations = 1
+            self.last_intrinsic_reward = 0.0
+            return 0.0
+
+        ratio = error / max(baseline, 1e-9)
+        # Update after measuring surprise so a novel state is compared with the
+        # familiar-state baseline that preceded it.
+        self.rnd_error_ema = 0.99 * baseline + 0.01 * error
+        self.rnd_observations += 1
+
+        if self.rnd_observations < 32:
+            novelty = 0.0
+        else:
+            novelty = max(0.0, min(1.0, (ratio - 1.15) / 0.85))
+        self.last_intrinsic_reward = novelty
+        return novelty
+
     def intrinsic_reward(self, observation: list[float]) -> float:
         with self.actor_lock, torch.inference_mode():
             obs = self._actor_tensor(observation).unsqueeze(0)
             target = self.actor_rnd_target(obs)
             prediction = self.actor_rnd(obs)
             error = torch.nn.functional.mse_loss(prediction, target).item()
-        if self.intrinsic_scale is None:
-            self.intrinsic_scale = max(error, 1e-6)
-        else:
-            self.intrinsic_scale = 0.995 * self.intrinsic_scale + 0.005 * max(error, 1e-6)
-        normalized = error / max(self.intrinsic_scale, 1e-6)
-        return max(0.0, min(3.0, normalized)) / 3.0
+        return self._relative_novelty(error)
 
     def train_rollout(
         self,
@@ -367,5 +394,8 @@ class OnlinePPO:
             "updates": self.updates,
             "samples_trained": self.samples_trained,
             "checkpoint_load_error": self.load_error,
+            "rnd_error_ema": round(self.rnd_error_ema, 8) if self.rnd_error_ema is not None else None,
+            "rnd_last_error": round(self.last_intrinsic_error, 8),
+            "rnd_last_novelty": round(self.last_intrinsic_reward, 6),
             **self.last_stats,
         }
