@@ -5,7 +5,9 @@ import math
 from ..models import ActorObservation, GameState
 from .models import AgentIntent
 
-FEATURE_DIM = 192
+BASE_FEATURE_DIM = 192
+STACK_FRAMES = 4
+FEATURE_DIM = BASE_FEATURE_DIM * STACK_FRAMES
 BUTTON_NAMES = ("A", "B", "Z", "START", "R", "C_UP", "C_LEFT", "C_DOWN", "C_RIGHT")
 MODE_NAMES = ("explore", "navigate", "interact", "combat", "dialogue", "menu", "observe")
 PROBE_NAMES = (
@@ -130,7 +132,7 @@ def encode_state(
     actors = sorted(game.room_actors, key=lambda row: row.distance)[:6]
     for index in range(6):
         if index >= len(actors):
-            f.extend([0.0] * 10)
+            f.extend([0.0] * 13)
             continue
         actor = actors[index]
         f.extend(_relative(player, actor.focus_position or actor.position))
@@ -141,6 +143,9 @@ def encode_state(
             1.0 if actor.drawn else 0.0,
             1.0 if actor.targeted else 0.0,
             1.0 if actor.text_id is not None else 0.0,
+            _squash(actor.velocity[0], 8.0),
+            _squash(actor.velocity[2], 8.0),
+            (actor.collision_health_hint / 255.0) if actor.collision_health_hint is not None else -1.0,
         ])
 
     probe_by_name = {}
@@ -183,7 +188,19 @@ def encode_state(
     buttons += [0.0] * (len(BUTTON_NAMES) - len(buttons))
     f.extend(1.0 if value > 0.5 else 0.0 for value in buttons)
 
-    if len(f) > FEATURE_DIM:
-        raise RuntimeError(f"feature vector grew to {len(f)} > FEATURE_DIM={FEATURE_DIM}")
-    f.extend([0.0] * (FEATURE_DIM - len(f)))
+    if len(f) > BASE_FEATURE_DIM:
+        raise RuntimeError(
+            f"base feature vector grew to {len(f)} > BASE_FEATURE_DIM={BASE_FEATURE_DIM}"
+        )
+    f.extend([0.0] * (BASE_FEATURE_DIM - len(f)))
     return f
+
+
+def stack_frames(history: list[list[float]]) -> list[float]:
+    """Flatten the latest structured frames, left-padding a new episode with zeros."""
+    frames = [list(row) for row in history[-STACK_FRAMES:]]
+    padding = [[0.0] * BASE_FEATURE_DIM for _ in range(STACK_FRAMES - len(frames))]
+    combined = [value for row in [*padding, *frames] for value in row]
+    if len(combined) != FEATURE_DIM:
+        raise RuntimeError("invalid stacked observation size")
+    return combined
