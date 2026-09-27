@@ -4,6 +4,7 @@ import json
 import time
 import uuid
 
+from .autonomy import AgentIntent
 from .models import Decision, ModelInfo, SkillArgs, Usage
 from .providers.base import InferenceResult
 
@@ -25,6 +26,24 @@ class DemoProvider:
             memory_note=None)
         return InferenceResult(decision.model_dump_json(), Usage(input_tokens=0, output_tokens=0,
             cached_input_tokens=0, reasoning_output_tokens=0, cost_usd=0, actual_model="deterministic-demo"))
+
+
+    async def think(self, config, prompt):
+        await asyncio.sleep(0.1)
+        data = json.loads(prompt)
+        state = data.get("state") or {}
+        player = state.get("player") or {}
+        position = player.get("position") or [0, 0, 0]
+        intent = AgentIntent(
+            objective="Exercise the continuous autonomous control loop.",
+            summary="Exploring continuously while the simulator validates cognition/motor concurrency.",
+            mode="explore",
+            direction="forward" if position[2] < 50 else "right",
+            horizon_ms=1500,
+        )
+        return InferenceResult(intent.model_dump_json(), Usage(
+            input_tokens=0, output_tokens=0, cached_input_tokens=0,
+            reasoning_output_tokens=0, cost_usd=0, actual_model="deterministic-demo"))
 
     async def close(self):
         pass
