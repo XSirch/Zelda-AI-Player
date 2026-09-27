@@ -37,7 +37,7 @@ class AgentIntent(BaseModel):
     target_position: tuple[float, float, float] | None = None
     direction: IntentDirection | None = None
     choice_index: int | None = Field(default=None, ge=0, le=2)
-    horizon_ms: int = Field(default=3000, ge=500, le=15000)
+    horizon_ms: int = Field(default=15000, ge=2000, le=60000)
 
     @classmethod
     def model_json_schema(cls, *args, **kwargs):
@@ -79,5 +79,5 @@ class AgentIntent(BaseModel):
             objective="Discover the controls and make progress from the current game state.",
             summary="I am exploring continuously while I build a control and world model.",
             mode="explore",
-            horizon_ms=2500,
+            horizon_ms=10000,
         )
