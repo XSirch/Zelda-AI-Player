@@ -6,7 +6,6 @@ controlling Link at realtime bridge cadence while cognition runs concurrently.
 from .controller import ContinuousController
 from .models import AgentIntent, IntentMode
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
-from .runtime import AutonomyRuntime
 
 __all__ = [
     "AgentIntent",
@@ -14,5 +13,4 @@ __all__ = [
     "ContinuousController",
     "AUTONOMY_SYSTEM_PROMPT",
     "build_cognition_observation",
-    "AutonomyRuntime",
 ]
