@@ -272,6 +272,10 @@ class AutonomyRuntime:
             self.reason = ""
             self.config = config
             self.selected_model = None
+            self.metrics_cache = None
+            self.metrics_at = 0.0
+            self.provider_usage = {"available": False, "windows": []}
+            self.provider_usage_at = 0.0
             self.game_instance = game.instance_id
             self.started = time.monotonic()
             self.cognition_state = "connecting"
@@ -629,6 +633,8 @@ class AutonomyRuntime:
             return
         self.config, self.selected_model = self.pending_switch
         self.pending_switch = None
+        self.provider_usage = {"available": False, "windows": []}
+        self.provider_usage_at = 0.0
         self.segment_id = self.store.segment(
             self.run_id, self.config.model_dump(), self.namespace
         )
@@ -672,7 +678,11 @@ class AutonomyRuntime:
                 "game": bool(bridge_status.get("connected")),
                 "realtime": bool(realtime.get("enabled")),
                 "state_hz": realtime.get("state_hz"),
-                "ai": self.cognition_state not in {"provider_unavailable", "error"},
+                "ai": bool(
+                    self.state == "running"
+                    and self.selected_model is not None
+                    and self.cognition_state not in {"provider_unavailable", "error"}
+                ),
                 "ai_state": self.cognition_state,
                 "ai_error": self.cognition_error,
             },
