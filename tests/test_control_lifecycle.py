@@ -128,3 +128,21 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     assert runtime.controller.policy.checkpoint == checkpoint
     await runtime.control("stop")
     second_provider.release.set()
+
+
+def test_paused_observations_are_not_promoted_to_memory(tmp_path, store, state):
+    bridge = connected(state)
+    runtime = AutonomyRuntime(bridge, store, {}, tmp_path / "ml")
+    runtime.run_id = store.new_run(
+        unlimited().model_dump(), "soh", "paused-isolation"
+    )
+    runtime.state = "paused"
+
+    changed = state.model_copy(deep=True)
+    changed.seq += 1
+    changed.dialogue.active = True
+    changed.dialogue.text_id = 999
+    changed.dialogue.text = "Human-triggered paused dialogue"
+
+    runtime.on_state(changed, state)
+    assert store.recall(runtime.namespace) == []
