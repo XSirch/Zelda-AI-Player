@@ -115,12 +115,20 @@ class AutonomyRuntime:
         self.persist_tasks.add(task)
         task.add_done_callback(self.persist_tasks.discard)
 
-    async def _refresh_metrics(self):
-        if not self.run_id:
-            self.metrics_cache = None
+    async def _refresh_metrics(self, run_id: str | None = None):
+        target_run = run_id or self.run_id
+        if not target_run:
+            if run_id is None:
+                self.metrics_cache = None
             return
-        self.metrics_cache = await asyncio.to_thread(self.store.metrics, self.run_id)
-        self.metrics_at = time.monotonic()
+        metrics = await asyncio.to_thread(self.store.metrics, target_run)
+        if target_run == self.run_id:
+            self.metrics_cache = metrics
+            self.metrics_at = time.monotonic()
+
+    async def _finish_call(self, run_id: str, call_id: str, **values):
+        await asyncio.to_thread(self.store.finish_call, call_id, **values)
+        await self._refresh_metrics(run_id)
 
     async def close(self):
         self.closed = True
@@ -545,6 +553,17 @@ class AutonomyRuntime:
                 row for row in self.recent
                 if row.get("kind") not in {"intent_updated", "provider_rerouted"}
             ][-8:]
+            world_edges, memory_rows = await asyncio.gather(
+                asyncio.to_thread(
+                    self.store.world_neighbors,
+                    self.namespace,
+                    game.scene,
+                    game.room,
+                ),
+                asyncio.to_thread(self.store.recall, self.namespace, None, 12),
+            )
+            if generation != self.lifecycle or self.state != "running":
+                return
             observation = build_cognition_observation(
                 game=game,
                 objective=self.config.goal,
@@ -555,13 +574,8 @@ class AutonomyRuntime:
                     "actions_sampled": telemetry.get("actions_sampled"),
                 },
                 ml_learning=compact_learning,
-                world_edges=self.store.world_neighbors(
-                    self.namespace, game.scene, game.room
-                ),
-                memory=[
-                    row["note"]
-                    for row in self.store.recall(self.namespace, limit=12)
-                ],
+                world_edges=world_edges,
+                memory=[row["note"] for row in memory_rows],
                 recent_events=recent_for_model,
                 dialogue_transcript=list(self.dialogue_transcript),
             )
@@ -571,7 +585,22 @@ class AutonomyRuntime:
                 await self.halt("paused", reason)
                 return
 
-            call_id = self.store.begin_call(self.run_id, self.segment_id, observation)
+            call_run_id = self.run_id
+            call_segment_id = self.segment_id
+            call_id = await asyncio.to_thread(
+                self.store.begin_call,
+                call_run_id,
+                call_segment_id,
+                observation,
+            )
+            if generation != self.lifecycle or self.state != "running":
+                await self._finish_call(
+                    call_run_id,
+                    call_id,
+                    status="cancelled",
+                    error="Run changed before provider inference started.",
+                )
+                return
             self.cognition_state = "thinking"
             self.thinking_since = time.monotonic()
             self.publish(True)
@@ -586,7 +615,8 @@ class AutonomyRuntime:
                     )
                 result = await think(self.config, prompt)
                 if generation != self.lifecycle or self.state != "running":
-                    self.store.finish_call(
+                    await self._finish_call(
+                        call_run_id,
                         call_id,
                         status="cancelled",
                         usage=result.usage.model_dump(),
@@ -594,7 +624,8 @@ class AutonomyRuntime:
                     )
                     return
                 intent = AgentIntent.model_validate_json(result.text)
-                self.store.finish_call(
+                await self._finish_call(
+                    call_run_id,
                     call_id,
                     status="completed",
                     decision=intent.model_dump(),
@@ -604,18 +635,20 @@ class AutonomyRuntime:
             except asyncio.CancelledError:
                 if self.run_id:
                     with contextlib.suppress(Exception):
-                        self.store.finish_call(
+                        await asyncio.shield(self._finish_call(
+                            call_run_id,
                             call_id,
                             status="cancelled",
                             error="Cognition cancelled; motor control was independently revoked or continued.",
                             latency_ms=(time.monotonic() - started) * 1000,
-                        )
+                        ))
                 raise
             except (ProviderFailure, ValidationError, asyncio.TimeoutError) as exc:
                 usage = result.usage.model_dump() if result else getattr(exc, "usage", {})
                 if hasattr(usage, "model_dump"):
                     usage = usage.model_dump()
-                self.store.finish_call(
+                await self._finish_call(
+                    call_run_id,
                     call_id,
                     status="failed",
                     usage=usage or {},
@@ -632,7 +665,7 @@ class AutonomyRuntime:
                 return
 
             if result.usage.actual_model and result.usage.actual_model != self.config.model:
-                self.store.update_run(self.run_id, mixed=True)
+                await asyncio.to_thread(self.store.update_run, self.run_id, mixed=True)
                 self.log(
                     "provider_rerouted",
                     {
