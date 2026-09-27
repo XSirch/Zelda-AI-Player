@@ -97,9 +97,11 @@ def test_panel_shows_ml_learning_and_objective_achievements():
         "AMOSTRAS · RUN",
         "REWARD DA RUN",
         "CONQUISTAS DA RUN",
+        "PASSOS COM PROGRESSO",
     ]:
         assert label in main
     assert "LearningAchievement" in types
     assert "objective_score" in types
     assert "achievements" in types
+    assert "useful_progress_rate" in types
     assert "reward PPO" in main
