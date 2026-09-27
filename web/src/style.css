@@ -87,6 +87,54 @@ h1 {
 .led { width: 7px; height: 7px; border-radius: 50%; background: #4e5751; margin-right: 8px; box-shadow: 0 0 0 4px #4e575112; }
 .led.on { background: var(--signal); box-shadow: 0 0 0 4px #b9d77a12, 0 0 13px #b9d77a35; }
 
+
+.usage-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.35fr;
+  border: 1px solid var(--line);
+  border-top: 0;
+  background: #0b100d;
+}
+.usage-cell {
+  min-height: 86px;
+  padding: 14px 17px;
+  border-right: 1px solid var(--line);
+}
+.usage-cell:last-child { border-right: 0; }
+.usage-cell > span {
+  display: block;
+  color: var(--muted);
+  font: 8px ui-monospace, monospace;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+.usage-cell > strong {
+  display: block;
+  font: 18px/1 ui-monospace, monospace;
+  font-weight: 500;
+}
+.usage-cell > small {
+  display: block;
+  color: #66736a;
+  font: 8px/1.5 ui-monospace, monospace;
+  margin-top: 7px;
+}
+.quota-windows { display: flex; gap: 18px; align-items: flex-start; }
+.quota-window strong {
+  display: block;
+  color: var(--signal);
+  font: 17px/1 ui-monospace, monospace;
+  font-weight: 520;
+}
+.quota-window small {
+  display: block;
+  color: var(--muted);
+  font: 8px/1.4 ui-monospace, monospace;
+  margin-top: 7px;
+  max-width: 95px;
+  overflow-wrap: anywhere;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(420px, .8fr);
@@ -283,6 +331,10 @@ footer {
 }
 
 @media (max-width: 900px) {
+  .usage-strip { grid-template-columns: 1fr 1fr; }
+  .usage-cell:nth-child(2) { border-right: 0; }
+  .usage-cell { border-bottom: 1px solid var(--line); }
+  .usage-cell:nth-last-child(-n+2) { border-bottom: 0; }
   .shell { width: min(100% - 28px, 720px); padding-top: 18px; }
   .connections { grid-template-columns: 1fr; }
   .connection-item { border-right: 0; border-bottom: 1px solid var(--line); min-height: 70px; }
@@ -293,6 +345,9 @@ footer {
 }
 
 @media (max-width: 560px) {
+  .usage-strip { grid-template-columns: 1fr; }
+  .usage-cell { border-right: 0; border-bottom: 1px solid var(--line) !important; }
+  .usage-cell:last-child { border-bottom: 0 !important; }
   .topbar { align-items: center; }
   .topbar button { min-width: 94px; }
   .controller-grid { grid-template-columns: 1fr; }
