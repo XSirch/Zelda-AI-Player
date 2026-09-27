@@ -6,6 +6,7 @@ export interface AgentIntent {
   target_actor_params: number | null;
   target_actor_uid: string | null;
   target_position: number[] | null;
+  target_item_id: number | null;
   direction: 'forward' | 'back' | 'left' | 'right' | 'up' | 'down' | null;
   choice_index: number | null;
   horizon_ms: number;
