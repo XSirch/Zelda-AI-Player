@@ -4,9 +4,9 @@ import asyncio
 import contextlib
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Callable
 
 from ..bridge import Bridge
 from .features import BUTTON_NAMES, encode_novelty_state, encode_state, stack_frames
