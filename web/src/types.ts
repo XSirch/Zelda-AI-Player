@@ -101,7 +101,7 @@ export interface ProviderQuota {
   plan?: string | null;
   windows: QuotaWindow[];
   credits?: { has_credits: boolean; unlimited: boolean; balance: string | number | null } | null;
-  individual_limit?: { limit: number | null; used: number | null; remaining_percent: number | null; resets_at: number | null } | null;
+  individual_limit?: { limit: string | number | null; used: string | number | null; remaining_percent: number | null; resets_at: number | null } | null;
   rate_limit_reached_type?: string | null;
   error?: string | null;
 }
