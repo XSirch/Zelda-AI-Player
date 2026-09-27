@@ -76,6 +76,7 @@ export interface Snapshot {
   elapsed_s: number;
   connection: {
     game: boolean;
+    source: 'soh' | 'simulator' | null;
     realtime: boolean;
     state_hz: number | null;
     ai: boolean;
