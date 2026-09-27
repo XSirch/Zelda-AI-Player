@@ -241,8 +241,9 @@ class ContinuousController:
             learner.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await learner
-            # Saving only copies local model state and never sends controller input.
-            await asyncio.to_thread(self.policy.save)
+            # Completed learner updates checkpoint themselves in their worker thread.
+            # Do not start a second concurrent checkpoint write while cancellation
+            # of an in-flight training worker is still propagating.
 
     def telemetry(self) -> dict:
         return {
