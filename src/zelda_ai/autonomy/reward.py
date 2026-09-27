@@ -131,7 +131,7 @@ class RewardTracker:
             if previous["position"] and current["position"]:
                 moved = math.dist(previous["position"], current["position"])
                 if moved >= 4.0:
-                    b["movement"] = min(0.04, moved / 1500.0)
+                    b["movement"] = min(0.008, moved / 6000.0)
 
             if current["health"] < previous["health"]:
                 b["damage_taken"] = -min(1.2, (previous["health"] - current["health"]) / 16.0 * 0.25)
