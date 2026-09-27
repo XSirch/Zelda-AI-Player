@@ -8,7 +8,7 @@ import pytest
 
 from zelda_ai.models import RunConfig
 from zelda_ai.providers.base import ProviderFailure
-from zelda_ai.providers.codex import CodexProvider, parse_codex_version
+from zelda_ai.providers.codex import CodexProvider, parse_codex_version, summarize_rate_limits
 from zelda_ai.providers.openrouter import OpenRouterProvider
 
 
@@ -126,3 +126,55 @@ def test_system_prompt_explains_enemy_learning_as_fallible_experience():
     assert "enemy_learning" in SYSTEM_PROMPT
     assert "fallible learned experience" in SYSTEM_PROMPT
     assert "fight_enemy learns a separate local policy" in SYSTEM_PROMPT
+
+
+def test_codex_quota_normalizes_used_to_remaining_without_assuming_slots():
+    payload = {
+        "rateLimits": {
+            "limitId": "codex",
+            "planType": "plus",
+            "primary": {
+                "usedPercent": 31,
+                "windowDurationMins": 10080,
+                "resetsAt": 1790000000,
+            },
+            "secondary": None,
+            "credits": {
+                "hasCredits": False,
+                "unlimited": False,
+                "balance": "0",
+            },
+        },
+        "rateLimitsByLimitId": {
+            "codex": {
+                "limitId": "codex",
+                "limitName": "Codex",
+                "primary": {
+                    "usedPercent": 31,
+                    "windowDurationMins": 10080,
+                    "resetsAt": 1790000000,
+                },
+                "secondary": None,
+            }
+        },
+    }
+    quota = summarize_rate_limits(payload)
+    assert quota["available"] is True
+    assert len(quota["windows"]) == 1
+    assert quota["windows"][0]["used_percent"] == 31
+    assert quota["windows"][0]["remaining_percent"] == 69
+    assert quota["windows"][0]["window_duration_mins"] == 10080
+    assert quota["credits"]["balance"] == "0"
+
+
+def test_codex_quota_keeps_multiple_duration_windows_when_returned():
+    payload = {
+        "rateLimits": {
+            "limitId": "codex",
+            "primary": {"usedPercent": 25, "windowDurationMins": 300},
+            "secondary": {"usedPercent": 18, "windowDurationMins": 10080},
+        }
+    }
+    quota = summarize_rate_limits(payload)
+    assert [row["window_duration_mins"] for row in quota["windows"]] == [300, 10080]
+    assert [row["remaining_percent"] for row in quota["windows"]] == [75, 82]
