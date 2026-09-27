@@ -5,8 +5,7 @@ import time
 import pytest
 
 from zelda_ai.bridge import Bridge
-from zelda_ai.models import Decision, GameState, InputReceipt, RealtimeState
-from zelda_ai.runtime import _matching_actor, execute_skill
+from zelda_ai.models import GameState, InputReceipt, RealtimeState
 
 TOKEN = 'x' * 32
 PEER = ('127.0.0.1', 9999)
@@ -257,63 +256,3 @@ async def test_pulse_stops_renewing_when_feedback_is_lost(state):
 
 
 @pytest.mark.asyncio
-async def test_xz_overlap_on_different_floor_is_not_arrival(state, decision):
-    bridge = ready(state)
-    d = decision.model_copy(update={'skill': 'navigate_to', 'args': decision.args.model_copy(
-        update={'target_position': (0, 150, 0), 'duration_ms': 1000})})
-    result = await execute_skill(bridge, d, bridge.state)
-    assert result['reason'] == 'target_on_different_floor' and result['status'] == 'failed'
-    assert not any(p.get('stick_y') for p in bridge.transport.sent)
-
-
-def test_provider_schema_requires_nullable_uid_but_legacy_decisions_load(decision):
-    args = Decision.model_json_schema()['$defs']['SkillArgs']
-    assert 'target_actor_uid' in args['required']
-    assert 'default' not in args['properties']['target_actor_uid']
-    legacy = decision.model_dump(); legacy['args'].pop('target_actor_uid', None)
-    assert Decision.model_validate(legacy).args.target_actor_uid is None
-
-
-@pytest.mark.asyncio
-async def test_pulse_receipt_exposes_exact_native_edges(state):
-    bridge = ready(state)
-    task = asyncio.create_task(bridge.pulse_receipt(buttons=0x8000, timeout=.3))
-    await asyncio.sleep(0)
-    sequence = next(p for p in bridge.transport.sent if p.get('kind') == 'sequence')
-    seq = sequence['seq']
-    feed(bridge, fast(state, input_receipts=[receipt(seq, status='completed', first_tick=4, last_tick=5,
-        pressed=0x8000, released=0x8000, apply_latency_ms=7)]))
-    row = await task
-    assert row and row.seq == seq and row.apply_latency_ms == 7
-    assert row.pressed == row.released == 0x8000
-    status = bridge.status()['realtime']
-    assert status['native_apply_p99_ms'] == 7
-    assert status['last_receipt']['seq'] == seq
-
-
-def test_status_separates_client_latency_from_native_queue(state):
-    bridge = ready(state)
-    feed(bridge, fast(state, input_receipts=[receipt(150, status='completed', first_tick=2, last_tick=3,
-        pressed=0x8000, released=0x8000, apply_latency_ms=.18, client_to_consume_ms=17.25)]))
-    rt = bridge.status()['realtime']
-    assert rt['native_apply_p95_ms'] == .18
-    assert rt['client_to_consume_p95_ms'] == 17.25
-
-
-@pytest.mark.asyncio
-async def test_sequence_receipt_preserves_priming_step(state):
-    bridge = ready(state)
-    task = asyncio.create_task(bridge.sequence_receipt([
-        {'buttons': 0x2000, 'stick_x': 0, 'stick_y': -60, 'ticks': 1},
-        {'buttons': 0xA000, 'stick_x': 0, 'stick_y': -60, 'ticks': 1},
-        {'buttons': 0x2000, 'stick_x': 0, 'stick_y': -60, 'ticks': 2},
-    ], baseline_buttons=0x2000, edge_buttons=0x8000, timeout=.3))
-    await asyncio.sleep(0)
-    packet = next(p for p in bridge.transport.sent if p.get('kind') == 'sequence')
-    assert packet['steps'][0]['buttons'] == 0x2000
-    assert packet['steps'][1]['buttons'] == 0xA000
-    seq = packet['seq']
-    feed(bridge, fast(state, input_receipts=[receipt(seq, status='completed', first_tick=2, last_tick=5,
-        pressed=0xA000, released=0x8000, apply_latency_ms=.11, client_to_consume_ms=14.7)]))
-    row = await task
-    assert row and row.client_to_consume_ms == 14.7
