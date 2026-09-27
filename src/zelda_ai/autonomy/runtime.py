@@ -805,6 +805,9 @@ class AutonomyRuntime:
                 self.controller = ContinuousController(
                     self.bridge,
                     self.model_dir / "raw-controller-ppo-rnd-v2.pt",
+                    on_achievement=lambda achievement: self.log(
+                        "ml_achievement", achievement
+                    ),
                 )
             self.controller.reset_episode_state()
             await self._db_write(self.store.update_run, self.run_id, status="running", reason="")
