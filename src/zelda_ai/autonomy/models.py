@@ -50,6 +50,22 @@ class AgentIntent(BaseModel):
             schema["required"] = list(properties)
             for value in properties.values():
                 value.pop("default", None)
+
+            # Pydantic represents a fixed-length tuple with prefixItems. Codex /
+            # OpenAI structured output expects a regular array schema with items.
+            # Runtime validation still enforces the Python 3-tuple below.
+            properties["target_position"] = {
+                "anyOf": [
+                    {
+                        "type": "array",
+                        "items": {"type": "number"},
+                        "minItems": 3,
+                        "maxItems": 3,
+                    },
+                    {"type": "null"},
+                ],
+                "title": "Target Position",
+            }
         return schema
 
     @field_validator("target_position")
