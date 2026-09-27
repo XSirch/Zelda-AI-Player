@@ -15,6 +15,20 @@ PROBE_NAMES = (
     "back", "back_left", "left", "forward_left",
 )
 
+_NOVELTY_INTENT = AgentIntent(
+    objective="Environment novelty encoding",
+    summary="Environment novelty encoding",
+    mode="observe",
+    target_actor_id=None,
+    target_actor_params=None,
+    target_actor_uid=None,
+    target_position=None,
+    direction=None,
+    choice_index=None,
+    horizon_ms=2000,
+)
+
+
 
 def _squash(value: float, scale: float) -> float:
     return math.tanh(float(value) / scale)
@@ -218,6 +232,16 @@ def encode_state(
         )
     f.extend([0.0] * (BASE_FEATURE_DIM - len(f)))
     return f
+
+
+def encode_novelty_state(game: GameState) -> list[float]:
+    """Environment-only frame for RND; excludes changing intent and previous action."""
+    return encode_state(
+        game,
+        _NOVELTY_INTENT,
+        last_stick=(0.0, 0.0),
+        last_buttons=(),
+    )
 
 
 def stack_frames(history: list[list[float]]) -> list[float]:
