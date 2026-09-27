@@ -93,8 +93,8 @@ def test_panel_shows_ml_learning_and_objective_achievements():
     for label in [
         "APRENDIZADO ML",
         "PONTOS DE CONQUISTA",
-        "UPDATES PPO",
-        "AMOSTRAS TREINADAS",
+        "UPDATES PPO · RUN",
+        "AMOSTRAS · RUN",
         "REWARD DA RUN",
         "CONQUISTAS DA RUN",
     ]:
