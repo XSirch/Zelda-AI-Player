@@ -575,12 +575,11 @@ class AutonomyRuntime:
                 self.cognition_state = "error"
                 self.cognition_error = str(exc)[:240]
                 self.thought = (
-                    "Cognition failed, but the ML motor actor keeps playing with its "
-                    "last intent while a later cognition cycle retries."
+                    "Cognition failed. The ML motor actor keeps playing with the "
+                    "last intent; stop and start the run to explicitly retry the provider."
                 )
                 self.publish(True)
-                await asyncio.sleep(1.0)
-                continue
+                return
 
             if result.usage.actual_model and result.usage.actual_model != self.config.model:
                 self.store.update_run(self.run_id, mixed=True)
