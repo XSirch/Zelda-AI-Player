@@ -77,3 +77,11 @@ def test_panel_keeps_tokens_cost_and_codex_quota_visible():
     assert "window_duration_mins" in main
     assert "UsageSnapshot" in types
     assert "QuotaWindow" in types
+
+
+def test_panel_labels_simulator_and_stops_paused_runs():
+    text = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    assert "SIMULADOR · NÃO É GAMEPLAY REAL" in text
+    assert "MODO SIMULADOR" in text
+    assert "snapshot?.status === 'paused'" in text
+    assert "activeRun ? '/stop' : '/start'" in text
