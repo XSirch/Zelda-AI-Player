@@ -86,6 +86,8 @@ export interface LearningSnapshot {
   actor_device?: string;
   updates?: number;
   samples_trained?: number;
+  run_updates?: number;
+  run_samples_trained?: number;
   rollout_steps?: number;
   queued_rollouts?: number;
   last_reward?: number;
