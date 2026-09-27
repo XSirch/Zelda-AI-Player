@@ -18,8 +18,8 @@ class Transport:
 
 def full(state, **changes):
     values = state.model_dump()
-    values.update(protocol=2, kind='full', seq=10, full_seq=10, context_epoch=1,
-                  bridge_build='rt-input-v2.4', capabilities=['fast_state', 'input_sequence', 'consumed_receipts',
+    values.update(protocol=3, kind='full', seq=10, full_seq=10, context_epoch=1,
+                  bridge_build='rt-input-v3.0', capabilities=['fast_state', 'input_sequence', 'consumed_receipts',
                   'player_relative_dodge_state', 'control_stick_direction'],
                   event_floor=1, event_seq=0)
     values.update(changes)
