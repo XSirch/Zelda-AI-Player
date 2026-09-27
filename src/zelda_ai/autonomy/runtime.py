@@ -52,6 +52,7 @@ class AutonomyRuntime:
         self.controller_task: asyncio.Task | None = None
         self.cognition_task: asyncio.Task | None = None
         self.watchdog_task: asyncio.Task | None = None
+        self.usage_task: asyncio.Task | None = None
         self.settling_controller: asyncio.Task | None = None
         self.subscribers: set[asyncio.Queue] = set()
         self.last_publish = 0.0
@@ -72,6 +73,8 @@ class AutonomyRuntime:
         self.cognition_signature = None
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
+        self.provider_usage: dict = {"available": False, "windows": []}
+        self.provider_usage_at = 0.0
 
         self.bridge.on_state = self.on_state
 
@@ -327,6 +330,49 @@ class AutonomyRuntime:
         )
         self.cognition_task = self._spawn(self._cognition_loop(generation))
         self.watchdog_task = self._spawn(self._runtime_watchdog(generation))
+        self.usage_task = self._spawn(self._provider_usage_loop(generation))
+
+    async def _refresh_provider_usage(self):
+        if not self.config:
+            return
+        provider = self.providers.get(self.config.provider)
+        if provider is None:
+            return
+        try:
+            quota_reader = getattr(provider, "quota", None)
+            if quota_reader is not None:
+                usage = await quota_reader()
+            elif self.config.provider == "openrouter":
+                status = await provider.status()
+                usage = {
+                    "available": bool(status.get("connected")),
+                    "connected": bool(status.get("connected")),
+                    "limit": status.get("limit"),
+                    "limit_remaining": status.get("limit_remaining"),
+                    "windows": [],
+                }
+            else:
+                usage = {"available": False, "windows": []}
+            self.provider_usage = usage if isinstance(usage, dict) else {
+                "available": False, "windows": []
+            }
+            self.provider_usage_at = time.time()
+        except (ProviderFailure, asyncio.TimeoutError, ValueError) as exc:
+            # Keep the last valid quota snapshot; freshness/error is explicit.
+            self.provider_usage = {
+                **self.provider_usage,
+                "error": str(exc)[:180],
+            }
+            self.provider_usage_at = time.time()
+        self.publish(True)
+
+    async def _provider_usage_loop(self, generation: int):
+        while generation == self.lifecycle and self.state == "running":
+            await self._refresh_provider_usage()
+            for _ in range(40):
+                if generation != self.lifecycle or self.state != "running":
+                    return
+                await asyncio.sleep(0.5)
 
     async def _runtime_watchdog(self, generation: int):
         while generation == self.lifecycle and self.state == "running":
@@ -510,7 +556,7 @@ class AutonomyRuntime:
                 self.retired_tasks.add(controller_task)
                 controller_task.add_done_callback(self.retired_tasks.discard)
 
-            for task in (self.cognition_task, self.watchdog_task):
+            for task in (self.cognition_task, self.watchdog_task, self.usage_task):
                 if task and task is not current and not task.done():
                     task.cancel()
                     self.retired_tasks.add(task)
@@ -519,6 +565,7 @@ class AutonomyRuntime:
             self.controller_task = None
             self.cognition_task = None
             self.watchdog_task = None
+            self.usage_task = None
             self.tasks.clear()
             self.log("run_" + state, {"reason": reason})
             self.publish(True)
@@ -636,6 +683,19 @@ class AutonomyRuntime:
             "input": controller.get("setpoint"),
             "learning": controller.get("learning"),
             "metrics": self.metrics_cache if self.run_id else None,
+            "usage": {
+                "provider": self.config.provider if self.config else None,
+                "model": self.config.model if self.config else None,
+                "input_tokens": (self.metrics_cache or {}).get("input_tokens", 0),
+                "output_tokens": (self.metrics_cache or {}).get("output_tokens", 0),
+                "cached_input_tokens": (self.metrics_cache or {}).get("cached_input_tokens", 0),
+                "reasoning_output_tokens": (self.metrics_cache or {}).get("reasoning_output_tokens", 0),
+                "total_tokens": (self.metrics_cache or {}).get("total_tokens", 0),
+                "cost_usd": (self.metrics_cache or {}).get("cost_usd"),
+                "known_cost_usd": (self.metrics_cache or {}).get("known_cost_usd", 0),
+                "quota": self.provider_usage,
+                "quota_updated_at": self.provider_usage_at or None,
+            },
             # Compact compatibility block; the realtime web panel intentionally
             # does not stream the full GameState at 20 Hz.
             "bridge": {
