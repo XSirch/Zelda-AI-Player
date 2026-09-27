@@ -147,8 +147,9 @@ def test_metadata_only_follows_same_lifetime(state):
     feed(bridge, fast(state, room_actors=[actor('a', 50), actor('b', 10)]))
     assert bridge.state.room_actors[0].name == 'original'
     assert bridge.state.room_actors[1].name == ''
-    assert _matching_actor(bridge.state, 9, 0, 'a').distance == 50
-    assert _matching_actor(bridge.state, 9, 0, 'missing') is None
+    actors = {row.actor_uid: row for row in bridge.state.room_actors}
+    assert actors["a"].distance == 50
+    assert "missing" not in actors
 
 
 def test_event_bootstrap_does_not_replay_old_victories(state):
@@ -255,4 +256,3 @@ async def test_pulse_stops_renewing_when_feedback_is_lost(state):
     assert not any(p.get('kind') == 'renew' for p in bridge.transport.sent)
 
 
-@pytest.mark.asyncio
