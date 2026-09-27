@@ -725,7 +725,7 @@ class AutonomyRuntime:
         )
 
     def snapshot(self) -> dict:
-        bridge_status = self.bridge.status()
+        bridge_status = self.bridge.telemetry()
         controller = self.controller.telemetry() if self.controller else {
             "intent": AgentIntent.bootstrap().model_dump(),
             "motor": "Controller not started.",
