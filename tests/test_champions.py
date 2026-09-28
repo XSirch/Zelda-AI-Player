@@ -59,3 +59,22 @@ def test_champion_store_rejects_missing_or_invalid_ids(tmp_path):
             pass
         else:
             raise AssertionError(f"{champion_id!r} unexpectedly resolved")
+
+
+def test_champion_checksum_detects_tampering(tmp_path):
+    source = tmp_path / "training.pt"
+    source.write_bytes(b"trusted-policy")
+    store = ChampionStore(tmp_path / "champions")
+    champion = store.capture(
+        source,
+        {"run_id": "run-1", "elapsed_s": 100.0},
+    )
+    checkpoint = store.root / f"{champion['id']}.pt"
+    checkpoint.write_bytes(b"tampered-policy")
+
+    try:
+        store.resolve(champion["id"])
+    except ValueError as exc:
+        assert "checksum mismatch" in str(exc)
+    else:
+        raise AssertionError("tampered champion unexpectedly resolved")
