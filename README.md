@@ -40,6 +40,35 @@ O painel diferencia:
 
 Progresso que já existia no save ao iniciar a run é tratado como baseline e não gera conquista retroativa.
 
+### Champions e avaliação congelada
+
+Quando uma run de **treino** emite o evento nativo `game_completed`, o runtime espera o último rollout/gradient update terminar, salva o checkpoint de treino e cria um snapshot imutável:
+
+```text
+.local/ml/champions/
+  completion-0001.pt
+  completion-0001.json
+  completion-0002.pt
+  completion-0002.json
+  best-completion.pt
+  best-completion.json
+```
+
+Cada completion guarda SHA-256 e metadados da run (tempo, updates, amostras, reward e modelo de cognição). `best-completion.pt` é apenas um alias atualizável para o menor tempo de conclusão observado; os arquivos `completion-XXXX.pt` nunca são sobrescritos.
+
+**INICIAR** continua usando o checkpoint de treino `.local/ml/raw-controller-ppo-rnd-v2.pt`. Quando existe um champion, **AVALIAR CHAMPION** carrega por padrão o completion mais recente, desativa PPO/RND training e usa decisões determinísticas do actor. A avaliação nunca salva sobre o champion nem cria um novo champion ao terminar.
+
+Para testar retenção desde o começo do jogo: mantenha `.local/ml/` e o banco de conhecimento, carregue um **save novo** do OoT e então clique **AVALIAR CHAMPION**. O sistema não cria/apaga saves do jogo automaticamente.
+
+API avançada:
+
+```text
+GET  /api/champions
+POST /api/evaluate              {"champion_id": null}
+POST /api/evaluate              {"champion_id": "completion-0001"}
+POST /api/evaluate              {"champion_id": "best"}
+```
+
 ## Painel
 
 A interface principal mostra somente:
@@ -51,7 +80,7 @@ A interface principal mostra somente:
 - cache e reasoning tokens;
 - custo API quando o provider reporta USD;
 - cota restante do Codex/ChatGPT;
-- **INICIAR / PARAR**.
+- **INICIAR / PARAR** e **AVALIAR CHAMPION** quando houver um completion salvo.
 
 Para Codex autenticado por ChatGPT, o app-server fornece tokens, mas custo em USD permanece **—** quando não há cobrança API reportada. A cota é lida separadamente por `account/rateLimits/read`, sem chamada de modelo, e mostra somente as janelas realmente devolvidas pelo Codex.
 
