@@ -807,6 +807,7 @@ class AutonomyRuntime:
 
             telemetry = self.controller.telemetry()
             learning = telemetry.get("learning", {})
+            exploration = learning.get("exploration") or {}
             compact_learning = {
                 "run_updates": learning.get("run_updates", 0),
                 "run_samples_trained": learning.get("run_samples_trained", 0),
@@ -814,6 +815,12 @@ class AutonomyRuntime:
                 "useful_progress_rate": learning.get("useful_progress_rate", 0.0),
                 "seconds_since_useful_progress": learning.get(
                     "seconds_since_useful_progress", 0.0
+                ),
+                "local_dwell_seconds": exploration.get(
+                    "local_dwell_seconds", 0.0
+                ),
+                "unique_macro_regions": exploration.get(
+                    "unique_macro_regions", 0
                 ),
                 "reward_breakdown": learning.get("reward_breakdown", {}),
                 "recent_achievements": (learning.get("achievements") or [])[-4:],
