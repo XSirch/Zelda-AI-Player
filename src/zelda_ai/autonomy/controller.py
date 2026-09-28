@@ -388,6 +388,15 @@ class ContinuousController:
                     "unique_spaces": len(self.reward_tracker.visited_cells),
                     "unique_actors": len(self.reward_tracker.seen_actors),
                     "unique_transitions": len(self.reward_tracker.seen_transitions),
+                    "local_dwell_seconds": round(
+                        self.reward_tracker.local_dwell_seconds, 1
+                    ),
+                    "local_anchor_distance": round(
+                        self.reward_tracker.local_anchor_distance, 1
+                    ),
+                    "local_dwell_penalty": round(
+                        self.reward_tracker.local_dwell_penalty, 6
+                    ),
                 },
                 "reward_breakdown": self.last_reward_breakdown,
                 "last_update": self.last_training_stats,
