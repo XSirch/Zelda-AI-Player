@@ -133,6 +133,10 @@ class RewardTracker:
             return True
         if current["quest_items"] - previous["quest_items"]:
             return True
+        if current["dungeon_items"] - previous["dungeon_items"]:
+            return True
+        if current["max_health"] > previous["max_health"]:
+            return True
         if current["heart_pieces"] > previous["heart_pieces"]:
             return True
         if current["skull_tokens"] > previous["skull_tokens"]:
@@ -203,6 +207,7 @@ class RewardTracker:
                 for row in game.progress.equipment
             },
             "quest_items": set(game.progress.quest_items),
+            "dungeon_items": set(game.progress.dungeon_items),
             "story_flags": dict(game.progress.story_flags),
             "upgrades": dict(game.progress.upgrade_levels),
             "heart_pieces": game.progress.heart_pieces,
@@ -456,6 +461,40 @@ class RewardTracker:
                     title=quest_name,
                     detail="Novo quest item observado.",
                     points=250,
+                    training_reward=training_reward,
+                ))
+
+            for dungeon_name in sorted(
+                current["dungeon_items"] - previous["dungeon_items"]
+            ):
+                training_reward = 2.0
+                b["objective_milestone"] = (
+                    b.get("objective_milestone", 0.0) + training_reward
+                )
+                achievements.append(self._achievement(
+                    key=f"dungeon:{dungeon_name}",
+                    kind="item",
+                    title=dungeon_name,
+                    detail="Novo dungeon item persistente observado.",
+                    points=100,
+                    training_reward=training_reward,
+                ))
+
+            max_health_gain = current["max_health"] - previous["max_health"]
+            if max_health_gain > 0:
+                training_reward = min(
+                    4.0,
+                    (max_health_gain / 16.0) * 2.0,
+                )
+                b["objective_milestone"] = (
+                    b.get("objective_milestone", 0.0) + training_reward
+                )
+                achievements.append(self._achievement(
+                    key=f"max_health:{current['max_health']}",
+                    kind="progress",
+                    title="Capacidade de vida aumentada",
+                    detail=f"+{max_health_gain / 16.0:g} coração(ões) de capacidade.",
+                    points=max(50, round((max_health_gain / 16.0) * 150)),
                     training_reward=training_reward,
                 ))
 
