@@ -714,6 +714,19 @@ class AutonomyRuntime:
                 return
             await asyncio.sleep(0.25)
 
+    @staticmethod
+    def _stuck_signal(learning: dict) -> tuple[float, str]:
+        stalled_s = float(
+            learning.get("seconds_since_useful_progress") or 0.0
+        )
+        exploration = learning.get("exploration") or {}
+        local_dwell_s = float(
+            exploration.get("local_dwell_seconds") or 0.0
+        )
+        if local_dwell_s >= stalled_s:
+            return local_dwell_s, "local_area_stuck"
+        return stalled_s, "motor_stuck"
+
     async def _wait_for_cognition_need(self, generation: int) -> bool:
         """Wait for a strategic event or sustained motor stagnation.
 
@@ -740,10 +753,7 @@ class AutonomyRuntime:
             if not self.controller:
                 continue
             learning = self.controller.telemetry().get("learning", {})
-            stalled_s = float(learning.get("seconds_since_useful_progress") or 0.0)
-            exploration = learning.get("exploration") or {}
-            local_dwell_s = float(exploration.get("local_dwell_seconds") or 0.0)
-            stuck_age_s = max(stalled_s, local_dwell_s)
+            stuck_age_s, stuck_reason = self._stuck_signal(learning)
             now = time.monotonic()
             if (
                 stuck_age_s >= COGNITION_STUCK_AFTER_S
@@ -751,11 +761,7 @@ class AutonomyRuntime:
                 and now - self.last_cognition_at >= COGNITION_STUCK_AFTER_S
             ):
                 self.last_stuck_replan_at = now
-                self._request_cognition(
-                    "local_area_stuck"
-                    if local_dwell_s >= COGNITION_STUCK_AFTER_S
-                    else "motor_stuck"
-                )
+                self._request_cognition(stuck_reason)
         return False
 
     async def _cognition_loop(self, generation: int):
