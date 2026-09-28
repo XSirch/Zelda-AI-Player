@@ -13,6 +13,11 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
             "elapsed_s": 500.0,
             "updates": 10,
             "samples_trained": 2560,
+            "calls": 7,
+            "input_tokens": 1200,
+            "output_tokens": 300,
+            "total_tokens": 1500,
+            "cost_usd": 0.042,
         },
     )
     source.write_bytes(b"policy-v2")
@@ -27,6 +32,10 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     )
 
     assert first["id"] == "completion-0001"
+    assert first["input_tokens"] == 1200
+    assert first["output_tokens"] == 300
+    assert first["total_tokens"] == 1500
+    assert first["cost_usd"] == 0.042
     assert second["id"] == "completion-0002"
     assert (store.root / "completion-0001.pt").read_bytes() == b"policy-v1"
     assert (store.root / "completion-0002.pt").read_bytes() == b"policy-v2"
