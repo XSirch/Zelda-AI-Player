@@ -198,7 +198,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
           <span>CONQUISTAS DA RUN</span>
           <small>
             {exploration
-              ? `${exploration.unique_spaces} regiões · ${exploration.unique_actors} atores · ${exploration.unique_transitions} transições`
+              ? `${exploration.unique_spaces} regiões · ${exploration.unique_actors} atores · ${exploration.unique_transitions} transições · ${Math.floor(exploration.local_dwell_seconds ?? 0)}s mesma área`
               : 'sem exploração registrada'}
           </small>
         </div>
