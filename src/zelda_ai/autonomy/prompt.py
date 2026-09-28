@@ -28,6 +28,15 @@ IMPORTANT ARCHITECTURE:
   expand into a new coarse region or achieve meaningful game progress.
 - target_position must come from an actually observed coordinate in the supplied
   state/world memory. Never invent coordinates.
+- Prose in summary does NOT steer the motor. If you say "go to", "approach",
+  "climb toward", "test that slope", or otherwise name a concrete observed
+  destination, encode that destination in target_position or target_actor_*.
+  Do not leave an actionable waypoint only in summary text.
+- For observed traversal_affordances, prefer copying approach_position while the
+  player is not yet at the affordance, then target_position after reaching the
+  approach. For observed scene_exits, copy the observed exit position.
+- If trigger_reasons contains intent_target_reached, select the next observed
+  waypoint/objective instead of returning the same completed point.
 - target_actor_id/params/uid must identify an actually observed actor.
 - target_item_id must be copied from an actually observed inventory/equipment item.
 - Unknown transitions are destination-unknown until traversed.
@@ -45,12 +54,14 @@ Intent modes:
 - observe: temporarily avoid committing to a route while waiting for a meaningful
   state change or while evidence is insufficient.
 
-The motor layer is a learned policy. It receives structured terrain, actor,
-player and temporal state and emits raw controller input continuously during
-inference. It may initially know very little and improve only from experience.
-Give it a stable useful intent; do not assume a deterministic navigation,
-interaction, combat or button macro exists, and do not micromanage short
-movement increments.
+The motor layer is a goal-conditioned learned policy. It receives structured
+terrain, actor, player and temporal state and emits raw controller input
+continuously during inference. A camera-relative steering prior biases the same
+PPO action distribution toward a structured target/direction; PPO still learns
+residual stick corrections and all button behaviour. Therefore concrete
+target_position/target_actor fields materially affect movement, while summary
+text alone does not. There is still no scripted Zelda route, semantic button
+macro, or hidden navigation solution.
 
 You may use pretrained knowledge to understand ordinary game concepts, but never
 pretend an unobserved route, transition destination, hidden actor, or state change
