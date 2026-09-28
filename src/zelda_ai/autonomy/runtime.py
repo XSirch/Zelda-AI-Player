@@ -71,6 +71,7 @@ class AutonomyRuntime:
         self.thought = "Ready to start autonomous play."
         self.thinking_since: float | None = None
         self.last_cognition_at = 0.0
+        self.last_cognition_reasons: list[str] = []
         self.pending_switch: tuple[RunConfig, ModelInfo] | None = None
         self.switch_request = 0
 
@@ -442,6 +443,7 @@ class AutonomyRuntime:
             self.thought = "Starting ML actor immediately; cognition is connecting in parallel."
             self.thinking_since = None
             self.last_cognition_at = 0.0
+            self.last_cognition_reasons = []
             self.last_stuck_replan_at = 0.0
             self.recent.clear()
             self.dialogue_transcript.clear()
@@ -631,6 +633,7 @@ class AutonomyRuntime:
             trigger_reasons = self._take_cognition_reasons()
             if not trigger_reasons:
                 trigger_reasons = ["run_started"] if self.last_cognition_at == 0 else ["strategic_event"]
+            self.last_cognition_reasons = trigger_reasons
 
             telemetry = self.controller.telemetry()
             learning = telemetry.get("learning", {})
@@ -965,6 +968,7 @@ class AutonomyRuntime:
                     if self.thinking_since else 0,
                 "intent": controller.get("intent"),
                 "motor": controller.get("motor"),
+                "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
             },
             "input": controller.get("setpoint"),
             "learning": controller.get("learning"),
@@ -972,6 +976,7 @@ class AutonomyRuntime:
             "usage": {
                 "provider": self.config.provider if self.config else None,
                 "model": self.config.model if self.config else None,
+                "calls": (self.metrics_cache or {}).get("calls", 0),
                 "input_tokens": (self.metrics_cache or {}).get("input_tokens", 0),
                 "output_tokens": (self.metrics_cache or {}).get("output_tokens", 0),
                 "cached_input_tokens": (self.metrics_cache or {}).get("cached_input_tokens", 0),
