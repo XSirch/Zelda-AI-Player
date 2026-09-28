@@ -172,7 +172,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   return <section className="learning-panel">
     <div className="section-label">
       APRENDIZADO ML
-      <span className={updates > 0 ? 'learning-state active' : 'learning-state'}>{trainingState}</span>
+      <span className={evaluating || updates > 0 ? 'learning-state active' : 'learning-state'}>{trainingState}</span>
     </div>
     <div className="learning-metrics">
       <div><span>PONTOS DE CONQUISTA</span><strong>{compact(objectiveScore)}</strong><small>objetivos observados · não é reward PPO</small></div>
