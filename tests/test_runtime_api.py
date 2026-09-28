@@ -101,6 +101,7 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
         assert "calls" in status["usage"]
         assert "quota" in status["usage"]
         assert "trigger" in status["thought"]
+        assert "guidance" in status["thought"]
 
         detail = client.get(f"/api/runs/{run_id}").json()
         assert detail["source"] == "simulator"
