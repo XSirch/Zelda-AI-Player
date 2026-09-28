@@ -107,6 +107,7 @@ def test_panel_shows_ml_learning_and_objective_achievements():
     assert "useful_progress_rate" in types
     assert "reward PPO" in main
     assert "sem expansão" in main
+    assert "frontier" in main
 
 
 def test_panel_exposes_sparse_cognition_telemetry():
