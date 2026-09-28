@@ -130,15 +130,12 @@ class ChampionStore:
         if not source_checkpoint.is_file():
             raise ValueError("Training checkpoint is missing; champion was not created")
 
-        rows = self._rows()
-        sequence = max(
-            (
-                int(match.group(1))
-                for row in rows
-                if (match := _CHAMPION_ID.match(str(row.get("id", ""))))
-            ),
-            default=0,
-        ) + 1
+        existing_ids = set()
+        for pattern in ("completion-*.pt", "completion-*.json"):
+            for path in self.root.glob(pattern):
+                if match := _CHAMPION_ID.match(path.stem):
+                    existing_ids.add(int(match.group(1)))
+        sequence = max(existing_ids, default=0) + 1
         champion_id = f"completion-{sequence:04d}"
         checkpoint = self.root / f"{champion_id}.pt"
         metadata_path = self.root / f"{champion_id}.json"
@@ -157,14 +154,21 @@ class ChampionStore:
         best = self.best_completion()
         if best is not None:
             best_source = self.root / f"{best['id']}.pt"
-            _atomic_copy(best_source, self.root / "best-completion.pt")
-            _atomic_json(
-                self.root / "best-completion.json",
-                {
-                    "champion_id": best["id"],
-                    "elapsed_s": best.get("elapsed_s"),
-                    "created_at": best.get("created_at"),
-                    "sha256": best.get("sha256"),
-                },
-            )
+            try:
+                if _sha256(best_source) == best.get("sha256"):
+                    _atomic_copy(best_source, self.root / "best-completion.pt")
+                    _atomic_json(
+                        self.root / "best-completion.json",
+                        {
+                            "champion_id": best["id"],
+                            "elapsed_s": best.get("elapsed_s"),
+                            "created_at": best.get("created_at"),
+                            "sha256": best.get("sha256"),
+                        },
+                    )
+            except OSError:
+                # The individual completion is already durable. The best alias
+                # is a convenience and must never turn a saved champion into a
+                # failed capture.
+                pass
         return dict(row)
