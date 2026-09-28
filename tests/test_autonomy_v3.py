@@ -146,7 +146,12 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     observation = [0.0] * FEATURE_DIM
     rollout = []
     for index in range(16):
-        sample = policy.sample(observation)
+        sample = policy.sample(
+            observation,
+            guidance_stick=(0.0, 1.0),
+            guidance_strength=0.7,
+            button_quiet_strength=0.5,
+        )
         assert len(sample["stick"]) == 2
         assert len(sample["buttons"]) == button_count
         rollout.append({
@@ -155,6 +160,9 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
             "buttons": sample["buttons"],
             "log_prob": sample["log_prob"],
             "value": sample["value"],
+            "guidance_stick": sample["guidance_stick"],
+            "guidance_strength": sample["guidance_strength"],
+            "button_quiet_strength": sample["button_quiet_strength"],
             "reward": 0.05 + index * 0.001,
             "done": False,
         })
