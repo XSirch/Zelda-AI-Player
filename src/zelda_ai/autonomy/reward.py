@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass
 
 from ..models import GameState
@@ -20,6 +21,11 @@ EQUIPMENT_OBJECTIVES: dict[tuple[str, int], tuple[str, int, float]] = {
     ("boots", 2): ("Iron Boots", 150, 2.5),
     ("boots", 3): ("Hover Boots", 150, 2.5),
 }
+
+LOCAL_DWELL_RADIUS = 320.0
+LOCAL_DWELL_GRACE_S = 45.0
+LOCAL_DWELL_RAMP_S = 180.0
+LOCAL_DWELL_MAX_PENALTY = 0.35
 
 STORY_OBJECTIVES: dict[str, tuple[str, int, float]] = {
     "greeted_by_saria": ("Falou com Saria", 20, 0.4),
@@ -58,11 +64,37 @@ class RewardTracker:
         self.combat_contact = False
         self.seen_inventory_items: set[int] = set()
         self.stagnation_steps = 0
+        self.local_anchor_scope: tuple[int, int] | None = None
+        self.local_anchor_position: tuple[float, float, float] | None = None
+        self.local_anchor_at: float | None = None
+        self.local_dwell_seconds = 0.0
+        self.local_anchor_distance = 0.0
+        self.local_dwell_penalty = 0.0
         self.previous: dict | None = None
 
     def break_causal_chain(self):
-        """Drop only the previous transition; keep novelty history for the run."""
+        """Drop causal/local residence state; keep run-wide novelty history."""
         self.previous = None
+        self.local_anchor_scope = None
+        self.local_anchor_position = None
+        self.local_anchor_at = None
+        self.local_dwell_seconds = 0.0
+        self.local_anchor_distance = 0.0
+        self.local_dwell_penalty = 0.0
+
+    def _reset_local_anchor(self, current: dict, now_s: float):
+        position = current.get("position")
+        if position is None:
+            self.local_anchor_scope = None
+            self.local_anchor_position = None
+            self.local_anchor_at = None
+        else:
+            self.local_anchor_scope = (current["scene"], current["room"])
+            self.local_anchor_position = tuple(position)
+            self.local_anchor_at = now_s
+        self.local_dwell_seconds = 0.0
+        self.local_anchor_distance = 0.0
+        self.local_dwell_penalty = 0.0
 
     @staticmethod
     def _progress_fingerprint(game: GameState):
@@ -178,7 +210,9 @@ class RewardTracker:
         *,
         intrinsic: float,
         pressed_buttons: int,
+        now_s: float | None = None,
     ) -> RewardResult:
+        now_s = time.monotonic() if now_s is None else float(now_s)
         current = self._snapshot(game, intent)
         b: dict[str, float] = {}
         achievements: list[dict] = []
@@ -484,6 +518,70 @@ class RewardTracker:
             ):
                 improvement = max(-100.0, min(100.0, old_dist - new_dist))
                 b["intent_progress"] = improvement / 500.0
+
+        major_progress_keys = {
+            "new_dialogue",
+            "new_world_transition",
+            "durable_progress",
+            "objective_milestone",
+            "enemy_damage",
+            "native_event",
+        }
+        major_progress = any(
+            b.get(key, 0.0) > 0 for key in major_progress_keys
+        )
+        current_scope = (current["scene"], current["room"])
+        current_position = current["position"]
+        if current_position is None:
+            self._reset_local_anchor(current, now_s)
+        elif (
+            self.local_anchor_scope != current_scope
+            or self.local_anchor_position is None
+            or self.local_anchor_at is None
+            or major_progress
+            or game.dialogue.active
+            or game.pause_menu.active
+            or game.cutscene_active
+        ):
+            self._reset_local_anchor(current, now_s)
+        else:
+            self.local_anchor_distance = math.dist(
+                current_position,
+                self.local_anchor_position,
+            )
+            if self.local_anchor_distance >= LOCAL_DWELL_RADIUS:
+                # Genuine spatial expansion moves the residence anchor. Small
+                # circles inside the radius do not reset the clock.
+                self._reset_local_anchor(current, now_s)
+            else:
+                self.local_dwell_seconds = max(
+                    0.0,
+                    now_s - self.local_anchor_at,
+                )
+                if self.local_dwell_seconds > LOCAL_DWELL_GRACE_S:
+                    ramp = min(
+                        1.0,
+                        (self.local_dwell_seconds - LOCAL_DWELL_GRACE_S)
+                        / LOCAL_DWELL_RAMP_S,
+                    )
+                    base_penalty = (
+                        0.02
+                        + (LOCAL_DWELL_MAX_PENALTY - 0.02) * ramp
+                    )
+                    # Give the policy a directional gradient: punishment falls
+                    # as it moves toward the edge of the local bubble, but never
+                    # vanishes until it actually escapes the radius.
+                    distance_ratio = min(
+                        1.0,
+                        self.local_anchor_distance / LOCAL_DWELL_RADIUS,
+                    )
+                    distance_factor = 1.0 - 0.6 * distance_ratio
+                    self.local_dwell_penalty = -(
+                        base_penalty * distance_factor
+                    )
+                    b["local_dwell"] = self.local_dwell_penalty
+                else:
+                    self.local_dwell_penalty = 0.0
 
         if previous and previous["position"] is not None and current["position"] is not None:
             dx = current["position"][0] - previous["position"][0]
