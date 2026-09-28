@@ -115,3 +115,21 @@ def test_panel_exposes_sparse_cognition_telemetry():
     assert "usage?.calls" in main
     assert "trigger: string | null" in types
     assert "calls: number" in types
+
+
+def test_panel_exposes_champion_evaluation():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    for label in [
+        "AVALIAR CHAMPION",
+        "AVALIAÇÃO · PESOS CONGELADOS",
+        "CHAMPIONS",
+        "LATEST",
+        "BEST TIME",
+    ]:
+        assert label in main
+    assert "'/evaluate'" in main
+    assert "run_mode" in types
+    assert "ChampionSummary" in types
+    assert "ChampionCatalog" in types
+    assert "training_enabled" in types
