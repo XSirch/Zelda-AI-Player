@@ -499,6 +499,13 @@ class AutonomyRuntime:
         self.champion_catalog = self.champions.catalog()
         return self.champion_catalog
 
+    def champion_status(self) -> dict:
+        return {
+            **self.champion_catalog,
+            "capture_pending": not self.completion_capture_ready.is_set(),
+            "error": self.last_champion_error or None,
+        }
+
     async def _capture_completion_champion(
         self,
         controller: ContinuousController,
@@ -1136,11 +1143,7 @@ class AutonomyRuntime:
             "run_id": self.run_id,
             "run_mode": self.config.run_mode if self.config else "train",
             "active_champion": self.active_champion,
-            "champions": {
-                **self.champion_catalog,
-                "capture_pending": not self.completion_capture_ready.is_set(),
-                "error": self.last_champion_error or None,
-            },
+            "champions": self.champion_status(),
             "elapsed_s": round(time.monotonic() - self.started, 1) if self.run_id else 0.0,
             "connection": {
                 "game": bool(bridge_status.get("connected")),
