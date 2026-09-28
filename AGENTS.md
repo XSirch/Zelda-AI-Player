@@ -12,5 +12,6 @@ This is a game-agent laboratory, not a solved Zelda bot. Read README.md and docs
 - Native input must expire, release on stop, reject stale/cross-scene packets, and remain limited to controller input. No teleports, HP writes, or hidden solution flags in observations.
 - Preserve SoH as a separate checkout pinned by the integration script. Do not hard-reset user source/assets or distribute ROMs, saves or copyrighted game data.
 - Capture actual validation in docs/STATUS.md. No claim of autonomous completion, learned aiming or reliable navigation before reproducing it in the game.
+- Completion champions are immutable evidence artifacts. Training `game_completed` must snapshot only after final PPO work settles. Evaluation must never train, save over, quarantine/move, or otherwise mutate a champion; invalid champions fail closed. Keep evaluation deterministic at the motor-policy level.
 - UI direction: minimal realtime instrument panel. Show connection, operational thought, raw stick/buttons, token usage/API cost when known, and provider quota. Do not reintroduce skill/debug/navigation tabs into the primary UI.
 - No GitHub Actions required. Prefer local checks; generate dependency lockfiles after an actual successful resolve and do not invent them.
