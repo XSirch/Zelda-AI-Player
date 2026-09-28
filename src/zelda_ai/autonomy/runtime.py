@@ -567,6 +567,10 @@ class AutonomyRuntime:
                 )
                 self.refresh_champions()
 
+            # Load/validate the policy before opening a new run record. A corrupt
+            # immutable champion therefore fails cleanly while the runtime is idle.
+            controller = self._make_controller(config)
+
             self.lifecycle += 1
             self.state = "starting"
             self.reason = ""
@@ -610,7 +614,7 @@ class AutonomyRuntime:
             self.segment_id = self.store.segment(
                 self.run_id, config.model_dump(), self.namespace
             )
-            self.controller = self._make_controller(config)
+            self.controller = controller
             self.bridge.enable_control()
             self.state = "running"
             self.log(
