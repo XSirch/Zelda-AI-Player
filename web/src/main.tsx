@@ -285,6 +285,7 @@ function App() {
   const activeRun = snapshot?.status === 'running' || snapshot?.status === 'paused' || snapshot?.status === 'starting';
   const simulator = snapshot?.connection.source === 'simulator';
   const championAvailable = !!snapshot?.champions?.latest;
+  const championCapturePending = !!snapshot?.champions?.capture_pending;
   const connectionDetail = useMemo(() => {
     const hz = snapshot?.connection.state_hz;
     return hz ? `${hz.toFixed(1)} Hz` : undefined;
@@ -318,14 +319,14 @@ function App() {
         </button> : <>
           <button
             className="start"
-            disabled={busy || !snapshot?.connection.game}
+            disabled={busy || championCapturePending || !snapshot?.connection.game}
             onClick={() => void control('/start')}
           >
             {busy ? '…' : 'INICIAR'}
           </button>
           <button
             className="evaluate"
-            disabled={busy || !snapshot?.connection.game || !championAvailable}
+            disabled={busy || championCapturePending || !snapshot?.connection.game || !championAvailable}
             onClick={() => void control('/evaluate')}
             title={championAvailable ? 'Carrega o champion mais recente com pesos congelados' : 'Nenhum champion concluído disponível'}
           >
@@ -349,6 +350,9 @@ function App() {
     {simulator && <div className="notice">MODO SIMULADOR — gameplay, inputs e métricas desta sessão são sintéticos.</div>}
     {snapshot?.run_mode === 'evaluation' && snapshot?.active_champion && <div className="evaluation-notice">
       AVALIAÇÃO CONGELADA — {snapshot.active_champion.id}. PPO/RND não atualizam pesos nesta run.
+    </div>}
+    {championCapturePending && <div className="notice">
+      SALVANDO CHAMPION — novas runs ficam bloqueadas até o snapshot de conclusão terminar.
     </div>}
 
     {error && <div className="error" role="alert">{error}</div>}
