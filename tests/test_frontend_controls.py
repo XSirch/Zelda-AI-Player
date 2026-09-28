@@ -48,7 +48,7 @@ def test_panel_uses_realtime_websocket_and_simple_start_stop():
     assert "/api/events" in text
     assert "socket.onmessage" in text
     assert "api<Snapshot>(path, {})" in text
-    assert "'/start' | '/stop'" in text
+    assert "'/start' | '/stop' | '/evaluate'" in text
 
 
 def test_frontend_contract_is_compact():
@@ -84,7 +84,8 @@ def test_panel_labels_simulator_and_stops_paused_runs():
     assert "SIMULADOR · NÃO É GAMEPLAY REAL" in text
     assert "MODO SIMULADOR" in text
     assert "snapshot?.status === 'paused'" in text
-    assert "activeRun ? '/stop' : '/start'" in text
+    assert "onClick={() => void control('/stop')}" in text
+    assert "onClick={() => void control('/start')}" in text
 
 
 def test_panel_shows_ml_learning_and_objective_achievements():
