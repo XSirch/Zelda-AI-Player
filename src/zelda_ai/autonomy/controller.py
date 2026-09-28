@@ -116,6 +116,7 @@ class ContinuousController:
             "active": False,
             "stick": (0.0, 0.0),
             "strength": 0.0,
+            "button_quiet": 0.0,
             "distance": None,
             "source": "none",
             "target": None,
