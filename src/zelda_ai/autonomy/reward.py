@@ -106,21 +106,6 @@ class RewardTracker:
         self.local_dwell_penalty = 0.0
 
     @staticmethod
-    def _progress_fingerprint(game: GameState):
-        return (
-            tuple(game.inventory),
-            tuple(game.progress.quest_items),
-            tuple(game.progress.owned_equipment),
-            tuple(sorted(game.progress.upgrade_levels.items())),
-            game.progress.heart_pieces,
-            game.progress.skull_tokens,
-            game.progress.magic_acquired,
-            game.progress.double_magic,
-            game.progress.double_defense,
-            game.progress.small_keys,
-        )
-
-    @staticmethod
     def _enemy_health(game: GameState):
         result = {}
         for actor in game.room_actors:
@@ -189,7 +174,6 @@ class RewardTracker:
             "health": player.health if player else 0,
             "dialogue": (game.dialogue.active, game.dialogue.text_id, game.dialogue.state_code),
             "context": (game.context_action.code, game.context_action.label),
-            "progress": self._progress_fingerprint(game),
             "intent_key": self._intent_key(intent),
             "target_distance": self._target_distance(game, intent),
             "enemy_health": self._enemy_health(game),
