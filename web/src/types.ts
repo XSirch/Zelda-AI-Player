@@ -106,15 +106,46 @@ export interface LearningSnapshot {
   reward_breakdown?: Record<string, number>;
   last_update?: Record<string, unknown>;
   checkpoint_load_error?: string;
+  training_enabled?: boolean;
   rnd_error_ema?: number | null;
   rnd_last_error?: number;
   rnd_last_novelty?: number;
+}
+
+
+export interface ChampionSummary {
+  id: string;
+  kind: string;
+  created_at: number;
+  run_id: string;
+  elapsed_s: number;
+  contract?: string;
+  updates?: number;
+  samples_trained?: number;
+  run_updates?: number;
+  run_samples_trained?: number;
+  objective_score?: number;
+  total_reward?: number;
+  provider?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  sha256?: string;
+}
+
+export interface ChampionCatalog {
+  count: number;
+  latest: ChampionSummary | null;
+  best_completion: ChampionSummary | null;
+  error?: string | null;
 }
 
 export interface Snapshot {
   status: string;
   reason: string;
   run_id: string | null;
+  run_mode: 'train' | 'evaluation';
+  active_champion: ChampionSummary | null;
+  champions: ChampionCatalog;
   elapsed_s: number;
   connection: {
     game: boolean;
