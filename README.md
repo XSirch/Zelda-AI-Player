@@ -6,11 +6,19 @@ Jogador autônomo para **The Legend of Zelda: Ocarina of Time** no **Ship of Har
 
 Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 
-- **ML actor:** PPO local em PyTorch emite diretamente o analógico N64 e bits físicos dos botões. Não recebe `A = interact`, `B = attack`, `navigate_to`, `fight_enemy` ou macros equivalentes.
+- **ML actor goal-conditioned:** PPO local em PyTorch continua emitindo analógico N64 e bits físicos dos botões, mas um prior geométrico camera-relative transforma `target_position`/ator/direção observados em viés da própria distribuição do stick. O PPO aprende correções residuais e todos os botões. Não existe `navigate_to`, rota de Zelda ou mapping semântico de botão.
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
 - **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor. A cognição é **sparse/event-driven**: uma chamada inicial e novas chamadas somente em eventos estratégicos (transição, progresso durável, escolha/resolução relevante de diálogo, morte/boss) ou após stuck sustentado. Não existe refresh periódico por `horizon_ms`.
 
-A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto, permitindo aprender timing e rotas específicas. O checkpoint persistente fica em `.local/ml/raw-controller-ppo-rnd-v2.pt`.
+A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto. O steering prior é calculado apenas de coordenadas/direções observadas e da câmera atual; ele não conhece rotas ocultas. O checkpoint persistente continua em `.local/ml/raw-controller-ppo-rnd-v2.pt`, portanto o aprendizado existente é reaproveitado.
+
+### Goal-conditioned motor
+
+Texto do Luna em `summary` não controla Link. Para um destino ser acionável, a cognição precisa preencher `target_position`, `target_actor_*` ou uma direção estruturada. O motor converte esse objetivo para um vetor de analógico relativo à câmera e o injeta como prior na **mesma distribuição Beta usada pelo PPO**; os log-probs continuam coerentes para treino on-policy.
+
+Quando existe guidance forte de navegação, uma prior moderada também reduz a probabilidade-base de button-mashing, sem bloquear nenhum botão: logits aprendidos pelo PPO ainda podem superar esse viés. Em `combat`, `dialogue` e `menu` o steering prior fica desligado.
+
+Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
 
 ## Reward
 
