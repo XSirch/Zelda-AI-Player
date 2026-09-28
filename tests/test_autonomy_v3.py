@@ -210,7 +210,7 @@ def test_long_local_dwell_penalizes_circling_even_when_link_keeps_moving(state):
     assert "local_dwell" not in early.breakdown
 
     same_area = nearby.model_copy(deep=True)
-    same_area.player.position = (45.0, 0.0, -25.0)
+    same_area.player.position = (45.0, 0.0, 25.0)
     pressured = tracker.step(
         same_area,
         intent,
@@ -257,7 +257,7 @@ def test_local_dwell_resets_after_real_spatial_expansion(state):
     assert pressured.breakdown["local_dwell"] < 0
 
     escaped = state.model_copy(deep=True)
-    escaped.player.position = (400.0, 0.0, 0.0)
+    escaped.player.position = (600.0, 0.0, 0.0)
     result = tracker.step(
         escaped,
         intent,
