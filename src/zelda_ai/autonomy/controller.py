@@ -53,7 +53,10 @@ class ContinuousController:
         training_enabled: bool = True,
     ):
         self.bridge = bridge
-        self.policy = OnlinePPO(checkpoint)
+        self.policy = OnlinePPO(
+            checkpoint,
+            strict_checkpoint=not training_enabled,
+        )
         self.starting_updates = self.policy.updates
         self.starting_samples_trained = self.policy.samples_trained
         self.rollout_size = rollout_size
