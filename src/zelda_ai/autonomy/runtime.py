@@ -479,14 +479,19 @@ class AutonomyRuntime:
             self.active_champion = champion
             training_enabled = False
 
-        return ContinuousController(
-            self.bridge,
-            checkpoint,
-            on_achievement=lambda achievement: self.log(
-                "ml_achievement", achievement
-            ),
-            training_enabled=training_enabled,
-        )
+        try:
+            return ContinuousController(
+                self.bridge,
+                checkpoint,
+                on_achievement=lambda achievement: self.log(
+                    "ml_achievement", achievement
+                ),
+                training_enabled=training_enabled,
+            )
+        except RuntimeError as exc:
+            if config.run_mode == "evaluation":
+                raise ValueError(str(exc)) from None
+            raise
 
     def refresh_champions(self) -> dict:
         self.champion_catalog = self.champions.catalog()
