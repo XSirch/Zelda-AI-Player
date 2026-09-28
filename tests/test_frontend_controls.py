@@ -108,6 +108,10 @@ def test_panel_shows_ml_learning_and_objective_achievements():
     assert "reward PPO" in main
     assert "sem expansão" in main
     assert "frontier" in main
+    assert "COLETAS" in main
+    assert "rupees" in main
+    assert "baús" in main
+    assert "resources?:" in types
 
 
 def test_panel_exposes_sparse_cognition_telemetry():
