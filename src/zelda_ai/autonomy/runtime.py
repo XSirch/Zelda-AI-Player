@@ -20,6 +20,9 @@ from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
 CONTRACT_VERSION = "autonomy-v3/raw-controller-v2/ppo-rnd-v2"
+COGNITION_EVENT_DEBOUNCE_S = 1.5
+COGNITION_STUCK_AFTER_S = 90.0
+COGNITION_STUCK_COOLDOWN_S = 180.0
 
 
 class AutonomyRuntime:
@@ -75,7 +78,8 @@ class AutonomyRuntime:
         self.seen_events: set[str] = set()
         self.seen_event_order: deque[str] = deque()
         self.cognition_trigger = asyncio.Event()
-        self.cognition_signature = None
+        self.cognition_reasons: set[str] = set()
+        self.last_stuck_replan_at = 0.0
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
         self.provider_usage: dict = {"available": False, "windows": []}
@@ -171,31 +175,35 @@ class AutonomyRuntime:
         self.publish(True)
 
     @staticmethod
-    def _signature(game):
-        target = game.target_actor.actor_uid if game.target_actor else None
+    def _progress_signature(game):
         return (
-            game.scene,
-            game.room,
-            game.scene_epoch,
-            game.dialogue.active,
-            game.dialogue.text_id,
-            game.dialogue.choice_index,
-            game.pause_menu.active,
-            game.game_over_state,
-            game.context_action.code,
-            target,
-            tuple(game.inventory),
+            tuple(row.item_id for row in game.inventory_named),
             tuple(game.progress.quest_items),
             tuple(game.progress.owned_equipment),
+            tuple(sorted(game.progress.upgrade_levels.items())),
+            game.progress.heart_pieces,
+            game.progress.skull_tokens,
+            game.progress.magic_acquired,
+            game.progress.double_magic,
+            game.progress.double_defense,
             game.progress.small_keys,
+            tuple(game.progress.dungeon_items),
+            tuple(sorted(game.progress.story_flags.items())),
         )
 
-    def on_state(self, state, old):
-        signature = self._signature(state)
-        if signature != self.cognition_signature:
-            self.cognition_signature = signature
-            self.cognition_trigger.set()
+    def _request_cognition(self, reason: str):
+        if self.state != "running":
+            return
+        self.cognition_reasons.add(reason)
+        self.cognition_trigger.set()
 
+    def _take_cognition_reasons(self) -> list[str]:
+        reasons = sorted(self.cognition_reasons)
+        self.cognition_reasons.clear()
+        self.cognition_trigger.clear()
+        return reasons
+
+    def on_state(self, state, old):
         if not self.run_id or self.state != "running":
             self.publish()
             return
@@ -403,12 +411,13 @@ class AutonomyRuntime:
             self.thought = "Starting ML actor immediately; cognition is connecting in parallel."
             self.thinking_since = None
             self.last_cognition_at = 0.0
+            self.last_stuck_replan_at = 0.0
             self.recent.clear()
             self.dialogue_transcript.clear()
             self.seen_events = {f"{game.instance_id}:{event.id}" for event in game.events}
             self.seen_event_order = deque(self.seen_events)
-            self.cognition_signature = self._signature(game)
-            self.cognition_trigger.clear()
+            self.cognition_reasons = {"run_started"}
+            self.cognition_trigger.set()
 
             fingerprint = hashlib.sha256(
                 json.dumps(
