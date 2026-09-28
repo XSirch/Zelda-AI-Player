@@ -555,8 +555,6 @@ class RewardTracker:
             or self.local_anchor_position is None
             or self.local_progress_at is None
             or major_progress
-            or game.dialogue.active
-            or game.pause_menu.active
             or game.cutscene_active
         ):
             # The clock resets only for real coarse spatial expansion or useful
