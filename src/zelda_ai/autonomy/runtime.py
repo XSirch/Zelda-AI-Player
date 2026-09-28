@@ -290,6 +290,8 @@ class AutonomyRuntime:
             asyncio.create_task(self.halt("paused", "game_instance_changed"))
             return
 
+        self._check_intent_target_reached(state)
+
         if old and old.instance_id == state.instance_id and (
             old.scene,
             old.room,
@@ -649,6 +651,7 @@ class AutonomyRuntime:
             self.seen_event_order = deque(self.seen_events)
             self.cognition_reasons = {"run_started"}
             self.cognition_seen_dialogue_triggers.clear()
+            self.cognition_seen_target_reached.clear()
             self.cognition_trigger.set()
 
             fingerprint = hashlib.sha256(
@@ -1229,6 +1232,7 @@ class AutonomyRuntime:
                     if self.thinking_since else 0,
                 "intent": controller.get("intent"),
                 "motor": controller.get("motor"),
+                "guidance": controller.get("guidance"),
                 "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
             },
             "input": controller.get("setpoint"),
