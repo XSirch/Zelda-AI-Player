@@ -497,6 +497,7 @@ class AutonomyRuntime:
         controller: ContinuousController,
         run_id: str,
         elapsed_s: float,
+        config: RunConfig,
     ):
         if self.completion_champion_saved_run_id == run_id:
             return
@@ -516,9 +517,9 @@ class AutonomyRuntime:
                 ),
                 "objective_score": int(learning.get("objective_score") or 0),
                 "total_reward": float(learning.get("total_reward") or 0.0),
-                "provider": self.config.provider if self.config else None,
-                "model": self.config.model if self.config else None,
-                "effort": self.config.effort if self.config else None,
+                "provider": config.provider,
+                "model": config.model,
+                "effort": config.effort,
             }
             champion = await asyncio.to_thread(
                 self.champions.capture,
@@ -951,6 +952,7 @@ class AutonomyRuntime:
         completion_controller: ContinuousController | None = None
         completion_run_id: str | None = None
         completion_elapsed_s = 0.0
+        completion_config: RunConfig | None = None
         async with self.lock:
             if self.state not in {"running", "starting", "paused"} and state != "completed":
                 return
@@ -997,6 +999,7 @@ class AutonomyRuntime:
                 completion_elapsed_s = max(
                     0.0, time.monotonic() - self.started
                 )
+                completion_config = self.config.model_copy(deep=True)
 
             self.controller_task = None
             self.cognition_task = None
@@ -1006,7 +1009,11 @@ class AutonomyRuntime:
             self.log("run_" + state, {"reason": reason})
             self.publish(True)
 
-        if completion_controller is not None and completion_run_id is not None:
+        if (
+            completion_controller is not None
+            and completion_run_id is not None
+            and completion_config is not None
+        ):
             # Wait until queued/in-flight PPO work and the partial final rollout
             # finish. The champion therefore represents the policy that actually
             # completed the run, including its final training update.
@@ -1015,6 +1022,7 @@ class AutonomyRuntime:
                 completion_controller,
                 completion_run_id,
                 completion_elapsed_s,
+                completion_config,
             )
 
     async def control(self, action: str):
