@@ -164,3 +164,15 @@ def test_default_cognition_is_luna_xhigh(monkeypatch):
     settings = Settings(_env_file=None)
     assert settings.agent_model == "gpt-6-luna"
     assert settings.agent_effort == "xhigh"
+
+
+def test_run_mode_defaults_to_training():
+    config = RunConfig(provider="codex", model="m")
+    assert config.run_mode == "train"
+    assert config.champion_id is None
+
+    evaluation = config.model_copy(
+        update={"run_mode": "evaluation", "champion_id": "completion-0001"}
+    )
+    assert evaluation.run_mode == "evaluation"
+    assert evaluation.champion_id == "completion-0001"
