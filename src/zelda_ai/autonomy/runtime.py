@@ -14,6 +14,7 @@ from ..budgets import budget_reason, runtime_exhausted
 from ..models import ModelInfo, RunConfig, SwitchConfig
 from ..providers.base import ProviderFailure
 from ..providers.openrouter import reserve_cost
+from .champions import ChampionStore
 from .controller import ContinuousController
 from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
@@ -39,6 +40,12 @@ class AutonomyRuntime:
         self.providers = providers
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
+        self.training_checkpoint = self.model_dir / "raw-controller-ppo-rnd-v2.pt"
+        self.champions = ChampionStore(self.model_dir / "champions")
+        self.champion_catalog = self.champions.catalog()
+        self.active_champion: dict | None = None
+        self.last_champion_error = ""
+        self.completion_champion_saved_run_id: str | None = None
 
         self.state = "idle"
         self.reason = ""
@@ -463,6 +470,80 @@ class AutonomyRuntime:
         if self.settling_controller is task:
             self.settling_controller = None
 
+    def _make_controller(self, config: RunConfig) -> ContinuousController:
+        checkpoint = self.training_checkpoint
+        training_enabled = True
+        self.active_champion = None
+        if config.run_mode == "evaluation":
+            champion, checkpoint = self.champions.resolve(config.champion_id)
+            self.active_champion = champion
+            training_enabled = False
+
+        return ContinuousController(
+            self.bridge,
+            checkpoint,
+            on_achievement=lambda achievement: self.log(
+                "ml_achievement", achievement
+            ),
+            training_enabled=training_enabled,
+        )
+
+    def refresh_champions(self) -> dict:
+        self.champion_catalog = self.champions.catalog()
+        return self.champion_catalog
+
+    async def _capture_completion_champion(
+        self,
+        controller: ContinuousController,
+        run_id: str,
+        elapsed_s: float,
+    ):
+        if self.completion_champion_saved_run_id == run_id:
+            return
+        try:
+            await asyncio.to_thread(controller.policy.save)
+            telemetry = controller.telemetry()
+            learning = telemetry.get("learning") or {}
+            metadata = {
+                "run_id": run_id,
+                "elapsed_s": round(elapsed_s, 3),
+                "contract": CONTRACT_VERSION,
+                "updates": int(learning.get("updates") or 0),
+                "samples_trained": int(learning.get("samples_trained") or 0),
+                "run_updates": int(learning.get("run_updates") or 0),
+                "run_samples_trained": int(
+                    learning.get("run_samples_trained") or 0
+                ),
+                "objective_score": int(learning.get("objective_score") or 0),
+                "total_reward": float(learning.get("total_reward") or 0.0),
+                "provider": self.config.provider if self.config else None,
+                "model": self.config.model if self.config else None,
+                "effort": self.config.effort if self.config else None,
+            }
+            champion = await asyncio.to_thread(
+                self.champions.capture,
+                self.training_checkpoint,
+                metadata,
+            )
+            self.completion_champion_saved_run_id = run_id
+            self.last_champion_error = ""
+            self.refresh_champions()
+            self.log(
+                "champion_saved",
+                {
+                    "champion_id": champion["id"],
+                    "elapsed_s": champion["elapsed_s"],
+                    "sha256": champion["sha256"],
+                },
+            )
+        except Exception as exc:
+            self.last_champion_error = f"{type(exc).__name__}: {str(exc)[:180]}"
+            self.log(
+                "champion_save_failed",
+                {"error": self.last_champion_error},
+            )
+        self.publish(True)
+
     async def start(self, config: RunConfig):
         await self._settle_previous_controller()
         await self._drain_persistence()
@@ -472,6 +553,13 @@ class AutonomyRuntime:
             game = self.bridge.state
             if not self.bridge.connected or not game or not game.in_game or not game.player:
                 raise ValueError("Connect Ship of Harkinian and load a playable save first")
+
+            if config.run_mode == "evaluation":
+                champion, _ = self.champions.resolve(config.champion_id)
+                config = config.model_copy(
+                    update={"champion_id": champion["id"]}
+                )
+                self.refresh_champions()
 
             self.lifecycle += 1
             self.state = "starting"
@@ -506,6 +594,8 @@ class AutonomyRuntime:
                         "revision": game.upstream_revision,
                         "instance": game.instance_id,
                         "initial_scene": [game.scene, game.room],
+                        "run_mode": config.run_mode,
+                        "champion_id": config.champion_id,
                     },
                     sort_keys=True,
                 ).encode()
@@ -514,13 +604,7 @@ class AutonomyRuntime:
             self.segment_id = self.store.segment(
                 self.run_id, config.model_dump(), self.namespace
             )
-            self.controller = ContinuousController(
-                self.bridge,
-                self.model_dir / "raw-controller-ppo-rnd-v2.pt",
-                on_achievement=lambda achievement: self.log(
-                    "ml_achievement", achievement
-                ),
-            )
+            self.controller = self._make_controller(config)
             self.bridge.enable_control()
             self.state = "running"
             self.log(
@@ -529,6 +613,9 @@ class AutonomyRuntime:
                     "contract": CONTRACT_VERSION,
                     "ml": "ppo+rnd",
                     "control": "raw_stick+raw_buttons",
+                    "run_mode": config.run_mode,
+                    "champion_id": config.champion_id,
+                    "training_enabled": config.run_mode == "train",
                 },
             )
             self._spawn_tasks()
@@ -925,13 +1012,7 @@ class AutonomyRuntime:
             self.reason = ""
             self.bridge.enable_control()
             if self.controller is None:
-                self.controller = ContinuousController(
-                    self.bridge,
-                    self.model_dir / "raw-controller-ppo-rnd-v2.pt",
-                    on_achievement=lambda achievement: self.log(
-                        "ml_achievement", achievement
-                    ),
-                )
+                self.controller = self._make_controller(self.config)
             self.controller.reset_episode_state()
             await self._db_write(self.store.update_run, self.run_id, status="running", reason="")
             self._spawn_tasks()
@@ -994,6 +1075,12 @@ class AutonomyRuntime:
             "status": self.state,
             "reason": self.reason,
             "run_id": self.run_id,
+            "run_mode": self.config.run_mode if self.config else "train",
+            "active_champion": self.active_champion,
+            "champions": {
+                **self.champion_catalog,
+                "error": self.last_champion_error or None,
+            },
             "elapsed_s": round(time.monotonic() - self.started, 1) if self.run_id else 0.0,
             "connection": {
                 "game": bool(bridge_status.get("connected")),
