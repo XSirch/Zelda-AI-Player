@@ -78,3 +78,17 @@ def test_champion_checksum_detects_tampering(tmp_path):
         assert "checksum mismatch" in str(exc)
     else:
         raise AssertionError("tampered champion unexpectedly resolved")
+
+
+def test_orphan_champion_number_is_never_reused(tmp_path):
+    source = tmp_path / "training.pt"
+    source.write_bytes(b"new-policy")
+    store = ChampionStore(tmp_path / "champions")
+    (store.root / "completion-0007.pt").write_bytes(b"orphan-policy")
+
+    champion = store.capture(
+        source,
+        {"run_id": "run-8", "elapsed_s": 80.0},
+    )
+    assert champion["id"] == "completion-0008"
+    assert (store.root / "completion-0007.pt").read_bytes() == b"orphan-policy"
