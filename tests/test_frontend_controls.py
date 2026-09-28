@@ -71,8 +71,11 @@ def test_legacy_dashboard_components_are_removed():
 def test_panel_keeps_tokens_cost_and_codex_quota_visible():
     main = Path("web/src/main.tsx").read_text(encoding="utf-8")
     types = Path("web/src/types.ts").read_text(encoding="utf-8")
-    for label in ["TOKENS RUN", "CACHE / REASONING", "CUSTO API", "COTA RESTANTE"]:
+    for label in ["TEMPO RUN", "TEMPO FINAL", "TOKENS RUN", "CACHE / REASONING", "CUSTO API", "COTA RESTANTE"]:
         assert label in main
+    assert "usage?.input_tokens" in main
+    assert "usage?.output_tokens" in main
+    assert "snapshot?.elapsed_s" in main
     assert "remaining_percent" in main
     assert "window_duration_mins" in main
     assert "UsageSnapshot" in types
