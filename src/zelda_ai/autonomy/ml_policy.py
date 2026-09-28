@@ -46,18 +46,45 @@ class HybridActorCritic(nn.Module if nn is not None else object):
         self.value_head = nn.Linear(256, 1)
         nn.init.constant_(self.button_logits.bias, -2.2)
 
-    def distributions(self, observations):
+    def distributions(
+        self,
+        observations,
+        guidance_stick=None,
+        guidance_strength=None,
+    ):
         latent = self.trunk(observations)
         alpha = torch.nn.functional.softplus(self.stick_alpha(latent)) + 1.05
         beta = torch.nn.functional.softplus(self.stick_beta(latent)) + 1.05
+
+        # Goal-conditioned steering is expressed as a prior on the same Beta
+        # distribution PPO samples from. This keeps behaviour-policy log-probs
+        # correct while letting the learned network supply residual corrections.
+        if guidance_stick is not None and guidance_strength is not None:
+            prior01 = ((guidance_stick + 1.0) * 0.5).clamp(0.001, 0.999)
+            strength = guidance_strength.reshape(-1, 1).clamp(0.0, 1.0)
+            prior_concentration = strength * 10.0
+            alpha = alpha + prior01 * prior_concentration
+            beta = beta + (1.0 - prior01) * prior_concentration
+
         stick_dist = Beta(alpha, beta)
         button_logits = self.button_logits(latent)
         button_dist = Bernoulli(logits=button_logits)
         value = self.value_head(latent).squeeze(-1)
         return stick_dist, button_dist, value, button_logits
 
-    def evaluate(self, observations, stick_unit, buttons):
-        stick_dist, button_dist, value, button_logits = self.distributions(observations)
+    def evaluate(
+        self,
+        observations,
+        stick_unit,
+        buttons,
+        guidance_stick=None,
+        guidance_strength=None,
+    ):
+        stick_dist, button_dist, value, button_logits = self.distributions(
+            observations,
+            guidance_stick=guidance_stick,
+            guidance_strength=guidance_strength,
+        )
         stick01 = ((stick_unit + 1.0) * 0.5).clamp(1e-5, 1.0 - 1e-5)
         log_prob = stick_dist.log_prob(stick01).sum(-1) + button_dist.log_prob(buttons).sum(-1)
         entropy = stick_dist.entropy().sum(-1) + button_dist.entropy().sum(-1)
@@ -172,10 +199,34 @@ class OnlinePPO:
     def _actor_tensor(self, observation: list[float]):
         return torch.tensor(observation, dtype=torch.float32, device=self.actor_device)
 
-    def sample(self, observation: list[float], *, deterministic: bool = False) -> dict:
+    def sample(
+        self,
+        observation: list[float],
+        *,
+        deterministic: bool = False,
+        guidance_stick: tuple[float, float] | list[float] | None = None,
+        guidance_strength: float = 0.0,
+    ) -> dict:
         with self.actor_lock, torch.inference_mode():
             obs = self._actor_tensor(observation).unsqueeze(0)
-            stick_dist, button_dist, value, button_logits = self.actor.distributions(obs)
+            guidance_tensor = None
+            strength_tensor = None
+            if guidance_stick is not None and guidance_strength > 0.0:
+                guidance_tensor = torch.tensor(
+                    [guidance_stick],
+                    dtype=torch.float32,
+                    device=self.actor_device,
+                )
+                strength_tensor = torch.tensor(
+                    [guidance_strength],
+                    dtype=torch.float32,
+                    device=self.actor_device,
+                )
+            stick_dist, button_dist, value, button_logits = self.actor.distributions(
+                obs,
+                guidance_stick=guidance_tensor,
+                guidance_strength=strength_tensor,
+            )
             if deterministic:
                 sampled01 = stick_dist.mean
                 buttons = (torch.sigmoid(button_logits) >= 0.5).to(
@@ -198,6 +249,12 @@ class OnlinePPO:
                 "buttons": [float(v) for v in buttons.squeeze(0).detach().cpu().tolist()],
                 "log_prob": float(log_prob.item()),
                 "value": float(value.item()),
+                "guidance_stick": (
+                    [float(v) for v in guidance_stick]
+                    if guidance_stick is not None
+                    else [0.0, 0.0]
+                ),
+                "guidance_strength": float(guidance_strength),
             }
 
     def actor_value(self, observation: list[float]) -> float:
@@ -267,6 +324,16 @@ class OnlinePPO:
         buttons = torch.tensor(
             [row["buttons"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
+        guidance_sticks = torch.tensor(
+            [row.get("guidance_stick", [0.0, 0.0]) for row in rollout],
+            dtype=torch.float32,
+            device=self.learner_device,
+        )
+        guidance_strengths = torch.tensor(
+            [row.get("guidance_strength", 0.0) for row in rollout],
+            dtype=torch.float32,
+            device=self.learner_device,
+        )
         old_log_probs = torch.tensor(
             [row["log_prob"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
@@ -305,7 +372,11 @@ class OnlinePPO:
             for start in range(0, count, self.minibatch_size):
                 batch = permutation[start:start + self.minibatch_size]
                 new_log_probs, entropy, values, button_logits = self.learner.evaluate(
-                    observations[batch], sticks[batch], buttons[batch]
+                    observations[batch],
+                    sticks[batch],
+                    buttons[batch],
+                    guidance_stick=guidance_sticks[batch],
+                    guidance_strength=guidance_strengths[batch],
                 )
                 ratio = torch.exp(new_log_probs - old_log_probs[batch])
                 unclipped = ratio * advantages[batch]
