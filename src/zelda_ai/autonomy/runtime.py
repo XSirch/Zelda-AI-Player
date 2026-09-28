@@ -231,6 +231,8 @@ class AutonomyRuntime:
         if not self.controller or not state.player:
             return
         intent = self.controller.intent
+        if intent.mode not in {"navigate", "explore", "observe"}:
+            return
         point = target_point(state, intent)
         if point is None:
             return
@@ -238,7 +240,6 @@ class AutonomyRuntime:
         threshold = 95.0 if (
             intent.target_actor_uid is not None
             or intent.target_actor_id is not None
-            or intent.mode == "interact"
         ) else 80.0
         if distance > threshold:
             return
