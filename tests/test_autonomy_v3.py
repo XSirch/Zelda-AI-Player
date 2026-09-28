@@ -23,6 +23,18 @@ def test_agent_intent_schema_is_strict_and_not_a_skill_contract():
     assert "prefixItems" not in target
 
 
+def test_uid_only_actor_target_stays_navigate():
+    intent = AgentIntent(
+        objective="Approach observed actor",
+        summary="Approach observed actor",
+        mode="navigate",
+        target_actor_uid="actor-123",
+        horizon_ms=10000,
+    )
+    assert intent.mode == "navigate"
+    assert intent.target_actor_uid == "actor-123"
+
+
 def test_structured_state_is_stacked_for_temporal_policy(state):
     intent = AgentIntent.bootstrap()
     frame = encode_state(state, intent)
