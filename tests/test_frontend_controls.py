@@ -142,3 +142,13 @@ def test_panel_exposes_champion_evaluation():
     assert "ChampionCatalog" in types
     assert "capture_pending" in types
     assert "training_enabled" in types
+
+
+def test_panel_shows_actionable_goal_guidance():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    assert "GUIDANCE DO OBJETIVO" in main
+    assert "thought?.guidance?.active" in main
+    assert "MotorGuidance" in types
+    assert "button_quiet" in types
+    assert "distance: number | null" in types
