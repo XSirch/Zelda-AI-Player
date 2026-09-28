@@ -136,6 +136,7 @@ export interface ChampionCatalog {
   count: number;
   latest: ChampionSummary | null;
   best_completion: ChampionSummary | null;
+  capture_pending: boolean;
   error?: string | null;
 }
 
