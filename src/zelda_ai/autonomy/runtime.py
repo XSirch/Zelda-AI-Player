@@ -1072,6 +1072,7 @@ class AutonomyRuntime:
         completion_run_id: str | None = None
         completion_elapsed_s = 0.0
         completion_config: RunConfig | None = None
+        cancelled_tasks: list[asyncio.Task] = []
         async with self.lock:
             if self.state not in {"running", "starting", "paused"} and state != "completed":
                 return
@@ -1105,6 +1106,7 @@ class AutonomyRuntime:
                     task.cancel()
                     self.retired_tasks.add(task)
                     task.add_done_callback(self.retired_tasks.discard)
+                    cancelled_tasks.append(task)
 
             if (
                 state == "completed"
@@ -1130,6 +1132,13 @@ class AutonomyRuntime:
             self.tasks.clear()
             self.log("run_" + state, {"reason": reason})
             self.publish(True)
+
+        if state in {"stopped", "completed"}:
+            if cancelled_tasks:
+                await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+            await self._drain_persistence()
+            if self.run_id:
+                await self._refresh_metrics(self.run_id)
 
         if (
             completion_controller is not None
