@@ -58,6 +58,7 @@ export interface ProviderQuota {
 export interface UsageSnapshot {
   provider: string | null;
   model: string | null;
+  calls: number;
   input_tokens: number;
   output_tokens: number;
   cached_input_tokens: number;
@@ -130,6 +131,7 @@ export interface Snapshot {
     thinking_ms: number;
     intent: AgentIntent | null;
     motor: string;
+    trigger: string | null;
   };
   input: InputState;
   learning: LearningSnapshot;

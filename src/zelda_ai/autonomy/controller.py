@@ -77,6 +77,7 @@ class ContinuousController:
         self.last_reward_breakdown: dict[str, float] = {}
         self.reward_window = deque(maxlen=200)
         self.useful_progress_window = deque(maxlen=200)
+        self.last_useful_progress_at = time.monotonic()
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
@@ -95,6 +96,7 @@ class ContinuousController:
         self.last_reward_breakdown = {}
         self.reward_window.clear()
         self.useful_progress_window.clear()
+        self.last_useful_progress_at = time.monotonic()
         self.achievements.clear()
 
     def set_intent(self, intent: AgentIntent):
@@ -167,6 +169,7 @@ class ContinuousController:
         self.last_reward_breakdown = reward.breakdown
         useful_keys = {
             "new_space",
+            "new_actor",
             "new_dialogue",
             "new_context",
             "new_world_transition",
@@ -178,6 +181,8 @@ class ContinuousController:
         useful = any(reward.breakdown.get(key, 0.0) > 0 for key in useful_keys)
         useful = useful or reward.breakdown.get("intent_progress", 0.0) > 0.01
         self.useful_progress_window.append(bool(useful))
+        if useful:
+            self.last_useful_progress_at = time.monotonic()
         for achievement in reward.achievements:
             row = {
                 **achievement,
@@ -358,6 +363,9 @@ class ContinuousController:
                     / len(self.useful_progress_window),
                     4,
                 ) if self.useful_progress_window else 0.0,
+                "seconds_since_useful_progress": round(
+                    time.monotonic() - self.last_useful_progress_at, 1
+                ),
                 "objective_score": self.reward_tracker.objective_score,
                 "achievements": list(self.achievements),
                 "exploration": {

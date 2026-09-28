@@ -78,6 +78,7 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
     <div className="thought-copy">
       <p>{thought?.summary ?? 'Aguardando início.'}</p>
       {intent?.objective && <div className="objective"><span>OBJETIVO ATUAL</span><strong>{intent.objective}</strong></div>}
+      {thought?.trigger && <div className="planner-line"><span>ÚLTIMA CHAMADA IA</span><strong>{thought.trigger}</strong></div>}
       {thought?.motor && <div className="motor-line"><span>MOTOR ML</span><strong>{thought.motor}</strong></div>}
     </div>
   </section>;
@@ -104,7 +105,7 @@ function UsageStrip({ snapshot }: { snapshot: Snapshot | null }) {
     <div className="usage-cell">
       <span>TOKENS RUN</span>
       <strong>{compact(usage?.total_tokens ?? 0)}</strong>
-      <small>{compact(usage?.input_tokens ?? 0)} in · {compact(usage?.output_tokens ?? 0)} out</small>
+      <small>{compact(usage?.calls ?? 0)} chamadas · {compact(usage?.input_tokens ?? 0)} in · {compact(usage?.output_tokens ?? 0)} out</small>
     </div>
     <div className="usage-cell">
       <span>CACHE / REASONING</span>

@@ -188,14 +188,17 @@ h1 {
 }
 
 .objective,
+.planner-line,
 .motor-line {
   margin-top: auto;
   padding-top: 28px;
   border-top: 1px solid var(--line);
 }
+.planner-line,
 .motor-line { margin-top: 22px; }
 
 .objective span,
+.planner-line span,
 .motor-line span {
   display: block;
   color: var(--muted);
@@ -204,6 +207,7 @@ h1 {
   margin-bottom: 8px;
 }
 .objective strong,
+.planner-line strong,
 .motor-line strong {
   display: block;
   font-size: 12px;

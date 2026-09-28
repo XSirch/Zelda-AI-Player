@@ -20,6 +20,10 @@ from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
 CONTRACT_VERSION = "autonomy-v3/raw-controller-v2/ppo-rnd-v2"
+COGNITION_EVENT_DEBOUNCE_S = 1.5
+COGNITION_MIN_INTERVAL_S = 8.0
+COGNITION_STUCK_AFTER_S = 90.0
+COGNITION_STUCK_COOLDOWN_S = 180.0
 
 
 class AutonomyRuntime:
@@ -67,6 +71,7 @@ class AutonomyRuntime:
         self.thought = "Ready to start autonomous play."
         self.thinking_since: float | None = None
         self.last_cognition_at = 0.0
+        self.last_cognition_reasons: list[str] = []
         self.pending_switch: tuple[RunConfig, ModelInfo] | None = None
         self.switch_request = 0
 
@@ -75,7 +80,9 @@ class AutonomyRuntime:
         self.seen_events: set[str] = set()
         self.seen_event_order: deque[str] = deque()
         self.cognition_trigger = asyncio.Event()
-        self.cognition_signature = None
+        self.cognition_reasons: set[str] = set()
+        self.cognition_seen_dialogue_triggers: set[tuple] = set()
+        self.last_stuck_replan_at = 0.0
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
         self.provider_usage: dict = {"available": False, "windows": []}
@@ -171,31 +178,56 @@ class AutonomyRuntime:
         self.publish(True)
 
     @staticmethod
-    def _signature(game):
-        target = game.target_actor.actor_uid if game.target_actor else None
-        return (
-            game.scene,
-            game.room,
-            game.scene_epoch,
-            game.dialogue.active,
-            game.dialogue.text_id,
-            game.dialogue.choice_index,
-            game.pause_menu.active,
-            game.game_over_state,
-            game.context_action.code,
-            target,
-            tuple(game.inventory),
-            tuple(game.progress.quest_items),
-            tuple(game.progress.owned_equipment),
-            game.progress.small_keys,
-        )
+    def _durable_progress_gained(old, new) -> bool:
+        old_items = {row.item_id for row in old.inventory_named}
+        new_items = {row.item_id for row in new.inventory_named}
+        if new_items - old_items:
+            return True
+        if set(new.progress.quest_items) - set(old.progress.quest_items):
+            return True
+        if set(new.progress.owned_equipment) - set(old.progress.owned_equipment):
+            return True
+        if set(new.progress.dungeon_items) - set(old.progress.dungeon_items):
+            return True
+        if new.progress.heart_pieces > old.progress.heart_pieces:
+            return True
+        if new.progress.skull_tokens > old.progress.skull_tokens:
+            return True
+        if new.progress.small_keys > old.progress.small_keys:
+            return True
+        if new.progress.magic_acquired and not old.progress.magic_acquired:
+            return True
+        if new.progress.double_magic and not old.progress.double_magic:
+            return True
+        if new.progress.double_defense and not old.progress.double_defense:
+            return True
+        for name, level in new.progress.upgrade_levels.items():
+            if level > old.progress.upgrade_levels.get(name, 0):
+                return True
+        for name, enabled in new.progress.story_flags.items():
+            if enabled and not old.progress.story_flags.get(name, False):
+                return True
+        return False
+
+    def _request_dialogue_cognition(self, reason: str, key: tuple):
+        if key in self.cognition_seen_dialogue_triggers:
+            return
+        self.cognition_seen_dialogue_triggers.add(key)
+        self._request_cognition(reason)
+
+    def _request_cognition(self, reason: str):
+        if self.state != "running":
+            return
+        self.cognition_reasons.add(reason)
+        self.cognition_trigger.set()
+
+    def _take_cognition_reasons(self) -> list[str]:
+        reasons = sorted(self.cognition_reasons)
+        self.cognition_reasons.clear()
+        self.cognition_trigger.clear()
+        return reasons
 
     def on_state(self, state, old):
-        signature = self._signature(state)
-        if signature != self.cognition_signature:
-            self.cognition_signature = signature
-            self.cognition_trigger.set()
-
         if not self.run_id or self.state != "running":
             self.publish()
             return
@@ -211,11 +243,9 @@ class AutonomyRuntime:
         if old and old.instance_id == state.instance_id and (
             old.scene,
             old.room,
-            old.scene_epoch,
         ) != (
             state.scene,
             state.room,
-            state.scene_epoch,
         ):
             if old.player and state.player:
                 self._persist(
@@ -244,6 +274,7 @@ class AutonomyRuntime:
                     "to_room": state.room,
                 },
             )
+            self._request_cognition("world_transition")
 
         if old:
             if not old.dialogue.active and state.dialogue.active:
@@ -270,6 +301,17 @@ class AutonomyRuntime:
                     f"{state.scene_name or state.scene}/room {state.room}: "
                     f"{dialogue_evidence}",
                 )
+                if state.dialogue.choice_count > 0:
+                    self._request_dialogue_cognition(
+                        "dialogue_choice",
+                        (
+                            state.scene,
+                            state.room,
+                            state.dialogue.text_id,
+                            tuple(state.dialogue.choices),
+                            "choice",
+                        ),
+                    )
             elif state.dialogue.active and (
                 old.dialogue.text_id != state.dialogue.text_id
                 or old.dialogue.text != state.dialogue.text
@@ -282,6 +324,44 @@ class AutonomyRuntime:
                 if not self.dialogue_transcript or self.dialogue_transcript[-1] != entry:
                     self.dialogue_transcript.append(entry)
                 self.log("dialogue_changed", entry)
+                if state.dialogue.choice_count > 0:
+                    self._request_dialogue_cognition(
+                        "dialogue_choice",
+                        (
+                            state.scene,
+                            state.room,
+                            state.dialogue.text_id,
+                            tuple(state.dialogue.choices),
+                            "choice",
+                        ),
+                    )
+
+            if old.dialogue.active and not state.dialogue.active:
+                # Linear text/signposts normally do not need LLM calls. If the
+                # current intent explicitly waited on that text, one resolution
+                # trigger prevents the planner from remaining stuck on "observe".
+                waiting_on_dialogue = bool(
+                    self.controller
+                    and self.controller.intent.mode in {"dialogue", "observe"}
+                )
+                if (
+                    old.dialogue.speaker is not None
+                    or old.dialogue.choice_count > 0
+                    or waiting_on_dialogue
+                ):
+                    self._request_dialogue_cognition(
+                        "dialogue_resolved",
+                        (
+                            state.scene,
+                            state.room,
+                            old.dialogue.text_id,
+                            "resolved",
+                        ),
+                    )
+
+            if self._durable_progress_gained(old, state):
+                self._request_cognition("durable_progress")
+
             old_items = {row.item_id: row.name for row in old.inventory_named}
             new_items = {row.item_id: row.name for row in state.inventory_named}
             acquired_items = [
@@ -309,12 +389,16 @@ class AutonomyRuntime:
 
             if old.player and state.player and old.player.health > 0 and state.player.health == 0:
                 self.log("player_died", {"scene": state.scene, "room": state.room})
+                self._request_cognition("player_died")
                 self._persist(
                     self.store.remember,
                     self.namespace,
                     state.scene,
                     f"Death observed in {state.scene_name or state.scene}/room {state.room}.",
                 )
+
+            if old.game_over_state == 0 and state.game_over_state != 0:
+                self._request_cognition("game_over")
 
         for event in state.events:
             key = f"{state.instance_id}:{event.id}"
@@ -325,6 +409,8 @@ class AutonomyRuntime:
             while len(self.seen_event_order) > 4096:
                 self.seen_events.discard(self.seen_event_order.popleft())
             self.log(event.kind, {"detail": event.detail, "scene": state.scene, "room": state.room})
+            if event.kind == "boss_defeated":
+                self._request_cognition("boss_defeated")
             if event.kind == "game_completed" and self.state == "running":
                 asyncio.create_task(self.halt("completed", "game_completed"))
 
@@ -403,12 +489,15 @@ class AutonomyRuntime:
             self.thought = "Starting ML actor immediately; cognition is connecting in parallel."
             self.thinking_since = None
             self.last_cognition_at = 0.0
+            self.last_cognition_reasons = []
+            self.last_stuck_replan_at = 0.0
             self.recent.clear()
             self.dialogue_transcript.clear()
             self.seen_events = {f"{game.instance_id}:{event.id}" for event in game.events}
             self.seen_event_order = deque(self.seen_events)
-            self.cognition_signature = self._signature(game)
-            self.cognition_trigger.clear()
+            self.cognition_reasons = {"run_started"}
+            self.cognition_seen_dialogue_triggers.clear()
+            self.cognition_trigger.set()
 
             fingerprint = hashlib.sha256(
                 json.dumps(
@@ -515,6 +604,43 @@ class AutonomyRuntime:
                 return
             await asyncio.sleep(0.25)
 
+    async def _wait_for_cognition_need(self, generation: int) -> bool:
+        """Wait for a strategic event or sustained motor stagnation.
+
+        There is deliberately no periodic LLM refresh. A valid high-level intent
+        remains active until game evidence says it should change.
+        """
+        while generation == self.lifecycle and self.state == "running":
+            if self.cognition_trigger.is_set():
+                since_last = time.monotonic() - self.last_cognition_at
+                delay = max(
+                    COGNITION_EVENT_DEBOUNCE_S,
+                    COGNITION_MIN_INTERVAL_S - since_last,
+                )
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                return generation == self.lifecycle and self.state == "running"
+
+            try:
+                await asyncio.wait_for(self.cognition_trigger.wait(), timeout=5.0)
+                continue
+            except asyncio.TimeoutError:
+                pass
+
+            if not self.controller:
+                continue
+            learning = self.controller.telemetry().get("learning", {})
+            stalled_s = float(learning.get("seconds_since_useful_progress") or 0.0)
+            now = time.monotonic()
+            if (
+                stalled_s >= COGNITION_STUCK_AFTER_S
+                and now - self.last_stuck_replan_at >= COGNITION_STUCK_COOLDOWN_S
+                and now - self.last_cognition_at >= COGNITION_STUCK_AFTER_S
+            ):
+                self.last_stuck_replan_at = now
+                self._request_cognition("motor_stuck")
+        return False
+
     async def _cognition_loop(self, generation: int):
         while generation == self.lifecycle and self.state == "running":
             assert self.config and self.run_id and self.segment_id and self.controller
@@ -547,33 +673,32 @@ class AutonomyRuntime:
                     await asyncio.sleep(3.0)
                     continue
 
-            # High-level cognition is event-driven but rate-limited. The ML actor
-            # continues controlling Link during this debounce.
-            since_last = time.monotonic() - self.last_cognition_at
-            if since_last < 3.0:
-                await asyncio.sleep(3.0 - since_last)
-                if generation != self.lifecycle or self.state != "running":
+            if self.last_cognition_at > 0:
+                if not await self._wait_for_cognition_need(generation):
                     return
+
+            trigger_reasons = self._take_cognition_reasons()
+            if not trigger_reasons:
+                trigger_reasons = ["run_started"] if self.last_cognition_at == 0 else ["strategic_event"]
+            self.last_cognition_reasons = trigger_reasons
 
             telemetry = self.controller.telemetry()
             learning = telemetry.get("learning", {})
             compact_learning = {
-                key: learning.get(key)
-                for key in (
-                    "updates",
-                    "samples_trained",
-                    "last_reward",
-                    "total_reward",
-                    "reward_breakdown",
-                    "objective_score",
-                    "achievements",
-                )
-                if key in learning
+                "run_updates": learning.get("run_updates", 0),
+                "run_samples_trained": learning.get("run_samples_trained", 0),
+                "objective_score": learning.get("objective_score", 0),
+                "useful_progress_rate": learning.get("useful_progress_rate", 0.0),
+                "seconds_since_useful_progress": learning.get(
+                    "seconds_since_useful_progress", 0.0
+                ),
+                "reward_breakdown": learning.get("reward_breakdown", {}),
+                "recent_achievements": (learning.get("achievements") or [])[-4:],
             }
             recent_for_model = [
                 row for row in self.recent
                 if row.get("kind") not in {"intent_updated", "provider_rerouted"}
-            ][-8:]
+            ][-5:]
             world_edges, memory_rows = await asyncio.gather(
                 asyncio.to_thread(
                     self.store.world_neighbors,
@@ -591,14 +716,16 @@ class AutonomyRuntime:
                 current_intent=self.controller.intent,
                 motor={
                     "summary": telemetry.get("motor"),
-                    "setpoint": telemetry.get("setpoint"),
-                    "actions_sampled": telemetry.get("actions_sampled"),
+                    "seconds_since_useful_progress": learning.get(
+                        "seconds_since_useful_progress", 0.0
+                    ),
                 },
                 ml_learning=compact_learning,
                 world_edges=world_edges,
                 memory=[row["note"] for row in memory_rows],
                 recent_events=recent_for_model,
                 dialogue_transcript=list(self.dialogue_transcript),
+                trigger_reasons=trigger_reasons,
             )
             prompt = json.dumps(observation, ensure_ascii=False, separators=(",", ":"))
             reason = self._budget_reason(prompt)
@@ -730,12 +857,8 @@ class AutonomyRuntime:
                 },
             )
 
-            timeout = max(5.0, min(30.0, intent.horizon_ms / 1000.0))
-            self.cognition_trigger.clear()
-            try:
-                await asyncio.wait_for(self.cognition_trigger.wait(), timeout=timeout)
-            except asyncio.TimeoutError:
-                pass
+            # No horizon-based refresh here. The next iteration blocks until a
+            # strategic trigger or sustained stuck condition requests replanning.
 
     async def halt(self, state: str, reason: str):
         async with self.lock:
@@ -892,6 +1015,7 @@ class AutonomyRuntime:
                     if self.thinking_since else 0,
                 "intent": controller.get("intent"),
                 "motor": controller.get("motor"),
+                "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
             },
             "input": controller.get("setpoint"),
             "learning": controller.get("learning"),
@@ -899,6 +1023,7 @@ class AutonomyRuntime:
             "usage": {
                 "provider": self.config.provider if self.config else None,
                 "model": self.config.model if self.config else None,
+                "calls": (self.metrics_cache or {}).get("calls", 0),
                 "input_tokens": (self.metrics_cache or {}).get("input_tokens", 0),
                 "output_tokens": (self.metrics_cache or {}).get("output_tokens", 0),
                 "cached_input_tokens": (self.metrics_cache or {}).get("cached_input_tokens", 0),
