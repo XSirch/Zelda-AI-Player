@@ -53,6 +53,10 @@ class LoginInput(BaseModel):
     device: bool = False
 
 
+class EvaluateInput(BaseModel):
+    champion_id: str | None = Field(default=None, max_length=80)
+
+
 def default_run_config(settings: Settings) -> RunConfig:
     return RunConfig(
         provider=settings.agent_provider,
@@ -183,6 +187,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def start():
         await app.state.runtime.start(default_run_config(app.state.settings))
         return app.state.runtime.snapshot()
+
+    @app.post("/api/evaluate")
+    async def evaluate(body: EvaluateInput):
+        config = default_run_config(app.state.settings).model_copy(
+            update={
+                "run_mode": "evaluation",
+                "champion_id": body.champion_id,
+            }
+        )
+        await app.state.runtime.start(config)
+        return app.state.runtime.snapshot()
+
+    @app.get("/api/champions")
+    async def champions():
+        return await asyncio.to_thread(app.state.runtime.refresh_champions)
 
     @app.post("/api/stop")
     async def stop():
