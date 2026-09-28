@@ -127,10 +127,12 @@ def test_panel_exposes_champion_evaluation():
         "CHAMPIONS",
         "LATEST",
         "BEST TIME",
+        "SALVANDO CHAMPION",
     ]:
         assert label in main
     assert "'/evaluate'" in main
     assert "run_mode" in types
     assert "ChampionSummary" in types
     assert "ChampionCatalog" in types
+    assert "capture_pending" in types
     assert "training_enabled" in types
