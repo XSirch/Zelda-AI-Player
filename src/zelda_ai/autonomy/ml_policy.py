@@ -51,6 +51,7 @@ class HybridActorCritic(nn.Module if nn is not None else object):
         observations,
         guidance_stick=None,
         guidance_strength=None,
+        button_quiet_strength=None,
     ):
         latent = self.trunk(observations)
         alpha = torch.nn.functional.softplus(self.stick_alpha(latent)) + 1.05
@@ -68,6 +69,9 @@ class HybridActorCritic(nn.Module if nn is not None else object):
 
         stick_dist = Beta(alpha, beta)
         button_logits = self.button_logits(latent)
+        if button_quiet_strength is not None:
+            quiet = button_quiet_strength.reshape(-1, 1).clamp(0.0, 1.0)
+            button_logits = button_logits - quiet * 0.9
         button_dist = Bernoulli(logits=button_logits)
         value = self.value_head(latent).squeeze(-1)
         return stick_dist, button_dist, value, button_logits
@@ -79,11 +83,13 @@ class HybridActorCritic(nn.Module if nn is not None else object):
         buttons,
         guidance_stick=None,
         guidance_strength=None,
+        button_quiet_strength=None,
     ):
         stick_dist, button_dist, value, button_logits = self.distributions(
             observations,
             guidance_stick=guidance_stick,
             guidance_strength=guidance_strength,
+            button_quiet_strength=button_quiet_strength,
         )
         stick01 = ((stick_unit + 1.0) * 0.5).clamp(1e-5, 1.0 - 1e-5)
         log_prob = stick_dist.log_prob(stick01).sum(-1) + button_dist.log_prob(buttons).sum(-1)
@@ -206,11 +212,13 @@ class OnlinePPO:
         deterministic: bool = False,
         guidance_stick: tuple[float, float] | list[float] | None = None,
         guidance_strength: float = 0.0,
+        button_quiet_strength: float = 0.0,
     ) -> dict:
         with self.actor_lock, torch.inference_mode():
             obs = self._actor_tensor(observation).unsqueeze(0)
             guidance_tensor = None
             strength_tensor = None
+            quiet_tensor = None
             if guidance_stick is not None and guidance_strength > 0.0:
                 guidance_tensor = torch.tensor(
                     [guidance_stick],
@@ -222,10 +230,17 @@ class OnlinePPO:
                     dtype=torch.float32,
                     device=self.actor_device,
                 )
+            if button_quiet_strength > 0.0:
+                quiet_tensor = torch.tensor(
+                    [button_quiet_strength],
+                    dtype=torch.float32,
+                    device=self.actor_device,
+                )
             stick_dist, button_dist, value, button_logits = self.actor.distributions(
                 obs,
                 guidance_stick=guidance_tensor,
                 guidance_strength=strength_tensor,
+                button_quiet_strength=quiet_tensor,
             )
             if deterministic:
                 sampled01 = stick_dist.mean
@@ -255,6 +270,7 @@ class OnlinePPO:
                     else [0.0, 0.0]
                 ),
                 "guidance_strength": float(guidance_strength),
+                "button_quiet_strength": float(button_quiet_strength),
             }
 
     def actor_value(self, observation: list[float]) -> float:
@@ -334,6 +350,11 @@ class OnlinePPO:
             dtype=torch.float32,
             device=self.learner_device,
         )
+        button_quiet_strengths = torch.tensor(
+            [row.get("button_quiet_strength", 0.0) for row in rollout],
+            dtype=torch.float32,
+            device=self.learner_device,
+        )
         old_log_probs = torch.tensor(
             [row["log_prob"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
@@ -377,6 +398,7 @@ class OnlinePPO:
                     buttons[batch],
                     guidance_stick=guidance_sticks[batch],
                     guidance_strength=guidance_strengths[batch],
+                    button_quiet_strength=button_quiet_strengths[batch],
                 )
                 ratio = torch.exp(new_log_probs - old_log_probs[batch])
                 unclipped = ratio * advantages[batch]
