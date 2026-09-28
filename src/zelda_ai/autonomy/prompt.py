@@ -19,7 +19,11 @@ IMPORTANT ARCHITECTURE:
   recent outcomes.
 - Prefer stable strategic objectives that can remain valid for minutes. You are
   invoked only when a meaningful event or sustained stuck condition warrants
-  replanning; do not ask for periodic refreshes or micromanage transient state.
+  reconsideration; do not ask for periodic refreshes or micromanage transient state.
+- trigger_reasons tells you why this call happened. If that evidence does not
+  invalidate the current intent, preserve the current objective instead of
+  inventing a new plan. For motor_stuck, change strategy only when the evidence
+  suggests the current target/intent is not producing useful progress.
 - target_position must come from an actually observed coordinate in the supplied
   state/world memory. Never invent coordinates.
 - target_actor_id/params/uid must identify an actually observed actor.
