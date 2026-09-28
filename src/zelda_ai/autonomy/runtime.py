@@ -22,7 +22,7 @@ from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/raw-controller-v2/ppo-rnd-v2/reward-v5"
+CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v3/ppo-rnd-v2/reward-v5"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -521,6 +521,10 @@ class AutonomyRuntime:
         self.active_champion = None
         if config.run_mode == "evaluation":
             champion, checkpoint = self.champions.resolve(config.champion_id)
+            if champion.get("contract") != CONTRACT_VERSION:
+                raise ValueError(
+                    "Champion contract is incompatible with the current motor architecture"
+                )
             self.active_champion = champion
             training_enabled = False
 
