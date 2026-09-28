@@ -351,8 +351,8 @@ class RewardTracker:
             # later reacquisition cannot farm the same objective.
             self.seen_inventory_items.update(current["inventory_items"])
         if previous and previous["instance"] == current["instance"]:
-            if (previous["scene"], previous["room"], previous["scene_epoch"]) != (
-                current["scene"], current["room"], current["scene_epoch"]
+            if (previous["scene"], previous["room"]) != (
+                current["scene"], current["room"]
             ):
                 edge = (
                     previous["scene"],
