@@ -48,6 +48,28 @@ class SlowCognition:
         )
 
 
+class CountingCognition:
+    def __init__(self):
+        self.calls = 0
+        self.prompts = []
+        self.called = asyncio.Event()
+
+    async def status(self):
+        return {"connected": True}
+
+    async def models(self):
+        return [ModelInfo(id="test", name="test")]
+
+    async def think(self, config, prompt):
+        self.calls += 1
+        self.prompts.append(json.loads(prompt))
+        self.called.set()
+        return InferenceResult(
+            AgentIntent.bootstrap().model_dump_json(),
+            Usage(input_tokens=3, output_tokens=4, actual_model="test"),
+        )
+
+
 def unlimited():
     return RunConfig(
         provider="codex",
@@ -146,3 +168,109 @@ def test_paused_observations_are_not_promoted_to_memory(tmp_path, store, state):
 
     runtime.on_state(changed, state)
     assert store.recall(runtime.namespace) == []
+
+
+@pytest.mark.asyncio
+async def test_cognition_is_sparse_and_ignores_context_noise(tmp_path, store, state, monkeypatch):
+    import zelda_ai.autonomy.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "COGNITION_EVENT_DEBOUNCE_S", 0.01)
+    monkeypatch.setattr(runtime_module, "COGNITION_MIN_INTERVAL_S", 0.0)
+
+    bridge = connected(state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(bridge, store, {"codex": provider}, tmp_path / "ml")
+    await runtime.start(unlimited())
+
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 1
+    assert provider.prompts[0]["trigger_reasons"] == ["run_started"]
+
+    # Transient contextual affordance changes used to trigger expensive replans.
+    old = bridge.state
+    noisy = old.model_copy(deep=True)
+    noisy.seq += 1
+    noisy.context_action.code = min(255, old.context_action.code + 1)
+    noisy.context_action.label = "open"
+    bridge.state = noisy
+    runtime.on_state(noisy, old)
+    await asyncio.sleep(0.08)
+    assert provider.calls == 1
+    assert not runtime.cognition_trigger.is_set()
+
+    # There is no horizon/periodic refresh anymore.
+    await asyncio.sleep(0.12)
+    assert provider.calls == 1
+
+    # A real world transition is strategic and causes exactly one replan.
+    provider.called.clear()
+    transitioned = noisy.model_copy(deep=True)
+    transitioned.seq += 1
+    transitioned.room += 1
+    transitioned.scene_epoch += 1
+    bridge.state = transitioned
+    runtime.on_state(transitioned, noisy)
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 2
+    assert "world_transition" in provider.prompts[-1]["trigger_reasons"]
+
+    await runtime.control("stop")
+
+
+@pytest.mark.asyncio
+async def test_linear_signpost_does_not_replan_unless_intent_waited_for_it(tmp_path, store, state, monkeypatch):
+    import zelda_ai.autonomy.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "COGNITION_EVENT_DEBOUNCE_S", 0.01)
+    monkeypatch.setattr(runtime_module, "COGNITION_MIN_INTERVAL_S", 0.0)
+
+    bridge = connected(state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(bridge, store, {"codex": provider}, tmp_path / "ml")
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 1
+
+    signpost = state.model_copy(deep=True)
+    signpost.seq += 1
+    signpost.dialogue.active = True
+    signpost.dialogue.text_id = 123
+    signpost.dialogue.text = "A signpost"
+    signpost.dialogue.choice_count = 0
+    signpost.dialogue.speaker = None
+    bridge.state = signpost
+    runtime.on_state(signpost, state)
+    await asyncio.sleep(0.05)
+    assert provider.calls == 1
+
+    closed = signpost.model_copy(deep=True)
+    closed.seq += 1
+    closed.dialogue.active = False
+    bridge.state = closed
+    runtime.on_state(closed, signpost)
+    await asyncio.sleep(0.05)
+    assert provider.calls == 1
+
+    # If cognition explicitly chose observe/dialogue while text was active,
+    # resolving it gets one call so that "wait" cannot become permanent.
+    runtime.controller.set_intent(
+        AgentIntent.bootstrap().model_copy(update={"mode": "observe"})
+    )
+    reopened = closed.model_copy(deep=True)
+    reopened.seq += 1
+    reopened.dialogue.active = True
+    reopened.dialogue.text_id = 124
+    reopened.dialogue.text = "Another signpost"
+    bridge.state = reopened
+    runtime.on_state(reopened, closed)
+    resolved = reopened.model_copy(deep=True)
+    resolved.seq += 1
+    resolved.dialogue.active = False
+    bridge.state = resolved
+    provider.called.clear()
+    runtime.on_state(resolved, reopened)
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 2
+    assert "dialogue_resolved" in provider.prompts[-1]["trigger_reasons"]
+
+    await runtime.control("stop")
