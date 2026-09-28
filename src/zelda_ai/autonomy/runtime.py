@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import math
 import time
 from collections import deque
 from pathlib import Path
@@ -16,6 +17,7 @@ from ..providers.base import ProviderFailure
 from ..providers.openrouter import reserve_cost
 from .champions import ChampionStore
 from .controller import ContinuousController
+from .features import target_point
 from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
@@ -91,6 +93,7 @@ class AutonomyRuntime:
         self.cognition_trigger = asyncio.Event()
         self.cognition_reasons: set[str] = set()
         self.cognition_seen_dialogue_triggers: set[tuple] = set()
+        self.cognition_seen_target_reached: set[tuple] = set()
         self.last_stuck_replan_at = 0.0
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
