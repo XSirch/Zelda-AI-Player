@@ -102,6 +102,9 @@ export interface LearningSnapshot {
     unique_spaces: number;
     unique_actors: number;
     unique_transitions: number;
+    local_dwell_seconds?: number;
+    local_anchor_distance?: number;
+    local_dwell_penalty?: number;
   };
   reward_breakdown?: Record<string, number>;
   last_update?: Record<string, unknown>;
