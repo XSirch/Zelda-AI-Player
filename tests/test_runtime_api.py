@@ -46,6 +46,43 @@ def test_metrics_and_memory_isolation(store):
     assert store.recall("n2", 85) == []
 
 
+def test_mixed_run_benchmark_keeps_known_cost_without_inventing_total(store):
+    codex = RunConfig(provider="codex", model="gpt-test").model_dump()
+    run = store.new_run(codex, "soh", "fingerprint")
+    codex_segment = store.segment(run, codex, "n1")
+    codex_call = store.begin_call(run, codex_segment, {})
+    store.finish_call(codex_call, status="completed", usage={
+        "input_tokens": 80,
+        "output_tokens": 20,
+        "cost_usd": None,
+        "actual_model": "gpt-test",
+    }, latency_ms=25)
+
+    openrouter = RunConfig(provider="openrouter", model="vendor/model").model_dump()
+    openrouter_segment = store.segment(run, openrouter, "n1")
+    openrouter_call = store.begin_call(run, openrouter_segment, {})
+    store.finish_call(openrouter_call, status="completed", usage={
+        "input_tokens": 120,
+        "output_tokens": 30,
+        "cost_usd": 0.05,
+        "actual_model": "vendor/model",
+    }, latency_ms=30)
+
+    store.update_run(run, status="completed", mixed=True, reason="game_completed")
+    store.end_segments(run)
+    metrics = store.metrics(run)
+
+    assert metrics["input_tokens"] == 200
+    assert metrics["output_tokens"] == 50
+    assert metrics["total_tokens"] == 250
+    assert metrics["known_cost_usd"] == 0.05
+    assert metrics["cost_usd"] is None
+    assert len(metrics["usage_by_model"]) == 2
+    by_provider = {row["provider"]: row for row in metrics["usage_by_model"]}
+    assert by_provider["codex"]["cost_usd"] is None
+    assert by_provider["openrouter"]["cost_usd"] == 0.05
+
+
 def test_restart_does_not_resume_run(tmp_path):
     url = f"sqlite:///{tmp_path}/restart.sqlite3"
     first = Store(url)
