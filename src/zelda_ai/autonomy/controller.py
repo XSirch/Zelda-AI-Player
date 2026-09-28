@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..bridge import Bridge
-from .features import BUTTON_NAMES, encode_novelty_state, encode_state, stack_frames
+from .features import (
+    BUTTON_NAMES,
+    encode_novelty_state,
+    encode_state,
+    goal_guidance,
+    stack_frames,
+)
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .reward import RewardTracker
@@ -85,6 +91,14 @@ class ContinuousController:
         self.last_useful_progress_at = time.monotonic()
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
+        self.last_guidance = {
+            "active": False,
+            "stick": (0.0, 0.0),
+            "strength": 0.0,
+            "distance": None,
+            "source": "none",
+            "target": None,
+        }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
     def reset_episode_state(self):
@@ -97,6 +111,14 @@ class ContinuousController:
         self.last_setpoint = Setpoint()
         self.last_stick = (0.0, 0.0)
         self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+        self.last_guidance = {
+            "active": False,
+            "stick": (0.0, 0.0),
+            "strength": 0.0,
+            "distance": None,
+            "source": "none",
+            "target": None,
+        }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
         self.reward_window.clear()
@@ -122,10 +144,16 @@ class ContinuousController:
                 mask |= BUTTON_MASKS[name]
         return mask
 
-    def _sample_setpoint(self, observation: list[float]) -> tuple[Setpoint, dict]:
+    def _sample_setpoint(
+        self,
+        observation: list[float],
+        guidance: dict,
+    ) -> tuple[Setpoint, dict]:
         sample = self.policy.sample(
             observation,
             deterministic=not self.training_enabled,
+            guidance_stick=guidance["stick"] if guidance.get("active") else None,
+            guidance_strength=float(guidance.get("strength") or 0.0),
         )
         stick = sample["stick"]
         buttons = sample["buttons"]
@@ -220,7 +248,9 @@ class ContinuousController:
         ):
             self._enqueue_rollout(observation, done=reward.done)
 
-        setpoint, sample = self._sample_setpoint(observation)
+        guidance = goal_guidance(game, self.intent)
+        setpoint, sample = self._sample_setpoint(observation, guidance)
+        self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
         self.last_buttons = tuple(sample["buttons"])
@@ -231,6 +261,8 @@ class ContinuousController:
             "buttons": list(sample["buttons"]),
             "log_prob": sample["log_prob"],
             "value": sample["value"],
+            "guidance_stick": sample.get("guidance_stick", [0.0, 0.0]),
+            "guidance_strength": sample.get("guidance_strength", 0.0),
         }
         self.actions_sampled += 1
 
@@ -239,9 +271,23 @@ class ContinuousController:
             if value > 0.5
         ]
         buttons_text = "+".join(active_names) if active_names else "none"
+        guidance_text = ""
+        if guidance.get("active"):
+            distance = guidance.get("distance")
+            distance_text = (
+                f", distance {distance:.0f}u"
+                if isinstance(distance, (int, float))
+                else ""
+            )
+            guidance_text = (
+                f" Goal guidance {guidance.get('source')}: "
+                f"({guidance['stick'][0]:+.2f}, {guidance['stick'][1]:+.2f}) "
+                f"strength {guidance['strength']:.2f}{distance_text}."
+            )
         self.last_motor_summary = (
             f"ML policy sampled raw controller: stick "
             f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), buttons {buttons_text}."
+            + guidance_text
         )
         return setpoint
 
@@ -350,6 +396,15 @@ class ContinuousController:
             "intent": self.intent.model_dump(),
             "intent_age_ms": round((time.monotonic() - self.intent_updated_at) * 1000),
             "motor": self.last_motor_summary,
+            "guidance": {
+                **self.last_guidance,
+                "stick": list(self.last_guidance.get("stick") or (0.0, 0.0)),
+                "target": (
+                    list(self.last_guidance["target"])
+                    if self.last_guidance.get("target") is not None
+                    else None
+                ),
+            },
             "motor_ticks": self.motor_ticks,
             "actions_sampled": self.actions_sampled,
             "setpoint": {
