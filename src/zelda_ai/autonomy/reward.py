@@ -76,6 +76,11 @@ class RewardTracker:
         self.local_anchor_distance = 0.0
         self.local_frontier_radius = 0.0
         self.local_dwell_penalty = 0.0
+        self.rupees_collected = 0
+        self.ammo_collected = 0
+        self.health_recovered = 0
+        self.magic_recovered = 0
+        self.chests_opened = 0
         self.previous: dict | None = None
 
     def break_causal_chain(self):
@@ -179,12 +184,20 @@ class RewardTracker:
             "scene_epoch": game.scene_epoch,
             "position": tuple(player.position) if player else None,
             "health": player.health if player else 0,
+            "max_health": player.max_health if player else 0,
+            "rupees": player.rupees if player else 0,
+            "magic": player.magic if player else 0,
             "dialogue": (game.dialogue.active, game.dialogue.text_id, game.dialogue.state_code),
             "context": (game.context_action.code, game.context_action.label),
             "intent_key": self._intent_key(intent),
             "target_distance": self._target_distance(game, intent),
             "enemy_health": self._enemy_health(game),
             "inventory_items": {row.item_id: row.name for row in game.inventory_named},
+            "inventory_ammo": {
+                row.item_id: (row.name, row.ammo)
+                for row in game.inventory_named
+                if row.ammo is not None
+            },
             "equipment": {
                 row.item_id: (row.name, row.equipment_type, row.value)
                 for row in game.progress.equipment
@@ -319,6 +332,7 @@ class RewardTracker:
                 "enemy_defeated": 1.0,
                 "boss_defeated": 2.5,
                 "game_completed": 5.0,
+                "chest_opened": 0.6,
             }.get(event.kind, 0.0)
             if event_reward > 0:
                 b["native_event"] = b.get("native_event", 0.0) + event_reward
@@ -350,6 +364,16 @@ class RewardTracker:
                     training_reward=event_reward,
                 ))
                 done = True
+            elif event.kind == "chest_opened":
+                self.chests_opened += 1
+                achievements.append(self._achievement(
+                    key=f"chest:{event.id}",
+                    kind="exploration",
+                    title="Baú aberto",
+                    detail=event.detail or "Treasure flag observado pela bridge.",
+                    points=10,
+                    training_reward=event_reward,
+                ))
 
         previous = self.previous
         if previous is None:
@@ -511,6 +535,48 @@ class RewardTracker:
                         points=points,
                         training_reward=training_reward,
                     ))
+
+            rupee_gain = current["rupees"] - previous["rupees"]
+            if rupee_gain > 0:
+                self.rupees_collected += rupee_gain
+                b["resource_rupees"] = min(
+                    0.30,
+                    0.03 + 0.01 * rupee_gain,
+                )
+
+            ammo_reward = 0.0
+            for item_id, (name, ammo) in current["inventory_ammo"].items():
+                previous_row = previous["inventory_ammo"].get(item_id)
+                if previous_row is None:
+                    # First acquisition is already handled by the stronger
+                    # persistent-item milestone; do not double-count its ammo.
+                    continue
+                old_ammo = previous_row[1]
+                if ammo is None or old_ammo is None:
+                    continue
+                gained = ammo - old_ammo
+                if gained <= 0:
+                    continue
+                self.ammo_collected += gained
+                ammo_reward += min(0.18, 0.025 + 0.0125 * gained)
+            if ammo_reward > 0:
+                b["resource_ammo"] = min(0.35, ammo_reward)
+
+            health_gain = current["health"] - previous["health"]
+            if health_gain > 0:
+                self.health_recovered += health_gain
+                b["resource_health"] = min(
+                    0.24,
+                    (health_gain / 16.0) * 0.08,
+                )
+
+            magic_gain = current["magic"] - previous["magic"]
+            if magic_gain > 0:
+                self.magic_recovered += magic_gain
+                b["resource_magic"] = min(
+                    0.18,
+                    magic_gain * 0.004,
+                )
 
             if current["health"] < previous["health"]:
                 b["damage_taken"] = -min(
