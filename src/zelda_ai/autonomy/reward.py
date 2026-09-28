@@ -27,6 +27,10 @@ LOCAL_REGION_Y = 160.0
 LOCAL_DWELL_GRACE_S = 60.0
 LOCAL_DWELL_RAMP_S = 180.0
 LOCAL_DWELL_MAX_PENALTY = 0.35
+NEW_MACRO_REGION_REWARD = 0.8
+FRONTIER_PROGRESS_MIN_DELTA = 6.0
+FRONTIER_PROGRESS_SCALE = 160.0
+FRONTIER_PROGRESS_MAX_REWARD = 0.18
 
 STORY_OBJECTIVES: dict[str, tuple[str, int, float]] = {
     "greeted_by_saria": ("Falou com Saria", 20, 0.4),
@@ -70,6 +74,7 @@ class RewardTracker:
         self.local_progress_at: float | None = None
         self.local_dwell_seconds = 0.0
         self.local_anchor_distance = 0.0
+        self.local_frontier_radius = 0.0
         self.local_dwell_penalty = 0.0
         self.previous: dict | None = None
 
@@ -80,6 +85,7 @@ class RewardTracker:
         self.local_progress_at = None
         self.local_dwell_seconds = 0.0
         self.local_anchor_distance = 0.0
+        self.local_frontier_radius = 0.0
         self.local_dwell_penalty = 0.0
 
     @staticmethod
@@ -90,9 +96,9 @@ class RewardTracker:
         return (
             current["scene"],
             current["room"],
-            math.floor(position[0] / LOCAL_REGION_XZ),
-            math.floor(position[1] / LOCAL_REGION_Y),
-            math.floor(position[2] / LOCAL_REGION_XZ),
+            math.floor((position[0] + LOCAL_REGION_XZ / 2.0) / LOCAL_REGION_XZ),
+            math.floor((position[1] + LOCAL_REGION_Y / 2.0) / LOCAL_REGION_Y),
+            math.floor((position[2] + LOCAL_REGION_XZ / 2.0) / LOCAL_REGION_XZ),
         )
 
     def _reset_local_pressure(self, current: dict, now_s: float):
@@ -103,6 +109,7 @@ class RewardTracker:
         self.local_progress_at = now_s if position is not None else None
         self.local_dwell_seconds = 0.0
         self.local_anchor_distance = 0.0
+        self.local_frontier_radius = 0.0
         self.local_dwell_penalty = 0.0
 
     @staticmethod
@@ -536,15 +543,16 @@ class RewardTracker:
                 and old_dist is not None
                 and new_dist is not None
             ):
-                improvement = max(-100.0, min(100.0, old_dist - new_dist))
-                b["intent_progress"] = improvement / 500.0
+                improvement = max(-60.0, min(60.0, old_dist - new_dist))
+                b["intent_progress"] = max(
+                    -0.4,
+                    min(0.4, improvement / 150.0),
+                )
 
         major_progress_keys = {
-            "new_dialogue",
             "new_world_transition",
             "durable_progress",
             "objective_milestone",
-            "enemy_damage",
             "native_event",
         }
         major_progress = any(
@@ -558,6 +566,32 @@ class RewardTracker:
         )
         if macro_expansion:
             self.seen_macro_regions.add(macro_region)
+            if previous is not None:
+                b["new_macro_region"] = NEW_MACRO_REGION_REWARD
+
+        frontier_mode = intent.mode in {
+            "explore",
+            "navigate",
+            "interact",
+            "observe",
+        }
+        if (
+            current_position is not None
+            and self.local_anchor_position is not None
+            and not macro_expansion
+            and frontier_mode
+            and not game.dialogue.active
+            and not game.pause_menu.active
+            and not game.cutscene_active
+        ):
+            radius = math.dist(current_position, self.local_anchor_position)
+            frontier_delta = radius - self.local_frontier_radius
+            if frontier_delta >= FRONTIER_PROGRESS_MIN_DELTA:
+                b["frontier_progress"] = min(
+                    FRONTIER_PROGRESS_MAX_REWARD,
+                    frontier_delta / FRONTIER_PROGRESS_SCALE,
+                )
+                self.local_frontier_radius = radius
 
         if current_position is None:
             self._reset_local_pressure(current, now_s)

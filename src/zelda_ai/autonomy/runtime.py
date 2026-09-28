@@ -20,7 +20,7 @@ from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/raw-controller-v2/ppo-rnd-v2/reward-v3"
+CONTRACT_VERSION = "autonomy-v3/raw-controller-v2/ppo-rnd-v2/reward-v4"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -821,6 +821,9 @@ class AutonomyRuntime:
                 ),
                 "unique_macro_regions": exploration.get(
                     "unique_macro_regions", 0
+                ),
+                "local_frontier_radius": exploration.get(
+                    "local_frontier_radius", 0.0
                 ),
                 "reward_breakdown": learning.get("reward_breakdown", {}),
                 "recent_achievements": (learning.get("achievements") or [])[-4:],
