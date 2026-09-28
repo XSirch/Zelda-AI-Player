@@ -298,9 +298,18 @@ class AutonomyRuntime:
                     self._request_cognition("dialogue_choice")
 
             if old.dialogue.active and not state.dialogue.active:
-                # Linear text/signposts do not need LLM calls. Replan only after
-                # a real NPC/choice interaction has finished.
-                if old.dialogue.speaker is not None or old.dialogue.choice_count > 0:
+                # Linear text/signposts normally do not need LLM calls. If the
+                # current intent explicitly waited on that text, one resolution
+                # trigger prevents the planner from remaining stuck on "observe".
+                waiting_on_dialogue = bool(
+                    self.controller
+                    and self.controller.intent.mode in {"dialogue", "observe"}
+                )
+                if (
+                    old.dialogue.speaker is not None
+                    or old.dialogue.choice_count > 0
+                    or waiting_on_dialogue
+                ):
                     self._request_cognition("dialogue_resolved")
 
             if self._progress_signature(old) != self._progress_signature(state):
