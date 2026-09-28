@@ -17,8 +17,9 @@ IMPORTANT ARCHITECTURE:
 - Your job is to maintain a useful high-level intent from structured game state,
   observed dialogue, learned world transitions, control-affordance evidence, and
   recent outcomes.
-- Prefer objectives that can remain valid for several seconds. Replan when the
-  scene, dialogue, threat, inventory/progress, or reachable target changes.
+- Prefer stable strategic objectives that can remain valid for minutes. You are
+  invoked only when a meaningful event or sustained stuck condition warrants
+  replanning; do not ask for periodic refreshes or micromanage transient state.
 - target_position must come from an actually observed coordinate in the supplied
   state/world memory. Never invent coordinates.
 - target_actor_id/params/uid must identify an actually observed actor.
@@ -98,18 +99,20 @@ def _game_payload(game: GameState) -> dict:
         "context_action": game.context_action.model_dump(),
         "context_actor": _actor(game.context_actor),
         "target_actor": _actor(game.target_actor),
-        "room_actors": [_actor(a) for a in game.room_actors[:40]],
+        "room_actors": [
+            _actor(a) for a in sorted(game.room_actors, key=lambda row: row.distance)[:12]
+        ],
         "dialogue": {
             "active": game.dialogue.active,
             "text_id": game.dialogue.text_id,
-            "text": game.dialogue.text[:1400],
+            "text": game.dialogue.text[:800],
             "can_advance": game.dialogue.can_advance,
             "choice_count": game.dialogue.choice_count,
             "choice_index": game.dialogue.choice_index,
             "choices": game.dialogue.choices,
             "speaker": _actor(game.dialogue.speaker),
         },
-        "inventory_named": [row.model_dump() for row in game.inventory_named],
+        "inventory_named": [row.model_dump() for row in game.inventory_named[:16]],
         "progress": {
             "quest_items": game.progress.quest_items,
             "owned_equipment": game.progress.owned_equipment,
@@ -124,7 +127,7 @@ def _game_payload(game: GameState) -> dict:
                 "samples": row.samples,
                 "direct_reachable": row.direct_reachable,
             }
-            for row in game.scene_exits
+            for row in game.scene_exits[:8]
         ],
         "traversal_affordances": [
             {
@@ -135,7 +138,7 @@ def _game_payload(game: GameState) -> dict:
                 "distance": row.distance,
                 "height_delta": row.height_delta,
             }
-            for row in game.traversal_affordances[:16]
+            for row in game.traversal_affordances[:8]
         ],
         "navigation": {
             "navmesh_available": game.navmesh.available,
@@ -155,8 +158,10 @@ def build_cognition_observation(
     memory: list[str],
     recent_events: list[dict],
     dialogue_transcript: list[dict],
+    trigger_reasons: list[str],
 ) -> dict:
     return {
+        "trigger_reasons": trigger_reasons,
         "objective": objective,
         "current_intent": current_intent.model_dump(),
         "state": _game_payload(game),
@@ -174,9 +179,9 @@ def build_cognition_observation(
                 "to_position": row.get("to_position"),
                 "traversals": row.get("traversals"),
             }
-            for row in world_edges[:12]
+            for row in world_edges[:6]
         ],
-        "memory": memory[:12],
-        "recent_events": recent_events[-8:],
-        "dialogue_transcript": dialogue_transcript[-12:],
+        "memory": memory[:6],
+        "recent_events": recent_events[-5:],
+        "dialogue_transcript": dialogue_transcript[-4:],
     }
