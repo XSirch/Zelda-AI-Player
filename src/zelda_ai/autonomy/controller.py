@@ -95,6 +95,7 @@ class ContinuousController:
             "active": False,
             "stick": (0.0, 0.0),
             "strength": 0.0,
+            "button_quiet": 0.0,
             "distance": None,
             "source": "none",
             "target": None,
@@ -134,6 +135,15 @@ class ContinuousController:
         self.last_setpoint = Setpoint(reason=reason)
         self.last_stick = (0.0, 0.0)
         self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+        self.last_guidance = {
+            "active": False,
+            "stick": (0.0, 0.0),
+            "strength": 0.0,
+            "button_quiet": 0.0,
+            "distance": None,
+            "source": "none",
+            "target": None,
+        }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
     @staticmethod
@@ -154,6 +164,7 @@ class ContinuousController:
             deterministic=not self.training_enabled,
             guidance_stick=guidance["stick"] if guidance.get("active") else None,
             guidance_strength=float(guidance.get("strength") or 0.0),
+            button_quiet_strength=float(guidance.get("button_quiet") or 0.0),
         )
         stick = sample["stick"]
         buttons = sample["buttons"]
@@ -263,6 +274,7 @@ class ContinuousController:
             "value": sample["value"],
             "guidance_stick": sample.get("guidance_stick", [0.0, 0.0]),
             "guidance_strength": sample.get("guidance_strength", 0.0),
+            "button_quiet_strength": sample.get("button_quiet_strength", 0.0),
         }
         self.actions_sampled += 1
 
