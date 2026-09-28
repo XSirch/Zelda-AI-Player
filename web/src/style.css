@@ -97,7 +97,7 @@ h1 {
 
 .usage-strip {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1.35fr;
+  grid-template-columns: .9fr 1.15fr 1fr 1fr 1.35fr;
   border: 1px solid var(--line);
   border-top: 0;
   background: #0b100d;
@@ -539,9 +539,13 @@ footer {
   .learning-metrics > div:last-child { grid-column: 1 / -1; border-bottom: 0; }
   .learning-body { grid-template-columns: 1fr; }
   .learning-note { border-left: 0; border-top: 1px solid var(--line); }
-  .usage-cell:nth-child(2) { border-right: 0; }
   .usage-cell { border-bottom: 1px solid var(--line); }
-  .usage-cell:nth-last-child(-n+2) { border-bottom: 0; }
+  .usage-cell:nth-child(even) { border-right: 0; }
+  .usage-cell:last-child {
+    grid-column: 1 / -1;
+    border-right: 0;
+    border-bottom: 0;
+  }
   .shell { width: min(100% - 28px, 720px); padding-top: 18px; }
   .connections { grid-template-columns: 1fr; }
   .connection-item { border-right: 0; border-bottom: 1px solid var(--line); min-height: 70px; }
