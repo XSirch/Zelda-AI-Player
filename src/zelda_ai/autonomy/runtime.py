@@ -81,6 +81,7 @@ class AutonomyRuntime:
         self.seen_event_order: deque[str] = deque()
         self.cognition_trigger = asyncio.Event()
         self.cognition_reasons: set[str] = set()
+        self.cognition_seen_dialogue_triggers: set[tuple] = set()
         self.last_stuck_replan_at = 0.0
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
@@ -177,21 +178,42 @@ class AutonomyRuntime:
         self.publish(True)
 
     @staticmethod
-    def _progress_signature(game):
-        return (
-            tuple(row.item_id for row in game.inventory_named),
-            tuple(game.progress.quest_items),
-            tuple(game.progress.owned_equipment),
-            tuple(sorted(game.progress.upgrade_levels.items())),
-            game.progress.heart_pieces,
-            game.progress.skull_tokens,
-            game.progress.magic_acquired,
-            game.progress.double_magic,
-            game.progress.double_defense,
-            game.progress.small_keys,
-            tuple(game.progress.dungeon_items),
-            tuple(sorted(game.progress.story_flags.items())),
-        )
+    def _durable_progress_gained(old, new) -> bool:
+        old_items = {row.item_id for row in old.inventory_named}
+        new_items = {row.item_id for row in new.inventory_named}
+        if new_items - old_items:
+            return True
+        if set(new.progress.quest_items) - set(old.progress.quest_items):
+            return True
+        if set(new.progress.owned_equipment) - set(old.progress.owned_equipment):
+            return True
+        if set(new.progress.dungeon_items) - set(old.progress.dungeon_items):
+            return True
+        if new.progress.heart_pieces > old.progress.heart_pieces:
+            return True
+        if new.progress.skull_tokens > old.progress.skull_tokens:
+            return True
+        if new.progress.small_keys > old.progress.small_keys:
+            return True
+        if new.progress.magic_acquired and not old.progress.magic_acquired:
+            return True
+        if new.progress.double_magic and not old.progress.double_magic:
+            return True
+        if new.progress.double_defense and not old.progress.double_defense:
+            return True
+        for name, level in new.progress.upgrade_levels.items():
+            if level > old.progress.upgrade_levels.get(name, 0):
+                return True
+        for name, enabled in new.progress.story_flags.items():
+            if enabled and not old.progress.story_flags.get(name, False):
+                return True
+        return False
+
+    def _request_dialogue_cognition(self, reason: str, key: tuple):
+        if key in self.cognition_seen_dialogue_triggers:
+            return
+        self.cognition_seen_dialogue_triggers.add(key)
+        self._request_cognition(reason)
 
     def _request_cognition(self, reason: str):
         if self.state != "running":
@@ -221,11 +243,9 @@ class AutonomyRuntime:
         if old and old.instance_id == state.instance_id and (
             old.scene,
             old.room,
-            old.scene_epoch,
         ) != (
             state.scene,
             state.room,
-            state.scene_epoch,
         ):
             if old.player and state.player:
                 self._persist(
@@ -282,7 +302,16 @@ class AutonomyRuntime:
                     f"{dialogue_evidence}",
                 )
                 if state.dialogue.choice_count > 0:
-                    self._request_cognition("dialogue_choice")
+                    self._request_dialogue_cognition(
+                        "dialogue_choice",
+                        (
+                            state.scene,
+                            state.room,
+                            state.dialogue.text_id,
+                            tuple(state.dialogue.choices),
+                            "choice",
+                        ),
+                    )
             elif state.dialogue.active and (
                 old.dialogue.text_id != state.dialogue.text_id
                 or old.dialogue.text != state.dialogue.text
@@ -296,7 +325,16 @@ class AutonomyRuntime:
                     self.dialogue_transcript.append(entry)
                 self.log("dialogue_changed", entry)
                 if state.dialogue.choice_count > 0:
-                    self._request_cognition("dialogue_choice")
+                    self._request_dialogue_cognition(
+                        "dialogue_choice",
+                        (
+                            state.scene,
+                            state.room,
+                            state.dialogue.text_id,
+                            tuple(state.dialogue.choices),
+                            "choice",
+                        ),
+                    )
 
             if old.dialogue.active and not state.dialogue.active:
                 # Linear text/signposts normally do not need LLM calls. If the
@@ -311,9 +349,17 @@ class AutonomyRuntime:
                     or old.dialogue.choice_count > 0
                     or waiting_on_dialogue
                 ):
-                    self._request_cognition("dialogue_resolved")
+                    self._request_dialogue_cognition(
+                        "dialogue_resolved",
+                        (
+                            state.scene,
+                            state.room,
+                            old.dialogue.text_id,
+                            "resolved",
+                        ),
+                    )
 
-            if self._progress_signature(old) != self._progress_signature(state):
+            if self._durable_progress_gained(old, state):
                 self._request_cognition("durable_progress")
 
             old_items = {row.item_id: row.name for row in old.inventory_named}
@@ -450,6 +496,7 @@ class AutonomyRuntime:
             self.seen_events = {f"{game.instance_id}:{event.id}" for event in game.events}
             self.seen_event_order = deque(self.seen_events)
             self.cognition_reasons = {"run_started"}
+            self.cognition_seen_dialogue_triggers.clear()
             self.cognition_trigger.set()
 
             fingerprint = hashlib.sha256(
