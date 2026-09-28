@@ -40,6 +40,14 @@ O painel diferencia:
 
 Progresso que já existia no save ao iniciar a run é tratado como baseline e não gera conquista retroativa.
 
+### Pressão contra ficar preso na mesma área
+
+Além da penalidade de ficar literalmente parado, a reward v2 acompanha **expansão espacial grossa**. O mundo observado é dividido em macro-regiões locais de aproximadamente 500×160×500 unidades por scene/room. Entrar pela primeira vez numa macro-região, obter progresso durável, iniciar diálogo novo relevante, causar dano ou alcançar outro marco útil reinicia o relógio.
+
+Circular por células pequenas, revisitar macro-regiões já conhecidas ou apertar botões enquanto continua perto do mesmo lugar **não reinicia** esse relógio. Após 60 s sem expansão/progresso entra `local_dwell`; a penalidade cresce até cerca de `-0.35` por decisão ML após mais 180 s. O breakdown ao vivo mostra `local_dwell`, e o painel mostra o tempo `sem expansão`.
+
+Esse mesmo relógio participa do detector de stuck da cognição: aos 90 s sem expansão local, o Luna pode receber um evento `local_area_stuck`, ainda sujeito ao cooldown de 180 s entre replans por stuck.
+
 ### Champions e avaliação congelada
 
 Quando uma run de **treino** emite o evento nativo `game_completed`, o runtime espera o último rollout/gradient update terminar, salva o checkpoint de treino e cria um snapshot imutável:
