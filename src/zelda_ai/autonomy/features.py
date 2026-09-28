@@ -94,6 +94,7 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
             "active": False,
             "stick": (0.0, 0.0),
             "strength": 0.0,
+            "button_quiet": 0.0,
             "distance": None,
             "source": "none",
             "target": None,
@@ -159,6 +160,11 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
             "active": strength > 0.01,
             "stick": stick,
             "strength": strength,
+            "button_quiet": (
+                strength * 0.9
+                if intent.mode in {"navigate", "explore", "observe"}
+                else strength * 0.25
+            ),
             "distance": distance,
             "source": source,
             "target": tuple(point),
@@ -176,6 +182,7 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
             "active": True,
             "stick": stick,
             "strength": 0.58,
+            "button_quiet": 0.48,
             "distance": None,
             "source": f"direction:{intent.direction}",
             "target": None,
@@ -185,6 +192,7 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
         "active": False,
         "stick": (0.0, 0.0),
         "strength": 0.0,
+        "button_quiet": 0.0,
         "distance": None,
         "source": "none",
         "target": None,
