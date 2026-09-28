@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from zelda_ai.autonomy.champions import ChampionStore
 
 
