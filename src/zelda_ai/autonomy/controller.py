@@ -177,6 +177,8 @@ class ContinuousController:
         self.last_reward_breakdown = reward.breakdown
         useful_keys = {
             "new_space",
+            "new_macro_region",
+            "frontier_progress",
             "new_actor",
             "new_dialogue",
             "new_context",
@@ -396,6 +398,9 @@ class ContinuousController:
                     ),
                     "local_anchor_distance": round(
                         self.reward_tracker.local_anchor_distance, 1
+                    ),
+                    "local_frontier_radius": round(
+                        self.reward_tracker.local_frontier_radius, 1
                     ),
                     "local_dwell_penalty": round(
                         self.reward_tracker.local_dwell_penalty, 6
