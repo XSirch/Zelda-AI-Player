@@ -21,7 +21,25 @@ def test_metrics_and_memory_isolation(store):
         "reasoning_output_tokens": 30,
     }, latency_ms=50)
     metrics = store.metrics(run)
+    assert metrics["input_tokens"] == 100
+    assert metrics["output_tokens"] == 40
     assert metrics["total_tokens"] == 140 and metrics["cost_usd"] is None
+    assert metrics["usage_by_model"][0]["provider"] == "codex"
+    assert metrics["usage_by_model"][0]["model"] == "m"
+    assert metrics["usage_by_model"][0]["input_tokens"] == 100
+    assert metrics["usage_by_model"][0]["output_tokens"] == 40
+    assert metrics["usage_by_model"][0]["cost_usd"] is None
+
+    time.sleep(.01)
+    store.update_run(run, status="completed", reason="game_completed")
+    store.end_segments(run)
+    final_metrics = store.metrics(run)
+    assert final_metrics["ended_at"] is not None
+    assert final_metrics["elapsed_s"] >= 0
+    final_elapsed = final_metrics["elapsed_s"]
+    time.sleep(.01)
+    assert store.metrics(run)["elapsed_s"] == final_elapsed
+
     store.remember("n1", 85, "A tentative route")
     store.remember("n1", 85, "A tentative route")
     assert len(store.recall("n1", 85)) == 1
