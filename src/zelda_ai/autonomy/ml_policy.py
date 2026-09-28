@@ -71,7 +71,7 @@ class HybridActorCritic(nn.Module if nn is not None else object):
         button_logits = self.button_logits(latent)
         if button_quiet_strength is not None:
             quiet = button_quiet_strength.reshape(-1, 1).clamp(0.0, 1.0)
-            button_logits = button_logits - quiet * 0.9
+            button_logits = button_logits - quiet * 1.4
         button_dist = Bernoulli(logits=button_logits)
         value = self.value_head(latent).squeeze(-1)
         return stick_dist, button_dist, value, button_logits
