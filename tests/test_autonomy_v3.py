@@ -270,6 +270,45 @@ def test_local_dwell_resets_after_real_spatial_expansion(state):
     assert tracker.local_anchor_distance == 0.0
 
 
+
+def test_consuming_progress_resource_does_not_clear_local_dwell(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    with_key = state.model_copy(deep=True)
+    with_key.progress.small_keys = 1
+    tracker.step(
+        with_key,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    circling = with_key.model_copy(deep=True)
+    circling.player.position = (30.0, 0.0, 30.0)
+    pressured = tracker.step(
+        circling,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=120.0,
+    )
+    assert pressured.breakdown["local_dwell"] < 0
+
+    spent_key = circling.model_copy(deep=True)
+    spent_key.progress.small_keys = 0
+    still_pressured = tracker.step(
+        spent_key,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=130.0,
+    )
+    assert "durable_progress" not in still_pressured.breakdown
+    assert still_pressured.breakdown["local_dwell"] < 0
+    assert tracker.local_dwell_seconds == 130.0
+
+
 def test_local_dwell_resets_on_meaningful_progress(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap()
