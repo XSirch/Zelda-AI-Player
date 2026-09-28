@@ -201,7 +201,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/api/champions")
     async def champions():
-        return await asyncio.to_thread(app.state.runtime.refresh_champions)
+        await asyncio.to_thread(app.state.runtime.refresh_champions)
+        return app.state.runtime.champion_status()
 
     @app.post("/api/stop")
     async def stop():
