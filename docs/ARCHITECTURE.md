@@ -18,7 +18,7 @@ Authenticated UDP Bridge
       │              current high-level intent
       │
       ▼
-ML Actor (10 Hz action sampling / 20 Hz lease renewal)
+Goal-conditioned ML Actor (10 Hz action sampling / 20 Hz lease renewal)
       │ raw stick_x / stick_y / physical button bits
       ▼
 SoH input consumer
@@ -38,7 +38,11 @@ Experience ──► reward + RND curiosity ──► PPO learner thread
 - PPO updates with GAE;
 - RND predictor/target networks for intrinsic novelty reward.
 
-The policy receives four structured frames, left-padded at episode start. It is not told semantic button meanings.
+The policy receives four structured frames, left-padded at episode start. It is not told semantic button meanings. When cognition supplies an observed target/actor/direction, `goal_guidance()` projects that objective into camera-relative stick space and adds it as prior concentration to the same Beta action distribution. PPO therefore learns residual corrections around an actionable goal rather than learning the camera transform from scratch.
+
+### Waypoint completion
+
+Movement intents with structured targets are monitored against observed player position. Reaching the waypoint emits a deduplicated `intent_target_reached` strategic trigger; cognition then selects the next observed waypoint instead of leaving a stale point active. Interaction intents are not considered complete merely by proximity.
 
 ## Concurrency
 
