@@ -405,6 +405,42 @@ def test_repeated_dialogue_does_not_farm_reward(state):
     assert "new_dialogue" not in again.breakdown
 
 
+
+def test_scene_epoch_churn_is_not_world_progress_or_dwell_reset(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    circling = state.model_copy(deep=True)
+    circling.player.position = (30.0, 0.0, 30.0)
+    tracker.step(
+        circling,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=120.0,
+    )
+
+    epoch_only = circling.model_copy(deep=True)
+    epoch_only.scene_epoch += 1
+    result = tracker.step(
+        epoch_only,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=130.0,
+    )
+    assert "new_world_transition" not in result.breakdown
+    assert result.breakdown["local_dwell"] < 0
+    assert tracker.local_dwell_seconds == 130.0
+
+
 def test_repeated_world_edge_is_not_a_progress_farm(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap()
