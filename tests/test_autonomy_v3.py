@@ -280,3 +280,14 @@ def test_policy_features_include_menu_and_camera_state(state):
     frame = encode_state(state, intent)
     assert len(frame) == BASE_FEATURE_DIM
     assert any(value != 0.0 for value in frame)
+
+
+def test_strict_evaluation_checkpoint_is_never_quarantined(tmp_path):
+    checkpoint = tmp_path / "champion.pt"
+    checkpoint.write_bytes(b"not-a-valid-torch-checkpoint")
+    original = checkpoint.read_bytes()
+    with pytest.raises(RuntimeError, match="Evaluation checkpoint could not be loaded"):
+        OnlinePPO(checkpoint, strict_checkpoint=True)
+    assert checkpoint.is_file()
+    assert checkpoint.read_bytes() == original
+    assert not list(tmp_path.glob("champion.pt.corrupt-*"))
