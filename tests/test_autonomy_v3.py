@@ -275,6 +275,30 @@ def test_chest_opened_event_rewards_once(state):
     assert tracker.chests_opened == 1
 
 
+
+def test_dungeon_item_and_max_health_gain_are_persistent_rewards(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+
+    progressed = state.model_copy(deep=True)
+    progressed.progress.dungeon_items = ["Dungeon Map"]
+    progressed.player.max_health = state.player.max_health + 16
+    progressed.player.health = min(progressed.player.max_health, state.player.health + 16)
+    result = tracker.step(
+        progressed,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+    )
+
+    assert result.breakdown["durable_progress"] == 2.0
+    assert result.breakdown["objective_milestone"] >= 4.0
+    titles = {row["title"] for row in result.achievements}
+    assert "Dungeon Map" in titles
+    assert "Capacidade de vida aumentada" in titles
+
+
 def test_native_game_completed_event_ends_episode_and_scores_achievement(state):
     tracker = RewardTracker()
     tracker.step(state, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
