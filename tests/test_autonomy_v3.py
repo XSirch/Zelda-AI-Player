@@ -56,6 +56,17 @@ def test_raw_controller_source_has_no_legacy_skill_dispatch():
 
 
 @pytest.mark.parametrize("button_count", [9])
+
+
+def test_deterministic_policy_action_is_repeatable(tmp_path):
+    policy = OnlinePPO(tmp_path / "policy.pt", epochs=1, minibatch_size=8)
+    observation = [0.0] * FEATURE_DIM
+    first = policy.sample(observation, deterministic=True)
+    second = policy.sample(observation, deterministic=True)
+    assert first["stick"] == second["stick"]
+    assert first["buttons"] == second["buttons"]
+
+
 def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     policy = OnlinePPO(
         tmp_path / "policy.pt",
