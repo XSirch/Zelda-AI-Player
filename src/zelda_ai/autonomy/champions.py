@@ -120,6 +120,9 @@ class ChampionStore:
         checkpoint = self.root / f"{row['id']}.pt"
         if not checkpoint.is_file():
             raise ValueError("Champion checkpoint is missing")
+        expected_hash = row.get("sha256")
+        if not isinstance(expected_hash, str) or _sha256(checkpoint) != expected_hash:
+            raise ValueError("Champion checkpoint checksum mismatch")
         return dict(row), checkpoint
 
     def capture(self, source_checkpoint: Path, metadata: dict) -> dict:
