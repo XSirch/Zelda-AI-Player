@@ -569,8 +569,15 @@ class AutonomyRuntime:
             await asyncio.to_thread(controller.policy.save)
             telemetry = controller.telemetry()
             learning = telemetry.get("learning") or {}
-            metrics = await asyncio.to_thread(self.store.metrics, run_id)
-            persisted_elapsed_s = metrics.get("elapsed_s")
+            summary = await asyncio.to_thread(self.store.benchmark, run_id)
+            metrics = (summary or {}).get("metrics")
+            if not isinstance(metrics, dict):
+                metrics = await asyncio.to_thread(self.store.metrics, run_id)
+            persisted_elapsed_s = (
+                (summary or {}).get("elapsed_s")
+                if isinstance(summary, dict)
+                else metrics.get("elapsed_s")
+            )
             if not isinstance(persisted_elapsed_s, (int, float)):
                 persisted_elapsed_s = elapsed_s
             metadata = {
@@ -1138,7 +1145,12 @@ class AutonomyRuntime:
                 await asyncio.gather(*cancelled_tasks, return_exceptions=True)
             await self._drain_persistence()
             if self.run_id:
-                await self._refresh_metrics(self.run_id)
+                summary = await self._db_write(self.store.finalize_run, self.run_id)
+                if summary and isinstance(summary.get("metrics"), dict):
+                    self.metrics_cache = summary["metrics"]
+                    self.metrics_at = time.monotonic()
+                else:
+                    await self._refresh_metrics(self.run_id)
 
         if (
             completion_controller is not None
