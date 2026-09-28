@@ -741,14 +741,21 @@ class AutonomyRuntime:
                 continue
             learning = self.controller.telemetry().get("learning", {})
             stalled_s = float(learning.get("seconds_since_useful_progress") or 0.0)
+            exploration = learning.get("exploration") or {}
+            local_dwell_s = float(exploration.get("local_dwell_seconds") or 0.0)
+            stuck_age_s = max(stalled_s, local_dwell_s)
             now = time.monotonic()
             if (
-                stalled_s >= COGNITION_STUCK_AFTER_S
+                stuck_age_s >= COGNITION_STUCK_AFTER_S
                 and now - self.last_stuck_replan_at >= COGNITION_STUCK_COOLDOWN_S
                 and now - self.last_cognition_at >= COGNITION_STUCK_AFTER_S
             ):
                 self.last_stuck_replan_at = now
-                self._request_cognition("motor_stuck")
+                self._request_cognition(
+                    "local_area_stuck"
+                    if local_dwell_s >= COGNITION_STUCK_AFTER_S
+                    else "motor_stuck"
+                )
         return False
 
     async def _cognition_loop(self, generation: int):
