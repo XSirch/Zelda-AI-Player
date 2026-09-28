@@ -8,7 +8,7 @@ Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 
 - **ML actor:** PPO local em PyTorch emite diretamente o analógico N64 e bits físicos dos botões. Não recebe `A = interact`, `B = attack`, `navigate_to`, `fight_enemy` ou macros equivalentes.
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
-- **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor.
+- **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor. A cognição é **sparse/event-driven**: uma chamada inicial e novas chamadas somente em eventos estratégicos (transição, progresso durável, escolha/resolução relevante de diálogo, morte/boss) ou após stuck sustentado. Não existe refresh periódico por `horizon_ms`.
 
 A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto, permitindo aprender timing e rotas específicas. O checkpoint persistente fica em `.local/ml/raw-controller-ppo-rnd-v2.pt`.
 
@@ -47,7 +47,7 @@ A interface principal mostra somente:
 - conexão SoH / bridge realtime / cognição;
 - pensamento operacional;
 - analógico e botões físicos em tempo real;
-- tokens da run;
+- tokens e número de chamadas da run;
 - cache e reasoning tokens;
 - custo API quando o provider reporta USD;
 - cota restante do Codex/ChatGPT;
