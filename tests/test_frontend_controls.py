@@ -105,3 +105,13 @@ def test_panel_shows_ml_learning_and_objective_achievements():
     assert "achievements" in types
     assert "useful_progress_rate" in types
     assert "reward PPO" in main
+
+
+def test_panel_exposes_sparse_cognition_telemetry():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    assert "ÚLTIMA CHAMADA IA" in main
+    assert "chamadas" in main
+    assert "usage?.calls" in main
+    assert "trigger: string | null" in types
+    assert "calls: number" in types
