@@ -96,9 +96,9 @@ class RewardTracker:
         return (
             current["scene"],
             current["room"],
-            math.floor(position[0] / LOCAL_REGION_XZ),
-            math.floor(position[1] / LOCAL_REGION_Y),
-            math.floor(position[2] / LOCAL_REGION_XZ),
+            math.floor((position[0] + LOCAL_REGION_XZ / 2.0) / LOCAL_REGION_XZ),
+            math.floor((position[1] + LOCAL_REGION_Y / 2.0) / LOCAL_REGION_Y),
+            math.floor((position[2] + LOCAL_REGION_XZ / 2.0) / LOCAL_REGION_XZ),
         )
 
     def _reset_local_pressure(self, current: dict, now_s: float):
