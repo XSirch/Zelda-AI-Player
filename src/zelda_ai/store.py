@@ -16,6 +16,10 @@ runs = Table("runs", metadata,
     Column("source", String, nullable=False), Column("fingerprint", String, nullable=False),
     Column("assisted", Boolean, default=False), Column("mixed", Boolean, default=False),
     Column("reason", String, default=""))
+run_summaries = Table("run_summaries", metadata,
+    Column("run_id", String, primary_key=True), Column("finalized_at", Float, nullable=False),
+    Column("status", String, nullable=False), Column("reason", String, default=""),
+    Column("elapsed_s", Float, nullable=False), Column("metrics", JSON, nullable=False))
 segments = Table("segments", metadata,
     Column("id", String, primary_key=True), Column("run_id", String, index=True),
     Column("started_at", Float), Column("ended_at", Float), Column("config", JSON), Column("namespace", String))
@@ -171,12 +175,47 @@ class Store:
                 world_edges.c.namespace == namespace).order_by(
                     world_edges.c.updated_at.desc()).limit(limit)).mappings()]
 
+    def benchmark(self, run_id: str) -> dict | None:
+        with self.engine.connect() as conn:
+            row = conn.execute(select(run_summaries).where(
+                run_summaries.c.run_id == run_id
+            )).mappings().first()
+        return dict(row) if row else None
+
+    def finalize_run(self, run_id: str) -> dict | None:
+        metrics = self.metrics(run_id)
+        with self.engine.begin() as conn:
+            run = conn.execute(select(runs.c.status, runs.c.reason).where(
+                runs.c.id == run_id
+            )).mappings().first()
+            if run is None:
+                return None
+            values = {
+                "run_id": run_id,
+                "finalized_at": time.time(),
+                "status": run["status"],
+                "reason": run["reason"] or "",
+                "elapsed_s": float(metrics.get("elapsed_s") or 0.0),
+                "metrics": metrics,
+            }
+            exists = conn.execute(select(run_summaries.c.run_id).where(
+                run_summaries.c.run_id == run_id
+            )).first()
+            if exists:
+                conn.execute(run_summaries.update().where(
+                    run_summaries.c.run_id == run_id
+                ).values(**values))
+            else:
+                conn.execute(run_summaries.insert().values(**values))
+        return values
+
     def list_runs(self, limit: int = 50) -> list[dict]:
         with self.engine.connect() as conn:
             result = [dict(row) for row in conn.execute(select(runs).order_by(runs.c.created_at.desc())
                 .limit(limit)).mappings()]
         for run in result:
             run["metrics"] = self.metrics(run["id"])
+            run["benchmark"] = self.benchmark(run["id"])
         return result
 
     def detail(self, run_id: str) -> dict | None:
@@ -190,6 +229,7 @@ class Store:
                 result[name] = [dict(r) for r in conn.execute(select(table).where(table.c.run_id == run_id)
                     .order_by(order.desc()).limit(200)).mappings()]
         result["metrics"] = self.metrics(run_id)
+        result["benchmark"] = self.benchmark(run_id)
         return result
 
     def metrics(self, run_id: str) -> dict[str, Any]:
