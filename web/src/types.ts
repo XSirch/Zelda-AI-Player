@@ -102,6 +102,7 @@ export interface LearningSnapshot {
     unique_spaces: number;
     unique_actors: number;
     unique_transitions: number;
+    unique_macro_regions?: number;
     local_dwell_seconds?: number;
     local_anchor_distance?: number;
     local_dwell_penalty?: number;
