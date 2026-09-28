@@ -90,6 +90,17 @@ const compact = (value: number) => new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 1,
 }).format(value);
 
+function durationLabel(seconds: number | null | undefined) {
+  if (seconds == null || !Number.isFinite(seconds)) return '—';
+  const total = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  return hours
+    ? `${hours}h ${String(minutes).padStart(2, '0')}m`
+    : `${minutes}m ${String(secs).padStart(2, '0')}s`;
+}
+
 function windowLabel(minutes: number | null) {
   if (minutes == null) return 'JANELA';
   if (minutes % 1440 === 0) return `${minutes / 1440}D`;
@@ -146,11 +157,17 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
     .filter(([, value]) => value !== 0)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 7);
-  const trainingState = updates > 0
-    ? 'TREINANDO'
-    : snapshot?.status === 'running'
-      ? 'COLETANDO EXPERIÊNCIA'
-      : 'AGUARDANDO';
+  const evaluating = snapshot?.run_mode === 'evaluation';
+  const trainingState = evaluating
+    ? 'AVALIAÇÃO · PESOS CONGELADOS'
+    : updates > 0
+      ? 'TREINANDO'
+      : snapshot?.status === 'running'
+        ? 'COLETANDO EXPERIÊNCIA'
+        : 'AGUARDANDO';
+  const activeChampion = snapshot?.active_champion;
+  const latestChampion = snapshot?.champions?.latest;
+  const bestChampion = snapshot?.champions?.best_completion;
 
   return <section className="learning-panel">
     <div className="section-label">
@@ -159,10 +176,21 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
     </div>
     <div className="learning-metrics">
       <div><span>PONTOS DE CONQUISTA</span><strong>{compact(objectiveScore)}</strong><small>objetivos observados · não é reward PPO</small></div>
-      <div><span>UPDATES PPO · RUN</span><strong>{compact(updates)}</strong><small>{compact(lifetimeUpdates)} no checkpoint</small></div>
-      <div><span>AMOSTRAS · RUN</span><strong>{compact(samples)}</strong><small>{compact(lifetimeSamples)} treinadas no total</small></div>
+      <div><span>UPDATES PPO · RUN</span><strong>{compact(updates)}</strong><small>{evaluating ? 'congelado · sem updates' : `${compact(lifetimeUpdates)} no checkpoint`}</small></div>
+      <div><span>AMOSTRAS · RUN</span><strong>{compact(samples)}</strong><small>{evaluating ? 'avaliação não treina' : `${compact(lifetimeSamples)} treinadas no total`}</small></div>
       <div><span>REWARD DA RUN</span><strong>{totalReward.toFixed(2)}</strong><small>última média: {recentReward.toFixed(3)}</small></div>
       <div><span>PASSOS COM PROGRESSO</span><strong>{Math.round(usefulProgressRate * 100)}%</strong><small>ignora curiosidade pura</small></div>
+    </div>
+    <div className="champion-strip">
+      <span>CHAMPIONS <b>{snapshot?.champions?.count ?? 0}</b></span>
+      <span>
+        {activeChampion
+          ? <>ATIVO <b>{activeChampion.id}</b> · {durationLabel(activeChampion.elapsed_s)}</>
+          : latestChampion
+            ? <>LATEST <b>{latestChampion.id}</b> · {durationLabel(latestChampion.elapsed_s)}</>
+            : 'nenhum completion salvo'}
+      </span>
+      {bestChampion && <span>BEST TIME <b>{bestChampion.id}</b> · {durationLabel(bestChampion.elapsed_s)}</span>}
     </div>
     <div className="learning-body">
       <div className="achievements">
@@ -256,12 +284,13 @@ function App() {
 
   const activeRun = snapshot?.status === 'running' || snapshot?.status === 'paused' || snapshot?.status === 'starting';
   const simulator = snapshot?.connection.source === 'simulator';
+  const championAvailable = !!snapshot?.champions?.latest;
   const connectionDetail = useMemo(() => {
     const hz = snapshot?.connection.state_hz;
     return hz ? `${hz.toFixed(1)} Hz` : undefined;
   }, [snapshot?.connection.state_hz]);
 
-  async function control(path: '/start' | '/stop') {
+  async function control(path: '/start' | '/stop' | '/evaluate') {
     setBusy(true);
     setError('');
     try {
@@ -279,13 +308,31 @@ function App() {
         <span className="kicker">ZELDA AI PLAYER</span>
         <h1>AUTONOMOUS ML</h1>
       </div>
-      <button
-        className={activeRun ? 'stop' : 'start'}
-        disabled={busy || (!activeRun && !snapshot?.connection.game)}
-        onClick={() => void control(activeRun ? '/stop' : '/start')}
-      >
-        {busy ? '…' : activeRun ? 'PARAR' : 'INICIAR'}
-      </button>
+      <div className="run-actions">
+        {activeRun ? <button
+          className="stop"
+          disabled={busy}
+          onClick={() => void control('/stop')}
+        >
+          {busy ? '…' : 'PARAR'}
+        </button> : <>
+          <button
+            className="start"
+            disabled={busy || !snapshot?.connection.game}
+            onClick={() => void control('/start')}
+          >
+            {busy ? '…' : 'INICIAR'}
+          </button>
+          <button
+            className="evaluate"
+            disabled={busy || !snapshot?.connection.game || !championAvailable}
+            onClick={() => void control('/evaluate')}
+            title={championAvailable ? 'Carrega o champion mais recente com pesos congelados' : 'Nenhum champion concluído disponível'}
+          >
+            AVALIAR CHAMPION
+          </button>
+        </>}
+      </div>
     </header>
 
     <section className="connections">
@@ -300,6 +347,9 @@ function App() {
 
     <UsageStrip snapshot={snapshot} />
     {simulator && <div className="notice">MODO SIMULADOR — gameplay, inputs e métricas desta sessão são sintéticos.</div>}
+    {snapshot?.run_mode === 'evaluation' && snapshot?.active_champion && <div className="evaluation-notice">
+      AVALIAÇÃO CONGELADA — {snapshot.active_champion.id}. PPO/RND não atualizam pesos nesta run.
+    </div>}
 
     {error && <div className="error" role="alert">{error}</div>}
     {snapshot?.reason && snapshot.status !== 'running' && <div className="notice">{snapshot.reason}</div>}
@@ -313,7 +363,7 @@ function App() {
 
     <footer>
       <span>{snapshot?.status?.toUpperCase() ?? 'OFFLINE'}</span>
-      <span>{snapshot?.elapsed_s ? `${Math.floor(snapshot.elapsed_s)}s` : '0s'} · política ML contínua</span>
+      <span>{snapshot?.elapsed_s ? `${Math.floor(snapshot.elapsed_s)}s` : '0s'} · {snapshot?.run_mode === 'evaluation' ? 'avaliação congelada' : 'política ML contínua'}</span>
     </footer>
   </main>;
 }
