@@ -120,7 +120,19 @@ function UsageStrip({ snapshot }: { snapshot: Snapshot | null }) {
   const usage = snapshot?.usage;
   const windows = usage?.quota?.windows ?? [];
   const cost = usage?.cost_usd;
+  const knownCost = usage?.known_cost_usd ?? 0;
+  const terminal = snapshot?.status === 'completed' || snapshot?.status === 'stopped';
+  const costLabel = cost != null
+    ? `US$ ${cost.toFixed(4)}`
+    : knownCost > 0
+      ? `≥ US$ ${knownCost.toFixed(4)}`
+      : '—';
   return <section className="usage-strip">
+    <div className="usage-cell run-time-cell">
+      <span>{terminal ? 'TEMPO FINAL' : 'TEMPO RUN'}</span>
+      <strong>{durationLabel(snapshot?.elapsed_s)}</strong>
+      <small>{terminal ? 'benchmark congelado' : 'tempo desde o início da run'}</small>
+    </div>
     <div className="usage-cell">
       <span>TOKENS RUN</span>
       <strong>{compact(usage?.total_tokens ?? 0)}</strong>
@@ -133,7 +145,7 @@ function UsageStrip({ snapshot }: { snapshot: Snapshot | null }) {
     </div>
     <div className="usage-cell">
       <span>CUSTO API</span>
-      <strong>{cost == null ? '—' : `${cost.toFixed(4)}`}</strong>
+      <strong>{costLabel}</strong>
       <small>{usage?.provider === 'codex' ? 'ChatGPT · sem custo USD reportado' : 'custo reportado pelo provider'}</small>
     </div>
     <div className="usage-cell quota-cell">
