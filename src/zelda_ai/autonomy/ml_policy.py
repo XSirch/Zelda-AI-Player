@@ -172,12 +172,18 @@ class OnlinePPO:
     def _actor_tensor(self, observation: list[float]):
         return torch.tensor(observation, dtype=torch.float32, device=self.actor_device)
 
-    def sample(self, observation: list[float]) -> dict:
+    def sample(self, observation: list[float], *, deterministic: bool = False) -> dict:
         with self.actor_lock, torch.inference_mode():
             obs = self._actor_tensor(observation).unsqueeze(0)
-            stick_dist, button_dist, value, _ = self.actor.distributions(obs)
-            sampled01 = stick_dist.sample()
-            buttons = button_dist.sample()
+            stick_dist, button_dist, value, button_logits = self.actor.distributions(obs)
+            if deterministic:
+                sampled01 = stick_dist.mean
+                buttons = (torch.sigmoid(button_logits) >= 0.5).to(
+                    dtype=torch.float32
+                )
+            else:
+                sampled01 = stick_dist.sample()
+                buttons = button_dist.sample()
             sampled = sampled01 * 2.0 - 1.0
             # Quantize first so PPO trains on the exact N64 stick values that
             # Bridge.send will deliver, not on an unobservable pre-rounding action.
