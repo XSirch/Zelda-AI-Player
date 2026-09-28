@@ -33,7 +33,13 @@ def test_metrics_and_memory_isolation(store):
     time.sleep(.01)
     store.update_run(run, status="completed", reason="game_completed")
     store.end_segments(run)
+    summary = store.finalize_run(run)
+    assert summary is not None
     final_metrics = store.metrics(run)
+    assert summary["metrics"]["input_tokens"] == 100
+    assert summary["metrics"]["output_tokens"] == 40
+    assert summary["metrics"]["total_tokens"] == 140
+    assert summary["metrics"]["cost_usd"] is None
     assert final_metrics["ended_at"] is not None
     assert final_metrics["elapsed_s"] >= 0
     final_elapsed = final_metrics["elapsed_s"]
@@ -70,6 +76,8 @@ def test_mixed_run_benchmark_keeps_known_cost_without_inventing_total(store):
 
     store.update_run(run, status="completed", mixed=True, reason="game_completed")
     store.end_segments(run)
+    summary = store.finalize_run(run)
+    assert summary is not None
     metrics = store.metrics(run)
 
     assert metrics["input_tokens"] == 200
@@ -81,6 +89,8 @@ def test_mixed_run_benchmark_keeps_known_cost_without_inventing_total(store):
     by_provider = {row["provider"]: row for row in metrics["usage_by_model"]}
     assert by_provider["codex"]["cost_usd"] is None
     assert by_provider["openrouter"]["cost_usd"] == 0.05
+    assert summary["metrics"]["known_cost_usd"] == 0.05
+    assert summary["metrics"]["cost_usd"] is None
 
 
 def test_restart_does_not_resume_run(tmp_path):
@@ -168,6 +178,12 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
         assert stopped.json()["input"]["buttons"] == 0
         assert stopped.json()["input"]["stick_x"] == 0
         assert stopped.json()["input"]["stick_y"] == 0
+
+        final_detail = client.get(f"/api/runs/{run_id}").json()
+        assert final_detail["benchmark"]["status"] == "stopped"
+        assert final_detail["benchmark"]["elapsed_s"] >= 0
+        assert final_detail["benchmark"]["metrics"]["input_tokens"] >= 0
+        assert final_detail["benchmark"]["metrics"]["output_tokens"] >= 0
 
         assert client.post(
             "/api/diagnostics/input", json={"action": "tap_a"}, headers=headers
