@@ -187,6 +187,132 @@ def test_vertical_movement_counts_as_new_space(state):
 
 
 
+
+def test_frontier_progress_rewards_only_new_outward_radius(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    outward = state.model_copy(deep=True)
+    outward.player.position = (40.0, 0.0, 0.0)
+    first = tracker.step(
+        outward,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=1.0,
+    )
+    assert first.breakdown.get("frontier_progress", 0) > 0
+    best = tracker.local_frontier_radius
+
+    circle = outward.model_copy(deep=True)
+    circle.player.position = (0.0, 0.0, 40.0)
+    repeated_radius = tracker.step(
+        circle,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=2.0,
+    )
+    assert "frontier_progress" not in repeated_radius.breakdown
+    assert tracker.local_frontier_radius == best
+
+    farther = circle.model_copy(deep=True)
+    farther.player.position = (90.0, 0.0, 0.0)
+    improved = tracker.step(
+        farther,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=3.0,
+    )
+    assert improved.breakdown.get("frontier_progress", 0) > 0
+    assert tracker.local_frontier_radius > best
+
+
+def test_new_macro_region_gets_strong_exploration_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    first = tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+    assert "new_macro_region" not in first.breakdown
+
+    escaped = state.model_copy(deep=True)
+    escaped.player.position = (300.0, 0.0, 0.0)
+    result = tracker.step(
+        escaped,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=1.0,
+    )
+    assert result.breakdown["new_macro_region"] == 0.8
+    assert len(tracker.seen_macro_regions) == 2
+
+
+def test_macro_region_grid_does_not_split_tiny_moves_across_zero(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    tiny_negative = state.model_copy(deep=True)
+    tiny_negative.player.position = (-10.0, 0.0, -10.0)
+    result = tracker.step(
+        tiny_negative,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=1.0,
+    )
+    assert "new_macro_region" not in result.breakdown
+    assert len(tracker.seen_macro_regions) == 1
+
+
+def test_intent_target_progress_has_meaningful_dense_weight(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap().model_copy(
+        update={
+            "mode": "navigate",
+            "target_position": (300.0, 0.0, 0.0),
+        }
+    )
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    closer = state.model_copy(deep=True)
+    closer.player.position = (30.0, 0.0, 0.0)
+    result = tracker.step(
+        closer,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=1.0,
+    )
+    assert result.breakdown["intent_progress"] >= 0.19
+
+
 def test_long_local_dwell_penalizes_circling_even_when_link_keeps_moving(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap()
