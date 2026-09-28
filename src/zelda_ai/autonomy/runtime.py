@@ -822,6 +822,9 @@ class AutonomyRuntime:
                 "unique_macro_regions": exploration.get(
                     "unique_macro_regions", 0
                 ),
+                "local_frontier_radius": exploration.get(
+                    "local_frontier_radius", 0.0
+                ),
                 "reward_breakdown": learning.get("reward_breakdown", {}),
                 "recent_achievements": (learning.get("achievements") or [])[-4:],
             }
