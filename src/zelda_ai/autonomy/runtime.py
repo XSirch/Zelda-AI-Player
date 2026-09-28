@@ -21,6 +21,7 @@ from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 CONTRACT_VERSION = "autonomy-v3/raw-controller-v2/ppo-rnd-v2"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
+COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
 COGNITION_STUCK_COOLDOWN_S = 180.0
 
@@ -545,6 +546,43 @@ class AutonomyRuntime:
                 return
             await asyncio.sleep(0.25)
 
+    async def _wait_for_cognition_need(self, generation: int) -> bool:
+        """Wait for a strategic event or sustained motor stagnation.
+
+        There is deliberately no periodic LLM refresh. A valid high-level intent
+        remains active until game evidence says it should change.
+        """
+        while generation == self.lifecycle and self.state == "running":
+            if self.cognition_trigger.is_set():
+                since_last = time.monotonic() - self.last_cognition_at
+                delay = max(
+                    COGNITION_EVENT_DEBOUNCE_S,
+                    COGNITION_MIN_INTERVAL_S - since_last,
+                )
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                return generation == self.lifecycle and self.state == "running"
+
+            try:
+                await asyncio.wait_for(self.cognition_trigger.wait(), timeout=5.0)
+                continue
+            except asyncio.TimeoutError:
+                pass
+
+            if not self.controller:
+                continue
+            learning = self.controller.telemetry().get("learning", {})
+            stalled_s = float(learning.get("seconds_since_useful_progress") or 0.0)
+            now = time.monotonic()
+            if (
+                stalled_s >= COGNITION_STUCK_AFTER_S
+                and now - self.last_stuck_replan_at >= COGNITION_STUCK_COOLDOWN_S
+                and now - self.last_cognition_at >= COGNITION_STUCK_AFTER_S
+            ):
+                self.last_stuck_replan_at = now
+                self._request_cognition("motor_stuck")
+        return False
+
     async def _cognition_loop(self, generation: int):
         while generation == self.lifecycle and self.state == "running":
             assert self.config and self.run_id and self.segment_id and self.controller
@@ -577,33 +615,31 @@ class AutonomyRuntime:
                     await asyncio.sleep(3.0)
                     continue
 
-            # High-level cognition is event-driven but rate-limited. The ML actor
-            # continues controlling Link during this debounce.
-            since_last = time.monotonic() - self.last_cognition_at
-            if since_last < 3.0:
-                await asyncio.sleep(3.0 - since_last)
-                if generation != self.lifecycle or self.state != "running":
+            if self.last_cognition_at > 0:
+                if not await self._wait_for_cognition_need(generation):
                     return
+
+            trigger_reasons = self._take_cognition_reasons()
+            if not trigger_reasons:
+                trigger_reasons = ["run_started"] if self.last_cognition_at == 0 else ["strategic_event"]
 
             telemetry = self.controller.telemetry()
             learning = telemetry.get("learning", {})
             compact_learning = {
-                key: learning.get(key)
-                for key in (
-                    "updates",
-                    "samples_trained",
-                    "last_reward",
-                    "total_reward",
-                    "reward_breakdown",
-                    "objective_score",
-                    "achievements",
-                )
-                if key in learning
+                "run_updates": learning.get("run_updates", 0),
+                "run_samples_trained": learning.get("run_samples_trained", 0),
+                "objective_score": learning.get("objective_score", 0),
+                "useful_progress_rate": learning.get("useful_progress_rate", 0.0),
+                "seconds_since_useful_progress": learning.get(
+                    "seconds_since_useful_progress", 0.0
+                ),
+                "reward_breakdown": learning.get("reward_breakdown", {}),
+                "recent_achievements": (learning.get("achievements") or [])[-4:],
             }
             recent_for_model = [
                 row for row in self.recent
                 if row.get("kind") not in {"intent_updated", "provider_rerouted"}
-            ][-8:]
+            ][-5:]
             world_edges, memory_rows = await asyncio.gather(
                 asyncio.to_thread(
                     self.store.world_neighbors,
@@ -621,14 +657,16 @@ class AutonomyRuntime:
                 current_intent=self.controller.intent,
                 motor={
                     "summary": telemetry.get("motor"),
-                    "setpoint": telemetry.get("setpoint"),
-                    "actions_sampled": telemetry.get("actions_sampled"),
+                    "seconds_since_useful_progress": learning.get(
+                        "seconds_since_useful_progress", 0.0
+                    ),
                 },
                 ml_learning=compact_learning,
                 world_edges=world_edges,
                 memory=[row["note"] for row in memory_rows],
                 recent_events=recent_for_model,
                 dialogue_transcript=list(self.dialogue_transcript),
+                trigger_reasons=trigger_reasons,
             )
             prompt = json.dumps(observation, ensure_ascii=False, separators=(",", ":"))
             reason = self._budget_reason(prompt)
@@ -760,12 +798,8 @@ class AutonomyRuntime:
                 },
             )
 
-            timeout = max(5.0, min(30.0, intent.horizon_ms / 1000.0))
-            self.cognition_trigger.clear()
-            try:
-                await asyncio.wait_for(self.cognition_trigger.wait(), timeout=timeout)
-            except asyncio.TimeoutError:
-                pass
+            # No horizon-based refresh here. The next iteration blocks until a
+            # strategic trigger or sustained stuck condition requests replanning.
 
     async def halt(self, state: str, reason: str):
         async with self.lock:
