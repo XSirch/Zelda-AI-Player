@@ -80,6 +80,117 @@ def target_point(game: GameState, intent: AgentIntent):
     return intent.target_position
 
 
+def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
+    """Convert a structured high-level goal into camera-relative analog guidance.
+
+    This is not a route solver and does not choose buttons. It only makes an
+    observed point/direction actionable for the goal-conditioned ML policy.
+    The PPO distribution remains stochastic in training and learns residual
+    corrections around this prior.
+    """
+    player = game.player
+    if player is None or intent.mode in {"combat", "dialogue", "menu"}:
+        return {
+            "active": False,
+            "stick": (0.0, 0.0),
+            "strength": 0.0,
+            "distance": None,
+            "source": "none",
+            "target": None,
+        }
+
+    point = target_point(game, intent)
+    source = "target"
+    if point is None and intent.direction in {"up", "down"}:
+        candidates = [
+            row for row in game.traversal_affordances
+            if row.direction == intent.direction
+        ]
+        if candidates:
+            affordance = min(candidates, key=lambda row: row.distance)
+            approach_distance = math.dist(
+                player.position,
+                affordance.approach_position,
+            )
+            if approach_distance > 85.0:
+                point = affordance.approach_position
+                source = f"traversal:{affordance.kind}:approach"
+            else:
+                point = affordance.target_position
+                source = f"traversal:{affordance.kind}:target"
+
+    if point is not None:
+        dx = point[0] - player.position[0]
+        dz = point[2] - player.position[2]
+        horizontal = math.hypot(dx, dz)
+        distance = math.dist(player.position, point)
+        if horizontal < 1e-4:
+            stick = (0.0, 0.0)
+        else:
+            camera_raw = (
+                game.camera_input_yaw
+                if game.camera_input_yaw is not None
+                else player.yaw
+            )
+            camera_yaw = camera_raw * math.pi / 32768.0
+            forward_x = math.sin(camera_yaw)
+            forward_z = math.cos(camera_yaw)
+            right_x = math.cos(camera_yaw)
+            right_z = -math.sin(camera_yaw)
+            forward = dx * forward_x + dz * forward_z
+            right = dx * right_x + dz * right_z
+            norm = max(1e-6, math.hypot(right, forward))
+            stick = (
+                max(-1.0, min(1.0, right / norm)),
+                max(-1.0, min(1.0, forward / norm)),
+            )
+
+        base_strength = {
+            "navigate": 0.86,
+            "interact": 0.78,
+            "explore": 0.74,
+            "observe": 0.62,
+        }.get(intent.mode, 0.68)
+        # Fade the steering prior near the waypoint so learned interaction/
+        # traversal behaviour can take over instead of orbiting the point.
+        proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
+        strength = base_strength * proximity
+        return {
+            "active": strength > 0.01,
+            "stick": stick,
+            "strength": strength,
+            "distance": distance,
+            "source": source,
+            "target": tuple(point),
+        }
+
+    direction_sticks = {
+        "forward": (0.0, 1.0),
+        "back": (0.0, -1.0),
+        "left": (-1.0, 0.0),
+        "right": (1.0, 0.0),
+    }
+    stick = direction_sticks.get(intent.direction)
+    if stick is not None:
+        return {
+            "active": True,
+            "stick": stick,
+            "strength": 0.58,
+            "distance": None,
+            "source": f"direction:{intent.direction}",
+            "target": None,
+        }
+
+    return {
+        "active": False,
+        "stick": (0.0, 0.0),
+        "strength": 0.0,
+        "distance": None,
+        "source": "none",
+        "target": None,
+    }
+
+
 def encode_state(
     game: GameState,
     intent: AgentIntent,
