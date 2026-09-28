@@ -142,12 +142,12 @@ class ChampionStore:
 
         _atomic_copy(source_checkpoint, checkpoint)
         row = {
+            **metadata,
             "id": champion_id,
             "kind": "game_completed",
             "created_at": time.time(),
             "checkpoint_file": checkpoint.name,
             "sha256": _sha256(checkpoint),
-            **metadata,
         }
         _atomic_json(metadata_path, row)
 
