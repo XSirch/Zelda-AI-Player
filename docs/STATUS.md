@@ -8,7 +8,7 @@
 - Four-frame structured-state stack for temporal behaviour and combat timing.
 - Online PPO learner with GAE and separate actor/learner weights.
 - RND intrinsic curiosity.
-- Observable reward shaping without a scripted Zelda quest path.
+- Observable reward shaping without a scripted Zelda quest path, including escalating coarse-area dwell penalties for long spatial loops.
 - Persistent atomic PyTorch training checkpoint plus immutable completion champions under `.local/ml/champions/`.
 - High-level `AgentIntent` cognition contract with no skill/action selector.
 - Codex and OpenRouter intent providers.

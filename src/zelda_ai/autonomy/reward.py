@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass
 
 from ..models import GameState
@@ -20,6 +21,12 @@ EQUIPMENT_OBJECTIVES: dict[tuple[str, int], tuple[str, int, float]] = {
     ("boots", 2): ("Iron Boots", 150, 2.5),
     ("boots", 3): ("Hover Boots", 150, 2.5),
 }
+
+LOCAL_REGION_XZ = 500.0
+LOCAL_REGION_Y = 160.0
+LOCAL_DWELL_GRACE_S = 60.0
+LOCAL_DWELL_RAMP_S = 180.0
+LOCAL_DWELL_MAX_PENALTY = 0.35
 
 STORY_OBJECTIVES: dict[str, tuple[str, int, float]] = {
     "greeted_by_saria": ("Falou com Saria", 20, 0.4),
@@ -58,26 +65,45 @@ class RewardTracker:
         self.combat_contact = False
         self.seen_inventory_items: set[int] = set()
         self.stagnation_steps = 0
+        self.seen_macro_regions: set[tuple[int, int, int, int, int]] = set()
+        self.local_anchor_position: tuple[float, float, float] | None = None
+        self.local_progress_at: float | None = None
+        self.local_dwell_seconds = 0.0
+        self.local_anchor_distance = 0.0
+        self.local_dwell_penalty = 0.0
         self.previous: dict | None = None
 
     def break_causal_chain(self):
-        """Drop only the previous transition; keep novelty history for the run."""
+        """Drop causal/local residence state; keep run-wide novelty history."""
         self.previous = None
+        self.local_anchor_position = None
+        self.local_progress_at = None
+        self.local_dwell_seconds = 0.0
+        self.local_anchor_distance = 0.0
+        self.local_dwell_penalty = 0.0
 
     @staticmethod
-    def _progress_fingerprint(game: GameState):
+    def _macro_region(current: dict) -> tuple[int, int, int, int, int] | None:
+        position = current.get("position")
+        if position is None:
+            return None
         return (
-            tuple(game.inventory),
-            tuple(game.progress.quest_items),
-            tuple(game.progress.owned_equipment),
-            tuple(sorted(game.progress.upgrade_levels.items())),
-            game.progress.heart_pieces,
-            game.progress.skull_tokens,
-            game.progress.magic_acquired,
-            game.progress.double_magic,
-            game.progress.double_defense,
-            game.progress.small_keys,
+            current["scene"],
+            current["room"],
+            math.floor(position[0] / LOCAL_REGION_XZ),
+            math.floor(position[1] / LOCAL_REGION_Y),
+            math.floor(position[2] / LOCAL_REGION_XZ),
         )
+
+    def _reset_local_pressure(self, current: dict, now_s: float):
+        position = current.get("position")
+        self.local_anchor_position = (
+            tuple(position) if position is not None else None
+        )
+        self.local_progress_at = now_s if position is not None else None
+        self.local_dwell_seconds = 0.0
+        self.local_anchor_distance = 0.0
+        self.local_dwell_penalty = 0.0
 
     @staticmethod
     def _enemy_health(game: GameState):
@@ -88,6 +114,32 @@ class RewardTracker:
             key = actor.actor_uid or f"{actor.actor_id}:{actor.params}:{actor.room}"
             result[key] = actor.collision_health_hint
         return result
+
+    @staticmethod
+    def _durable_progress_gain(previous: dict, current: dict) -> bool:
+        if set(current["equipment"]) - set(previous["equipment"]):
+            return True
+        if current["quest_items"] - previous["quest_items"]:
+            return True
+        if current["heart_pieces"] > previous["heart_pieces"]:
+            return True
+        if current["skull_tokens"] > previous["skull_tokens"]:
+            return True
+        if current["small_keys"] > previous["small_keys"]:
+            return True
+        if current["magic_acquired"] and not previous["magic_acquired"]:
+            return True
+        if current["double_magic"] and not previous["double_magic"]:
+            return True
+        if current["double_defense"] and not previous["double_defense"]:
+            return True
+        for name, level in current["upgrades"].items():
+            if level > previous["upgrades"].get(name, 0):
+                return True
+        for name, enabled in current["story_flags"].items():
+            if enabled and not previous["story_flags"].get(name, False):
+                return True
+        return False
 
     @staticmethod
     def _intent_key(intent: AgentIntent):
@@ -122,7 +174,6 @@ class RewardTracker:
             "health": player.health if player else 0,
             "dialogue": (game.dialogue.active, game.dialogue.text_id, game.dialogue.state_code),
             "context": (game.context_action.code, game.context_action.label),
-            "progress": self._progress_fingerprint(game),
             "intent_key": self._intent_key(intent),
             "target_distance": self._target_distance(game, intent),
             "enemy_health": self._enemy_health(game),
@@ -136,6 +187,7 @@ class RewardTracker:
             "upgrades": dict(game.progress.upgrade_levels),
             "heart_pieces": game.progress.heart_pieces,
             "skull_tokens": game.progress.skull_tokens,
+            "small_keys": game.progress.small_keys,
             "magic_acquired": game.progress.magic_acquired,
             "double_magic": game.progress.double_magic,
             "double_defense": game.progress.double_defense,
@@ -178,7 +230,9 @@ class RewardTracker:
         *,
         intrinsic: float,
         pressed_buttons: int,
+        now_s: float | None = None,
     ) -> RewardResult:
+        now_s = time.monotonic() if now_s is None else float(now_s)
         current = self._snapshot(game, intent)
         b: dict[str, float] = {}
         achievements: list[dict] = []
@@ -297,8 +351,8 @@ class RewardTracker:
             # later reacquisition cannot farm the same objective.
             self.seen_inventory_items.update(current["inventory_items"])
         if previous and previous["instance"] == current["instance"]:
-            if (previous["scene"], previous["room"], previous["scene_epoch"]) != (
-                current["scene"], current["room"], current["scene_epoch"]
+            if (previous["scene"], previous["room"]) != (
+                current["scene"], current["room"]
             ):
                 edge = (
                     previous["scene"],
@@ -325,7 +379,7 @@ class RewardTracker:
                     # become a repeatable reward farm.
                     b["repeated_transition"] = 0.0
 
-            if previous["progress"] != current["progress"]:
+            if self._durable_progress_gain(previous, current):
                 b["durable_progress"] = 2.0
 
             new_equipment = set(current["equipment"]) - set(previous["equipment"])
@@ -484,6 +538,62 @@ class RewardTracker:
             ):
                 improvement = max(-100.0, min(100.0, old_dist - new_dist))
                 b["intent_progress"] = improvement / 500.0
+
+        major_progress_keys = {
+            "new_dialogue",
+            "new_world_transition",
+            "durable_progress",
+            "objective_milestone",
+            "enemy_damage",
+            "native_event",
+        }
+        major_progress = any(
+            b.get(key, 0.0) > 0 for key in major_progress_keys
+        )
+        current_position = current["position"]
+        macro_region = self._macro_region(current)
+        macro_expansion = (
+            macro_region is not None
+            and macro_region not in self.seen_macro_regions
+        )
+        if macro_expansion:
+            self.seen_macro_regions.add(macro_region)
+
+        if current_position is None:
+            self._reset_local_pressure(current, now_s)
+        elif (
+            macro_expansion
+            or self.local_anchor_position is None
+            or self.local_progress_at is None
+            or major_progress
+            or game.cutscene_active
+        ):
+            # The clock resets only for real coarse spatial expansion or useful
+            # game progress. Circling through already-known nearby regions does
+            # not buy another grace period.
+            self._reset_local_pressure(current, now_s)
+        else:
+            self.local_anchor_distance = math.dist(
+                current_position,
+                self.local_anchor_position,
+            )
+            self.local_dwell_seconds = max(
+                0.0,
+                now_s - self.local_progress_at,
+            )
+            if self.local_dwell_seconds > LOCAL_DWELL_GRACE_S:
+                ramp = min(
+                    1.0,
+                    (self.local_dwell_seconds - LOCAL_DWELL_GRACE_S)
+                    / LOCAL_DWELL_RAMP_S,
+                )
+                self.local_dwell_penalty = -(
+                    0.02
+                    + (LOCAL_DWELL_MAX_PENALTY - 0.02) * ramp
+                )
+                b["local_dwell"] = self.local_dwell_penalty
+            else:
+                self.local_dwell_penalty = 0.0
 
         if previous and previous["position"] is not None and current["position"] is not None:
             dx = current["position"][0] - previous["position"][0]

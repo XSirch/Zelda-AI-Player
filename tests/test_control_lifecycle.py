@@ -370,3 +370,19 @@ async def test_new_run_waits_for_completion_champion_capture(
     assert runtime.state == "running"
 
     await runtime.control("stop")
+
+
+def test_local_area_dwell_overrides_recent_micro_progress_for_stuck_detection():
+    age, reason = AutonomyRuntime._stuck_signal({
+        "seconds_since_useful_progress": 8.0,
+        "exploration": {"local_dwell_seconds": 125.0},
+    })
+    assert age == 125.0
+    assert reason == "local_area_stuck"
+
+    age, reason = AutonomyRuntime._stuck_signal({
+        "seconds_since_useful_progress": 140.0,
+        "exploration": {"local_dwell_seconds": 20.0},
+    })
+    assert age == 140.0
+    assert reason == "motor_stuck"

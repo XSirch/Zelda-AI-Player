@@ -29,7 +29,7 @@ Memórias persistentes são criadas somente a partir de evidência observada, co
 
 ### Pontos de conquista vs reward PPO
 
-Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v2, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
+Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v3, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
 
 O painel diferencia:
 - pontos de conquista da run;
@@ -39,6 +39,14 @@ O painel diferencia:
 - conquistas concretas como equipamento, itens, story flags, transições novas, dano causado, inimigos e bosses derrotados.
 
 Progresso que já existia no save ao iniciar a run é tratado como baseline e não gera conquista retroativa.
+
+### Pressão contra ficar preso na mesma área
+
+Além da penalidade de ficar literalmente parado, a reward v3 acompanha **expansão espacial grossa**. O mundo observado é dividido em macro-regiões locais de aproximadamente 500×160×500 unidades por scene/room. Entrar pela primeira vez numa macro-região, obter progresso durável, iniciar diálogo novo relevante, causar dano ou alcançar outro marco útil reinicia o relógio.
+
+Circular por células pequenas, revisitar macro-regiões já conhecidas ou apertar botões enquanto continua perto do mesmo lugar **não reinicia** esse relógio. Após 60 s sem expansão/progresso entra `local_dwell`; a penalidade cresce até cerca de `-0.35` por decisão ML após mais 180 s. O breakdown ao vivo mostra `local_dwell`, e o painel mostra o tempo `sem expansão`.
+
+Esse mesmo relógio participa do detector de stuck da cognição: aos 90 s sem expansão local, o Luna pode receber um evento `local_area_stuck`, ainda sujeito ao cooldown de 180 s entre replans por stuck.
 
 ### Champions e avaliação congelada
 
