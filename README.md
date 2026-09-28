@@ -98,9 +98,10 @@ A interface principal mostra somente:
 - conexão SoH / bridge realtime / cognição;
 - pensamento operacional;
 - analógico e botões físicos em tempo real;
-- tokens e número de chamadas da run;
+- tempo da run ao vivo e tempo final congelado quando ela termina;
+- tokens de input/output, total e número de chamadas da run;
 - cache e reasoning tokens;
-- custo API quando o provider reporta USD;
+- custo API quando o provider reporta USD (ou custo parcial conhecido em runs mistas);
 - cota restante do Codex/ChatGPT;
 - **INICIAR / PARAR** e **AVALIAR CHAMPION** quando houver um completion salvo.
 
