@@ -1,6 +1,6 @@
 # Realtime input foundation (Native Bridge V3)
 
-This document describes **Native Bridge v3.0 / Adapter v3.0**, the low-level SoH bridge used by Autonomy V3. The realtime wire protocol is `3`; protocol `2` adapters are intentionally incompatible so stale native builds fail clearly.
+This document describes **Native Bridge v3.1 / Adapter v3.1**, the low-level SoH bridge used by Autonomy V3. The realtime wire protocol is `3`; protocol `2` adapters are intentionally incompatible so stale native builds fail clearly.
 
 ## Responsibilities
 
