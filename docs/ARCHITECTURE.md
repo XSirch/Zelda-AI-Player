@@ -62,6 +62,8 @@ There is no forced Kokiri/Saria/Mido route. Milestones such as Kokiri Sword or s
 
 Long-horizon anti-loop shaping is separate from per-step stagnation. The tracker remembers coarse 500×160×500 scene/room macro-regions. After 60 seconds without a previously unseen macro-region or meaningful game progress, `local_dwell` becomes negative and ramps to roughly -0.35/action over the next 180 seconds. Fine-cell movement and revisits do not reset this timer, so walking circles remains costly. The same dwell age can trigger sparse cognition's `local_area_stuck` path after 90 seconds, subject to the existing 180-second stuck cooldown.
 
+Reward v4 adds a directional, game-generic exploration signal: `frontier_progress` only pays when Link sets a new maximum radius from the current local exploration anchor, and a first visit to a new coarse macro-region pays `new_macro_region`. Returning/circling at an already achieved radius cannot farm this reward. Observed intent-target distance shaping is also stronger, so a real target supplied by cognition provides a dense potential signal without encoding a Zelda route.
+
 ## Persistence
 
 - SQLAlchemy stores runs, calls, events, memories and empirically observed world edges.
