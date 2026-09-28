@@ -14,6 +14,7 @@ from ..budgets import budget_reason, runtime_exhausted
 from ..models import ModelInfo, RunConfig, SwitchConfig
 from ..providers.base import ProviderFailure
 from ..providers.openrouter import reserve_cost
+from .champions import ChampionStore
 from .controller import ContinuousController
 from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
@@ -39,6 +40,14 @@ class AutonomyRuntime:
         self.providers = providers
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
+        self.training_checkpoint = self.model_dir / "raw-controller-ppo-rnd-v2.pt"
+        self.champions = ChampionStore(self.model_dir / "champions")
+        self.champion_catalog = self.champions.catalog()
+        self.active_champion: dict | None = None
+        self.last_champion_error = ""
+        self.completion_champion_saved_run_id: str | None = None
+        self.completion_capture_ready = asyncio.Event()
+        self.completion_capture_ready.set()
 
         self.state = "idle"
         self.reason = ""
@@ -463,7 +472,98 @@ class AutonomyRuntime:
         if self.settling_controller is task:
             self.settling_controller = None
 
+    def _make_controller(self, config: RunConfig) -> ContinuousController:
+        checkpoint = self.training_checkpoint
+        training_enabled = True
+        self.active_champion = None
+        if config.run_mode == "evaluation":
+            champion, checkpoint = self.champions.resolve(config.champion_id)
+            self.active_champion = champion
+            training_enabled = False
+
+        try:
+            return ContinuousController(
+                self.bridge,
+                checkpoint,
+                on_achievement=lambda achievement: self.log(
+                    "ml_achievement", achievement
+                ),
+                training_enabled=training_enabled,
+            )
+        except RuntimeError as exc:
+            if config.run_mode == "evaluation":
+                raise ValueError(str(exc)) from None
+            raise
+
+    def refresh_champions(self) -> dict:
+        self.champion_catalog = self.champions.catalog()
+        return self.champion_catalog
+
+    def champion_status(self) -> dict:
+        return {
+            **self.champion_catalog,
+            "capture_pending": not self.completion_capture_ready.is_set(),
+            "error": self.last_champion_error or None,
+        }
+
+    async def _capture_completion_champion(
+        self,
+        controller: ContinuousController,
+        run_id: str,
+        elapsed_s: float,
+        config: RunConfig,
+    ):
+        if self.completion_champion_saved_run_id == run_id:
+            return
+        try:
+            await asyncio.to_thread(controller.policy.save)
+            telemetry = controller.telemetry()
+            learning = telemetry.get("learning") or {}
+            metadata = {
+                "run_id": run_id,
+                "elapsed_s": round(elapsed_s, 3),
+                "contract": CONTRACT_VERSION,
+                "updates": int(learning.get("updates") or 0),
+                "samples_trained": int(learning.get("samples_trained") or 0),
+                "run_updates": int(learning.get("run_updates") or 0),
+                "run_samples_trained": int(
+                    learning.get("run_samples_trained") or 0
+                ),
+                "objective_score": int(learning.get("objective_score") or 0),
+                "total_reward": float(learning.get("total_reward") or 0.0),
+                "provider": config.provider,
+                "model": config.model,
+                "effort": config.effort,
+            }
+            champion = await asyncio.to_thread(
+                self.champions.capture,
+                self.training_checkpoint,
+                metadata,
+            )
+            self.completion_champion_saved_run_id = run_id
+            self.last_champion_error = ""
+            self.refresh_champions()
+            self.log(
+                "champion_saved",
+                {
+                    "champion_id": champion["id"],
+                    "elapsed_s": champion["elapsed_s"],
+                    "sha256": champion["sha256"],
+                },
+            )
+        except Exception as exc:
+            self.last_champion_error = f"{type(exc).__name__}: {str(exc)[:180]}"
+            self.log(
+                "champion_save_failed",
+                {"error": self.last_champion_error},
+            )
+        self.publish(True)
+
     async def start(self, config: RunConfig):
+        # A completed training run is not startable until its immutable champion
+        # snapshot has either been captured or explicitly failed. This prevents
+        # a new run from racing the final checkpoint save/copy.
+        await self.completion_capture_ready.wait()
         await self._settle_previous_controller()
         await self._drain_persistence()
         async with self.lock:
@@ -472,6 +572,17 @@ class AutonomyRuntime:
             game = self.bridge.state
             if not self.bridge.connected or not game or not game.in_game or not game.player:
                 raise ValueError("Connect Ship of Harkinian and load a playable save first")
+
+            if config.run_mode == "evaluation":
+                champion, _ = self.champions.resolve(config.champion_id)
+                config = config.model_copy(
+                    update={"champion_id": champion["id"]}
+                )
+                self.refresh_champions()
+
+            # Load/validate the policy before opening a new run record. A corrupt
+            # immutable champion therefore fails cleanly while the runtime is idle.
+            controller = self._make_controller(config)
 
             self.lifecycle += 1
             self.state = "starting"
@@ -506,6 +617,8 @@ class AutonomyRuntime:
                         "revision": game.upstream_revision,
                         "instance": game.instance_id,
                         "initial_scene": [game.scene, game.room],
+                        "run_mode": config.run_mode,
+                        "champion_id": config.champion_id,
                     },
                     sort_keys=True,
                 ).encode()
@@ -514,13 +627,7 @@ class AutonomyRuntime:
             self.segment_id = self.store.segment(
                 self.run_id, config.model_dump(), self.namespace
             )
-            self.controller = ContinuousController(
-                self.bridge,
-                self.model_dir / "raw-controller-ppo-rnd-v2.pt",
-                on_achievement=lambda achievement: self.log(
-                    "ml_achievement", achievement
-                ),
-            )
+            self.controller = controller
             self.bridge.enable_control()
             self.state = "running"
             self.log(
@@ -529,6 +636,9 @@ class AutonomyRuntime:
                     "contract": CONTRACT_VERSION,
                     "ml": "ppo+rnd",
                     "control": "raw_stick+raw_buttons",
+                    "run_mode": config.run_mode,
+                    "champion_id": config.champion_id,
+                    "training_enabled": config.run_mode == "train",
                 },
             )
             self._spawn_tasks()
@@ -861,6 +971,10 @@ class AutonomyRuntime:
             # strategic trigger or sustained stuck condition requests replanning.
 
     async def halt(self, state: str, reason: str):
+        completion_controller: ContinuousController | None = None
+        completion_run_id: str | None = None
+        completion_elapsed_s = 0.0
+        completion_config: RunConfig | None = None
         async with self.lock:
             if self.state not in {"running", "starting", "paused"} and state != "completed":
                 return
@@ -894,6 +1008,23 @@ class AutonomyRuntime:
                     self.retired_tasks.add(task)
                     task.add_done_callback(self.retired_tasks.discard)
 
+            if (
+                state == "completed"
+                and self.config is not None
+                and self.config.run_mode == "train"
+                and self.controller is not None
+                and self.run_id is not None
+                and self.completion_champion_saved_run_id != self.run_id
+                and self.completion_capture_ready.is_set()
+            ):
+                self.completion_capture_ready.clear()
+                completion_controller = self.controller
+                completion_run_id = self.run_id
+                completion_elapsed_s = max(
+                    0.0, time.monotonic() - self.started
+                )
+                completion_config = self.config.model_copy(deep=True)
+
             self.controller_task = None
             self.cognition_task = None
             self.watchdog_task = None
@@ -901,6 +1032,28 @@ class AutonomyRuntime:
             self.tasks.clear()
             self.log("run_" + state, {"reason": reason})
             self.publish(True)
+
+        if (
+            completion_controller is not None
+            and completion_run_id is not None
+            and completion_config is not None
+        ):
+            try:
+                # Wait until queued/in-flight PPO work and the partial final rollout
+                # finish. The champion therefore represents the policy that actually
+                # completed the run, including its final training update.
+                await self._settle_previous_controller()
+                await self._capture_completion_champion(
+                    completion_controller,
+                    completion_run_id,
+                    completion_elapsed_s,
+                    completion_config,
+                )
+            finally:
+                # Capture failure is visible in champion metadata/status, but must
+                # never leave the runtime permanently unable to start another run.
+                self.completion_capture_ready.set()
+                self.publish(True)
 
     async def control(self, action: str):
         if action not in {"stop", "pause", "resume", "take_control"}:
@@ -925,13 +1078,7 @@ class AutonomyRuntime:
             self.reason = ""
             self.bridge.enable_control()
             if self.controller is None:
-                self.controller = ContinuousController(
-                    self.bridge,
-                    self.model_dir / "raw-controller-ppo-rnd-v2.pt",
-                    on_achievement=lambda achievement: self.log(
-                        "ml_achievement", achievement
-                    ),
-                )
+                self.controller = self._make_controller(self.config)
             self.controller.reset_episode_state()
             await self._db_write(self.store.update_run, self.run_id, status="running", reason="")
             self._spawn_tasks()
@@ -994,6 +1141,9 @@ class AutonomyRuntime:
             "status": self.state,
             "reason": self.reason,
             "run_id": self.run_id,
+            "run_mode": self.config.run_mode if self.config else "train",
+            "active_champion": self.active_champion,
+            "champions": self.champion_status(),
             "elapsed_s": round(time.monotonic() - self.started, 1) if self.run_id else 0.0,
             "connection": {
                 "game": bool(bridge_status.get("connected")),

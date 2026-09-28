@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ProviderId = Literal["codex", "openrouter", "demo"]
+RunMode = Literal["train", "evaluation"]
 Effort = str  # Actual accepted values are validated against the provider catalog.
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
@@ -397,6 +398,8 @@ class RunConfig(StrictModel):
     provider: ProviderId
     model: str = Field(min_length=1, max_length=200)
     effort: Effort | None = None
+    run_mode: RunMode = "train"
+    champion_id: str | None = Field(default=None, max_length=80)
     goal: str = Field(default="Complete Ocarina of Time autonomously and defeat final Ganon.", min_length=1, max_length=400)
     max_calls: int = Field(default=5000, ge=0, le=10000, description="Run call limit; 0 disables this limit.")
     max_tokens: int = Field(default=5000000, ge=0, le=10000000, description="Run token limit; 0 disables this limit.")

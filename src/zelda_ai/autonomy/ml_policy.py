@@ -101,6 +101,7 @@ class OnlinePPO:
         value_coef: float = 0.5,
         epochs: int = 4,
         minibatch_size: int = 64,
+        strict_checkpoint: bool = False,
     ):
         require_torch()
         self.checkpoint = Path(checkpoint)
@@ -116,6 +117,7 @@ class OnlinePPO:
         self.value_coef = value_coef
         self.epochs = epochs
         self.minibatch_size = minibatch_size
+        self.strict_checkpoint = strict_checkpoint
         self.actor_lock = threading.Lock()
 
         self.learner = HybridActorCritic().to(self.learner_device)
@@ -148,7 +150,12 @@ class OnlinePPO:
             try:
                 self._load()
             except Exception as exc:
-                # A truncated local checkpoint must not prevent autonomous play.
+                if self.strict_checkpoint:
+                    raise RuntimeError(
+                        f"Evaluation checkpoint could not be loaded: "
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    ) from exc
+                # A truncated training checkpoint must not prevent autonomous play.
                 # Preserve it for inspection and start a fresh learner.
                 corrupt = self.checkpoint.with_suffix(
                     self.checkpoint.suffix + f".corrupt-{int(__import__('time').time())}"
@@ -165,12 +172,18 @@ class OnlinePPO:
     def _actor_tensor(self, observation: list[float]):
         return torch.tensor(observation, dtype=torch.float32, device=self.actor_device)
 
-    def sample(self, observation: list[float]) -> dict:
+    def sample(self, observation: list[float], *, deterministic: bool = False) -> dict:
         with self.actor_lock, torch.inference_mode():
             obs = self._actor_tensor(observation).unsqueeze(0)
-            stick_dist, button_dist, value, _ = self.actor.distributions(obs)
-            sampled01 = stick_dist.sample()
-            buttons = button_dist.sample()
+            stick_dist, button_dist, value, button_logits = self.actor.distributions(obs)
+            if deterministic:
+                sampled01 = stick_dist.mean
+                buttons = (torch.sigmoid(button_logits) >= 0.5).to(
+                    dtype=torch.float32
+                )
+            else:
+                sampled01 = stick_dist.sample()
+                buttons = button_dist.sample()
             sampled = sampled01 * 2.0 - 1.0
             # Quantize first so PPO trains on the exact N64 stick values that
             # Bridge.send will deliver, not on an unobservable pre-rounding action.

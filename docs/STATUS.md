@@ -9,12 +9,13 @@
 - Online PPO learner with GAE and separate actor/learner weights.
 - RND intrinsic curiosity.
 - Observable reward shaping without a scripted Zelda quest path.
-- Persistent atomic PyTorch checkpoint under `.local/ml/`.
+- Persistent atomic PyTorch training checkpoint plus immutable completion champions under `.local/ml/champions/`.
 - High-level `AgentIntent` cognition contract with no skill/action selector.
 - Codex and OpenRouter intent providers.
 - Codex token usage accounting and independent quota polling.
 - Bridge authority/watchdog remains the hard safety boundary for controller ownership.
 - Existing native scene autosave and structured observation telemetry remain available.
+- Automatic champion capture after training `game_completed`, plus frozen deterministic evaluation mode.
 
 ## Removed
 
@@ -36,7 +37,9 @@ Before calling this autonomous completion-capable, reproduce on real SoH:
 4. verify navigation improves over repeated attempts in Link's House/Kokiri without human commands;
 5. verify combat behaviour improves across repeated enemy encounters;
 6. verify **PARAR** produces immediate neutral input even during provider inference or PPO training;
-7. verify token totals and Codex remaining quota update independently of motor control.
+7. verify token totals and Codex remaining quota update independently of motor control;
+8. after a real completion, verify a champion is created only after final PPO work settles;
+9. evaluate that champion from a new save and confirm `run_updates == 0`, the champion SHA stays unchanged, and repeat performance is measurable.
 
 ## Current limitation
 

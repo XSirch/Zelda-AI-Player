@@ -50,13 +50,18 @@ class ContinuousController:
         *,
         rollout_size: int = 256,
         on_achievement: Callable[[dict], None] | None = None,
+        training_enabled: bool = True,
     ):
         self.bridge = bridge
-        self.policy = OnlinePPO(checkpoint)
+        self.policy = OnlinePPO(
+            checkpoint,
+            strict_checkpoint=not training_enabled,
+        )
         self.starting_updates = self.policy.updates
         self.starting_samples_trained = self.policy.samples_trained
         self.rollout_size = rollout_size
         self.on_achievement = on_achievement
+        self.training_enabled = training_enabled
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
@@ -118,7 +123,10 @@ class ContinuousController:
         return mask
 
     def _sample_setpoint(self, observation: list[float]) -> tuple[Setpoint, dict]:
-        sample = self.policy.sample(observation)
+        sample = self.policy.sample(
+            observation,
+            deterministic=not self.training_enabled,
+        )
         stick = sample["stick"]
         buttons = sample["buttons"]
         setpoint = Setpoint(
@@ -192,7 +200,7 @@ class ContinuousController:
             if self.on_achievement is not None:
                 self.on_achievement(dict(row))
 
-        if self.pending is not None:
+        if self.training_enabled and self.pending is not None:
             transition = {
                 **self.pending,
                 "reward": reward.reward,
@@ -200,7 +208,10 @@ class ContinuousController:
             }
             self.rollout.append(transition)
 
-        if len(self.rollout) >= self.rollout_size or (reward.done and len(self.rollout) >= 16):
+        if self.training_enabled and (
+            len(self.rollout) >= self.rollout_size
+            or (reward.done and len(self.rollout) >= 16)
+        ):
             self._enqueue_rollout(observation, done=reward.done)
 
         setpoint, sample = self._sample_setpoint(observation)
@@ -254,7 +265,11 @@ class ContinuousController:
                 publish()
 
     async def run(self, active: Callable[[], bool], publish: Callable[[], None]):
-        learner = asyncio.create_task(self._learner_loop(active, publish))
+        learner = (
+            asyncio.create_task(self._learner_loop(active, publish))
+            if self.training_enabled
+            else None
+        )
         try:
             while active():
                 game = self.bridge.state
@@ -299,13 +314,13 @@ class ContinuousController:
             self.bridge.release()
             # Let queued/in-flight batches finish after input authority is gone.
             # This cannot move Link because the controller loop has already ended.
-            with contextlib.suppress(asyncio.CancelledError):
-                await asyncio.shield(learner)
+            if learner is not None:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await asyncio.shield(learner)
 
-            # A short play session may stop before rollout_size. Preserve useful
-            # experience instead of discarding it; the newest pending action has
-            # no observed reward yet and is deliberately excluded.
-            if len(self.rollout) >= 16:
+            # A short training session may stop before rollout_size. Preserve useful
+            # experience instead of discarding it; evaluation never updates weights.
+            if self.training_enabled and len(self.rollout) >= 16:
                 game = self.bridge.state
                 if game is not None and self.feature_history:
                     observation = stack_frames(list(self.feature_history))
@@ -343,6 +358,7 @@ class ContinuousController:
             },
             "learning": {
                 **self.policy.stats(),
+                "training_enabled": self.training_enabled,
                 "run_updates": max(0, self.policy.updates - self.starting_updates),
                 "run_samples_trained": max(
                     0, self.policy.samples_trained - self.starting_samples_trained

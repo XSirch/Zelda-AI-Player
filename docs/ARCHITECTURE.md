@@ -63,9 +63,18 @@ There is no forced Kokiri/Saria/Mido route. Milestones such as Kokiri Sword or s
 ## Persistence
 
 - SQLAlchemy stores runs, calls, events, memories and empirically observed world edges.
-- ML weights/optimizer/RND state persist in `.local/ml/raw-controller-ppo-rnd-v2.pt`.
-- Checkpoint writes use temporary-file replacement.
+- Training weights/optimizer/RND state persist in `.local/ml/raw-controller-ppo-rnd-v2.pt`.
+- On a training `game_completed`, the runtime first waits for queued/in-flight PPO work and the final partial rollout to settle, then snapshots the resulting checkpoint under `.local/ml/champions/completion-XXXX.pt`.
+- Completion snapshots are immutable and have JSON metadata + SHA-256. `best-completion.pt` is a mutable convenience alias for the shortest observed completed run; the default evaluation candidate is the latest completion because it usually contains the newest training.
+- Evaluation loads a champion with strict checkpoint validation, disables all PPO/RND optimization and checkpoint writes, and uses deterministic actor actions (Beta mean for stick; Bernoulli probability threshold for buttons).
+- Checkpoint writes/copies use temporary-file replacement.
 - Existing SQLite tables from older versions may remain in an old database, but Autonomy V3 code no longer reads/writes skill trajectories or heuristic combat profiles.
+
+## Train vs evaluation
+
+`RunConfig.run_mode` is `train` by default. In training mode the actor is stochastic and online PPO/RND continues updating. In `evaluation` mode a selected champion is required; the actor is deterministic and its weights are frozen. Cognition remains sparse/event-driven in both modes because it supplies high-level intent rather than motor learning.
+
+A frozen evaluation does not itself prove generalization unless it is started from an appropriate fresh/held-out game save. Save lifecycle remains under SoH/user control.
 
 ## Providers and usage
 

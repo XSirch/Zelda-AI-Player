@@ -68,6 +68,12 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
         status_before = client.get("/api/status").json()
         assert status_before["connection"]["game"]
         assert status_before["connection"]["source"] == "simulator"
+        assert status_before["run_mode"] == "train"
+        assert status_before["champions"]["count"] == 0
+        assert client.get("/api/champions").json()["count"] == 0
+        assert client.post(
+            "/api/evaluate", json={}, headers=headers
+        ).status_code == 400
 
         started = client.post("/api/start", json={}, headers=headers)
         assert started.status_code == 200, started.text

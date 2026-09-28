@@ -55,6 +55,15 @@ def test_raw_controller_source_has_no_legacy_skill_dispatch():
     assert "stick_x" in text and "stick_y" in text
 
 
+def test_deterministic_policy_action_is_repeatable(tmp_path):
+    policy = OnlinePPO(tmp_path / "policy.pt", epochs=1, minibatch_size=8)
+    observation = [0.0] * FEATURE_DIM
+    first = policy.sample(observation, deterministic=True)
+    second = policy.sample(observation, deterministic=True)
+    assert first["stick"] == second["stick"]
+    assert first["buttons"] == second["buttons"]
+
+
 @pytest.mark.parametrize("button_count", [9])
 def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     policy = OnlinePPO(
@@ -269,3 +278,14 @@ def test_policy_features_include_menu_and_camera_state(state):
     frame = encode_state(state, intent)
     assert len(frame) == BASE_FEATURE_DIM
     assert any(value != 0.0 for value in frame)
+
+
+def test_strict_evaluation_checkpoint_is_never_quarantined(tmp_path):
+    checkpoint = tmp_path / "champion.pt"
+    checkpoint.write_bytes(b"not-a-valid-torch-checkpoint")
+    original = checkpoint.read_bytes()
+    with pytest.raises(RuntimeError, match="Evaluation checkpoint could not be loaded"):
+        OnlinePPO(checkpoint, strict_checkpoint=True)
+    assert checkpoint.is_file()
+    assert checkpoint.read_bytes() == original
+    assert not list(tmp_path.glob("champion.pt.corrupt-*"))

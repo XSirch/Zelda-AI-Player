@@ -48,7 +48,7 @@ def test_panel_uses_realtime_websocket_and_simple_start_stop():
     assert "/api/events" in text
     assert "socket.onmessage" in text
     assert "api<Snapshot>(path, {})" in text
-    assert "'/start' | '/stop'" in text
+    assert "'/start' | '/stop' | '/evaluate'" in text
 
 
 def test_frontend_contract_is_compact():
@@ -84,7 +84,8 @@ def test_panel_labels_simulator_and_stops_paused_runs():
     assert "SIMULADOR · NÃO É GAMEPLAY REAL" in text
     assert "MODO SIMULADOR" in text
     assert "snapshot?.status === 'paused'" in text
-    assert "activeRun ? '/stop' : '/start'" in text
+    assert "onClick={() => void control('/stop')}" in text
+    assert "onClick={() => void control('/start')}" in text
 
 
 def test_panel_shows_ml_learning_and_objective_achievements():
@@ -115,3 +116,23 @@ def test_panel_exposes_sparse_cognition_telemetry():
     assert "usage?.calls" in main
     assert "trigger: string | null" in types
     assert "calls: number" in types
+
+
+def test_panel_exposes_champion_evaluation():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    for label in [
+        "AVALIAR CHAMPION",
+        "AVALIAÇÃO · PESOS CONGELADOS",
+        "CHAMPIONS",
+        "LATEST",
+        "BEST TIME",
+        "SALVANDO CHAMPION",
+    ]:
+        assert label in main
+    assert "'/evaluate'" in main
+    assert "run_mode" in types
+    assert "ChampionSummary" in types
+    assert "ChampionCatalog" in types
+    assert "capture_pending" in types
+    assert "training_enabled" in types
