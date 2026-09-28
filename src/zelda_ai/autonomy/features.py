@@ -101,7 +101,11 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
         }
 
     point = target_point(game, intent)
-    source = "target"
+    source = (
+        "target_actor"
+        if intent.target_actor_uid is not None or intent.target_actor_id is not None
+        else "target_position"
+    )
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
