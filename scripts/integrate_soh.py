@@ -16,7 +16,7 @@ LEGACY_CALL = "        ZeldaAiBridge_OverrideInput(i, &input->cur.button, &input
 CALL = "        ZeldaAiBridge_ConsumeInput(i, newInput, mode);\n"
 ANCHOR = "        ogInput++;"
 NATIVE_FILES = ("ZeldaAiBridge.cpp", "ZeldaAiBridge.h", "InputScheduler.hpp", "ActorRegistry.hpp")
-ADAPTER_VERSION = "3.0"
+ADAPTER_VERSION = "3.1"
 WIRE_PROTOCOL = 3
 BRIDGE_BUILD = f"rt-input-v{ADAPTER_VERSION}"
 

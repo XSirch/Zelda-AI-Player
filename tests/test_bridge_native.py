@@ -110,3 +110,11 @@ def test_native_ml_combat_state_is_exposed():
         '{"invincibility_timer", player->invincibilityTimer}',
     ]:
         assert marker in source
+
+
+def test_native_chest_open_event_is_one_shot_treasure_flag():
+    root = Path(__file__).resolve().parents[1]
+    source = (root / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
+    assert "flagType == FLAG_SCENE_TREASURE" in source
+    assert 'Event("chest_opened"' in source
+    assert 'Event("scene_flag_set", detail)' in source

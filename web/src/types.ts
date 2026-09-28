@@ -98,6 +98,13 @@ export interface LearningSnapshot {
   useful_progress_rate?: number;
   objective_score?: number;
   achievements?: LearningAchievement[];
+  resources?: {
+    chests_opened: number;
+    rupees_collected: number;
+    ammo_collected: number;
+    health_recovered: number;
+    magic_recovered: number;
+  };
   exploration?: {
     unique_spaces: number;
     unique_actors: number;

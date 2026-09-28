@@ -40,7 +40,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.0";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.1";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -1575,7 +1575,14 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagSet>(
         [](int16_t scene, int16_t flagType, int16_t flag) {
-            Event("scene_flag_set", std::to_string(scene) + ":" + std::to_string(flagType) + ":" + std::to_string(flag));
+            const std::string detail =
+                std::to_string(scene) + ":" + std::to_string(flagType) + ":" + std::to_string(flag);
+            Event("scene_flag_set", detail);
+            // Flags_SetTreasure only emits OnSceneFlagSet on the first transition
+            // from unopened -> opened, so this is naturally anti-farm per chest.
+            if (flagType == FLAG_SCENE_TREASURE) {
+                Event("chest_opened", std::to_string(scene) + ":" + std::to_string(flag));
+            }
         });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneFlagUnset>(

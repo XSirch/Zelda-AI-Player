@@ -403,6 +403,27 @@ h1 {
   font-weight: 560;
 }
 
+.resource-strip {
+  min-height: 38px;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  color: #758178;
+  font: 8px/1.4 ui-monospace, monospace;
+  letter-spacing: .4px;
+}
+.resource-strip > span:first-child {
+  color: #a7b0aa;
+  letter-spacing: 1px;
+}
+.resource-strip b {
+  color: var(--signal);
+  font-weight: 560;
+}
+
 .learning-body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 280px;

@@ -29,7 +29,7 @@ Memórias persistentes são criadas somente a partir de evidência observada, co
 
 ### Pontos de conquista vs reward PPO
 
-Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v4, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
+Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v5, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
 
 O painel diferencia:
 - pontos de conquista da run;
@@ -42,13 +42,15 @@ Progresso que já existia no save ao iniciar a run é tratado como baseline e n�
 
 ### Pressão contra ficar preso na mesma área
 
-Além da penalidade de ficar literalmente parado, a reward v4 acompanha **expansão espacial grossa**. O mundo observado é dividido em macro-regiões locais de aproximadamente 500×160×500 unidades por scene/room. Entrar pela primeira vez numa macro-região, obter progresso durável, iniciar diálogo novo relevante, causar dano ou alcançar outro marco útil reinicia o relógio.
+Além da penalidade de ficar literalmente parado, a reward v5 acompanha **expansão espacial grossa**. O mundo observado é dividido em macro-regiões locais de aproximadamente 500×160×500 unidades por scene/room. Entrar pela primeira vez numa macro-região, obter progresso durável, iniciar diálogo novo relevante, causar dano ou alcançar outro marco útil reinicia o relógio.
 
 Circular por células pequenas, revisitar macro-regiões já conhecidas ou apertar botões enquanto continua perto do mesmo lugar **não reinicia** esse relógio. Após 60 s sem expansão/progresso entra `local_dwell`; a penalidade cresce até cerca de `-0.35` por decisão ML após mais 180 s. O breakdown ao vivo mostra `local_dwell`, e o painel mostra o tempo `sem expansão`.
 
 Esse mesmo relógio participa do detector de stuck da cognição: aos 90 s sem expansão local, o Luna pode receber um evento `local_area_stuck`, ainda sujeito ao cooldown de 180 s entre replans por stuck.
 
-**Frontier progress:** punição negativa sozinha não indica qual ação é melhor. A reward v4 também mantém o maior raio alcançado desde a última expansão/progresso. Aumentar esse raio pela primeira vez gera `frontier_progress`; andar em círculos no mesmo raio não paga. Entrar numa nova macro-região rende `new_macro_region +0.8`. Quando a cognição fornece um alvo observado, `intent_progress` também recebe peso maior e simétrico para aproximar/afastar.
+**Frontier progress:** punição negativa sozinha não indica qual ação é melhor. A reward v5 também mantém o maior raio alcançado desde a última expansão/progresso. Aumentar esse raio pela primeira vez gera `frontier_progress`; andar em círculos no mesmo raio não paga. Entrar numa nova macro-região rende `new_macro_region +0.8`. Quando a cognição fornece um alvo observado, `intent_progress` também recebe peso maior e simétrico para aproximar/afastar.
+
+**Coletas e baús:** a reward v5 também premia ganho observado de rupees, munição, vida e magia. O reward usa o **delta real do estado**: se a carteira, munição, vida ou magia já estiverem cheias e a coleta não aumentar o valor, o bônus é zero. Primeira aquisição de um item continua usando o milestone persistente mais forte, sem somar o bônus de ammo inicial. A bridge v3.1 emite `chest_opened` a partir do treasure flag nativo, uma única vez por baú, gerando reward e conquista próprios.
 
 ### Champions e avaliação congelada
 
@@ -122,7 +124,7 @@ npm run build
 cd ..
 ```
 
-## Native Bridge v3.0 (SoH)
+## Native Bridge v3.1 (SoH)
 
 Revisão Shipwright fixada:
 
@@ -131,7 +133,7 @@ HarbourMasters/Shipwright
 d30fc192f2eb01ceea45bd1e12de61636cafbf86
 ```
 
-A Autonomy V3 usa **Native Bridge v3.0 / Adapter v3.0** com wire protocol `3`.
+A Autonomy V3 usa **Native Bridge v3.1 / Adapter v3.1** com wire protocol `3`.
 
 Instale/atualize a bridge:
 
