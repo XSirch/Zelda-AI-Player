@@ -22,8 +22,9 @@ EQUIPMENT_OBJECTIVES: dict[tuple[str, int], tuple[str, int, float]] = {
     ("boots", 3): ("Hover Boots", 150, 2.5),
 }
 
-LOCAL_DWELL_RADIUS = 320.0
-LOCAL_DWELL_GRACE_S = 45.0
+LOCAL_REGION_XZ = 500.0
+LOCAL_REGION_Y = 160.0
+LOCAL_DWELL_GRACE_S = 60.0
 LOCAL_DWELL_RAMP_S = 180.0
 LOCAL_DWELL_MAX_PENALTY = 0.35
 
@@ -64,9 +65,9 @@ class RewardTracker:
         self.combat_contact = False
         self.seen_inventory_items: set[int] = set()
         self.stagnation_steps = 0
-        self.local_anchor_scope: tuple[int, int] | None = None
+        self.seen_macro_regions: set[tuple[int, int, int, int, int]] = set()
         self.local_anchor_position: tuple[float, float, float] | None = None
-        self.local_anchor_at: float | None = None
+        self.local_progress_at: float | None = None
         self.local_dwell_seconds = 0.0
         self.local_anchor_distance = 0.0
         self.local_dwell_penalty = 0.0
@@ -75,23 +76,31 @@ class RewardTracker:
     def break_causal_chain(self):
         """Drop causal/local residence state; keep run-wide novelty history."""
         self.previous = None
-        self.local_anchor_scope = None
         self.local_anchor_position = None
-        self.local_anchor_at = None
+        self.local_progress_at = None
         self.local_dwell_seconds = 0.0
         self.local_anchor_distance = 0.0
         self.local_dwell_penalty = 0.0
 
-    def _reset_local_anchor(self, current: dict, now_s: float):
+    @staticmethod
+    def _macro_region(current: dict) -> tuple[int, int, int, int, int] | None:
         position = current.get("position")
         if position is None:
-            self.local_anchor_scope = None
-            self.local_anchor_position = None
-            self.local_anchor_at = None
-        else:
-            self.local_anchor_scope = (current["scene"], current["room"])
-            self.local_anchor_position = tuple(position)
-            self.local_anchor_at = now_s
+            return None
+        return (
+            current["scene"],
+            current["room"],
+            math.floor(position[0] / LOCAL_REGION_XZ),
+            math.floor(position[1] / LOCAL_REGION_Y),
+            math.floor(position[2] / LOCAL_REGION_XZ),
+        )
+
+    def _reset_local_pressure(self, current: dict, now_s: float):
+        position = current.get("position")
+        self.local_anchor_position = (
+            tuple(position) if position is not None else None
+        )
+        self.local_progress_at = now_s if position is not None else None
         self.local_dwell_seconds = 0.0
         self.local_anchor_distance = 0.0
         self.local_dwell_penalty = 0.0
@@ -530,58 +539,52 @@ class RewardTracker:
         major_progress = any(
             b.get(key, 0.0) > 0 for key in major_progress_keys
         )
-        current_scope = (current["scene"], current["room"])
         current_position = current["position"]
+        macro_region = self._macro_region(current)
+        macro_expansion = (
+            macro_region is not None
+            and macro_region not in self.seen_macro_regions
+        )
+        if macro_expansion:
+            self.seen_macro_regions.add(macro_region)
+
         if current_position is None:
-            self._reset_local_anchor(current, now_s)
+            self._reset_local_pressure(current, now_s)
         elif (
-            self.local_anchor_scope != current_scope
+            macro_expansion
             or self.local_anchor_position is None
-            or self.local_anchor_at is None
+            or self.local_progress_at is None
             or major_progress
             or game.dialogue.active
             or game.pause_menu.active
             or game.cutscene_active
         ):
-            self._reset_local_anchor(current, now_s)
+            # The clock resets only for real coarse spatial expansion or useful
+            # game progress. Circling through already-known nearby regions does
+            # not buy another grace period.
+            self._reset_local_pressure(current, now_s)
         else:
             self.local_anchor_distance = math.dist(
                 current_position,
                 self.local_anchor_position,
             )
-            if self.local_anchor_distance >= LOCAL_DWELL_RADIUS:
-                # Genuine spatial expansion moves the residence anchor. Small
-                # circles inside the radius do not reset the clock.
-                self._reset_local_anchor(current, now_s)
-            else:
-                self.local_dwell_seconds = max(
-                    0.0,
-                    now_s - self.local_anchor_at,
+            self.local_dwell_seconds = max(
+                0.0,
+                now_s - self.local_progress_at,
+            )
+            if self.local_dwell_seconds > LOCAL_DWELL_GRACE_S:
+                ramp = min(
+                    1.0,
+                    (self.local_dwell_seconds - LOCAL_DWELL_GRACE_S)
+                    / LOCAL_DWELL_RAMP_S,
                 )
-                if self.local_dwell_seconds > LOCAL_DWELL_GRACE_S:
-                    ramp = min(
-                        1.0,
-                        (self.local_dwell_seconds - LOCAL_DWELL_GRACE_S)
-                        / LOCAL_DWELL_RAMP_S,
-                    )
-                    base_penalty = (
-                        0.02
-                        + (LOCAL_DWELL_MAX_PENALTY - 0.02) * ramp
-                    )
-                    # Give the policy a directional gradient: punishment falls
-                    # as it moves toward the edge of the local bubble, but never
-                    # vanishes until it actually escapes the radius.
-                    distance_ratio = min(
-                        1.0,
-                        self.local_anchor_distance / LOCAL_DWELL_RADIUS,
-                    )
-                    distance_factor = 1.0 - 0.6 * distance_ratio
-                    self.local_dwell_penalty = -(
-                        base_penalty * distance_factor
-                    )
-                    b["local_dwell"] = self.local_dwell_penalty
-                else:
-                    self.local_dwell_penalty = 0.0
+                self.local_dwell_penalty = -(
+                    0.02
+                    + (LOCAL_DWELL_MAX_PENALTY - 0.02) * ramp
+                )
+                b["local_dwell"] = self.local_dwell_penalty
+            else:
+                self.local_dwell_penalty = 0.0
 
         if previous and previous["position"] is not None and current["position"] is not None:
             dx = current["position"][0] - previous["position"][0]
