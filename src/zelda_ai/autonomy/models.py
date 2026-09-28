@@ -80,10 +80,13 @@ class AgentIntent(BaseModel):
 
     @model_validator(mode="after")
     def coherent_target(self):
-        if self.mode == "navigate" and self.target_position is None and self.target_actor_id is None:
+        has_actor_target = (
+            self.target_actor_uid is not None or self.target_actor_id is not None
+        )
+        if self.mode == "navigate" and self.target_position is None and not has_actor_target:
             # Navigation without a concrete target is equivalent to exploration.
             self.mode = "explore"
-        if self.mode == "interact" and self.target_actor_id is None and self.target_position is None:
+        if self.mode == "interact" and not has_actor_target and self.target_position is None:
             # Contextual A-actions can still be handled locally; keep the mode.
             pass
         if self.mode == "dialogue" and self.choice_index is not None and self.choice_index > 2:

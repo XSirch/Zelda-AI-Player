@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from zelda_ai.autonomy.features import BASE_FEATURE_DIM, FEATURE_DIM, STACK_FRAMES, encode_state, stack_frames
+from zelda_ai.autonomy.features import BASE_FEATURE_DIM, FEATURE_DIM, STACK_FRAMES, encode_state, goal_guidance, stack_frames
 from zelda_ai.autonomy.ml_policy import OnlinePPO
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.reward import RewardTracker
@@ -21,6 +21,18 @@ def test_agent_intent_schema_is_strict_and_not_a_skill_contract():
     assert target["items"] == {"type": "number"}
     assert target["minItems"] == target["maxItems"] == 3
     assert "prefixItems" not in target
+
+
+def test_uid_only_actor_target_stays_navigate():
+    intent = AgentIntent(
+        objective="Approach observed actor",
+        summary="Approach observed actor",
+        mode="navigate",
+        target_actor_uid="actor-123",
+        horizon_ms=10000,
+    )
+    assert intent.mode == "navigate"
+    assert intent.target_actor_uid == "actor-123"
 
 
 def test_structured_state_is_stacked_for_temporal_policy(state):
@@ -55,6 +67,78 @@ def test_raw_controller_source_has_no_legacy_skill_dispatch():
     assert "stick_x" in text and "stick_y" in text
 
 
+
+def test_goal_guidance_is_camera_relative(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (0.0, 0.0, 300.0),
+    })
+    state.camera_input_yaw = 0
+    guidance = goal_guidance(state, intent)
+    assert guidance["active"] is True
+    assert abs(guidance["stick"][0]) < 0.05
+    assert guidance["stick"][1] > 0.95
+    assert guidance["strength"] > 0.8
+
+    east = intent.model_copy(update={"target_position": (300.0, 0.0, 0.0)})
+    east_guidance = goal_guidance(state, east)
+    assert east_guidance["stick"][0] > 0.95
+    assert abs(east_guidance["stick"][1]) < 0.05
+
+    # Rotate the camera 90 degrees: world +X becomes camera-forward.
+    state.camera_input_yaw = 0x4000
+    rotated = goal_guidance(state, east)
+    assert abs(rotated["stick"][0]) < 0.05
+    assert rotated["stick"][1] > 0.95
+
+
+def test_goal_guidance_uses_observed_vertical_traversal(state):
+    from zelda_ai.models import TraversalAffordanceObservation
+
+    state.traversal_affordances = [
+        TraversalAffordanceObservation(
+            kind="stairs_or_slope_up",
+            direction="up",
+            approach_position=(0.0, 0.0, 160.0),
+            target_position=(0.0, 70.0, 260.0),
+            distance=160.0,
+            height_delta=70.0,
+            wall_flags=0,
+        )
+    ]
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "direction": "up",
+    })
+    guidance = goal_guidance(state, intent)
+    assert guidance["active"] is True
+    assert guidance["source"].startswith("traversal:stairs_or_slope_up")
+    assert guidance["stick"][1] > 0.9
+
+
+def test_goal_prior_moves_deterministic_distribution_toward_target(tmp_path):
+    policy = OnlinePPO(tmp_path / "policy.pt", epochs=1, minibatch_size=8)
+    observation = [0.0] * FEATURE_DIM
+
+    forward = policy.sample(
+        observation,
+        deterministic=True,
+        guidance_stick=(0.0, 1.0),
+        guidance_strength=0.9,
+        button_quiet_strength=0.8,
+    )
+    backward = policy.sample(
+        observation,
+        deterministic=True,
+        guidance_stick=(0.0, -1.0),
+        guidance_strength=0.9,
+        button_quiet_strength=0.8,
+    )
+    assert forward["stick"][1] > backward["stick"][1]
+    assert forward["guidance_strength"] == pytest.approx(0.9)
+    assert forward["button_quiet_strength"] == pytest.approx(0.8)
+
+
 def test_deterministic_policy_action_is_repeatable(tmp_path):
     policy = OnlinePPO(tmp_path / "policy.pt", epochs=1, minibatch_size=8)
     observation = [0.0] * FEATURE_DIM
@@ -74,7 +158,12 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     observation = [0.0] * FEATURE_DIM
     rollout = []
     for index in range(16):
-        sample = policy.sample(observation)
+        sample = policy.sample(
+            observation,
+            guidance_stick=(0.0, 1.0),
+            guidance_strength=0.7,
+            button_quiet_strength=0.5,
+        )
         assert len(sample["stick"]) == 2
         assert len(sample["buttons"]) == button_count
         rollout.append({
@@ -83,6 +172,9 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
             "buttons": sample["buttons"],
             "log_prob": sample["log_prob"],
             "value": sample["value"],
+            "guidance_stick": sample["guidance_stick"],
+            "guidance_strength": sample["guidance_strength"],
+            "button_quiet_strength": sample["button_quiet_strength"],
             "reward": 0.05 + index * 0.001,
             "done": False,
         })

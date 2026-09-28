@@ -79,6 +79,14 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
       <p>{thought?.summary ?? 'Aguardando início.'}</p>
       {intent?.objective && <div className="objective"><span>OBJETIVO ATUAL</span><strong>{intent.objective}</strong></div>}
       {thought?.trigger && <div className="planner-line"><span>ÚLTIMA CHAMADA IA</span><strong>{thought.trigger}</strong></div>}
+      {thought?.guidance?.active && <div className="guidance-line">
+        <span>GUIDANCE DO OBJETIVO</span>
+        <strong>
+          {thought.guidance.source} · força {thought.guidance.strength.toFixed(2)}
+          {thought.guidance.distance != null ? ` · ${Math.round(thought.guidance.distance)}u do alvo` : ''}
+          {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
+        </strong>
+      </div>}
       {thought?.motor && <div className="motor-line"><span>MOTOR ML</span><strong>{thought.motor}</strong></div>}
     </div>
   </section>;

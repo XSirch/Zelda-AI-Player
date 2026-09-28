@@ -386,3 +386,53 @@ def test_local_area_dwell_overrides_recent_micro_progress_for_stuck_detection():
     })
     assert age == 140.0
     assert reason == "motor_stuck"
+
+
+@pytest.mark.asyncio
+async def test_reaching_structured_waypoint_triggers_one_sparse_replan(
+    tmp_path, store, state, monkeypatch
+):
+    import zelda_ai.autonomy.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "COGNITION_EVENT_DEBOUNCE_S", 0.01)
+    monkeypatch.setattr(runtime_module, "COGNITION_MIN_INTERVAL_S", 0.0)
+
+    bridge = connected(state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(
+        bridge,
+        store,
+        {"codex": provider},
+        tmp_path / "ml",
+    )
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 1
+
+    target_intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (50.0, 0.0, 0.0),
+        "objective": "Reach observed waypoint.",
+        "summary": "Move to observed waypoint.",
+    })
+    runtime.controller.set_intent(target_intent)
+
+    reached = state.model_copy(deep=True)
+    reached.seq += 1
+    reached.player.position = (10.0, 0.0, 0.0)
+    bridge.state = reached
+    provider.called.clear()
+    runtime.on_state(reached, state)
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 2
+    assert "intent_target_reached" in provider.prompts[-1]["trigger_reasons"]
+
+    # The same completed waypoint is deduplicated.
+    again = reached.model_copy(deep=True)
+    again.seq += 1
+    bridge.state = again
+    runtime.on_state(again, reached)
+    await asyncio.sleep(0.08)
+    assert provider.calls == 2
+
+    await runtime.control("stop")

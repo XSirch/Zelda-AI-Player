@@ -5,6 +5,8 @@
 - Minimal realtime panel: connection, operational thought, raw N64 inputs, tokens/cost/quota, start/stop.
 - Continuous motor loop independent from LLM latency.
 - Raw-action PPO actor-critic: analog stick + physical button bits.
+- Goal-conditioned camera-relative steering prior inside the PPO stick distribution, with learned residual control and a mild navigation button-quiet prior.
+- One-shot `intent_target_reached` replanning so completed waypoints do not remain stale.
 - Four-frame structured-state stack for temporal behaviour and combat timing.
 - Online PPO learner with GAE and separate actor/learner weights.
 - RND intrinsic curiosity.
@@ -35,7 +37,7 @@ Before calling this autonomous completion-capable, reproduce on real SoH:
 1. click **INICIAR** and confirm raw inputs continue while a deliberately slow cognition call is pending;
 2. confirm ML checkpoint update count grows during play and survives restart;
 3. confirm the policy discovers useful button effects from reward rather than hard-coded mappings;
-4. verify navigation improves over repeated attempts in Link's House/Kokiri without human commands;
+4. verify structured Luna waypoints produce active motor guidance, distance falls, `intent_target_reached` advances the waypoint, and navigation improves without human commands;
 5. verify combat behaviour improves across repeated enemy encounters;
 6. verify **PARAR** produces immediate neutral input even during provider inference or PPO training;
 7. verify token totals and Codex remaining quota update independently of motor control;

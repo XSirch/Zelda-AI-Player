@@ -152,6 +152,17 @@ export interface ChampionCatalog {
   error?: string | null;
 }
 
+
+export interface MotorGuidance {
+  active: boolean;
+  stick: number[];
+  strength: number;
+  button_quiet: number;
+  distance: number | null;
+  source: string;
+  target: number[] | null;
+}
+
 export interface Snapshot {
   status: string;
   reason: string;
@@ -175,6 +186,7 @@ export interface Snapshot {
     thinking_ms: number;
     intent: AgentIntent | null;
     motor: string;
+    guidance: MotorGuidance | null;
     trigger: string | null;
   };
   input: InputState;
