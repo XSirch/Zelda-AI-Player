@@ -186,6 +186,135 @@ def test_vertical_movement_counts_as_new_space(state):
     assert "stagnation" not in result.breakdown
 
 
+
+def test_long_local_dwell_penalizes_circling_even_when_link_keeps_moving(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    nearby = state.model_copy(deep=True)
+    nearby.player.position = (30.0, 0.0, 30.0)
+    early = tracker.step(
+        nearby,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=30.0,
+    )
+    assert "local_dwell" not in early.breakdown
+
+    same_area = nearby.model_copy(deep=True)
+    same_area.player.position = (45.0, 0.0, -25.0)
+    pressured = tracker.step(
+        same_area,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=90.0,
+    )
+    assert pressured.breakdown["local_dwell"] < 0
+    first_penalty = pressured.breakdown["local_dwell"]
+
+    still_circling = same_area.model_copy(deep=True)
+    still_circling.player.position = (80.0, 0.0, 10.0)
+    late = tracker.step(
+        still_circling,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=300.0,
+    )
+    assert late.breakdown["local_dwell"] < first_penalty
+    assert tracker.local_dwell_seconds == 300.0
+
+
+def test_local_dwell_resets_after_real_spatial_expansion(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    circling = state.model_copy(deep=True)
+    circling.player.position = (20.0, 0.0, 20.0)
+    pressured = tracker.step(
+        circling,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=120.0,
+    )
+    assert pressured.breakdown["local_dwell"] < 0
+
+    escaped = state.model_copy(deep=True)
+    escaped.player.position = (400.0, 0.0, 0.0)
+    result = tracker.step(
+        escaped,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=130.0,
+    )
+    assert "local_dwell" not in result.breakdown
+    assert tracker.local_dwell_seconds == 0.0
+    assert tracker.local_anchor_distance == 0.0
+
+
+def test_local_dwell_resets_on_meaningful_progress(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(
+        state,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=0.0,
+    )
+
+    circling = state.model_copy(deep=True)
+    circling.player.position = (25.0, 0.0, 0.0)
+    tracker.step(
+        circling,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=120.0,
+    )
+    assert tracker.local_dwell_seconds == 120.0
+
+    progress = circling.model_copy(deep=True)
+    progress.progress.equipment = [
+        EquipmentObservation(
+            item_id=59,
+            name="Kokiri Sword",
+            equipment_type="sword",
+            value=1,
+            equipped=True,
+        )
+    ]
+    progress.progress.owned_equipment = ["Kokiri Sword"]
+    result = tracker.step(
+        progress,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=130.0,
+    )
+    assert result.breakdown["objective_milestone"] == 3.0
+    assert "local_dwell" not in result.breakdown
+    assert tracker.local_dwell_seconds == 0.0
+
+
 def test_static_state_does_not_keep_earning_reward(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap()
