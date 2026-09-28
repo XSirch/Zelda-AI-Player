@@ -153,6 +153,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const recentReward = learning?.recent_mean_reward ?? 0;
   const usefulProgressRate = learning?.useful_progress_rate ?? 0;
   const exploration = learning?.exploration;
+  const resources = learning?.resources;
   const rewardBreakdown = Object.entries(learning?.reward_breakdown ?? {})
     .filter(([, value]) => value !== 0)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -191,6 +192,14 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
             : 'nenhum completion salvo'}
       </span>
       {bestChampion && <span>BEST TIME <b>{bestChampion.id}</b> · {durationLabel(bestChampion.elapsed_s)}</span>}
+    </div>
+    <div className="resource-strip">
+      <span>COLETAS</span>
+      <span><b>{resources?.chests_opened ?? 0}</b> baús</span>
+      <span><b>+{resources?.rupees_collected ?? 0}</b> rupees</span>
+      <span><b>+{resources?.ammo_collected ?? 0}</b> ammo</span>
+      <span><b>+{Math.round((resources?.health_recovered ?? 0) / 16 * 10) / 10}</b> corações</span>
+      <span><b>+{resources?.magic_recovered ?? 0}</b> magic</span>
     </div>
     <div className="learning-body">
       <div className="achievements">
