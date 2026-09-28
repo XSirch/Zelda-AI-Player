@@ -46,6 +46,8 @@ class AutonomyRuntime:
         self.active_champion: dict | None = None
         self.last_champion_error = ""
         self.completion_champion_saved_run_id: str | None = None
+        self.completion_capture_ready = asyncio.Event()
+        self.completion_capture_ready.set()
 
         self.state = "idle"
         self.reason = ""
@@ -551,6 +553,10 @@ class AutonomyRuntime:
         self.publish(True)
 
     async def start(self, config: RunConfig):
+        # A completed training run is not startable until its immutable champion
+        # snapshot has either been captured or explicitly failed. This prevents
+        # a new run from racing the final checkpoint save/copy.
+        await self.completion_capture_ready.wait()
         await self._settle_previous_controller()
         await self._drain_persistence()
         async with self.lock:
@@ -1002,7 +1008,9 @@ class AutonomyRuntime:
                 and self.controller is not None
                 and self.run_id is not None
                 and self.completion_champion_saved_run_id != self.run_id
+                and self.completion_capture_ready.is_set()
             ):
+                self.completion_capture_ready.clear()
                 completion_controller = self.controller
                 completion_run_id = self.run_id
                 completion_elapsed_s = max(
@@ -1023,16 +1031,22 @@ class AutonomyRuntime:
             and completion_run_id is not None
             and completion_config is not None
         ):
-            # Wait until queued/in-flight PPO work and the partial final rollout
-            # finish. The champion therefore represents the policy that actually
-            # completed the run, including its final training update.
-            await self._settle_previous_controller()
-            await self._capture_completion_champion(
-                completion_controller,
-                completion_run_id,
-                completion_elapsed_s,
-                completion_config,
-            )
+            try:
+                # Wait until queued/in-flight PPO work and the partial final rollout
+                # finish. The champion therefore represents the policy that actually
+                # completed the run, including its final training update.
+                await self._settle_previous_controller()
+                await self._capture_completion_champion(
+                    completion_controller,
+                    completion_run_id,
+                    completion_elapsed_s,
+                    completion_config,
+                )
+            finally:
+                # Capture failure is visible in champion metadata/status, but must
+                # never leave the runtime permanently unable to start another run.
+                self.completion_capture_ready.set()
+                self.publish(True)
 
     async def control(self, action: str):
         if action not in {"stop", "pause", "resume", "take_control"}:
@@ -1124,6 +1138,7 @@ class AutonomyRuntime:
             "active_champion": self.active_champion,
             "champions": {
                 **self.champion_catalog,
+                "capture_pending": not self.completion_capture_ready.is_set(),
                 "error": self.last_champion_error or None,
             },
             "elapsed_s": round(time.monotonic() - self.started, 1) if self.run_id else 0.0,
