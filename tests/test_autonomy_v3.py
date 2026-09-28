@@ -158,6 +158,123 @@ def test_consumable_reacquisition_does_not_farm_objective_score(state):
     assert tracker.objective_score == 0
 
 
+
+def test_rupee_reward_requires_actual_wallet_increase(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    baseline = state.model_copy(deep=True)
+    baseline.player.rupees = 20
+    tracker.step(baseline, intent, intrinsic=0.0, pressed_buttons=0)
+
+    richer = baseline.model_copy(deep=True)
+    richer.player.rupees = 25
+    gained = tracker.step(richer, intent, intrinsic=0.0, pressed_buttons=0)
+    assert gained.breakdown["resource_rupees"] > 0
+    assert tracker.rupees_collected == 5
+
+    full_or_unchanged = richer.model_copy(deep=True)
+    unchanged = tracker.step(
+        full_or_unchanged,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+    )
+    assert "resource_rupees" not in unchanged.breakdown
+    assert tracker.rupees_collected == 5
+
+
+def test_ammo_reward_requires_actual_ammo_increase(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    baseline = state.model_copy(deep=True)
+    baseline.inventory_named = [
+        InventoryObservation(slot=0, item_id=1, name="Deku Stick", ammo=5)
+    ]
+    tracker.step(baseline, intent, intrinsic=0.0, pressed_buttons=0)
+
+    refilled = baseline.model_copy(deep=True)
+    refilled.inventory_named[0].ammo = 8
+    gained = tracker.step(refilled, intent, intrinsic=0.0, pressed_buttons=0)
+    assert gained.breakdown["resource_ammo"] > 0
+    assert tracker.ammo_collected == 3
+
+    full_pickup = refilled.model_copy(deep=True)
+    unchanged = tracker.step(
+        full_pickup,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+    )
+    assert "resource_ammo" not in unchanged.breakdown
+    assert tracker.ammo_collected == 3
+
+
+def test_new_item_does_not_double_count_initial_ammo(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+
+    acquired = state.model_copy(deep=True)
+    acquired.inventory_named = [
+        InventoryObservation(slot=0, item_id=1, name="Deku Stick", ammo=10)
+    ]
+    result = tracker.step(acquired, intent, intrinsic=0.0, pressed_buttons=0)
+    assert result.breakdown["objective_milestone"] > 0
+    assert "resource_ammo" not in result.breakdown
+    assert tracker.ammo_collected == 0
+
+
+def test_health_and_magic_pickups_only_reward_observed_recovery(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    baseline = state.model_copy(deep=True)
+    baseline.player.health = 32
+    baseline.player.magic = 20
+    tracker.step(baseline, intent, intrinsic=0.0, pressed_buttons=0)
+
+    recovered = baseline.model_copy(deep=True)
+    recovered.player.health = 48
+    recovered.player.magic = 35
+    result = tracker.step(recovered, intent, intrinsic=0.0, pressed_buttons=0)
+    assert result.breakdown["resource_health"] > 0
+    assert result.breakdown["resource_magic"] > 0
+    assert tracker.health_recovered == 16
+    assert tracker.magic_recovered == 15
+
+    unchanged = tracker.step(
+        recovered.model_copy(deep=True),
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+    )
+    assert "resource_health" not in unchanged.breakdown
+    assert "resource_magic" not in unchanged.breakdown
+
+
+def test_chest_opened_event_rewards_once(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap()
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0)
+
+    opened = state.model_copy(deep=True)
+    opened.events = [
+        GameEvent(id="chest-1", kind="chest_opened", detail="85:3")
+    ]
+    result = tracker.step(opened, intent, intrinsic=0.0, pressed_buttons=0)
+    assert result.breakdown["native_event"] == 0.6
+    assert tracker.chests_opened == 1
+    assert any(row["title"] == "Baú aberto" for row in result.achievements)
+
+    repeated = tracker.step(
+        opened.model_copy(deep=True),
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+    )
+    assert repeated.breakdown.get("native_event", 0) == 0
+    assert tracker.chests_opened == 1
+
+
 def test_native_game_completed_event_ends_episode_and_scores_achievement(state):
     tracker = RewardTracker()
     tracker.step(state, AgentIntent.bootstrap(), intrinsic=0.0, pressed_buttons=0)
