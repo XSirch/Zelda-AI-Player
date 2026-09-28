@@ -131,6 +131,32 @@ class RewardTracker:
         return result
 
     @staticmethod
+    def _durable_progress_gain(previous: dict, current: dict) -> bool:
+        if set(current["equipment"]) - set(previous["equipment"]):
+            return True
+        if current["quest_items"] - previous["quest_items"]:
+            return True
+        if current["heart_pieces"] > previous["heart_pieces"]:
+            return True
+        if current["skull_tokens"] > previous["skull_tokens"]:
+            return True
+        if current["small_keys"] > previous["small_keys"]:
+            return True
+        if current["magic_acquired"] and not previous["magic_acquired"]:
+            return True
+        if current["double_magic"] and not previous["double_magic"]:
+            return True
+        if current["double_defense"] and not previous["double_defense"]:
+            return True
+        for name, level in current["upgrades"].items():
+            if level > previous["upgrades"].get(name, 0):
+                return True
+        for name, enabled in current["story_flags"].items():
+            if enabled and not previous["story_flags"].get(name, False):
+                return True
+        return False
+
+    @staticmethod
     def _intent_key(intent: AgentIntent):
         return (
             intent.mode,
@@ -177,6 +203,7 @@ class RewardTracker:
             "upgrades": dict(game.progress.upgrade_levels),
             "heart_pieces": game.progress.heart_pieces,
             "skull_tokens": game.progress.skull_tokens,
+            "small_keys": game.progress.small_keys,
             "magic_acquired": game.progress.magic_acquired,
             "double_magic": game.progress.double_magic,
             "double_defense": game.progress.double_defense,
@@ -368,7 +395,7 @@ class RewardTracker:
                     # become a repeatable reward farm.
                     b["repeated_transition"] = 0.0
 
-            if previous["progress"] != current["progress"]:
+            if self._durable_progress_gain(previous, current):
                 b["durable_progress"] = 2.0
 
             new_equipment = set(current["equipment"]) - set(previous["equipment"])
