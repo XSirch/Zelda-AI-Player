@@ -60,6 +60,8 @@ Cognition is sparse and event-driven. There is one initial call; subsequent call
 
 There is no forced Kokiri/Saria/Mido route. Milestones such as Kokiri Sword or story flags can carry larger bounded training bonuses when observed, independent of order.
 
+Long-horizon anti-loop shaping is separate from per-step stagnation. The tracker remembers coarse 500×160×500 scene/room macro-regions. After 60 seconds without a previously unseen macro-region or meaningful game progress, `local_dwell` becomes negative and ramps to roughly -0.35/action over the next 180 seconds. Fine-cell movement and revisits do not reset this timer, so walking circles remains costly. The same dwell age can trigger sparse cognition's `local_area_stuck` path after 90 seconds, subject to the existing 180-second stuck cooldown.
+
 ## Persistence
 
 - SQLAlchemy stores runs, calls, events, memories and empirically observed world edges.
