@@ -105,6 +105,7 @@ export interface LearningSnapshot {
     unique_macro_regions?: number;
     local_dwell_seconds?: number;
     local_anchor_distance?: number;
+    local_frontier_radius?: number;
     local_dwell_penalty?: number;
   };
   reward_breakdown?: Record<string, number>;
