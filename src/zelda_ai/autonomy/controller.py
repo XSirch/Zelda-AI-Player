@@ -123,7 +123,10 @@ class ContinuousController:
         return mask
 
     def _sample_setpoint(self, observation: list[float]) -> tuple[Setpoint, dict]:
-        sample = self.policy.sample(observation)
+        sample = self.policy.sample(
+            observation,
+            deterministic=not self.training_enabled,
+        )
         stick = sample["stick"]
         buttons = sample["buttons"]
         setpoint = Setpoint(
