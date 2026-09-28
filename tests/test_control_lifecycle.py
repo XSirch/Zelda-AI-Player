@@ -1,5 +1,6 @@
 import asyncio
 import json
+import threading
 import time
 
 import pytest
@@ -324,3 +325,48 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     await asyncio.sleep(0.2)
     await runtime.control("stop")
     assert champion_path.read_bytes() == frozen_bytes
+
+
+@pytest.mark.asyncio
+async def test_new_run_waits_for_completion_champion_capture(
+    tmp_path, store, state
+):
+    bridge = connected(state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(
+        bridge,
+        store,
+        {"codex": provider},
+        tmp_path / "ml",
+    )
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+
+    original_capture = runtime.champions.capture
+    capture_started = threading.Event()
+    release_capture = threading.Event()
+
+    def slow_capture(source, metadata):
+        capture_started.set()
+        if not release_capture.wait(timeout=2.0):
+            raise RuntimeError("test capture release timed out")
+        return original_capture(source, metadata)
+
+    runtime.champions.capture = slow_capture
+    completion = asyncio.create_task(
+        runtime.halt("completed", "game_completed")
+    )
+    assert await asyncio.to_thread(capture_started.wait, 1.0)
+    assert runtime.snapshot()["champions"]["capture_pending"] is True
+
+    next_start = asyncio.create_task(runtime.start(unlimited()))
+    await asyncio.sleep(0.05)
+    assert next_start.done() is False
+
+    release_capture.set()
+    await asyncio.wait_for(completion, timeout=2.0)
+    await asyncio.wait_for(next_start, timeout=2.0)
+    assert runtime.snapshot()["champions"]["capture_pending"] is False
+    assert runtime.state == "running"
+
+    await runtime.control("stop")
