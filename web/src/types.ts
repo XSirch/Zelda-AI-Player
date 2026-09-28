@@ -55,6 +55,22 @@ export interface ProviderQuota {
   error?: string | null;
 }
 
+export interface RunUsageBreakdown {
+  provider: string;
+  model: string;
+  effort: string | null;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  cached_input_tokens: number;
+  reasoning_output_tokens: number;
+  total_tokens: number;
+  unknown_usage_calls: number;
+  unknown_cost_calls: number;
+  known_cost_usd: number;
+  cost_usd: number | null;
+}
+
 export interface UsageSnapshot {
   provider: string | null;
   model: string | null;
@@ -141,6 +157,17 @@ export interface ChampionSummary {
   provider?: string | null;
   model?: string | null;
   effort?: string | null;
+  calls?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  cached_input_tokens?: number;
+  reasoning_output_tokens?: number;
+  total_tokens?: number;
+  cost_usd?: number | null;
+  known_cost_usd?: number;
+  unknown_usage_calls?: number;
+  unknown_cost_calls?: number;
+  usage_by_model?: RunUsageBreakdown[];
   sha256?: string;
 }
 

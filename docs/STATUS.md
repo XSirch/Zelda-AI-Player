@@ -16,6 +16,7 @@
 - High-level `AgentIntent` cognition contract with no skill/action selector.
 - Codex and OpenRouter intent providers.
 - Codex token usage accounting and independent quota polling.
+- Persisted run benchmark summary with frozen terminal elapsed time, input/output token totals, known/unknown cost semantics, per-provider/model usage breakdown, and the same benchmark fields embedded in completion champion metadata.
 - Bridge authority/watchdog remains the hard safety boundary for controller ownership.
 - Existing native scene autosave and structured observation telemetry remain available.
 - Automatic champion capture after training `game_completed`, plus frozen deterministic evaluation mode.

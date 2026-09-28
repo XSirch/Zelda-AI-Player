@@ -121,6 +121,8 @@ class AutonomyRuntime:
             "game_completions": 0,
             "interventions": 0,
             "vision_calls": 0,
+            "elapsed_s": 0.0,
+            "usage_by_model": [],
         }
 
     async def _db_write(self, func, *args, **kwargs):
@@ -567,9 +569,20 @@ class AutonomyRuntime:
             await asyncio.to_thread(controller.policy.save)
             telemetry = controller.telemetry()
             learning = telemetry.get("learning") or {}
+            summary = await asyncio.to_thread(self.store.benchmark, run_id)
+            metrics = (summary or {}).get("metrics")
+            if not isinstance(metrics, dict):
+                metrics = await asyncio.to_thread(self.store.metrics, run_id)
+            persisted_elapsed_s = (
+                (summary or {}).get("elapsed_s")
+                if isinstance(summary, dict)
+                else metrics.get("elapsed_s")
+            )
+            if not isinstance(persisted_elapsed_s, (int, float)):
+                persisted_elapsed_s = elapsed_s
             metadata = {
                 "run_id": run_id,
-                "elapsed_s": round(elapsed_s, 3),
+                "elapsed_s": round(float(persisted_elapsed_s), 3),
                 "contract": CONTRACT_VERSION,
                 "updates": int(learning.get("updates") or 0),
                 "samples_trained": int(learning.get("samples_trained") or 0),
@@ -582,6 +595,25 @@ class AutonomyRuntime:
                 "provider": config.provider,
                 "model": config.model,
                 "effort": config.effort,
+                "calls": int(metrics.get("calls") or 0),
+                "input_tokens": int(metrics.get("input_tokens") or 0),
+                "output_tokens": int(metrics.get("output_tokens") or 0),
+                "cached_input_tokens": int(
+                    metrics.get("cached_input_tokens") or 0
+                ),
+                "reasoning_output_tokens": int(
+                    metrics.get("reasoning_output_tokens") or 0
+                ),
+                "total_tokens": int(metrics.get("total_tokens") or 0),
+                "cost_usd": metrics.get("cost_usd"),
+                "known_cost_usd": float(metrics.get("known_cost_usd") or 0.0),
+                "unknown_usage_calls": int(
+                    metrics.get("unknown_usage_calls") or 0
+                ),
+                "unknown_cost_calls": int(
+                    metrics.get("unknown_cost_calls") or 0
+                ),
+                "usage_by_model": metrics.get("usage_by_model") or [],
             }
             champion = await asyncio.to_thread(
                 self.champions.capture,
@@ -1047,6 +1079,7 @@ class AutonomyRuntime:
         completion_run_id: str | None = None
         completion_elapsed_s = 0.0
         completion_config: RunConfig | None = None
+        cancelled_tasks: list[asyncio.Task] = []
         async with self.lock:
             if self.state not in {"running", "starting", "paused"} and state != "completed":
                 return
@@ -1063,6 +1096,7 @@ class AutonomyRuntime:
                 await self._db_write(self.store.update_run, self.run_id, status=state, reason=reason)
                 if state in {"stopped", "completed"}:
                     await self._db_write(self.store.end_segments, self.run_id)
+                await self._refresh_metrics(self.run_id)
             current = asyncio.current_task()
 
             # Controller exits from its active() predicate and is intentionally
@@ -1079,6 +1113,7 @@ class AutonomyRuntime:
                     task.cancel()
                     self.retired_tasks.add(task)
                     task.add_done_callback(self.retired_tasks.discard)
+                    cancelled_tasks.append(task)
 
             if (
                 state == "completed"
@@ -1104,6 +1139,18 @@ class AutonomyRuntime:
             self.tasks.clear()
             self.log("run_" + state, {"reason": reason})
             self.publish(True)
+
+        if state in {"stopped", "completed"}:
+            if cancelled_tasks:
+                await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+            await self._drain_persistence()
+            if self.run_id:
+                summary = await self._db_write(self.store.finalize_run, self.run_id)
+                if summary and isinstance(summary.get("metrics"), dict):
+                    self.metrics_cache = summary["metrics"]
+                    self.metrics_at = time.monotonic()
+                else:
+                    await self._refresh_metrics(self.run_id)
 
         if (
             completion_controller is not None
@@ -1216,7 +1263,11 @@ class AutonomyRuntime:
             "run_mode": self.config.run_mode if self.config else "train",
             "active_champion": self.active_champion,
             "champions": self.champion_status(),
-            "elapsed_s": round(time.monotonic() - self.started, 1) if self.run_id else 0.0,
+            "elapsed_s": (
+                round(float((self.metrics_cache or {}).get("elapsed_s") or 0.0), 1)
+                if self.run_id and self.state in {"stopped", "completed"}
+                else round(time.monotonic() - self.started, 1) if self.run_id else 0.0
+            ),
             "connection": {
                 "game": bool(bridge_status.get("connected")),
                 "source": bridge_status.get("source"),

@@ -16,6 +16,10 @@ runs = Table("runs", metadata,
     Column("source", String, nullable=False), Column("fingerprint", String, nullable=False),
     Column("assisted", Boolean, default=False), Column("mixed", Boolean, default=False),
     Column("reason", String, default=""))
+run_summaries = Table("run_summaries", metadata,
+    Column("run_id", String, primary_key=True), Column("finalized_at", Float, nullable=False),
+    Column("status", String, nullable=False), Column("reason", String, default=""),
+    Column("elapsed_s", Float, nullable=False), Column("metrics", JSON, nullable=False))
 segments = Table("segments", metadata,
     Column("id", String, primary_key=True), Column("run_id", String, index=True),
     Column("started_at", Float), Column("ended_at", Float), Column("config", JSON), Column("namespace", String))
@@ -171,12 +175,47 @@ class Store:
                 world_edges.c.namespace == namespace).order_by(
                     world_edges.c.updated_at.desc()).limit(limit)).mappings()]
 
+    def benchmark(self, run_id: str) -> dict | None:
+        with self.engine.connect() as conn:
+            row = conn.execute(select(run_summaries).where(
+                run_summaries.c.run_id == run_id
+            )).mappings().first()
+        return dict(row) if row else None
+
+    def finalize_run(self, run_id: str) -> dict | None:
+        metrics = self.metrics(run_id)
+        with self.engine.begin() as conn:
+            run = conn.execute(select(runs.c.status, runs.c.reason).where(
+                runs.c.id == run_id
+            )).mappings().first()
+            if run is None:
+                return None
+            values = {
+                "run_id": run_id,
+                "finalized_at": time.time(),
+                "status": run["status"],
+                "reason": run["reason"] or "",
+                "elapsed_s": float(metrics.get("elapsed_s") or 0.0),
+                "metrics": metrics,
+            }
+            exists = conn.execute(select(run_summaries.c.run_id).where(
+                run_summaries.c.run_id == run_id
+            )).first()
+            if exists:
+                conn.execute(run_summaries.update().where(
+                    run_summaries.c.run_id == run_id
+                ).values(**values))
+            else:
+                conn.execute(run_summaries.insert().values(**values))
+        return values
+
     def list_runs(self, limit: int = 50) -> list[dict]:
         with self.engine.connect() as conn:
             result = [dict(row) for row in conn.execute(select(runs).order_by(runs.c.created_at.desc())
                 .limit(limit)).mappings()]
         for run in result:
             run["metrics"] = self.metrics(run["id"])
+            run["benchmark"] = self.benchmark(run["id"])
         return result
 
     def detail(self, run_id: str) -> dict | None:
@@ -190,40 +229,127 @@ class Store:
                 result[name] = [dict(r) for r in conn.execute(select(table).where(table.c.run_id == run_id)
                     .order_by(order.desc()).limit(200)).mappings()]
         result["metrics"] = self.metrics(run_id)
+        result["benchmark"] = self.benchmark(run_id)
         return result
 
     def metrics(self, run_id: str) -> dict[str, Any]:
         with self.engine.connect() as conn:
             data = list(conn.execute(select(calls.c.usage, calls.c.latency_ms, calls.c.status,
                 calls.c.segment_id).where(calls.c.run_id == run_id)).mappings())
-            segment_providers = dict(conn.execute(select(segments.c.id, segments.c.config)
+            segment_configs = dict(conn.execute(select(segments.c.id, segments.c.config)
                 .where(segments.c.run_id == run_id)).all())
-            event_data = list(conn.execute(select(events.c.kind, events.c.data)
+            segment_times = list(conn.execute(select(segments.c.started_at, segments.c.ended_at)
+                .where(segments.c.run_id == run_id)).mappings())
+            event_data = list(conn.execute(select(events.c.kind, events.c.data, events.c.created_at)
                 .where(events.c.run_id == run_id)).mappings())
+            run_row = conn.execute(select(runs.c.created_at, runs.c.status)
+                .where(runs.c.id == run_id)).mappings().first()
+
         kinds = Counter(r["kind"] for r in event_data)
         totals = {key: 0 for key in ["input_tokens", "output_tokens", "cached_input_tokens", "reasoning_output_tokens"]}
         unknown_usage = unknown_cost = 0
         cost = 0.0
         codex_calls = 0
         latencies = []
+        breakdowns: dict[tuple[str, str, str | None], dict[str, Any]] = {}
+
         for row in data:
             usage = row["usage"] or {}
-            unknown_usage += int(usage.get("input_tokens") is None or usage.get("output_tokens") is None)
-            for key in totals:
-                totals[key] += usage.get(key) or 0
-            provider = segment_providers[row["segment_id"]]["provider"]
+            call_usage_unknown = usage.get("input_tokens") is None or usage.get("output_tokens") is None
+            unknown_usage += int(call_usage_unknown)
+            for token_key in totals:
+                totals[token_key] += usage.get(token_key) or 0
+
+            config = segment_configs.get(row["segment_id"]) or {}
+            provider = str(config.get("provider") or "unknown")
+            model = str(usage.get("actual_model") or config.get("model") or "unknown")
+            effort = config.get("effort")
             codex_calls += int(provider == "codex")
-            if provider == "openrouter" and usage.get("cost_usd") is None:
-                unknown_cost += 1
-            cost += usage.get("cost_usd") or 0
+            call_cost_unknown = provider == "openrouter" and usage.get("cost_usd") is None
+            unknown_cost += int(call_cost_unknown)
+            call_cost = usage.get("cost_usd") or 0
+            cost += call_cost
             if row["latency_ms"] is not None:
                 latencies.append(row["latency_ms"])
+
+            breakdown_key = (provider, model, effort)
+            bucket = breakdowns.setdefault(breakdown_key, {
+                "provider": provider,
+                "model": model,
+                "effort": effort,
+                "calls": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cached_input_tokens": 0,
+                "reasoning_output_tokens": 0,
+                "total_tokens": 0,
+                "unknown_usage_calls": 0,
+                "unknown_cost_calls": 0,
+                "known_cost_usd": 0.0,
+                "_cost_unknown": provider == "codex",
+            })
+            bucket["calls"] += 1
+            bucket["unknown_usage_calls"] += int(call_usage_unknown)
+            bucket["unknown_cost_calls"] += int(call_cost_unknown)
+            bucket["_cost_unknown"] = bucket["_cost_unknown"] or call_cost_unknown
+            bucket["known_cost_usd"] += call_cost
+            for token_key in totals:
+                bucket[token_key] += usage.get(token_key) or 0
+            bucket["total_tokens"] = bucket["input_tokens"] + bucket["output_tokens"]
+
+        usage_by_model = []
+        for bucket in breakdowns.values():
+            cost_unknown = bool(bucket.pop("_cost_unknown"))
+            bucket["known_cost_usd"] = round(bucket["known_cost_usd"], 8)
+            bucket["cost_usd"] = None if cost_unknown else bucket["known_cost_usd"]
+            usage_by_model.append(bucket)
+        usage_by_model.sort(key=lambda row: (
+            row["provider"], row["model"], row["effort"] or ""
+        ))
+
+        now = time.time()
+        run_status = run_row["status"] if run_row else None
+        started_at = float(run_row["created_at"]) if run_row else None
+        elapsed_s = 0.0
+        ended_at = None
+        if segment_times:
+            all_ended = all(row["ended_at"] is not None for row in segment_times)
+            for row in segment_times:
+                if row["started_at"] is None:
+                    continue
+                segment_end = row["ended_at"] if row["ended_at"] is not None else now
+                elapsed_s += max(0.0, float(segment_end) - float(row["started_at"]))
+            ended_values = [float(row["ended_at"]) for row in segment_times if row["ended_at"] is not None]
+            if all_ended and ended_values:
+                ended_at = max(ended_values)
+        elif started_at is not None:
+            terminal_events = [
+                float(row["created_at"]) for row in event_data
+                if row["kind"] in {"run_completed", "run_stopped", "run_interrupted"}
+                and row["created_at"] is not None
+            ]
+            ended_at = max(terminal_events) if terminal_events else None
+            effective_end = ended_at if ended_at is not None else now
+            elapsed_s = max(0.0, effective_end - started_at)
+
         bosses = {json.dumps(r["data"], sort_keys=True) for r in event_data if r["kind"] == "boss_defeated"}
-        return {**totals, "total_tokens": totals["input_tokens"] + totals["output_tokens"],
-            "calls": len(data), "unknown_usage_calls": unknown_usage, "unknown_cost_calls": unknown_cost,
-            "known_cost_usd": round(cost, 8), "cost_usd": None if codex_calls or unknown_cost else round(cost, 8),
+        return {
+            **totals,
+            "total_tokens": totals["input_tokens"] + totals["output_tokens"],
+            "calls": len(data),
+            "unknown_usage_calls": unknown_usage,
+            "unknown_cost_calls": unknown_cost,
+            "known_cost_usd": round(cost, 8),
+            "cost_usd": None if codex_calls or unknown_cost else round(cost, 8),
+            "usage_by_model": usage_by_model,
+            "run_status": run_status,
+            "started_at": started_at,
+            "ended_at": ended_at,
+            "elapsed_s": round(elapsed_s, 3),
             "mean_latency_ms": sum(latencies) / len(latencies) if latencies else None,
-            "deaths": kinds["player_died"], "boss_events": len(bosses),
+            "deaths": kinds["player_died"],
+            "boss_events": len(bosses),
             "game_completions": kinds["game_completed"],
             "interventions": kinds["human_hint"] + kinds["take_control"],
-            "vision_calls": 0}
+            "vision_calls": 0,
+        }

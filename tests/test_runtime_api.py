@@ -21,11 +21,76 @@ def test_metrics_and_memory_isolation(store):
         "reasoning_output_tokens": 30,
     }, latency_ms=50)
     metrics = store.metrics(run)
+    assert metrics["input_tokens"] == 100
+    assert metrics["output_tokens"] == 40
     assert metrics["total_tokens"] == 140 and metrics["cost_usd"] is None
+    assert metrics["usage_by_model"][0]["provider"] == "codex"
+    assert metrics["usage_by_model"][0]["model"] == "m"
+    assert metrics["usage_by_model"][0]["input_tokens"] == 100
+    assert metrics["usage_by_model"][0]["output_tokens"] == 40
+    assert metrics["usage_by_model"][0]["cost_usd"] is None
+
+    time.sleep(.01)
+    store.update_run(run, status="completed", reason="game_completed")
+    store.end_segments(run)
+    summary = store.finalize_run(run)
+    assert summary is not None
+    final_metrics = store.metrics(run)
+    assert summary["metrics"]["input_tokens"] == 100
+    assert summary["metrics"]["output_tokens"] == 40
+    assert summary["metrics"]["total_tokens"] == 140
+    assert summary["metrics"]["cost_usd"] is None
+    assert final_metrics["ended_at"] is not None
+    assert final_metrics["elapsed_s"] >= 0
+    final_elapsed = final_metrics["elapsed_s"]
+    time.sleep(.01)
+    assert store.metrics(run)["elapsed_s"] == final_elapsed
+
     store.remember("n1", 85, "A tentative route")
     store.remember("n1", 85, "A tentative route")
     assert len(store.recall("n1", 85)) == 1
     assert store.recall("n2", 85) == []
+
+
+def test_mixed_run_benchmark_keeps_known_cost_without_inventing_total(store):
+    codex = RunConfig(provider="codex", model="gpt-test").model_dump()
+    run = store.new_run(codex, "soh", "fingerprint")
+    codex_segment = store.segment(run, codex, "n1")
+    codex_call = store.begin_call(run, codex_segment, {})
+    store.finish_call(codex_call, status="completed", usage={
+        "input_tokens": 80,
+        "output_tokens": 20,
+        "cost_usd": None,
+        "actual_model": "gpt-test",
+    }, latency_ms=25)
+
+    openrouter = RunConfig(provider="openrouter", model="vendor/model").model_dump()
+    openrouter_segment = store.segment(run, openrouter, "n1")
+    openrouter_call = store.begin_call(run, openrouter_segment, {})
+    store.finish_call(openrouter_call, status="completed", usage={
+        "input_tokens": 120,
+        "output_tokens": 30,
+        "cost_usd": 0.05,
+        "actual_model": "vendor/model",
+    }, latency_ms=30)
+
+    store.update_run(run, status="completed", mixed=True, reason="game_completed")
+    store.end_segments(run)
+    summary = store.finalize_run(run)
+    assert summary is not None
+    metrics = store.metrics(run)
+
+    assert metrics["input_tokens"] == 200
+    assert metrics["output_tokens"] == 50
+    assert metrics["total_tokens"] == 250
+    assert metrics["known_cost_usd"] == 0.05
+    assert metrics["cost_usd"] is None
+    assert len(metrics["usage_by_model"]) == 2
+    by_provider = {row["provider"]: row for row in metrics["usage_by_model"]}
+    assert by_provider["codex"]["cost_usd"] is None
+    assert by_provider["openrouter"]["cost_usd"] == 0.05
+    assert summary["metrics"]["known_cost_usd"] == 0.05
+    assert summary["metrics"]["cost_usd"] is None
 
 
 def test_restart_does_not_resume_run(tmp_path):
@@ -113,6 +178,12 @@ def test_api_controls_security_and_end_to_end_demo(tmp_path):
         assert stopped.json()["input"]["buttons"] == 0
         assert stopped.json()["input"]["stick_x"] == 0
         assert stopped.json()["input"]["stick_y"] == 0
+
+        final_detail = client.get(f"/api/runs/{run_id}").json()
+        assert final_detail["benchmark"]["status"] == "stopped"
+        assert final_detail["benchmark"]["elapsed_s"] >= 0
+        assert final_detail["benchmark"]["metrics"]["input_tokens"] >= 0
+        assert final_detail["benchmark"]["metrics"]["output_tokens"] >= 0
 
         assert client.post(
             "/api/diagnostics/input", json={"action": "tap_a"}, headers=headers
