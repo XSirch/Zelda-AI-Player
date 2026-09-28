@@ -252,6 +252,7 @@ class AutonomyRuntime:
                     "to_room": state.room,
                 },
             )
+            self._request_cognition("world_transition")
 
         if old:
             if not old.dialogue.active and state.dialogue.active:
@@ -278,6 +279,8 @@ class AutonomyRuntime:
                     f"{state.scene_name or state.scene}/room {state.room}: "
                     f"{dialogue_evidence}",
                 )
+                if state.dialogue.choice_count > 0:
+                    self._request_cognition("dialogue_choice")
             elif state.dialogue.active and (
                 old.dialogue.text_id != state.dialogue.text_id
                 or old.dialogue.text != state.dialogue.text
@@ -290,6 +293,18 @@ class AutonomyRuntime:
                 if not self.dialogue_transcript or self.dialogue_transcript[-1] != entry:
                     self.dialogue_transcript.append(entry)
                 self.log("dialogue_changed", entry)
+                if state.dialogue.choice_count > 0:
+                    self._request_cognition("dialogue_choice")
+
+            if old.dialogue.active and not state.dialogue.active:
+                # Linear text/signposts do not need LLM calls. Replan only after
+                # a real NPC/choice interaction has finished.
+                if old.dialogue.speaker is not None or old.dialogue.choice_count > 0:
+                    self._request_cognition("dialogue_resolved")
+
+            if self._progress_signature(old) != self._progress_signature(state):
+                self._request_cognition("durable_progress")
+
             old_items = {row.item_id: row.name for row in old.inventory_named}
             new_items = {row.item_id: row.name for row in state.inventory_named}
             acquired_items = [
@@ -317,12 +332,16 @@ class AutonomyRuntime:
 
             if old.player and state.player and old.player.health > 0 and state.player.health == 0:
                 self.log("player_died", {"scene": state.scene, "room": state.room})
+                self._request_cognition("player_died")
                 self._persist(
                     self.store.remember,
                     self.namespace,
                     state.scene,
                     f"Death observed in {state.scene_name or state.scene}/room {state.room}.",
                 )
+
+            if old.game_over_state == 0 and state.game_over_state != 0:
+                self._request_cognition("game_over")
 
         for event in state.events:
             key = f"{state.instance_id}:{event.id}"
@@ -333,6 +352,8 @@ class AutonomyRuntime:
             while len(self.seen_event_order) > 4096:
                 self.seen_events.discard(self.seen_event_order.popleft())
             self.log(event.kind, {"detail": event.detail, "scene": state.scene, "room": state.room})
+            if event.kind == "boss_defeated":
+                self._request_cognition("boss_defeated")
             if event.kind == "game_completed" and self.state == "running":
                 asyncio.create_task(self.halt("completed", "game_completed"))
 
