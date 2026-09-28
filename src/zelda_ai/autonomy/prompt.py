@@ -33,6 +33,8 @@ Intent modes:
 - interact: attempt the current contextual interaction or an observed actor.
 - combat: engage/react to an observed hostile actor.
 - dialogue: handle a semantic dialogue choice; linear advancement is local.
+  Do not abandon a stable objective merely because a signpost or linear text box
+  is temporarily active.
 - menu: pursue an inventory/equipment/menu objective.
 - observe: temporarily avoid committing to a route while waiting for a meaningful
   state change or while evidence is insufficient.
