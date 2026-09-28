@@ -22,8 +22,10 @@ IMPORTANT ARCHITECTURE:
   reconsideration; do not ask for periodic refreshes or micromanage transient state.
 - trigger_reasons tells you why this call happened. If that evidence does not
   invalidate the current intent, preserve the current objective instead of
-  inventing a new plan. For motor_stuck, change strategy only when the evidence
-  suggests the current target/intent is not producing useful progress.
+  inventing a new plan. For motor_stuck or local_area_stuck, change strategy
+  only when the evidence suggests the current target/intent is not producing
+  useful progress. local_area_stuck means the motor kept moving but failed to
+  expand into a new coarse region or achieve meaningful game progress.
 - target_position must come from an actually observed coordinate in the supplied
   state/world memory. Never invent coordinates.
 - target_actor_id/params/uid must identify an actually observed actor.
