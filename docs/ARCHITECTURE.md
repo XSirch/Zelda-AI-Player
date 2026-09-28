@@ -50,7 +50,9 @@ Stopping revokes bridge authority first. An already-running gradient update may 
 
 `AgentIntent` contains objective, short spectator summary, mode, optional observed actor/coordinate target, optional direction/choice and a bounded horizon. It contains no skill name and no raw controller action.
 
-The cognition prompt can use structured game state, dialogue, observed actors, current ML telemetry, learned world edges and recent events. Unknown transitions remain unknown until observed.
+The cognition prompt uses a compact strategic subset of structured game state, dialogue, observed actors, ML progress, learned world edges and recent events. Unknown transitions remain unknown until observed.
+
+Cognition is sparse and event-driven. There is one initial call; subsequent calls are requested only by strategic evidence such as a scene/room transition, durable progress, semantic dialogue choice/resolution, death/game-over, boss defeat, or sustained motor stagnation. Target/context-action churn does not trigger cognition, and `AgentIntent.horizon_ms` is not a periodic refresh timer. Stuck replanning starts only after 90 seconds without useful progress and is rate-limited to at most one stuck-triggered request per 180 seconds.
 
 ## Reward
 
