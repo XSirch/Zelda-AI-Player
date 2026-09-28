@@ -227,6 +227,44 @@ class AutonomyRuntime:
         self.cognition_seen_dialogue_triggers.add(key)
         self._request_cognition(reason)
 
+    def _check_intent_target_reached(self, state):
+        if not self.controller or not state.player:
+            return
+        intent = self.controller.intent
+        point = target_point(state, intent)
+        if point is None:
+            return
+        distance = math.dist(state.player.position, point)
+        threshold = 95.0 if (
+            intent.target_actor_uid is not None
+            or intent.target_actor_id is not None
+            or intent.mode == "interact"
+        ) else 80.0
+        if distance > threshold:
+            return
+        key = (
+            state.scene,
+            state.room,
+            intent.mode,
+            intent.target_actor_uid,
+            intent.target_actor_id,
+            intent.target_actor_params,
+            tuple(intent.target_position) if intent.target_position is not None else None,
+            intent.target_item_id,
+        )
+        if key in self.cognition_seen_target_reached:
+            return
+        self.cognition_seen_target_reached.add(key)
+        self.log(
+            "intent_target_reached",
+            {
+                "distance": round(distance, 2),
+                "target": list(point),
+                "mode": intent.mode,
+            },
+        )
+        self._request_cognition("intent_target_reached")
+
     def _request_cognition(self, reason: str):
         if self.state != "running":
             return
