@@ -53,6 +53,8 @@ class LearnedRouteGraph:
         self.last_scene_room: tuple[int, int] | None = None
         self.dirty = False
         self.new_edges_since_save = 0
+        self.revision = 0
+        self.last_failed_search: tuple[str, str, int] | None = None
         self.last_save_at = 0.0
         self.routes_reused = 0
         self.active_target_signature: str | None = None
@@ -130,6 +132,7 @@ class LearnedRouteGraph:
         self.active_target_node_id = None
         self.active_path = []
         self.counted_route_target_id = None
+        self.last_failed_search = None
 
     def _touch_node(self, scene: int, room: int, position, now_s: float) -> str:
         node_id = _node_id(scene, room, position)
@@ -146,6 +149,8 @@ class LearnedRouteGraph:
             }
             self.nodes[node_id] = row
             self._index_node(node_id, row)
+            self.revision += 1
+            self.last_failed_search = None
             self.dirty = True
         else:
             visits = max(1, int(existing.get("visits") or 1))
@@ -197,6 +202,8 @@ class LearnedRouteGraph:
                         "updated_at": now_s,
                     }
                     self.new_edges_since_save += 1
+                    self.revision += 1
+                    self.last_failed_search = None
                     edge_added = True
                 else:
                     traversals = max(1, int(edge.get("traversals") or 1))
@@ -359,8 +366,14 @@ class LearnedRouteGraph:
                 path = self.active_path[start_index:]
 
         if path is None:
+            search_key = (start_id, target_id, self.revision)
+            if self.last_failed_search == search_key:
+                self.last_path_nodes = 0
+                self.last_target_gap = target_gap
+                return None
             path = self._shortest_path(start_id, target_id)
             self.active_path = list(path or ())
+            self.last_failed_search = None if path else search_key
 
         if not path or len(path) < 2:
             self.active_path = list(path or ())
@@ -408,6 +421,7 @@ class LearnedRouteGraph:
             "routes_reused": self.routes_reused,
             "last_path_nodes": self.last_path_nodes,
             "cached_path_nodes": len(self.active_path),
+            "revision": self.revision,
             "last_target_gap": (
                 round(self.last_target_gap, 1)
                 if isinstance(self.last_target_gap, (int, float))
