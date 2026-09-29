@@ -950,6 +950,7 @@ class AutonomyRuntime:
                     "local_frontier_radius", 0.0
                 ),
                 "reward_breakdown": learning.get("reward_breakdown", {}),
+                "route_memory": learning.get("route_memory", {}),
                 "recent_achievements": (learning.get("achievements") or [])[-4:],
             }
             recent_for_model = [
