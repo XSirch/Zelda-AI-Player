@@ -101,6 +101,7 @@ class ContinuousController:
             "target": None,
             "blocked": False,
             "detour": None,
+            "direct_probe": None,
             "stuck_scale": 1.0,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
@@ -125,6 +126,7 @@ class ContinuousController:
             "target": None,
             "blocked": False,
             "detour": None,
+            "direct_probe": None,
             "stuck_scale": 1.0,
         }
         self.last_reward = 0.0
@@ -152,6 +154,7 @@ class ContinuousController:
             "target": None,
             "blocked": False,
             "detour": None,
+            "direct_probe": None,
             "stuck_scale": 1.0,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
