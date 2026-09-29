@@ -138,9 +138,15 @@ export interface LearningSnapshot {
     routes_reused: number;
     waypoints_advanced?: number;
     last_path_nodes: number;
+    cached_path_nodes?: number;
+    exhausted_partial_nodes?: number;
+    revision?: number;
+    persistence_revision?: number;
+    dirty?: boolean;
     last_target_gap: number | null;
     writable: boolean;
     load_error?: string | null;
+    save_error?: string | null;
   };
   last_update?: Record<string, unknown>;
   checkpoint_load_error?: string;
