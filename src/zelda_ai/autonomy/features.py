@@ -217,6 +217,7 @@ def goal_guidance(
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_waypoint_id": None,
             "route_partial": False,
         }
 
@@ -232,6 +233,7 @@ def goal_guidance(
     route_confidence = 0.0
     route_target_gap = None
     route_waypoint = None
+    route_waypoint_id = None
     route_partial = False
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
@@ -265,6 +267,12 @@ def goal_guidance(
         ):
             route_active = True
             route_waypoint = tuple(float(value) for value in waypoint)
+            waypoint_id = route_hint.get("waypoint_id")
+            route_waypoint_id = (
+                str(waypoint_id)[:160]
+                if waypoint_id is not None
+                else None
+            )
             point = route_waypoint
             source = "learned_route"
             route_path_nodes = max(0, int(route_hint.get("path_nodes") or 0))
@@ -325,7 +333,7 @@ def goal_guidance(
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
 
         dwell = max(0.0, float(local_dwell_seconds or 0.0))
-        if dwell <= 90.0:
+        if route_active or dwell <= 90.0:
             stuck_scale = 1.0
         else:
             stuck_scale = max(
@@ -354,6 +362,7 @@ def goal_guidance(
             "route_confidence": route_confidence,
             "route_target_gap": route_target_gap,
             "route_waypoint": route_waypoint,
+            "route_waypoint_id": route_waypoint_id,
             "route_partial": route_partial,
         }
 
@@ -387,6 +396,7 @@ def goal_guidance(
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_waypoint_id": None,
             "route_partial": False,
         }
 
@@ -407,6 +417,7 @@ def goal_guidance(
         "route_confidence": 0.0,
         "route_target_gap": None,
         "route_waypoint": None,
+        "route_waypoint_id": None,
         "route_partial": False,
     }
 
