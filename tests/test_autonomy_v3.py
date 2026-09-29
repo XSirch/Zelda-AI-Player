@@ -6,7 +6,7 @@ from zelda_ai.autonomy.features import BASE_FEATURE_DIM, FEATURE_DIM, STACK_FRAM
 from zelda_ai.autonomy.ml_policy import OnlinePPO
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.reward import RewardTracker
-from zelda_ai.models import EquipmentObservation, GameEvent, InventoryObservation
+from zelda_ai.models import EquipmentObservation, GameEvent, InventoryObservation, NavigationProbe
 
 
 def test_agent_intent_schema_is_strict_and_not_a_skill_contract():
@@ -90,6 +90,79 @@ def test_goal_guidance_is_camera_relative(state):
     rotated = goal_guidance(state, east)
     assert abs(rotated["stick"][0]) < 0.05
     assert rotated["stick"][1] > 0.95
+
+
+def test_goal_guidance_detours_around_observed_wall(state):
+    state.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=True,
+            wall_distance=35.0,
+        ),
+        NavigationProbe(
+            direction="forward_right",
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+        NavigationProbe(
+            direction="right",
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (0.0, 0.0, 500.0),
+    })
+
+    guidance = goal_guidance(state, intent)
+
+    assert guidance["active"] is True
+    assert guidance["blocked"] is True
+    assert guidance["direct_probe"] == "forward"
+    assert guidance["detour"] == "forward_right"
+    assert "detour:forward_right" in guidance["source"]
+    assert 0.5 < guidance["strength"] < 0.86
+
+
+def test_goal_guidance_fades_unreachable_target_after_long_dwell(state):
+    blocked = []
+    for direction in (
+        "forward", "forward_right", "right", "back_right",
+        "back", "back_left", "left", "forward_left",
+    ):
+        blocked.append(NavigationProbe(
+            direction=direction,
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=True,
+            wall_distance=25.0,
+        ))
+    state.navigation_probes = blocked
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (0.0, 0.0, 500.0),
+    })
+
+    guidance = goal_guidance(state, intent, local_dwell_seconds=400.0)
+
+    assert guidance["blocked"] is True
+    assert guidance["detour"] is None
+    assert guidance["stuck_scale"] == pytest.approx(0.25)
+    assert guidance["strength"] < 0.1
+    assert guidance["button_quiet"] < 0.05
 
 
 def test_goal_guidance_uses_observed_vertical_traversal(state):
@@ -419,6 +492,31 @@ def test_vertical_movement_counts_as_new_space(state):
     assert "stagnation" not in result.breakdown
 
 
+
+
+def test_stale_waypoint_stops_rewarding_return_to_same_target(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (400.0, 0.0, 0.0),
+    })
+
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0, now_s=0.0)
+
+    early = state.model_copy(deep=True)
+    early.player.position = (10.0, 0.0, 0.0)
+    early_result = tracker.step(
+        early, intent, intrinsic=0.0, pressed_buttons=0, now_s=30.0
+    )
+    assert early_result.breakdown.get("intent_progress", 0.0) > 0
+
+    stale = state.model_copy(deep=True)
+    stale.player.position = (20.0, 0.0, 0.0)
+    stale_result = tracker.step(
+        stale, intent, intrinsic=0.0, pressed_buttons=0, now_s=200.0
+    )
+    assert "intent_progress" not in stale_result.breakdown
+    assert stale_result.breakdown.get("local_dwell", 0.0) < 0
 
 
 def test_frontier_progress_rewards_only_new_outward_radius(state):
