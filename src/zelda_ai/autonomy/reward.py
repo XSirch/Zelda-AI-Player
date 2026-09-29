@@ -66,6 +66,9 @@ class RewardTracker:
         self.seen_contexts: set[tuple[int, int, int, str | None]] = set()
         self.seen_transitions: set[tuple[int, int, int, int]] = set()
         self.seen_route_waypoints: set[str] = set()
+        self.last_route_waypoint_reached: str | None = None
+        self.route_waypoint_advanced = False
+        self.route_waypoints_advanced = 0
         self.objective_score = 0
         self.combat_contact = False
         self.seen_inventory_items: set[int] = set()
@@ -77,6 +80,8 @@ class RewardTracker:
         self.local_anchor_distance = 0.0
         self.local_frontier_radius = 0.0
         self.local_dwell_penalty = 0.0
+        self.last_route_waypoint_reached = None
+        self.route_waypoint_advanced = False
         self.rupees_collected = 0
         self.ammo_collected = 0
         self.health_recovered = 0
@@ -261,6 +266,7 @@ class RewardTracker:
     ) -> RewardResult:
         now_s = time.monotonic() if now_s is None else float(now_s)
         current = self._snapshot(game, intent)
+        self.route_waypoint_advanced = False
         b: dict[str, float] = {}
         achievements: list[dict] = []
         done = False
@@ -684,8 +690,14 @@ class RewardTracker:
                 if abs(shaped_progress) > 1e-9:
                     b["intent_progress"] = shaped_progress
 
+        if previous is not None and previous["intent_key"] != current["intent_key"]:
+            # A route waypoint belongs to the intent that selected it. Do not
+            # credit a late arrival after cognition has already changed goals.
+            self.last_route_waypoint_reached = None
+
         if (
             previous is not None
+            and previous["intent_key"] == current["intent_key"]
             and guidance
             and guidance.get("route_active")
             and current.get("position") is not None
@@ -695,7 +707,6 @@ class RewardTracker:
             if (
                 isinstance(waypoint_id, str)
                 and waypoint_id
-                and waypoint_id not in self.seen_route_waypoints
                 and isinstance(waypoint, (list, tuple))
                 and len(waypoint) == 3
             ):
@@ -706,11 +717,21 @@ class RewardTracker:
                     )
                 except (TypeError, ValueError):
                     route_distance = float("inf")
-                if route_distance <= 95.0:
-                    self.seen_route_waypoints.add(waypoint_id)
-                    b["route_waypoint"] = 0.12
+                if (
+                    route_distance <= 95.0
+                    and waypoint_id != self.last_route_waypoint_reached
+                ):
+                    self.last_route_waypoint_reached = waypoint_id
+                    self.route_waypoint_advanced = True
+                    self.route_waypoints_advanced += 1
+                    # Reward a route node only once per run so replaying a known
+                    # path cannot farm PPO reward. The progress flag still
+                    # resets dwell/stuck timers on later legitimate replays.
+                    if waypoint_id not in self.seen_route_waypoints:
+                        self.seen_route_waypoints.add(waypoint_id)
+                        b["route_waypoint"] = 0.12
 
-        route_waypoint_progress = b.get("route_waypoint", 0.0) > 0
+        route_waypoint_progress = self.route_waypoint_advanced
         major_progress_keys = {
             "new_world_transition",
             "durable_progress",
