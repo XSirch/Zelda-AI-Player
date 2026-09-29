@@ -168,6 +168,7 @@ class LearnedRouteGraph:
         except (OSError, ValueError, TypeError) as exc:
             self.nodes = {}
             self.edges = {}
+            self.interactions = {}
             self.by_scene = {}
             self.load_error = f"{type(exc).__name__}: {str(exc)[:160]}"
 
