@@ -396,19 +396,21 @@ def goal_guidance(
                 "explore": 0.74,
                 "observe": 0.62,
             }.get(intent.mode, 0.68)
-        # Ordinary targets fade near the waypoint so learned interaction/
-        # traversal behaviour can take over instead of orbiting the point.
-        # Scene exits are different: they are explicit native transition surfaces.
-        # Once selected, keep steering authority high all the way to the threshold;
-        # contextual interaction probing neutralizes the stick separately.
+        # Direct cognition targets may be stale/unreachable, so they keep
+        # the anti-attractor fade. Empirically learned routes, observed frontiers,
+        # and native scene exits already have their own validity/expiry logic and
+        # must remain authoritative until their current waypoint is actually hit.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
-        if exit_active:
+        if route_active or frontier_active or exit_active:
             proximity = 1.0
 
         dwell = max(0.0, float(local_dwell_seconds or 0.0))
-        if exit_active:
-            # Long dwell is the reason exits become prioritized. Do not then
-            # weaken the selected exit because the same dwell timer is large.
+        if route_active or frontier_active or exit_active:
+            # A partial learned route is retired by route-memory endpoint
+            # exhaustion; frontiers are recomputed from current probes; exits
+            # are explicit native transition surfaces. Weakening any of these
+            # because local dwell is large hands control back to PPO residual
+            # exactly when structured navigation is most needed.
             stuck_scale = 1.0
         elif dwell <= 90.0:
             stuck_scale = 1.0
