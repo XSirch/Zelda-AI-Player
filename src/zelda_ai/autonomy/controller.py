@@ -278,6 +278,7 @@ class ContinuousController:
         }
         useful = any(reward.breakdown.get(key, 0.0) > 0 for key in useful_keys)
         useful = useful or reward.breakdown.get("intent_progress", 0.0) > 0.01
+        useful = useful or self.reward_tracker.route_waypoint_advanced
         self.useful_progress_window.append(bool(useful))
         if useful:
             self.last_useful_progress_at = time.monotonic()
@@ -549,7 +550,10 @@ class ContinuousController:
                     ),
                 },
                 "reward_breakdown": self.last_reward_breakdown,
-                "route_memory": self.route_graph.stats(),
+                "route_memory": {
+                    **self.route_graph.stats(),
+                    "waypoints_advanced": self.reward_tracker.route_waypoints_advanced,
+                },
                 "last_update": self.last_training_stats,
             },
         }
