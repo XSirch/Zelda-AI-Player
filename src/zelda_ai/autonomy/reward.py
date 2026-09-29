@@ -255,6 +255,7 @@ class RewardTracker:
         *,
         intrinsic: float,
         pressed_buttons: int,
+        guidance: dict | None = None,
         now_s: float | None = None,
     ) -> RewardResult:
         now_s = time.monotonic() if now_s is None else float(now_s)
@@ -643,10 +644,12 @@ class RewardTracker:
                         ))
 
             old_dist, new_dist = previous["target_distance"], current["target_distance"]
+            guidance_blocked = bool(guidance and guidance.get("blocked"))
             if (
                 previous["intent_key"] == current["intent_key"]
                 and old_dist is not None
                 and new_dist is not None
+                and not guidance_blocked
             ):
                 improvement = max(-60.0, min(60.0, old_dist - new_dist))
                 raw_intent_progress = max(
