@@ -10,7 +10,7 @@ Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
 - **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor. A cognição é **sparse/event-driven**: uma chamada inicial e novas chamadas somente em eventos estratégicos (transição, progresso durável, escolha/resolução relevante de diálogo, morte/boss) ou após stuck sustentado. Não existe refresh periódico por `horizon_ms`.
 
-A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto. O steering prior é calculado apenas de coordenadas/direções observadas e da câmera atual; ele não conhece rotas ocultas. O checkpoint persistente continua em `.local/ml/raw-controller-ppo-rnd-v2.pt`, portanto o aprendizado existente é reaproveitado.
+A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto. O steering prior é calculado apenas de coordenadas/direções observadas e da câmera atual; ele não conhece rotas ocultas. O checkpoint persistente continua em `.local/ml/raw-controller-ppo-rnd-v2.pt`, portanto o aprendizado existente é reaproveitado. Em paralelo, o controlador mantém uma memória topológica persistente em `.local/ml/route-graph-v1.json`, construída somente a partir de trajetos que Link realmente percorreu.
 
 ### Goal-conditioned motor
 
@@ -21,6 +21,14 @@ O guidance v4 também usa os oito probes locais de colisão já observados pela 
 Quando existe guidance forte de navegação, uma prior moderada também reduz a probabilidade-base de button-mashing, sem bloquear nenhum botão: logits aprendidos pelo PPO ainda podem superar esse viés. Perto de obstáculo essa supressão de botões é reduzida para deixar a política testar ações de travessia. Em `combat`, `dialogue` e `menu` o steering prior fica desligado.
 
 Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
+
+### Rotas aprendidas
+
+A route memory v1 transforma deslocamento real em um **grafo topológico dirigido**. Aproximadamente a cada célula de 80×50×80 unidades realmente atravessada, o controlador registra um nó e conecta somente o trecho que Link de fato percorreu. Não são criadas arestas reversas automaticamente, atalhos através de paredes nem conhecimento de collision que nunca foi visitado.
+
+Quando a cognição pede um `target_position`/ator e existe uma sequência já percorrida que termina perto desse alvo, o controlador calcula o caminho de menor custo no **grafo observado** e usa o próximo waypoint aprendido como guidance. Isso permite que um contorno descoberto por exploração aleatória seja repetido depois como A → B → C → D, em vez de voltar a apontar em linha reta para a parede. Trechos percorridos mais vezes recebem uma preferência pequena por confiabilidade.
+
+A memória é incremental e persistente entre runs. Ela não consegue inventar uma rota para uma área nunca alcançada: nesse caso continuam valendo exploração, probes locais de colisão e cognição. Runs de avaliação carregam a cópia read-only congelada junto com o champion, para que uma avaliação posterior não seja alterada por rotas aprendidas depois.
 
 ## Reward
 
@@ -58,7 +66,7 @@ Circular por células pequenas, revisitar macro-regiões já conhecidas ou apert
 
 Esse mesmo relógio participa do detector de stuck da cognição: aos 90 s sem expansão local, o Luna pode receber um evento `local_area_stuck`, ainda sujeito ao cooldown de 180 s entre replans por stuck.
 
-**Frontier progress:** punição negativa sozinha não indica qual ação é melhor. A reward v6 também mantém o maior raio alcançado desde a última expansão/progresso. Aumentar esse raio pela primeira vez gera `frontier_progress`; andar em círculos no mesmo raio não paga. Entrar numa nova macro-região rende `new_macro_region +0.8`. Quando a cognição fornece um alvo observado, `intent_progress` é simétrico para aproximar/afastar. Se o guidance executado estava bloqueado por colisão, esse shaping de distância reta é suprimido imediatamente para não punir um desvio; fora de bloqueio ele começa a desaparecer após 60 s sem expansão/progresso e chega a zero após mais 120 s. Assim, afastar-se e voltar para o mesmo waypoint obstruído não forma um reward loop.
+**Frontier progress:** punição negativa sozinha não indica qual ação é melhor. A reward v6 também mantém o maior raio alcançado desde a última expansão/progresso. Aumentar esse raio pela primeira vez gera `frontier_progress`; andar em círculos no mesmo raio não paga. Entrar numa nova macro-região rende `new_macro_region +0.8`. Quando a cognição fornece um alvo observado, `intent_progress` é simétrico para aproximar/afastar. Se o guidance executado estava bloqueado por colisão **ou reproduzindo uma rota aprendida**, esse shaping de distância reta é suprimido imediatamente: um contorno correto pode aumentar temporariamente a distância Euclidiana até o destino. Fora desses casos ele começa a desaparecer após 60 s sem expansão/progresso e chega a zero após mais 120 s. Assim, afastar-se para contornar uma parede não é punido e voltar para o mesmo waypoint obstruído não forma um reward loop.
 
 **Coletas e baús:** a reward v6 também premia ganho observado de rupees, munição, vida e magia. O reward usa o **delta real do estado**: se a carteira, munição, vida ou magia já estiverem cheias e a coleta não aumentar o valor, o bônus é zero. Primeira aquisição de um item continua usando o milestone persistente mais forte, sem somar o bônus de ammo inicial. A bridge v3.1 emite `chest_opened` a partir do treasure flag nativo, uma única vez por baú, gerando reward e conquista próprios.
 
@@ -76,7 +84,7 @@ Quando uma run de **treino** emite o evento nativo `game_completed`, o runtime e
   best-completion.json
 ```
 
-Cada completion guarda SHA-256 e metadados da run: tempo final, chamadas de cognição, tokens de input/output (além de cache/reasoning), custo reportado, breakdown por provider/modelo, updates, amostras, reward e modelo de cognição. `best-completion.pt` é apenas um alias atualizável para o menor tempo de conclusão observado; os arquivos `completion-XXXX.pt` nunca são sobrescritos.
+Cada completion guarda SHA-256 e metadados da run: tempo final, chamadas de cognição, tokens de input/output (além de cache/reasoning), custo reportado, breakdown por provider/modelo, updates, amostras, reward, modelo de cognição e estatísticas da route memory. O grafo de rotas usado naquele completion também é copiado para `completion-XXXX.routes.json` com SHA-256 próprio. `best-completion.pt` é apenas um alias atualizável para o menor tempo de conclusão observado; os arquivos individuais de policy/rotas nunca são sobrescritos.
 
 O benchmark da run também fica no banco. As métricas ao vivo continuam derivadas das chamadas/segmentos, mas ao encerrar normalmente a run o runtime grava um snapshot final em `run_summaries`, exposto como `benchmark` em `GET /api/runs/{run_id}`. Nele, `elapsed_s` fica congelado e os campos `input_tokens`, `output_tokens`, `total_tokens`, `known_cost_usd` e `usage_by_model` preservam o consumo final. `cost_usd` permanece `null` quando o custo total não pode ser conhecido (por exemplo, Codex autenticado via ChatGPT ou uma chamada OpenRouter sem custo retornado), evitando transformar custo desconhecido em zero.
 
@@ -105,6 +113,7 @@ A interface principal mostra somente:
 - cache e reasoning tokens;
 - custo API quando o provider reporta USD (ou custo parcial conhecido em runs mistas);
 - cota restante do Codex/ChatGPT;
+- route memory (nós, trechos e reusos) e indicação `rota aprendida` quando o guidance estiver reproduzindo um caminho observado;
 - **INICIAR / PARAR** e **AVALIAR CHAMPION** quando houver um completion salvo.
 
 Para Codex autenticado por ChatGPT, o app-server fornece tokens, mas custo em USD permanece **—** quando não há cobrança API reportada. A cota é lida separadamente por `account/rateLimits/read`, sem chamada de modelo, e mostra somente as janelas realmente devolvidas pelo Codex.
