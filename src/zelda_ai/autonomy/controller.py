@@ -50,6 +50,7 @@ class ContinuousController:
 
     tick_s = 0.05
     action_repeat_ticks = 2
+    route_save_interval_s = 20.0
 
     def __init__(
         self,
@@ -397,7 +398,10 @@ class ContinuousController:
         """Persist route learning outside the realtime control loop."""
         while not stop_event.is_set():
             try:
-                await asyncio.wait_for(stop_event.wait(), timeout=20.0)
+                await asyncio.wait_for(
+                    stop_event.wait(),
+                    timeout=self.route_save_interval_s,
+                )
                 break
             except asyncio.TimeoutError:
                 pass
