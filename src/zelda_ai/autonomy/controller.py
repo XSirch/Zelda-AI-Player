@@ -426,8 +426,6 @@ class ContinuousController:
                 except RuntimeError:
                     pass
 
-                if self.route_graph.should_save():
-                    await asyncio.to_thread(self.route_graph.save)
                 publish()
                 await asyncio.sleep(self.tick_s)
         finally:
