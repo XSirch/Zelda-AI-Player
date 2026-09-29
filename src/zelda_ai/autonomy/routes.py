@@ -68,6 +68,8 @@ class LearnedRouteGraph:
         self.active_target_node_id: str | None = None
         self.active_path: list[str] = []
         self.counted_route_target_signature: str | None = None
+        self.exhausted_partial_nodes: set[str] = set()
+        self.exhaustion_revision = 0
         self.last_path_nodes = 0
         self.last_target_gap: float | None = None
         self.load_error = ""
@@ -146,6 +148,8 @@ class LearnedRouteGraph:
         self.active_target_node_id = None
         self.active_path = []
         self.counted_route_target_signature = None
+        self.exhausted_partial_nodes.clear()
+        self.exhaustion_revision = self.revision
         self.last_failed_search = None
 
     def _touch_node(
@@ -323,10 +327,13 @@ class LearnedRouteGraph:
         self,
         start_id: str,
         target_position,
+        *,
+        excluded_endpoints: set[str] | None = None,
     ) -> tuple[list[str] | None, float | None]:
         if start_id not in self.nodes:
             return None, None
 
+        excluded_endpoints = excluded_endpoints or set()
         queue: list[tuple[float, str]] = [(0.0, start_id)]
         costs = {start_id: 0.0}
         previous: dict[str, str] = {}
@@ -346,7 +353,7 @@ class LearnedRouteGraph:
             # preferring an enormous historical loop just to end a few units
             # closer to the target.
             score = gap + current_cost * 0.25
-            if (
+            if current not in excluded_endpoints and (
                 score < best_score - 1e-6
                 or (
                     abs(score - best_score) <= 1e-6
@@ -433,6 +440,13 @@ class LearnedRouteGraph:
             self.active_target_node_id = None
             self.active_path = []
             self.counted_route_target_signature = None
+            self.exhausted_partial_nodes.clear()
+            self.exhaustion_revision = self.revision
+            self.last_failed_search = None
+        elif self.exhaustion_revision != self.revision:
+            # New observed nodes/edges may extend a formerly dead-end branch.
+            self.exhausted_partial_nodes.clear()
+            self.exhaustion_revision = self.revision
             self.last_failed_search = None
 
         path = None
@@ -447,6 +461,23 @@ class LearnedRouteGraph:
                 endpoint = self.nodes.get(path[-1])
                 if endpoint is not None:
                     target_gap = _distance(endpoint["position"], target_position)
+            elif start_index == len(self.active_path) - 1:
+                endpoint = self.nodes.get(start_id)
+                endpoint_gap = (
+                    _distance(endpoint["position"], target_position)
+                    if endpoint is not None
+                    else None
+                )
+                if (
+                    isinstance(endpoint_gap, (int, float))
+                    and endpoint_gap > ROUTE_TARGET_RADIUS
+                ):
+                    # This partial branch has delivered everything currently
+                    # known for this target. Do not repeatedly pull Link back
+                    # here until newly observed graph structure changes it.
+                    self.exhausted_partial_nodes.add(start_id)
+                    self.active_path = []
+                    self.last_failed_search = None
 
         if path is None:
             search_key = (start_id, target_signature, self.revision)
@@ -456,6 +487,7 @@ class LearnedRouteGraph:
             path, target_gap = self._best_reachable_path(
                 start_id,
                 target_position,
+                excluded_endpoints=self.exhausted_partial_nodes,
             )
             self.active_path = list(path or ())
             self.active_target_node_id = path[-1] if path else None
@@ -510,6 +542,7 @@ class LearnedRouteGraph:
             "routes_reused": self.routes_reused,
             "last_path_nodes": self.last_path_nodes,
             "cached_path_nodes": len(self.active_path),
+            "exhausted_partial_nodes": len(self.exhausted_partial_nodes),
             "revision": self.revision,
             "last_target_gap": (
                 round(self.last_target_gap, 1)
