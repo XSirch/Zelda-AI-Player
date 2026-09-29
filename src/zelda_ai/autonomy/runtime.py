@@ -535,14 +535,14 @@ class AutonomyRuntime:
                     "Champion contract is incompatible with the current motor architecture"
                 )
             frozen_routes = self.champions.resolve_route_graph(champion)
-            route_graph_path = frozen_routes or (
-                self.champions.root / f"{champion['id']}.routes.json"
-            )
+            if frozen_routes is None:
+                raise ValueError("Champion route graph metadata is missing")
+            route_graph_path = frozen_routes
             self.active_champion = champion
             training_enabled = False
 
         try:
-            return ContinuousController(
+            controller = ContinuousController(
                 self.bridge,
                 checkpoint,
                 on_achievement=lambda achievement: self.log(
@@ -551,7 +551,13 @@ class AutonomyRuntime:
                 training_enabled=training_enabled,
                 route_graph_path=route_graph_path,
             )
-        except RuntimeError as exc:
+            if config.run_mode == "evaluation" and controller.route_graph.load_error:
+                raise ValueError(
+                    "Champion route graph is invalid: "
+                    + controller.route_graph.load_error
+                )
+            return controller
+        except (RuntimeError, ValueError) as exc:
             if config.run_mode == "evaluation":
                 raise ValueError(str(exc)) from None
             raise
