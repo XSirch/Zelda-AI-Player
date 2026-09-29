@@ -705,6 +705,23 @@ class LearnedRouteGraph:
                     "direct_reachable": False,
                 }
 
+            context_door = bool(
+                game.context_actor is not None
+                and (
+                    game.context_actor.category_name or ""
+                ).strip().lower() == "door"
+            )
+            nearby_door = any(
+                (actor.category_name or "").strip().lower() == "door"
+                and _distance(actor.position, exit_row.position) <= 220.0
+                for actor in game.room_actors
+            )
+            if not context_door and not nearby_door:
+                # An exit surface behind unrelated collision is evidence of a
+                # destination, not of a currently traversable straight line.
+                # Keep exploring local frontiers until a real route is observed.
+                return None
+
         return {
             "waypoint": tuple(exit_row.position),
             "waypoint_id": (
