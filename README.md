@@ -229,10 +229,11 @@ A arquitetura de aprendizado contínuo está implementada, mas uma política PPO
 1. descoberta útil de controles sem mappings semânticos;
 2. melhoria de navegação após tentativas repetidas;
 3. aprendizado de combate por experiência temporal;
-4. retenção após restart pelo checkpoint ML;
-5. continuidade de inputs durante inferência e treino;
-6. neutralização imediata em **PARAR**;
-7. tokens e cota do Codex atualizando sem interferir no controle.
+4. retenção após restart pelo checkpoint ML e `route-graph-v1.json`;
+5. descoberta de um contorno não reto, crescimento de nós/trechos e reutilização posterior exibida como `rota aprendida`;
+6. continuidade de inputs durante inferência e treino;
+7. neutralização imediata em **PARAR**;
+8. tokens e cota do Codex atualizando sem interferir no controle.
 
 Documentação:
 
