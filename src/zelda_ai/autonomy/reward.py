@@ -65,6 +65,7 @@ class RewardTracker:
         self.seen_dialogue: set[tuple[int, int | None, str]] = set()
         self.seen_contexts: set[tuple[int, int, int, str | None]] = set()
         self.seen_transitions: set[tuple[int, int, int, int]] = set()
+        self.seen_route_waypoints: set[str] = set()
         self.objective_score = 0
         self.combat_contact = False
         self.seen_inventory_items: set[int] = set()
@@ -683,11 +684,38 @@ class RewardTracker:
                 if abs(shaped_progress) > 1e-9:
                     b["intent_progress"] = shaped_progress
 
+        if (
+            previous is not None
+            and guidance
+            and guidance.get("route_active")
+            and current.get("position") is not None
+        ):
+            waypoint_id = guidance.get("route_waypoint_id")
+            waypoint = guidance.get("route_waypoint")
+            if (
+                isinstance(waypoint_id, str)
+                and waypoint_id
+                and waypoint_id not in self.seen_route_waypoints
+                and isinstance(waypoint, (list, tuple))
+                and len(waypoint) == 3
+            ):
+                try:
+                    route_distance = math.dist(
+                        current["position"],
+                        tuple(float(value) for value in waypoint),
+                    )
+                except (TypeError, ValueError):
+                    route_distance = float("inf")
+                if route_distance <= 95.0:
+                    self.seen_route_waypoints.add(waypoint_id)
+                    b["route_waypoint"] = 0.12
+
         major_progress_keys = {
             "new_world_transition",
             "durable_progress",
             "objective_milestone",
             "native_event",
+            "route_waypoint",
         }
         major_progress = any(
             b.get(key, 0.0) > 0 for key in major_progress_keys
