@@ -324,8 +324,8 @@ def goal_guidance(
             # authority. Partial routes stay deliberately weaker so a frontier
             # guess cannot become another hard attractor.
             base_strength = (
-                0.52 + 0.30 * route_confidence
-            ) * (0.75 if route_partial else 1.0)
+                0.78 + 0.16 * route_confidence
+            ) * (0.85 if route_partial else 1.0)
         else:
             base_strength = {
                 "navigate": 0.86,
