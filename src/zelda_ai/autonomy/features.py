@@ -252,7 +252,10 @@ def goal_guidance(
             # Explicit vertical affordances (ladder/climbable wall/stairs) may
             # intentionally terminate at collision.  Do not steer away from the
             # very surface the observer identified as the traversal target.
-            if not source.startswith("traversal:"):
+            if (
+                intent.mode in {"navigate", "explore", "observe"}
+                and not source.startswith("traversal:")
+            ):
                 detour_stick, detour_info = _collision_detour(
                     game,
                     player,
