@@ -632,6 +632,66 @@ def test_learned_route_waypoint_rewards_once_and_resets_local_pressure(state):
     assert "route_waypoint" not in second.breakdown
 
 
+def test_replayed_route_waypoint_resets_dwell_without_repaying_reward(state):
+    tracker = RewardTracker()
+    first_intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (400.0, 0.0, 0.0),
+    })
+    tracker.step(state, first_intent, intrinsic=0.0, pressed_buttons=0, now_s=0.0)
+
+    waypoint = state.model_copy(deep=True)
+    waypoint.player.position = (80.0, 0.0, 0.0)
+    guidance = {
+        "route_active": True,
+        "blocked": False,
+        "route_waypoint_id": "normal:child:85:0:1:0:0",
+        "route_waypoint": [80.0, 0.0, 0.0],
+    }
+    first = tracker.step(
+        waypoint,
+        first_intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        guidance=guidance,
+        now_s=100.0,
+    )
+    assert first.breakdown["route_waypoint"] == pytest.approx(0.12)
+    assert tracker.route_waypoint_advanced is True
+
+    # Change strategic objective so a later traversal of the same learned node
+    # starts a new route episode. It may reset dwell again, but must not pay PPO
+    # reward a second time.
+    second_intent = first_intent.model_copy(update={
+        "target_position": (500.0, 0.0, 0.0),
+    })
+    reset = waypoint.model_copy(deep=True)
+    reset.seq += 1
+    tracker.step(
+        reset,
+        second_intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        now_s=220.0,
+    )
+
+    replay = reset.model_copy(deep=True)
+    replay.seq += 1
+    replay_result = tracker.step(
+        replay,
+        second_intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        guidance=guidance,
+        now_s=350.0,
+    )
+
+    assert "route_waypoint" not in replay_result.breakdown
+    assert tracker.route_waypoint_advanced is True
+    assert tracker.route_waypoints_advanced == 2
+    assert tracker.local_dwell_seconds == 0.0
+
+
 def test_learned_route_suppresses_straight_line_intent_reward(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap().model_copy(update={
