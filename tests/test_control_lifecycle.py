@@ -143,9 +143,9 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     assert checkpoint.is_file()
     await runtime.control("stop")
     route_graph = tmp_path / "ml" / "route-graph-v1.json"
-    assert route_graph.is_file()
     provider.release.set()
     await runtime._settle_previous_controller()
+    assert route_graph.is_file()
 
     second_provider = SlowCognition()
     runtime.providers["codex"] = second_provider
