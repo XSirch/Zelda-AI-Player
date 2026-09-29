@@ -84,6 +84,27 @@ def test_route_graph_does_not_invent_reverse_or_unobserved_edges(tmp_path, state
     assert reverse is None
 
 
+def test_route_graph_isolates_age_and_mirrored_world(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    child_normal = _at(state, (0.0, 0.0, 0.0), 400)
+    next_child = _at(state, (80.0, 0.0, 0.0), 401)
+    graph.observe(child_normal, now_s=1.0)
+    graph.observe(next_child, now_s=2.0)
+
+    assert graph.next_waypoint(
+        _at(state, (0.0, 0.0, 0.0), 402),
+        (160.0, 0.0, 0.0),
+    ) is not None
+
+    adult = _at(state, (0.0, 0.0, 0.0), 403)
+    adult.player.age = "adult"
+    assert graph.next_waypoint(adult, (160.0, 0.0, 0.0)) is None
+
+    mirrored = _at(state, (0.0, 0.0, 0.0), 404)
+    mirrored.mirrored_world = True
+    assert graph.next_waypoint(mirrored, (160.0, 0.0, 0.0)) is None
+
+
 def test_read_only_route_graph_never_learns_or_writes(tmp_path, state):
     path = tmp_path / "routes.json"
     writable = LearnedRouteGraph(path)
