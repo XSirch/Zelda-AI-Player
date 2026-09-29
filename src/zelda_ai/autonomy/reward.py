@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from ..models import GameState
 from .features import target_point
 from .models import AgentIntent
+from .routes import ROUTE_WAYPOINT_MIN_DISTANCE
 
 
 EQUIPMENT_OBJECTIVES: dict[tuple[str, int], tuple[str, int, float]] = {
@@ -718,7 +719,7 @@ class RewardTracker:
                 except (TypeError, ValueError):
                     route_distance = float("inf")
                 if (
-                    route_distance <= 95.0
+                    route_distance <= ROUTE_WAYPOINT_MIN_DISTANCE
                     and waypoint_id != self.last_route_waypoint_reached
                 ):
                     self.last_route_waypoint_reached = waypoint_id
