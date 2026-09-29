@@ -273,38 +273,6 @@ class LearnedRouteGraph:
         confidence_discount = min(0.30, math.log1p(traversals) * 0.07)
         return distance * (1.0 - confidence_discount)
 
-    def _shortest_path(self, start_id: str, target_id: str) -> list[str] | None:
-        if start_id == target_id:
-            return [start_id]
-        queue: list[tuple[float, str]] = [(0.0, start_id)]
-        distance = {start_id: 0.0}
-        previous: dict[str, str] = {}
-        while queue:
-            current_cost, current = heapq.heappop(queue)
-            if current_cost != distance.get(current):
-                continue
-            if current == target_id:
-                break
-            for neighbor, edge in self.edges.get(current, {}).items():
-                if neighbor not in self.nodes:
-                    continue
-                new_cost = current_cost + self._edge_cost(edge)
-                if new_cost >= distance.get(neighbor, float("inf")):
-                    continue
-                distance[neighbor] = new_cost
-                previous[neighbor] = current
-                heapq.heappush(queue, (new_cost, neighbor))
-        if target_id not in distance:
-            return None
-        path = [target_id]
-        while path[-1] != start_id:
-            parent = previous.get(path[-1])
-            if parent is None:
-                return None
-            path.append(parent)
-        path.reverse()
-        return path
-
     def _best_reachable_path(
         self,
         start_id: str,
