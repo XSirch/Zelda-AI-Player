@@ -591,7 +591,7 @@ def test_blocked_guidance_suppresses_straight_line_intent_reward(state):
     assert "intent_progress" not in result.breakdown
 
 
-def test_learned_route_waypoint_rewards_once_and_resets_local_pressure(state):
+def test_learned_route_waypoint_rewards_once_without_resetting_coarse_dwell(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap().model_copy(update={
         "mode": "navigate",
@@ -617,7 +617,9 @@ def test_learned_route_waypoint_rewards_once_and_resets_local_pressure(state):
     )
 
     assert first.breakdown["route_waypoint"] == pytest.approx(0.12)
-    assert tracker.local_dwell_seconds == 0.0
+    assert tracker.route_waypoint_advanced is True
+    assert tracker.local_dwell_seconds == 120.0
+    assert first.breakdown.get("local_dwell", 0.0) < 0
 
     repeated = reached.model_copy(deep=True)
     repeated.seq += 1
@@ -689,7 +691,8 @@ def test_replayed_route_waypoint_resets_dwell_without_repaying_reward(state):
     assert "route_waypoint" not in replay_result.breakdown
     assert tracker.route_waypoint_advanced is True
     assert tracker.route_waypoints_advanced == 2
-    assert tracker.local_dwell_seconds == 0.0
+    assert tracker.local_dwell_seconds > 0.0
+    assert replay_result.breakdown.get("local_dwell", 0.0) < 0
 
 
 def test_learned_route_suppresses_straight_line_intent_reward(state):
