@@ -155,3 +155,8 @@ def test_panel_shows_actionable_goal_guidance():
     assert "MotorGuidance" in types
     assert "button_quiet" in types
     assert "distance: number | null" in types
+    assert "blocked?: boolean" in types
+    assert "detour?: string | null" in types
+    assert "BLOQUEADO" in main
+    assert "desvio local" in main
+    assert "anti-loop" in main
