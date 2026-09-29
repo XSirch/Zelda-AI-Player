@@ -399,6 +399,11 @@ def goal_guidance(
         # Fade the steering prior near the waypoint so learned interaction/
         # traversal behaviour can take over instead of orbiting the point.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
+        if exit_active:
+            # Stay committed to the exit threshold while contextual interaction
+            # probes run. Fading to zero beside a closed door lets residual
+            # movement drift Link away before a button can be evaluated.
+            proximity = max(0.55, proximity)
 
         dwell = max(0.0, float(local_dwell_seconds or 0.0))
         if dwell <= 90.0:
