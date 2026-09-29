@@ -113,6 +113,16 @@ export interface LearningSnapshot {
   positive_reward_rate?: number;
   useful_progress_rate?: number;
   objective_score?: number;
+  button_probability_mean?: number;
+  expected_button_count?: number;
+  guidance_mix?: number;
+  stick_entropy?: number;
+  button_entropy?: number;
+  stick_entropy_coef?: number;
+  button_entropy_coef?: number;
+  current_stick_entropy_coef?: number;
+  current_button_entropy_coef?: number;
+  exploration_decay?: number;
   achievements?: LearningAchievement[];
   resources?: {
     chests_opened: number;
