@@ -591,6 +591,47 @@ def test_blocked_guidance_suppresses_straight_line_intent_reward(state):
     assert "intent_progress" not in result.breakdown
 
 
+def test_learned_route_waypoint_rewards_once_and_resets_local_pressure(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (400.0, 0.0, 0.0),
+    })
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0, now_s=0.0)
+
+    reached = state.model_copy(deep=True)
+    reached.player.position = (80.0, 0.0, 0.0)
+    guidance = {
+        "route_active": True,
+        "blocked": False,
+        "route_waypoint_id": "85:0:1:0:0",
+        "route_waypoint": [80.0, 0.0, 0.0],
+    }
+    first = tracker.step(
+        reached,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        guidance=guidance,
+        now_s=120.0,
+    )
+
+    assert first.breakdown["route_waypoint"] == pytest.approx(0.12)
+    assert tracker.local_dwell_seconds == 0.0
+
+    repeated = reached.model_copy(deep=True)
+    repeated.seq += 1
+    second = tracker.step(
+        repeated,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        guidance=guidance,
+        now_s=130.0,
+    )
+    assert "route_waypoint" not in second.breakdown
+
+
 def test_learned_route_suppresses_straight_line_intent_reward(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap().model_copy(update={
