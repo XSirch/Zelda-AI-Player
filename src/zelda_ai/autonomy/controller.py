@@ -289,7 +289,10 @@ class ContinuousController:
             game.dialogue.active and not probe["dialogue_active"]
         )
         exit_context_changed = bool(
-            probe.get("exit_active")
+            (
+                probe.get("exit_active")
+                or probe.get("actor_is_door")
+            )
             and current_key != probe["key"]
         )
         success = (
@@ -406,6 +409,7 @@ class ContinuousController:
             "room": game.room,
             "dialogue_active": bool(game.dialogue.active),
             "exit_active": bool(guidance.get("exit_active")),
+            "actor_is_door": bool(actor_is_door),
             "known": bool(using_known),
         }
         self.last_interaction_source = f"{source}:{key}->{button}"
