@@ -24,6 +24,8 @@ Quando existe guidance forte de navegação, a distribuição de botões também
 
 Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
 
+Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis, priorizando células ainda não visitadas e depois as menos visitadas. Esse frontier vira guidance temporário; nenhum mapa oculto é consultado.
+
 ### Rotas aprendidas
 
 A route memory v1 transforma deslocamento real em um **grafo topológico dirigido**. Aproximadamente a cada célula de 80×50×80 unidades realmente atravessada, o controlador registra um nó e conecta somente o trecho que Link de fato percorreu. Não são criadas arestas reversas automaticamente, atalhos através de paredes nem conhecimento de collision que nunca foi visitado.
