@@ -1,4 +1,5 @@
 from zelda_ai.autonomy.routes import LearnedRouteGraph
+from zelda_ai.models import NavigationProbe
 
 
 def _at(state, position, seq):
@@ -140,6 +141,41 @@ def test_route_graph_isolates_age_and_mirrored_world(tmp_path, state):
     assert graph.next_waypoint(mirrored, (160.0, 0.0, 0.0)) is None
     graph.observe(mirrored, now_s=4.0)
     assert graph.stats()["edges"] == before_edges
+
+
+def test_targetless_exploration_prefers_unseen_open_probe(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    origin = _at(state, (0.0, 0.0, 0.0), 600)
+    visited_forward = _at(state, (0.0, 0.0, 140.0), 601)
+    graph.observe(origin, now_s=1.0)
+    graph.observe(visited_forward, now_s=2.0)
+    graph.reset_trace()
+
+    origin.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+        NavigationProbe(
+            direction="right",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+
+    hint = graph.exploration_waypoint(origin)
+
+    assert hint is not None
+    assert hint["frontier"] is True
+    assert hint["direction"] == "right"
+    assert hint["waypoint"][0] < -120.0 or hint["waypoint"][0] > 120.0
 
 
 def test_read_only_route_graph_never_learns_or_writes(tmp_path, state):
