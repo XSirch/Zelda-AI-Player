@@ -84,6 +84,14 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
         <strong>
           {thought.guidance.source} · força {thought.guidance.strength.toFixed(2)}
           {thought.guidance.distance != null ? ` · ${Math.round(thought.guidance.distance)}u do alvo` : ''}
+          {thought.guidance.blocked
+            ? thought.guidance.detour
+              ? ` · desvio local ${thought.guidance.detour}`
+              : ' · BLOQUEADO'
+            : ''}
+          {thought.guidance.stuck_scale != null && thought.guidance.stuck_scale < 0.999
+            ? ` · anti-loop ${Math.round(thought.guidance.stuck_scale * 100)}%`
+            : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
         </strong>
       </div>}

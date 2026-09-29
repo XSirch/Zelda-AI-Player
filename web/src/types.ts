@@ -188,6 +188,10 @@ export interface MotorGuidance {
   distance: number | null;
   source: string;
   target: number[] | null;
+  blocked?: boolean;
+  detour?: string | null;
+  direct_probe?: string | null;
+  stuck_scale?: number;
 }
 
 export interface Snapshot {

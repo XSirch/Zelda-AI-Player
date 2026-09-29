@@ -8,7 +8,7 @@ import pytest
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
-from zelda_ai.models import ModelInfo, RunConfig, Usage
+from zelda_ai.models import ModelInfo, NavigationProbe, RunConfig, Usage
 from zelda_ai.providers.base import InferenceResult
 
 
@@ -214,6 +214,61 @@ async def test_cognition_is_sparse_and_ignores_context_noise(tmp_path, store, st
     await asyncio.wait_for(provider.called.wait(), timeout=1.0)
     assert provider.calls == 2
     assert "world_transition" in provider.prompts[-1]["trigger_reasons"]
+
+    await runtime.control("stop")
+
+
+@pytest.mark.asyncio
+async def test_hard_blocked_guidance_triggers_early_sparse_replan(
+    tmp_path, store, state, monkeypatch
+):
+    import zelda_ai.autonomy.runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "COGNITION_EVENT_DEBOUNCE_S", 0.01)
+    monkeypatch.setattr(runtime_module, "COGNITION_MIN_INTERVAL_S", 0.0)
+    monkeypatch.setattr(runtime_module, "COGNITION_BLOCKED_AFTER_S", 0.03)
+    monkeypatch.setattr(runtime_module, "COGNITION_BLOCKED_COOLDOWN_S", 0.0)
+    monkeypatch.setattr(runtime_module, "COGNITION_IDLE_POLL_S", 0.01)
+
+    blocked_state = state.model_copy(deep=True)
+    blocked_state.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=True,
+            wall_distance=25.0,
+        )
+    ]
+    bridge = connected(blocked_state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(
+        bridge,
+        store,
+        {"codex": provider},
+        tmp_path / "ml",
+    )
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 1
+
+    runtime.controller.set_intent(
+        AgentIntent.bootstrap().model_copy(update={
+            "mode": "navigate",
+            "target_position": (0.0, 0.0, 500.0),
+            "objective": "Reach the observed point.",
+            "summary": "Try the observed point.",
+        })
+    )
+    provider.called.clear()
+
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    assert provider.calls == 2
+    assert "guidance_blocked" in provider.prompts[-1]["trigger_reasons"]
+    assert provider.prompts[-1]["motor"]["guidance"]["blocked"] is True
+    assert provider.prompts[-1]["motor"]["guidance"]["detour"] is None
 
     await runtime.control("stop")
 

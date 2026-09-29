@@ -80,13 +80,122 @@ def target_point(game: GameState, intent: AgentIntent):
     return intent.target_position
 
 
-def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
-    """Convert a structured high-level goal into camera-relative analog guidance.
+_PROBE_YAW_OFFSETS = {
+    "forward": 0.0,
+    "forward_left": math.pi / 4.0,
+    "left": math.pi / 2.0,
+    "back_left": 3.0 * math.pi / 4.0,
+    "back": math.pi,
+    "back_right": -3.0 * math.pi / 4.0,
+    "right": -math.pi / 2.0,
+    "forward_right": -math.pi / 4.0,
+}
 
-    This is not a route solver and does not choose buttons. It only makes an
-    observed point/direction actionable for the goal-conditioned ML policy.
-    The PPO distribution remains stochastic in training and learns residual
-    corrections around this prior.
+
+def _wrap_angle(value: float) -> float:
+    return (value + math.pi) % (2.0 * math.pi) - math.pi
+
+
+def _camera_relative_stick(game: GameState, player, world_yaw: float) -> tuple[float, float]:
+    camera_raw = (
+        game.camera_input_yaw
+        if game.camera_input_yaw is not None
+        else player.yaw
+    )
+    camera_yaw = camera_raw * math.pi / 32768.0
+    relative = _wrap_angle(world_yaw - camera_yaw)
+    return (
+        max(-1.0, min(1.0, math.sin(relative))),
+        max(-1.0, min(1.0, math.cos(relative))),
+    )
+
+
+def _probe_is_walkable(probe) -> bool:
+    if not probe.floor_found:
+        return False
+    if probe.wall_hit:
+        return False
+    delta_y = probe.delta_y
+    if delta_y is not None and (delta_y > 70.0 or delta_y < -90.0):
+        return False
+    return True
+
+
+def _collision_detour(game: GameState, player, target_yaw: float) -> tuple[tuple[float, float] | None, dict]:
+    """Pick a locally collision-safe heading when the direct heading is blocked.
+
+    Navigation probes are scene collision observations relative to Link's yaw.
+    This is deliberately local/reactive: it does not solve a route or encode any
+    Zelda-specific destination knowledge.
+    """
+    probes = {}
+    for probe in game.navigation_probes:
+        current = probes.get(probe.direction)
+        if current is None or abs(probe.distance - 70.0) < abs(current.distance - 70.0):
+            probes[probe.direction] = probe
+    if not probes:
+        return None, {
+            "blocked": False,
+            "detour": None,
+            "direct_probe": None,
+        }
+
+    player_yaw = player.yaw * math.pi / 32768.0
+    relative_target = _wrap_angle(target_yaw - player_yaw)
+    direct_name = min(
+        _PROBE_YAW_OFFSETS,
+        key=lambda name: abs(_wrap_angle(relative_target - _PROBE_YAW_OFFSETS[name])),
+    )
+    direct_probe = probes.get(direct_name)
+    if direct_probe is None or _probe_is_walkable(direct_probe):
+        return None, {
+            "blocked": False,
+            "detour": None,
+            "direct_probe": direct_name,
+        }
+
+    candidates = []
+    for name, offset in _PROBE_YAW_OFFSETS.items():
+        probe = probes.get(name)
+        if probe is None or not _probe_is_walkable(probe):
+            continue
+        angular_error = abs(_wrap_angle(relative_target - offset))
+        alignment = math.cos(angular_error)
+        # Avoid choosing a reverse heading unless every forward/side option is
+        # unavailable.  Small floor-height changes are preferred.
+        if alignment < -0.25:
+            continue
+        height_penalty = min(0.2, abs(float(probe.delta_y or 0.0)) / 350.0)
+        candidates.append((alignment - height_penalty, -angular_error, name, offset))
+
+    if not candidates:
+        return None, {
+            "blocked": True,
+            "detour": None,
+            "direct_probe": direct_name,
+        }
+
+    _, _, selected_name, selected_offset = max(candidates)
+    selected_yaw = _wrap_angle(player_yaw + selected_offset)
+    return _camera_relative_stick(game, player, selected_yaw), {
+        "blocked": True,
+        "detour": selected_name,
+        "direct_probe": direct_name,
+    }
+
+
+def goal_guidance(
+    game: GameState,
+    intent: AgentIntent,
+    *,
+    local_dwell_seconds: float = 0.0,
+) -> dict:
+    """Convert a structured high-level goal into collision-aware analog guidance.
+
+    The target remains cognition-provided and observed.  Local collision probes
+    can bend the steering prior around an immediate obstacle, but they do not
+    create a route or select controller buttons.  Long residence in the same
+    area also fades the prior so a stale target cannot become a permanent magnet.
     """
     player = game.player
     if player is None or intent.mode in {"combat", "dialogue", "menu"}:
@@ -98,6 +207,10 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
             "distance": None,
             "source": "none",
             "target": None,
+            "blocked": False,
+            "detour": None,
+            "direct_probe": None,
+            "stuck_scale": 1.0,
         }
 
     point = target_point(game, intent)
@@ -129,26 +242,32 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
         dz = point[2] - player.position[2]
         horizontal = math.hypot(dx, dz)
         distance = math.dist(player.position, point)
+        blocked = False
+        detour = None
+        direct_probe = None
         if horizontal < 1e-4:
             stick = (0.0, 0.0)
         else:
-            camera_raw = (
-                game.camera_input_yaw
-                if game.camera_input_yaw is not None
-                else player.yaw
-            )
-            camera_yaw = camera_raw * math.pi / 32768.0
-            forward_x = math.sin(camera_yaw)
-            forward_z = math.cos(camera_yaw)
-            right_x = math.cos(camera_yaw)
-            right_z = -math.sin(camera_yaw)
-            forward = dx * forward_x + dz * forward_z
-            right = dx * right_x + dz * right_z
-            norm = max(1e-6, math.hypot(right, forward))
-            stick = (
-                max(-1.0, min(1.0, right / norm)),
-                max(-1.0, min(1.0, forward / norm)),
-            )
+            target_yaw = math.atan2(dx, dz)
+            stick = _camera_relative_stick(game, player, target_yaw)
+            # Explicit vertical affordances (ladder/climbable wall/stairs) may
+            # intentionally terminate at collision.  Do not steer away from the
+            # very surface the observer identified as the traversal target.
+            if (
+                intent.mode in {"navigate", "explore", "observe"}
+                and not source.startswith("traversal:")
+            ):
+                detour_stick, detour_info = _collision_detour(
+                    game,
+                    player,
+                    target_yaw,
+                )
+                blocked = bool(detour_info["blocked"])
+                detour = detour_info["detour"]
+                direct_probe = detour_info["direct_probe"]
+                if detour_stick is not None:
+                    stick = detour_stick
+                    source = f"{source}:detour:{detour}"
 
         base_strength = {
             "navigate": 0.86,
@@ -159,19 +278,32 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
         # Fade the steering prior near the waypoint so learned interaction/
         # traversal behaviour can take over instead of orbiting the point.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
-        strength = base_strength * proximity
+
+        dwell = max(0.0, float(local_dwell_seconds or 0.0))
+        if dwell <= 90.0:
+            stuck_scale = 1.0
+        else:
+            stuck_scale = max(
+                0.25,
+                1.0 - min(1.0, (dwell - 90.0) / 180.0) * 0.75,
+            )
+        obstacle_scale = 0.82 if detour is not None else 0.30 if blocked else 1.0
+        strength = base_strength * proximity * stuck_scale * obstacle_scale
+        quiet_multiplier = (
+            0.45 if blocked else 0.9
+        ) if intent.mode in {"navigate", "explore", "observe"} else 0.25
         return {
             "active": strength > 0.01,
             "stick": stick,
             "strength": strength,
-            "button_quiet": (
-                strength * 0.9
-                if intent.mode in {"navigate", "explore", "observe"}
-                else strength * 0.25
-            ),
+            "button_quiet": strength * quiet_multiplier,
             "distance": distance,
             "source": source,
             "target": tuple(point),
+            "blocked": blocked,
+            "detour": detour,
+            "direct_probe": direct_probe,
+            "stuck_scale": stuck_scale,
         }
 
     direction_sticks = {
@@ -182,14 +314,23 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
     }
     stick = direction_sticks.get(intent.direction)
     if stick is not None:
+        dwell = max(0.0, float(local_dwell_seconds or 0.0))
+        stuck_scale = 1.0 if dwell <= 90.0 else max(
+            0.25,
+            1.0 - min(1.0, (dwell - 90.0) / 180.0) * 0.75,
+        )
         return {
             "active": True,
             "stick": stick,
-            "strength": 0.58,
-            "button_quiet": 0.48,
+            "strength": 0.58 * stuck_scale,
+            "button_quiet": 0.48 * stuck_scale,
             "distance": None,
             "source": f"direction:{intent.direction}",
             "target": None,
+            "blocked": False,
+            "detour": None,
+            "direct_probe": None,
+            "stuck_scale": stuck_scale,
         }
 
     return {
@@ -200,8 +341,11 @@ def goal_guidance(game: GameState, intent: AgentIntent) -> dict:
         "distance": None,
         "source": "none",
         "target": None,
+        "blocked": False,
+        "detour": None,
+        "direct_probe": None,
+        "stuck_scale": 1.0,
     }
-
 
 def encode_state(
     game: GameState,

@@ -99,6 +99,10 @@ class ContinuousController:
             "distance": None,
             "source": "none",
             "target": None,
+            "blocked": False,
+            "detour": None,
+            "direct_probe": None,
+            "stuck_scale": 1.0,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
@@ -120,6 +124,10 @@ class ContinuousController:
             "distance": None,
             "source": "none",
             "target": None,
+            "blocked": False,
+            "detour": None,
+            "direct_probe": None,
+            "stuck_scale": 1.0,
         }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
@@ -144,6 +152,10 @@ class ContinuousController:
             "distance": None,
             "source": "none",
             "target": None,
+            "blocked": False,
+            "detour": None,
+            "direct_probe": None,
+            "stuck_scale": 1.0,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
@@ -210,6 +222,7 @@ class ContinuousController:
             self.intent,
             intrinsic=intrinsic,
             pressed_buttons=self.last_setpoint.buttons,
+            guidance=self.last_guidance,
         )
         self.last_reward = reward.reward
         self.total_reward += reward.reward
@@ -260,7 +273,11 @@ class ContinuousController:
         ):
             self._enqueue_rollout(observation, done=reward.done)
 
-        guidance = goal_guidance(game, self.intent)
+        guidance = goal_guidance(
+            game,
+            self.intent,
+            local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
+        )
         setpoint, sample = self._sample_setpoint(observation, guidance)
         self.last_guidance = guidance
         self.last_setpoint = setpoint

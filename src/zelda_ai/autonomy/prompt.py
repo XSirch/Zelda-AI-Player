@@ -37,6 +37,13 @@ IMPORTANT ARCHITECTURE:
   approach. For observed scene_exits, copy the observed exit position.
 - If trigger_reasons contains intent_target_reached, select the next observed
   waypoint/objective instead of returning the same completed point.
+- motor.guidance reports the local steering prior. If guidance.blocked is true,
+  collision telemetry says the direct heading is obstructed. A non-null detour
+  means the local controller found a walkable side heading and may keep trying it.
+  If guidance_blocked is a trigger, or local_area_stuck persists around a blocked
+  target, do not keep returning the same obstructed coordinate. Select another
+  observed intermediate waypoint/traversal/exit, or use explore with no fixed
+  target until new reachable evidence appears.
 - target_actor_id/params/uid must identify an actually observed actor.
 - target_item_id must be copied from an actually observed inventory/equipment item.
 - Unknown transitions are destination-unknown until traversed.
