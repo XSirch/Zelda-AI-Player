@@ -222,6 +222,7 @@ class ContinuousController:
             self.intent,
             intrinsic=intrinsic,
             pressed_buttons=self.last_setpoint.buttons,
+            guidance=self.last_guidance,
         )
         self.last_reward = reward.reward
         self.total_reward += reward.reward
