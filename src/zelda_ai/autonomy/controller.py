@@ -45,7 +45,7 @@ INTERACTION_PROBE_BUTTONS = tuple(
 )
 EXIT_PRIORITY_DWELL_S = 20.0
 INTERACTION_PROBE_COOLDOWN_S = 0.35
-INTERACTION_OUTCOME_WINDOW_S = 0.8
+INTERACTION_OUTCOME_WINDOW_S = 1.5
 
 
 @dataclass(frozen=True)
@@ -312,6 +312,11 @@ class ContinuousController:
             return
 
         if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
+            if probe.get("known"):
+                self.route_graph.record_interaction_failure(
+                    probe["key"],
+                    probe["button"],
+                )
             self.pending_interaction_probe = None
 
     def _interaction_override(
@@ -377,7 +382,8 @@ class ContinuousController:
             )
 
         known_button = self.route_graph.interaction_button(key)
-        if known_button in BUTTON_MASKS:
+        using_known = known_button in BUTTON_MASKS
+        if using_known:
             button = known_button
             source = "interaction_memory"
         else:
@@ -400,6 +406,7 @@ class ContinuousController:
             "room": game.room,
             "dialogue_active": bool(game.dialogue.active),
             "exit_active": bool(guidance.get("exit_active")),
+            "known": bool(using_known),
         }
         self.last_interaction_source = f"{source}:{key}->{button}"
         sample = {**sample, "buttons": executed_buttons}
