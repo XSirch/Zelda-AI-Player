@@ -4,8 +4,9 @@
 
 - Minimal realtime panel: connection, operational thought, raw N64 inputs, tokens/cost/quota, start/stop.
 - Continuous motor loop independent from LLM latency.
-- Raw-action PPO actor-critic: analog stick + physical button bits.
-- Goal-conditioned camera-relative steering prior inside the PPO stick distribution, with learned residual control and a mild navigation button-quiet prior.
+- Raw-action PPO actor-critic: residual analog stick + physical button bits.
+- Goal-conditioned camera-relative guidance is now mixed deterministically with the sampled residual stick, so structured navigation authority cannot be numerically overwhelmed by a mature Beta distribution.
+- Stick/button entropy are trained separately; button entropy anneals to zero over the first 50k trained samples and expected button count is explicitly regularized to stop indefinite button-mashing.
 - Collision-aware local goal guidance: observed probes bend a blocked direct heading toward a walkable side direction, hard blockage weakens the prior, prolonged dwell fades stale-target attraction, and cognition can replan on `guidance_blocked`.
 - Persistent route memory v1: directed topological nodes/edges are learned only from paths Link actually traverses, persisted across training runs, and reused as intermediate waypoints when a known route approaches the current structured target.
 - One-shot `intent_target_reached` replanning so completed waypoints do not remain stale.
