@@ -540,6 +540,28 @@ def test_vertical_movement_counts_as_new_space(state):
 
 
 
+def test_blocked_guidance_suppresses_straight_line_intent_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (400.0, 0.0, 0.0),
+    })
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0, now_s=0.0)
+
+    moved = state.model_copy(deep=True)
+    moved.player.position = (20.0, 0.0, 0.0)
+    result = tracker.step(
+        moved,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        guidance={"blocked": True, "detour": "forward_right"},
+        now_s=20.0,
+    )
+
+    assert "intent_progress" not in result.breakdown
+
+
 def test_stale_waypoint_stops_rewarding_return_to_same_target(state):
     tracker = RewardTracker()
     intent = AgentIntent.bootstrap().model_copy(update={
