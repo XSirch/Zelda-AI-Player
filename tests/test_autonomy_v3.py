@@ -240,6 +240,37 @@ def test_goal_guidance_replays_learned_route_waypoint(state):
     assert guidance["distance"] == pytest.approx(500.0)
 
 
+def test_targetless_explore_uses_observed_frontier_guidance(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "target_position": None,
+        "direction": None,
+    })
+    state.camera_input_yaw = 0
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        route_hint={
+            "waypoint": (0.0, 0.0, 140.0),
+            "waypoint_id": "frontier-node",
+            "path_nodes": 1,
+            "confidence": 0.5,
+            "partial": True,
+            "frontier": True,
+            "direction": "forward",
+        },
+    )
+
+    assert guidance["active"] is True
+    assert guidance["source"] == "observed_frontier"
+    assert guidance["frontier_active"] is True
+    assert guidance["frontier_direction"] == "forward"
+    assert guidance["route_active"] is False
+    assert guidance["stick"][1] > 0.95
+    assert guidance["strength"] > 0.5
+
+
 def test_goal_guidance_uses_observed_vertical_traversal(state):
     from zelda_ai.models import TraversalAffordanceObservation
 
