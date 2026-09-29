@@ -29,6 +29,7 @@ COGNITION_STUCK_AFTER_S = 90.0
 COGNITION_STUCK_COOLDOWN_S = 180.0
 COGNITION_BLOCKED_AFTER_S = 20.0
 COGNITION_BLOCKED_COOLDOWN_S = 60.0
+COGNITION_IDLE_POLL_S = 5.0
 
 
 class AutonomyRuntime:
@@ -832,7 +833,10 @@ class AutonomyRuntime:
                 return generation == self.lifecycle and self.state == "running"
 
             try:
-                await asyncio.wait_for(self.cognition_trigger.wait(), timeout=5.0)
+                await asyncio.wait_for(
+                    self.cognition_trigger.wait(),
+                    timeout=COGNITION_IDLE_POLL_S,
+                )
                 continue
             except asyncio.TimeoutError:
                 pass
