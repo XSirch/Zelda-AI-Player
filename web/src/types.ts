@@ -132,6 +132,15 @@ export interface LearningSnapshot {
     local_dwell_penalty?: number;
   };
   reward_breakdown?: Record<string, number>;
+  route_memory?: {
+    nodes: number;
+    edges: number;
+    routes_reused: number;
+    last_path_nodes: number;
+    last_target_gap: number | null;
+    writable: boolean;
+    load_error?: string | null;
+  };
   last_update?: Record<string, unknown>;
   checkpoint_load_error?: string;
   training_enabled?: boolean;
@@ -192,6 +201,11 @@ export interface MotorGuidance {
   detour?: string | null;
   direct_probe?: string | null;
   stuck_scale?: number;
+  route_active?: boolean;
+  route_path_nodes?: number;
+  route_confidence?: number;
+  route_target_gap?: number | null;
+  route_waypoint?: number[] | null;
 }
 
 export interface Snapshot {
