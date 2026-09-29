@@ -217,6 +217,7 @@ def goal_guidance(
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_partial": False,
         }
 
     point = target_point(game, intent)
@@ -231,6 +232,7 @@ def goal_guidance(
     route_confidence = 0.0
     route_target_gap = None
     route_waypoint = None
+    route_partial = False
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
@@ -271,6 +273,7 @@ def goal_guidance(
             )
             gap = route_hint.get("target_gap")
             route_target_gap = float(gap) if isinstance(gap, (int, float)) else None
+            route_partial = bool(route_hint.get("partial"))
 
     if point is not None:
         dx = point[0] - player.position[0]
@@ -351,6 +354,7 @@ def goal_guidance(
             "route_confidence": route_confidence,
             "route_target_gap": route_target_gap,
             "route_waypoint": route_waypoint,
+            "route_partial": route_partial,
         }
 
     direction_sticks = {
@@ -383,6 +387,7 @@ def goal_guidance(
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_partial": False,
         }
 
     return {
@@ -402,6 +407,7 @@ def goal_guidance(
         "route_confidence": 0.0,
         "route_target_gap": None,
         "route_waypoint": None,
+        "route_partial": False,
     }
 
 def encode_state(
