@@ -123,15 +123,39 @@ class ChampionStore:
         expected_hash = row.get("sha256")
         if not isinstance(expected_hash, str) or _sha256(checkpoint) != expected_hash:
             raise ValueError("Champion checkpoint checksum mismatch")
+        if row.get("route_graph_file"):
+            self.resolve_route_graph(row)
         return dict(row), checkpoint
 
-    def capture(self, source_checkpoint: Path, metadata: dict) -> dict:
+    def resolve_route_graph(self, champion: dict) -> Path | None:
+        filename = champion.get("route_graph_file")
+        if not filename:
+            return None
+        if not isinstance(filename, str) or Path(filename).name != filename:
+            raise ValueError("Champion route graph filename is invalid")
+        route_graph = self.root / filename
+        if not route_graph.is_file():
+            raise ValueError("Champion route graph is missing")
+        expected_hash = champion.get("route_graph_sha256")
+        if (
+            not isinstance(expected_hash, str)
+            or _sha256(route_graph) != expected_hash
+        ):
+            raise ValueError("Champion route graph checksum mismatch")
+        return route_graph
+
+    def capture(
+        self,
+        source_checkpoint: Path,
+        metadata: dict,
+        route_graph_source: Path | None = None,
+    ) -> dict:
         source_checkpoint = Path(source_checkpoint)
         if not source_checkpoint.is_file():
             raise ValueError("Training checkpoint is missing; champion was not created")
 
         existing_ids = set()
-        for pattern in ("completion-*.pt", "completion-*.json"):
+        for pattern in ("completion-*.pt", "completion-*.json", "completion-*.routes.json"):
             for path in self.root.glob(pattern):
                 if match := _CHAMPION_ID.match(path.stem):
                     existing_ids.add(int(match.group(1)))
@@ -139,8 +163,18 @@ class ChampionStore:
         champion_id = f"completion-{sequence:04d}"
         checkpoint = self.root / f"{champion_id}.pt"
         metadata_path = self.root / f"{champion_id}.json"
+        route_graph_path = self.root / f"{champion_id}.routes.json"
 
         _atomic_copy(source_checkpoint, checkpoint)
+        route_metadata = {}
+        if route_graph_source is not None:
+            source_routes = Path(route_graph_source)
+            if source_routes.is_file():
+                _atomic_copy(source_routes, route_graph_path)
+                route_metadata = {
+                    "route_graph_file": route_graph_path.name,
+                    "route_graph_sha256": _sha256(route_graph_path),
+                }
         row = {
             **metadata,
             "id": champion_id,
@@ -148,6 +182,7 @@ class ChampionStore:
             "created_at": time.time(),
             "checkpoint_file": checkpoint.name,
             "sha256": _sha256(checkpoint),
+            **route_metadata,
         }
         _atomic_json(metadata_path, row)
 
@@ -157,6 +192,15 @@ class ChampionStore:
             try:
                 if _sha256(best_source) == best.get("sha256"):
                     _atomic_copy(best_source, self.root / "best-completion.pt")
+                    best_route_metadata = {}
+                    best_route = self.resolve_route_graph(best)
+                    if best_route is not None:
+                        best_route_alias = self.root / "best-completion.routes.json"
+                        _atomic_copy(best_route, best_route_alias)
+                        best_route_metadata = {
+                            "route_graph_file": best_route_alias.name,
+                            "route_graph_sha256": _sha256(best_route_alias),
+                        }
                     _atomic_json(
                         self.root / "best-completion.json",
                         {
@@ -164,6 +208,7 @@ class ChampionStore:
                             "elapsed_s": best.get("elapsed_s"),
                             "created_at": best.get("created_at"),
                             "sha256": best.get("sha256"),
+                            **best_route_metadata,
                         },
                     )
             except OSError:
