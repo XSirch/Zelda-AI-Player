@@ -287,6 +287,45 @@ def test_goal_prior_moves_deterministic_distribution_toward_target(tmp_path):
     assert forward["button_quiet_strength"] == pytest.approx(0.8)
 
 
+def test_guidance_mixes_with_residual_stick_instead_of_being_a_soft_prior(tmp_path):
+    policy = OnlinePPO(tmp_path / "policy.pt", epochs=1, minibatch_size=8)
+    observation = [0.0] * FEATURE_DIM
+
+    free = policy.sample(observation, deterministic=True)
+    guided = policy.sample(
+        observation,
+        deterministic=True,
+        guidance_stick=(0.0, 1.0),
+        guidance_strength=0.9,
+    )
+
+    assert guided["policy_stick"] == free["policy_stick"]
+    expected_y = round(
+        (free["policy_stick"][1] * 0.1 + 1.0 * 0.9) * 80.0
+    ) / 80.0
+    assert guided["stick"][1] == pytest.approx(expected_y)
+    assert guided["guidance_strength"] == pytest.approx(0.9)
+
+
+def test_button_exploration_entropy_decays_to_zero(tmp_path):
+    policy = OnlinePPO(
+        tmp_path / "policy.pt",
+        epochs=1,
+        minibatch_size=8,
+        exploration_decay_samples=100,
+    )
+    stick_start, button_start, decay_start = policy._exploration_coefficients()
+    assert stick_start == pytest.approx(0.003)
+    assert button_start == pytest.approx(0.001)
+    assert decay_start == pytest.approx(0.0)
+
+    policy.samples_trained = 100
+    stick_end, button_end, decay_end = policy._exploration_coefficients()
+    assert stick_end == pytest.approx(0.0003)
+    assert button_end == pytest.approx(0.0)
+    assert decay_end == pytest.approx(1.0)
+
+
 def test_deterministic_policy_action_is_repeatable(tmp_path):
     policy = OnlinePPO(tmp_path / "policy.pt", epochs=1, minibatch_size=8)
     observation = [0.0] * FEATURE_DIM
@@ -317,6 +356,7 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
         rollout.append({
             "observation": observation,
             "stick": sample["stick"],
+            "policy_stick": sample["policy_stick"],
             "buttons": sample["buttons"],
             "log_prob": sample["log_prob"],
             "value": sample["value"],
@@ -329,6 +369,10 @@ def test_online_ppo_samples_and_updates_checkpoint(tmp_path, button_count):
     stats = policy.train_rollout(rollout, bootstrap_value=0.0, bootstrap_done=False)
     assert stats["updates"] == 1
     assert stats["samples_trained"] == 16
+    assert "stick_entropy" in stats
+    assert "button_entropy" in stats
+    assert "expected_button_count" in stats
+    assert stats["button_entropy_coef"] <= 0.001
     assert (tmp_path / "policy.pt").is_file()
 
 
