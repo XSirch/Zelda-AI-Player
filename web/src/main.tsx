@@ -93,7 +93,7 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
             ? ` · anti-loop ${Math.round(thought.guidance.stuck_scale * 100)}%`
             : ''}
           {thought.guidance.route_active
-            ? ` · rota aprendida ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%`
+            ? ` · rota aprendida${thought.guidance.route_partial ? ' parcial' : ''} ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%`
             : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
         </strong>
