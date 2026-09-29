@@ -1,0 +1,358 @@
+from __future__ import annotations
+
+import heapq
+import json
+import math
+import os
+import time
+import uuid
+from pathlib import Path
+
+from ..models import GameState
+
+
+ROUTE_GRAPH_VERSION = 1
+ROUTE_CELL_XZ = 80.0
+ROUTE_CELL_Y = 50.0
+ROUTE_MAX_EDGE_DISTANCE = 190.0
+ROUTE_START_RADIUS = 170.0
+ROUTE_TARGET_RADIUS = 240.0
+ROUTE_WAYPOINT_MIN_DISTANCE = 95.0
+ROUTE_MAX_NODES = 50_000
+
+
+def _distance(a, b) -> float:
+    return math.dist(tuple(a), tuple(b))
+
+
+def _node_id(scene: int, room: int, position) -> str:
+    x, y, z = position
+    gx = round(float(x) / ROUTE_CELL_XZ)
+    gy = round(float(y) / ROUTE_CELL_Y)
+    gz = round(float(z) / ROUTE_CELL_XZ)
+    return f"{scene}:{room}:{gx}:{gy}:{gz}"
+
+
+class LearnedRouteGraph:
+    """Persistent topological memory learned only from Link's observed traversal.
+
+    Nodes are coarse scene-local positions actually occupied by Link. Directed
+    edges are added only when Link physically moves between nodes. Path reuse
+    therefore contains no hidden map knowledge and cannot invent an unobserved
+    corridor.
+    """
+
+    def __init__(self, path: Path, *, writable: bool = True):
+        self.path = Path(path)
+        self.writable = writable
+        self.nodes: dict[str, dict] = {}
+        self.edges: dict[str, dict[str, dict]] = {}
+        self.by_scene: dict[tuple[int, int], set[str]] = {}
+        self.last_node_id: str | None = None
+        self.last_position: tuple[float, float, float] | None = None
+        self.last_scene_room: tuple[int, int] | None = None
+        self.dirty = False
+        self.new_edges_since_save = 0
+        self.last_save_at = 0.0
+        self.routes_reused = 0
+        self.last_path_nodes = 0
+        self.last_target_gap: float | None = None
+        self.load_error = ""
+        self._load()
+
+    def _index_node(self, node_id: str, row: dict):
+        key = (int(row["scene"]), int(row["room"]))
+        self.by_scene.setdefault(key, set()).add(node_id)
+
+    def _load(self):
+        if not self.path.is_file():
+            return
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+            if data.get("version") != ROUTE_GRAPH_VERSION:
+                raise ValueError("unsupported route graph version")
+            nodes = data.get("nodes")
+            edges = data.get("edges")
+            if not isinstance(nodes, dict) or not isinstance(edges, dict):
+                raise ValueError("invalid route graph payload")
+            for node_id, row in nodes.items():
+                if not isinstance(row, dict):
+                    continue
+                position = row.get("position")
+                if (
+                    not isinstance(position, list)
+                    or len(position) != 3
+                    or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in position)
+                ):
+                    continue
+                scene = row.get("scene")
+                room = row.get("room")
+                if not isinstance(scene, int) or not isinstance(room, int):
+                    continue
+                normalized = {
+                    "scene": scene,
+                    "room": room,
+                    "position": [float(v) for v in position],
+                    "visits": max(1, int(row.get("visits") or 1)),
+                    "updated_at": float(row.get("updated_at") or 0.0),
+                }
+                self.nodes[str(node_id)] = normalized
+                self._index_node(str(node_id), normalized)
+            for source, destinations in edges.items():
+                if source not in self.nodes or not isinstance(destinations, dict):
+                    continue
+                for target, edge in destinations.items():
+                    if target not in self.nodes or not isinstance(edge, dict):
+                        continue
+                    distance = edge.get("distance")
+                    if not isinstance(distance, (int, float)) or not math.isfinite(distance) or distance <= 0:
+                        continue
+                    self.edges.setdefault(source, {})[target] = {
+                        "distance": float(distance),
+                        "traversals": max(1, int(edge.get("traversals") or 1)),
+                        "updated_at": float(edge.get("updated_at") or 0.0),
+                    }
+        except (OSError, ValueError, TypeError) as exc:
+            self.nodes = {}
+            self.edges = {}
+            self.by_scene = {}
+            self.load_error = f"{type(exc).__name__}: {str(exc)[:160]}"
+
+    def reset_trace(self):
+        self.last_node_id = None
+        self.last_position = None
+        self.last_scene_room = None
+
+    def _touch_node(self, scene: int, room: int, position, now_s: float) -> str:
+        node_id = _node_id(scene, room, position)
+        existing = self.nodes.get(node_id)
+        if existing is None:
+            if len(self.nodes) >= ROUTE_MAX_NODES:
+                return node_id
+            row = {
+                "scene": int(scene),
+                "room": int(room),
+                "position": [float(v) for v in position],
+                "visits": 1,
+                "updated_at": now_s,
+            }
+            self.nodes[node_id] = row
+            self._index_node(node_id, row)
+            self.dirty = True
+        else:
+            visits = max(1, int(existing.get("visits") or 1))
+            # Slow running average keeps a stable representative point for the
+            # coarse cell instead of chasing every frame's jitter.
+            alpha = min(0.15, 1.0 / (visits + 1))
+            existing["position"] = [
+                float(old) * (1.0 - alpha) + float(new) * alpha
+                for old, new in zip(existing["position"], position)
+            ]
+            existing["visits"] = visits + 1
+            existing["updated_at"] = now_s
+            self.dirty = True
+        return node_id
+
+    def observe(self, game: GameState, *, now_s: float | None = None) -> bool:
+        if not self.writable or not game.player or not game.in_game or game.cutscene_active:
+            return False
+        now_s = time.time() if now_s is None else float(now_s)
+        position = tuple(float(v) for v in game.player.position)
+        scene_room = (int(game.scene), int(game.room))
+        node_id = _node_id(game.scene, game.room, position)
+
+        if node_id == self.last_node_id and scene_room == self.last_scene_room:
+            self.last_position = position
+            return False
+
+        node_id = self._touch_node(game.scene, game.room, position, now_s)
+        edge_added = False
+        if (
+            self.last_node_id is not None
+            and self.last_position is not None
+            and self.last_scene_room == scene_room
+            and self.last_node_id in self.nodes
+            and node_id in self.nodes
+            and self.last_node_id != node_id
+        ):
+            distance = _distance(self.last_position, position)
+            if 1.0 <= distance <= ROUTE_MAX_EDGE_DISTANCE:
+                bucket = self.edges.setdefault(self.last_node_id, {})
+                edge = bucket.get(node_id)
+                if edge is None:
+                    bucket[node_id] = {
+                        "distance": distance,
+                        "traversals": 1,
+                        "updated_at": now_s,
+                    }
+                    self.new_edges_since_save += 1
+                    edge_added = True
+                else:
+                    traversals = max(1, int(edge.get("traversals") or 1))
+                    edge["distance"] = (
+                        float(edge["distance"]) * traversals + distance
+                    ) / (traversals + 1)
+                    edge["traversals"] = traversals + 1
+                    edge["updated_at"] = now_s
+                self.dirty = True
+
+        self.last_node_id = node_id
+        self.last_position = position
+        self.last_scene_room = scene_room
+        return edge_added
+
+    def should_save(self, *, now_s: float | None = None) -> bool:
+        if not self.writable or not self.dirty:
+            return False
+        now_s = time.time() if now_s is None else float(now_s)
+        return self.new_edges_since_save >= 16 or now_s - self.last_save_at >= 20.0
+
+    def save(self, *, force: bool = False):
+        if not self.writable or not self.dirty:
+            return
+        if not force and not self.should_save():
+            return
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "version": ROUTE_GRAPH_VERSION,
+            "nodes": self.nodes,
+            "edges": self.edges,
+            "saved_at": time.time(),
+        }
+        temporary = self.path.with_name(
+            self.path.name + ".tmp-" + uuid.uuid4().hex
+        )
+        temporary.write_text(
+            json.dumps(payload, separators=(",", ":"), sort_keys=True),
+            encoding="utf-8",
+        )
+        os.replace(temporary, self.path)
+        self.dirty = False
+        self.new_edges_since_save = 0
+        self.last_save_at = time.time()
+
+    def _nearest_node(self, scene: int, room: int, position, radius: float):
+        candidates = self.by_scene.get((int(scene), int(room))) or ()
+        best_id = None
+        best_distance = float("inf")
+        for node_id in candidates:
+            node = self.nodes[node_id]
+            distance = _distance(node["position"], position)
+            if distance < best_distance:
+                best_id = node_id
+                best_distance = distance
+        if best_id is None or best_distance > radius:
+            return None, None
+        return best_id, best_distance
+
+    @staticmethod
+    def _edge_cost(edge: dict) -> float:
+        distance = max(1.0, float(edge.get("distance") or 1.0))
+        traversals = max(1, int(edge.get("traversals") or 1))
+        confidence_discount = min(0.30, math.log1p(traversals) * 0.07)
+        return distance * (1.0 - confidence_discount)
+
+    def _shortest_path(self, start_id: str, target_id: str) -> list[str] | None:
+        if start_id == target_id:
+            return [start_id]
+        queue: list[tuple[float, str]] = [(0.0, start_id)]
+        distance = {start_id: 0.0}
+        previous: dict[str, str] = {}
+        while queue:
+            current_cost, current = heapq.heappop(queue)
+            if current_cost != distance.get(current):
+                continue
+            if current == target_id:
+                break
+            for neighbor, edge in self.edges.get(current, {}).items():
+                if neighbor not in self.nodes:
+                    continue
+                new_cost = current_cost + self._edge_cost(edge)
+                if new_cost >= distance.get(neighbor, float("inf")):
+                    continue
+                distance[neighbor] = new_cost
+                previous[neighbor] = current
+                heapq.heappush(queue, (new_cost, neighbor))
+        if target_id not in distance:
+            return None
+        path = [target_id]
+        while path[-1] != start_id:
+            parent = previous.get(path[-1])
+            if parent is None:
+                return None
+            path.append(parent)
+        path.reverse()
+        return path
+
+    def next_waypoint(self, game: GameState, target_position) -> dict | None:
+        if not game.player or target_position is None:
+            self.last_path_nodes = 0
+            self.last_target_gap = None
+            return None
+        start_id, _ = self._nearest_node(
+            game.scene,
+            game.room,
+            game.player.position,
+            ROUTE_START_RADIUS,
+        )
+        target_id, target_gap = self._nearest_node(
+            game.scene,
+            game.room,
+            target_position,
+            ROUTE_TARGET_RADIUS,
+        )
+        if start_id is None or target_id is None:
+            self.last_path_nodes = 0
+            self.last_target_gap = target_gap
+            return None
+
+        path = self._shortest_path(start_id, target_id)
+        if not path or len(path) < 2:
+            self.last_path_nodes = len(path or ())
+            self.last_target_gap = target_gap
+            return None
+
+        player_position = game.player.position
+        waypoint_index = 1
+        while waypoint_index < len(path) - 1:
+            candidate = self.nodes[path[waypoint_index]]["position"]
+            if _distance(player_position, candidate) >= ROUTE_WAYPOINT_MIN_DISTANCE:
+                break
+            waypoint_index += 1
+
+        waypoint_id = path[waypoint_index]
+        waypoint = tuple(self.nodes[waypoint_id]["position"])
+        traversals = []
+        for source, target in zip(path[:-1], path[1:]):
+            edge = self.edges.get(source, {}).get(target)
+            if edge:
+                traversals.append(max(1, int(edge.get("traversals") or 1)))
+        confidence = min(1.0, (min(traversals) if traversals else 1) / 4.0)
+
+        self.routes_reused += 1
+        self.last_path_nodes = len(path)
+        self.last_target_gap = target_gap
+        return {
+            "waypoint": waypoint,
+            "waypoint_id": waypoint_id,
+            "path_nodes": len(path),
+            "waypoint_index": waypoint_index,
+            "target_gap": float(target_gap or 0.0),
+            "confidence": confidence,
+        }
+
+    def stats(self) -> dict:
+        edge_count = sum(len(rows) for rows in self.edges.values())
+        return {
+            "nodes": len(self.nodes),
+            "edges": edge_count,
+            "routes_reused": self.routes_reused,
+            "last_path_nodes": self.last_path_nodes,
+            "last_target_gap": (
+                round(self.last_target_gap, 1)
+                if isinstance(self.last_target_gap, (int, float))
+                else None
+            ),
+            "writable": self.writable,
+            "load_error": self.load_error or None,
+        }
