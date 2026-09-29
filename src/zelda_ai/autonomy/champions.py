@@ -211,7 +211,7 @@ class ChampionStore:
                             **best_route_metadata,
                         },
                     )
-            except OSError:
+            except (OSError, ValueError):
                 # The individual completion is already durable. The best alias
                 # is a convenience and must never turn a saved champion into a
                 # failed capture.
