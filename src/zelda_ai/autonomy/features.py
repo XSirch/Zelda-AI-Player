@@ -221,6 +221,9 @@ def goal_guidance(
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "exit_active": False,
+            "exit_index": None,
+            "exit_direct_reachable": False,
         }
 
     point = target_point(game, intent)
@@ -239,6 +242,9 @@ def goal_guidance(
     route_partial = False
     frontier_active = False
     frontier_direction = None
+    exit_active = False
+    exit_index = None
+    exit_direct_reachable = False
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
@@ -261,7 +267,11 @@ def goal_guidance(
         route_hint
         and intent.mode in {"navigate", "explore", "observe"}
         and not source.startswith("traversal:")
-        and (point is not None or bool(route_hint.get("frontier")))
+        and (
+            point is not None
+            or bool(route_hint.get("frontier"))
+            or bool(route_hint.get("exit"))
+        )
     ):
         waypoint = route_hint.get("waypoint")
         if (
@@ -270,8 +280,20 @@ def goal_guidance(
             and all(isinstance(value, (int, float)) and math.isfinite(value) for value in waypoint)
         ):
             is_frontier = bool(route_hint.get("frontier"))
-            route_active = not is_frontier
+            is_exit = bool(route_hint.get("exit"))
+            route_active = not is_frontier and not is_exit and int(
+                route_hint.get("path_nodes") or 0
+            ) > 1
             frontier_active = is_frontier
+            exit_active = is_exit
+            exit_index = (
+                int(route_hint.get("exit_index"))
+                if is_exit and route_hint.get("exit_index") is not None
+                else None
+            )
+            exit_direct_reachable = bool(
+                route_hint.get("direct_reachable")
+            ) if is_exit else False
             frontier_direction = (
                 str(route_hint.get("direction"))[:32]
                 if is_frontier and route_hint.get("direction") is not None
@@ -285,7 +307,29 @@ def goal_guidance(
                 else None
             )
             point = route_waypoint
-            source = "observed_frontier" if is_frontier else "learned_route"
+            if is_frontier:
+                source = "observed_frontier"
+            elif is_exit:
+                source = (
+                    "scene_exit"
+                    if int(route_hint.get("path_nodes") or 0) <= 1
+                    else "scene_exit_route"
+                )
+                final_exit = route_hint.get("exit_position")
+                if (
+                    isinstance(final_exit, (list, tuple))
+                    and len(final_exit) == 3
+                    and all(
+                        isinstance(value, (int, float))
+                        and math.isfinite(value)
+                        for value in final_exit
+                    )
+                ):
+                    final_point = tuple(
+                        float(value) for value in final_exit
+                    )
+            else:
+                source = "learned_route"
             route_path_nodes = max(0, int(route_hint.get("path_nodes") or 0))
             route_confidence = max(
                 0.0, min(1.0, float(route_hint.get("confidence") or 0.0))
@@ -316,6 +360,7 @@ def goal_guidance(
             if (
                 intent.mode in {"navigate", "explore", "observe"}
                 and not source.startswith("traversal:")
+                and not source.startswith("scene_exit")
             ):
                 detour_stick, detour_info = _collision_detour(
                     game,
@@ -335,6 +380,11 @@ def goal_guidance(
             base_strength = (
                 0.78 + 0.16 * route_confidence
             ) * (0.85 if route_partial else 1.0)
+        elif exit_active:
+            # A scene-exit surface is explicit bridge evidence of a transition.
+            # Give it high steering authority, but reduce button quieting near
+            # the threshold so a learned/contextual interaction can fire.
+            base_strength = 0.92 if exit_direct_reachable else 0.84
         elif frontier_active:
             # Targetless exploration should still have a stable local heading.
             # The waypoint comes from an observed open probe, not hidden map data.
@@ -360,9 +410,12 @@ def goal_guidance(
             )
         obstacle_scale = 0.82 if detour is not None else 0.30 if blocked else 1.0
         strength = base_strength * proximity * stuck_scale * obstacle_scale
-        quiet_multiplier = (
-            0.45 if blocked else 0.9
-        ) if intent.mode in {"navigate", "explore", "observe"} else 0.25
+        if exit_active:
+            quiet_multiplier = 0.12
+        else:
+            quiet_multiplier = (
+                0.45 if blocked else 0.9
+            ) if intent.mode in {"navigate", "explore", "observe"} else 0.25
         return {
             "active": strength > 0.01,
             "stick": stick,
@@ -384,6 +437,9 @@ def goal_guidance(
             "route_partial": route_partial,
             "frontier_active": frontier_active,
             "frontier_direction": frontier_direction,
+            "exit_active": exit_active,
+            "exit_index": exit_index,
+            "exit_direct_reachable": exit_direct_reachable,
         }
 
     direction_sticks = {
@@ -420,6 +476,9 @@ def goal_guidance(
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "exit_active": False,
+            "exit_index": None,
+            "exit_direct_reachable": False,
         }
 
     return {
@@ -443,6 +502,9 @@ def goal_guidance(
         "route_partial": False,
         "frontier_active": False,
         "frontier_direction": None,
+        "exit_active": False,
+        "exit_index": None,
+        "exit_direct_reachable": False,
     }
 
 def encode_state(
