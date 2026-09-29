@@ -475,7 +475,7 @@ class LearnedRouteGraph:
                     # This partial branch has delivered everything currently
                     # known for this target. Do not repeatedly pull Link back
                     # here until newly observed graph structure changes it.
-                    self.exhausted_partial_nodes.add(start_id)
+                    self.exhausted_partial_nodes.update(self.active_path)
                     self.active_path = []
                     self.last_failed_search = None
 
