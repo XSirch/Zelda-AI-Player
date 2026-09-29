@@ -211,6 +211,35 @@ def test_goal_guidance_keeps_explicit_climbable_wall_target(state):
     assert guidance["stick"][1] > 0.9
 
 
+def test_goal_guidance_replays_learned_route_waypoint(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (0.0, 0.0, 500.0),
+    })
+    state.camera_input_yaw = 0
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        route_hint={
+            "waypoint": (160.0, 0.0, 0.0),
+            "path_nodes": 7,
+            "target_gap": 20.0,
+            "confidence": 0.75,
+        },
+    )
+
+    assert guidance["route_active"] is True
+    assert guidance["source"] == "learned_route"
+    assert guidance["route_path_nodes"] == 7
+    assert guidance["route_confidence"] == pytest.approx(0.75)
+    assert guidance["route_target_gap"] == pytest.approx(20.0)
+    assert guidance["stick"][0] > 0.95
+    assert abs(guidance["stick"][1]) < 0.05
+    # UI distance remains the final objective distance, not just the next hop.
+    assert guidance["distance"] == pytest.approx(500.0)
+
+
 def test_goal_guidance_uses_observed_vertical_traversal(state):
     from zelda_ai.models import TraversalAffordanceObservation
 
@@ -556,6 +585,28 @@ def test_blocked_guidance_suppresses_straight_line_intent_reward(state):
         intrinsic=0.0,
         pressed_buttons=0,
         guidance={"blocked": True, "detour": "forward_right"},
+        now_s=20.0,
+    )
+
+    assert "intent_progress" not in result.breakdown
+
+
+def test_learned_route_suppresses_straight_line_intent_reward(state):
+    tracker = RewardTracker()
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (400.0, 0.0, 0.0),
+    })
+    tracker.step(state, intent, intrinsic=0.0, pressed_buttons=0, now_s=0.0)
+
+    detouring = state.model_copy(deep=True)
+    detouring.player.position = (0.0, 0.0, 40.0)
+    result = tracker.step(
+        detouring,
+        intent,
+        intrinsic=0.0,
+        pressed_buttons=0,
+        guidance={"route_active": True, "blocked": False},
         now_s=20.0,
     )
 
