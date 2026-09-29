@@ -379,16 +379,6 @@ class OnlinePPO:
         buttons = torch.tensor(
             [row["buttons"] for row in rollout], dtype=torch.float32, device=self.learner_device
         )
-        guidance_sticks = torch.tensor(
-            [row.get("guidance_stick", [0.0, 0.0]) for row in rollout],
-            dtype=torch.float32,
-            device=self.learner_device,
-        )
-        guidance_strengths = torch.tensor(
-            [row.get("guidance_strength", 0.0) for row in rollout],
-            dtype=torch.float32,
-            device=self.learner_device,
-        )
         button_quiet_strengths = torch.tensor(
             [row.get("button_quiet_strength", 0.0) for row in rollout],
             dtype=torch.float32,
