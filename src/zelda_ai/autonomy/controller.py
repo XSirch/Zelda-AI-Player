@@ -15,10 +15,12 @@ from .features import (
     encode_state,
     goal_guidance,
     stack_frames,
+    target_point,
 )
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .reward import RewardTracker
+from .routes import LearnedRouteGraph
 
 # Physical N64 controller wiring only.  These are not semantic skills and the
 # policy is never told what any button does.
@@ -68,6 +70,10 @@ class ContinuousController:
         self.rollout_size = rollout_size
         self.on_achievement = on_achievement
         self.training_enabled = training_enabled
+        self.route_graph = LearnedRouteGraph(
+            checkpoint.parent / "route-graph-v1.json",
+            writable=training_enabled,
+        )
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
@@ -103,11 +109,17 @@ class ContinuousController:
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
     def reset_episode_state(self):
         self.reward_tracker = RewardTracker()
+        self.route_graph.reset_trace()
         self.feature_history.clear()
         self.novelty_history.clear()
         self.pending = None
@@ -128,6 +140,11 @@ class ContinuousController:
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
         }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
@@ -156,6 +173,11 @@ class ContinuousController:
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
@@ -205,6 +227,7 @@ class ContinuousController:
         self.training_queue.put_nowait(batch)
 
     def _ml_step(self, game) -> Setpoint:
+        self.route_graph.observe(game)
         base_observation = encode_state(
             game,
             self.intent,
@@ -273,10 +296,20 @@ class ContinuousController:
         ):
             self._enqueue_rollout(observation, done=reward.done)
 
+        final_target = target_point(game, self.intent)
+        route_hint = (
+            self.route_graph.next_waypoint(game, final_target)
+            if (
+                final_target is not None
+                and self.intent.mode in {"navigate", "explore", "observe"}
+            )
+            else None
+        )
         guidance = goal_guidance(
             game,
             self.intent,
             local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
+            route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
         self.last_guidance = guidance
@@ -363,6 +396,7 @@ class ContinuousController:
                     self.feature_history.clear()
                     self.novelty_history.clear()
                     self.reward_tracker.break_causal_chain()
+                    self.route_graph.reset_trace()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
                     self.last_stick = (0.0, 0.0)
                     self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
@@ -375,6 +409,7 @@ class ContinuousController:
                 # During a non-interactive cutscene there is no useful control
                 # transition to learn; neutral input avoids polluting the rollout.
                 if game.cutscene_active and not game.dialogue.active:
+                    self.route_graph.reset_trace()
                     self.last_setpoint = Setpoint(reason="cutscene")
                     self.last_motor_summary = "Cutscene owns Link; ML actor remains live and resumes immediately."
                 elif self.tick % self.action_repeat_ticks == 1 or self.pending is None:
@@ -390,10 +425,15 @@ class ContinuousController:
                 except RuntimeError:
                     pass
 
+                if self.route_graph.should_save():
+                    await asyncio.to_thread(self.route_graph.save)
                 publish()
                 await asyncio.sleep(self.tick_s)
         finally:
             self.bridge.release()
+            if self.route_graph.writable:
+                with contextlib.suppress(OSError, ValueError):
+                    await asyncio.to_thread(self.route_graph.save, force=True)
             # Let queued/in-flight batches finish after input authority is gone.
             # This cannot move Link because the controller loop has already ended.
             if learner is not None:
@@ -503,6 +543,7 @@ class ContinuousController:
                     ),
                 },
                 "reward_breakdown": self.last_reward_breakdown,
+                "route_memory": self.route_graph.stats(),
                 "last_update": self.last_training_stats,
             },
         }
