@@ -22,7 +22,7 @@ from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v5/route-memory-v1/ppo-rnd-v2/reward-v6"
+CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v6/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -45,7 +45,10 @@ class AutonomyRuntime:
         self.providers = providers
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
-        self.training_checkpoint = self.model_dir / "raw-controller-ppo-rnd-v2.pt"
+        # V3 changes the policy action semantics from absolute sampled stick to
+        # residual stick mixed with structured guidance. Keep the old V2 file
+        # untouched for inspection; incompatible weights must not be reinterpreted.
+        self.training_checkpoint = self.model_dir / "raw-controller-ppo-rnd-v3.pt"
         self.champions = ChampionStore(self.model_dir / "champions")
         self.champion_catalog = self.champions.catalog()
         self.active_champion: dict | None = None
