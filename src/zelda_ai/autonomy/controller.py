@@ -358,12 +358,16 @@ class ContinuousController:
         now = time.monotonic()
         if self.pending_interaction_probe is not None:
             executed_buttons = [0.0 for _ in BUTTON_NAMES]
-            sample = {**sample, "buttons": executed_buttons}
+            sample = {
+                **sample,
+                "stick": [0.0, 0.0],
+                "buttons": executed_buttons,
+            }
             return (
                 Setpoint(
                     buttons=0,
-                    stick_x=setpoint.stick_x,
-                    stick_y=setpoint.stick_y,
+                    stick_x=0,
+                    stick_y=0,
                     reason="interaction_wait",
                 ),
                 sample,
@@ -372,12 +376,16 @@ class ContinuousController:
 
         if now - self.interaction_last_probe_at < INTERACTION_PROBE_COOLDOWN_S:
             executed_buttons = [0.0 for _ in BUTTON_NAMES]
-            sample = {**sample, "buttons": executed_buttons}
+            sample = {
+                **sample,
+                "stick": [0.0, 0.0],
+                "buttons": executed_buttons,
+            }
             return (
                 Setpoint(
                     buttons=0,
-                    stick_x=setpoint.stick_x,
-                    stick_y=setpoint.stick_y,
+                    stick_x=0,
+                    stick_y=0,
                     reason="interaction_wait",
                 ),
                 sample,
@@ -413,12 +421,16 @@ class ContinuousController:
             "known": bool(using_known),
         }
         self.last_interaction_source = f"{source}:{key}->{button}"
-        sample = {**sample, "buttons": executed_buttons}
+        sample = {
+            **sample,
+            "stick": [0.0, 0.0],
+            "buttons": executed_buttons,
+        }
         return (
             Setpoint(
                 buttons=BUTTON_MASKS[button],
-                stick_x=setpoint.stick_x,
-                stick_y=setpoint.stick_y,
+                stick_x=0,
+                stick_y=0,
                 reason=source,
             ),
             sample,
