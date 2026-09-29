@@ -34,7 +34,9 @@ Quando a cognição pede um `target_position`/ator, o controlador procura no **g
 
 Uma rota parcial não pode virar outro ímã: ao chegar ao fim conhecido de um ramo que ainda não alcança o alvo, esse endpoint fica marcado como esgotado para aquele objetivo e não é reproduzido novamente até o grafo ganhar novos nós/trechos. A memória também separa rotas por scene/room, idade de Link e mundo normal/espelhado. Ela nunca inventa arestas reversas, atalhos ou o restante de uma rota não observada.
 
-A memória é incremental e persistente entre runs. Avançar por uma rota conhecida conta como progresso operacional, mas **não zera `local_dwell`** nem reabre `frontier_progress`; assim, uma volta A → B → C → A não consegue mascarar um loop. Runs de avaliação carregam a cópia read-only congelada junto com o champion, para que uma avaliação posterior não seja alterada por rotas aprendidas depois.
+A memória é incremental e persistente entre runs. Avançar por uma rota conhecida conta como progresso operacional, mas **não zera `local_dwell`** nem reabre `frontier_progress`; assim, uma volta A → B → C → A não consegue mascarar um loop.
+
+A mesma `route-graph-v1.json` também guarda **affordances de interação aprendidas empiricamente**. Quando Link chega a uma saída/porta e existe `context_action`, o controlador não assume que "Open = A": ele testa um botão físico por vez (sem START), observa se houve transição de scene/room, diálogo ou outro efeito durável e só então grava a associação. Uma associação conhecida é reutilizada; após três falhas consecutivas ela é descartada e volta a ser explorada. Como isso fica no route graph, o snapshot do champion congela também essas affordances. Runs de avaliação carregam a cópia read-only congelada junto com o champion.
 
 ## Reward
 
