@@ -396,17 +396,21 @@ def goal_guidance(
                 "explore": 0.74,
                 "observe": 0.62,
             }.get(intent.mode, 0.68)
-        # Fade the steering prior near the waypoint so learned interaction/
+        # Ordinary targets fade near the waypoint so learned interaction/
         # traversal behaviour can take over instead of orbiting the point.
+        # Scene exits are different: they are explicit native transition surfaces.
+        # Once selected, keep steering authority high all the way to the threshold;
+        # contextual interaction probing neutralizes the stick separately.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
         if exit_active:
-            # Stay committed to the exit threshold while contextual interaction
-            # probes run. Fading to zero beside a closed door lets residual
-            # movement drift Link away before a button can be evaluated.
-            proximity = max(0.55, proximity)
+            proximity = 1.0
 
         dwell = max(0.0, float(local_dwell_seconds or 0.0))
-        if dwell <= 90.0:
+        if exit_active:
+            # Long dwell is the reason exits become prioritized. Do not then
+            # weaken the selected exit because the same dwell timer is large.
+            stuck_scale = 1.0
+        elif dwell <= 90.0:
             stuck_scale = 1.0
         else:
             stuck_scale = max(
