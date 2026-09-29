@@ -142,6 +142,8 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     runtime.controller.policy.save()
     assert checkpoint.is_file()
     await runtime.control("stop")
+    route_graph = tmp_path / "ml" / "route-graph-v1.json"
+    assert route_graph.is_file()
     provider.release.set()
     await runtime._settle_previous_controller()
 
@@ -149,6 +151,8 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     runtime.providers["codex"] = second_provider
     await runtime.start(unlimited())
     assert runtime.controller.policy.checkpoint == checkpoint
+    assert runtime.controller.route_graph.path == route_graph
+    assert runtime.controller.route_graph.stats()["nodes"] >= 1
     await runtime.control("stop")
     second_provider.release.set()
 
