@@ -36,9 +36,9 @@ def test_route_graph_learns_persists_and_reuses_observed_detour(tmp_path, state)
 
     assert hint is not None
     assert hint["path_nodes"] == len(positions)
-    # 80u is within the lookahead threshold, so the first actionable waypoint
-    # is the second observed eastward node, not the straight-line north target.
-    assert hint["waypoint"][0] > 120.0
+    # The first learned edge is replayed explicitly; nearby nodes are no longer
+    # skipped far enough to cut corners through collision.
+    assert 60.0 < hint["waypoint"][0] < 100.0
     assert abs(hint["waypoint"][2]) < 30.0
     assert loaded.stats()["routes_reused"] == 1
 
@@ -63,7 +63,7 @@ def test_route_graph_reuses_partial_path_toward_unvisited_target(tmp_path, state
     assert hint is not None
     assert hint["partial"] is True
     assert hint["target_gap"] > 240.0
-    assert hint["waypoint"][0] > 100.0
+    assert 60.0 < hint["waypoint"][0] < 100.0
 
 
 def test_partial_route_is_not_replayed_until_graph_extends(tmp_path, state):
