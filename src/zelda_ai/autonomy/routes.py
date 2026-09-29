@@ -59,7 +59,7 @@ class LearnedRouteGraph:
         self.by_scene: dict[tuple[int, int, bool, str], set[str]] = {}
         self.last_node_id: str | None = None
         self.last_position: tuple[float, float, float] | None = None
-        self.last_scene_room: tuple[int, int] | None = None
+        self.last_context: tuple[int, int, bool, str] | None = None
         self.dirty = False
         self.revision = 0
         self.last_failed_search: tuple[str, str, int] | None = None
@@ -143,7 +143,7 @@ class LearnedRouteGraph:
     def reset_trace(self):
         self.last_node_id = None
         self.last_position = None
-        self.last_scene_room = None
+        self.last_context = None
         self.active_target_signature = None
         self.active_target_node_id = None
         self.active_path = []
@@ -206,7 +206,12 @@ class LearnedRouteGraph:
             return False
         now_s = time.time() if now_s is None else float(now_s)
         position = tuple(float(v) for v in game.player.position)
-        scene_room = (int(game.scene), int(game.room))
+        context = (
+            int(game.scene),
+            int(game.room),
+            bool(game.mirrored_world),
+            "adult" if game.player.age == "adult" else "child",
+        )
         node_id = _node_id(
             game.scene,
             game.room,
@@ -215,7 +220,7 @@ class LearnedRouteGraph:
             age=game.player.age,
         )
 
-        if node_id == self.last_node_id and scene_room == self.last_scene_room:
+        if node_id == self.last_node_id and context == self.last_context:
             self.last_position = position
             return False
 
@@ -231,7 +236,7 @@ class LearnedRouteGraph:
         if (
             self.last_node_id is not None
             and self.last_position is not None
-            and self.last_scene_room == scene_room
+            and self.last_context == context
             and self.last_node_id in self.nodes
             and node_id in self.nodes
             and self.last_node_id != node_id
@@ -263,7 +268,7 @@ class LearnedRouteGraph:
 
         self.last_node_id = node_id
         self.last_position = position
-        self.last_scene_room = scene_room
+        self.last_context = context
         return edge_added
 
     def save(self, *, force: bool = False):
