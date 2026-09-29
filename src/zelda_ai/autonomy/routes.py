@@ -17,6 +17,7 @@ ROUTE_CELL_Y = 50.0
 ROUTE_MAX_EDGE_DISTANCE = 190.0
 ROUTE_START_RADIUS = 170.0
 ROUTE_TARGET_RADIUS = 240.0
+ROUTE_TARGET_REACHED_DISTANCE = 95.0
 ROUTE_PARTIAL_MIN_GAIN = 80.0
 ROUTE_WAYPOINT_MIN_DISTANCE = 45.0
 ROUTE_MAX_NODES = 50_000
@@ -475,7 +476,7 @@ class LearnedRouteGraph:
                 )
                 if (
                     isinstance(endpoint_gap, (int, float))
-                    and endpoint_gap > ROUTE_TARGET_RADIUS
+                    and endpoint_gap > ROUTE_TARGET_REACHED_DISTANCE
                 ):
                     # This partial branch has delivered everything currently
                     # known for this target. Do not repeatedly pull Link back
@@ -535,7 +536,7 @@ class LearnedRouteGraph:
             "confidence": confidence,
             "partial": bool(
                 isinstance(target_gap, (int, float))
-                and target_gap > ROUTE_TARGET_RADIUS
+                and target_gap > ROUTE_TARGET_REACHED_DISTANCE
             ),
         }
 
