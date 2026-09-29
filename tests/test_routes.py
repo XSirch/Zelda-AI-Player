@@ -47,6 +47,25 @@ def test_route_graph_learns_persists_and_reuses_observed_detour(tmp_path, state)
     assert loaded.stats()["routes_reused"] == 1
 
 
+def test_route_graph_reuses_partial_path_toward_unvisited_target(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    positions = [
+        (0.0, 0.0, 0.0),
+        (80.0, 0.0, 0.0),
+        (160.0, 0.0, 0.0),
+    ]
+    for index, position in enumerate(positions, start=1):
+        graph.observe(_at(state, position, 30 + index), now_s=float(index))
+
+    start = _at(state, positions[0], 300)
+    hint = graph.next_waypoint(start, (500.0, 0.0, 0.0))
+
+    assert hint is not None
+    assert hint["partial"] is True
+    assert hint["target_gap"] > 240.0
+    assert hint["waypoint"][0] > 100.0
+
+
 def test_route_graph_does_not_invent_reverse_or_unobserved_edges(tmp_path, state):
     graph = LearnedRouteGraph(tmp_path / "routes.json")
     positions = [
