@@ -55,6 +55,7 @@ class LearnedRouteGraph:
         self.new_edges_since_save = 0
         self.last_save_at = 0.0
         self.routes_reused = 0
+        self.active_route_target_id: str | None = None
         self.last_path_nodes = 0
         self.last_target_gap: float | None = None
         self.load_error = ""
@@ -122,6 +123,7 @@ class LearnedRouteGraph:
         self.last_node_id = None
         self.last_position = None
         self.last_scene_room = None
+        self.active_route_target_id = None
 
     def _touch_node(self, scene: int, room: int, position, now_s: float) -> str:
         node_id = _node_id(scene, room, position)
@@ -286,6 +288,7 @@ class LearnedRouteGraph:
 
     def next_waypoint(self, game: GameState, target_position) -> dict | None:
         if not game.player or target_position is None:
+            self.active_route_target_id = None
             self.last_path_nodes = 0
             self.last_target_gap = None
             return None
@@ -302,12 +305,14 @@ class LearnedRouteGraph:
             ROUTE_TARGET_RADIUS,
         )
         if start_id is None or target_id is None:
+            self.active_route_target_id = None
             self.last_path_nodes = 0
             self.last_target_gap = target_gap
             return None
 
         path = self._shortest_path(start_id, target_id)
         if not path or len(path) < 2:
+            self.active_route_target_id = None
             self.last_path_nodes = len(path or ())
             self.last_target_gap = target_gap
             return None
@@ -329,7 +334,9 @@ class LearnedRouteGraph:
                 traversals.append(max(1, int(edge.get("traversals") or 1)))
         confidence = min(1.0, (min(traversals) if traversals else 1) / 4.0)
 
-        self.routes_reused += 1
+        if self.active_route_target_id != target_id:
+            self.routes_reused += 1
+            self.active_route_target_id = target_id
         self.last_path_nodes = len(path)
         self.last_target_gap = target_gap
         return {
