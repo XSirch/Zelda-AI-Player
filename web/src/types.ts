@@ -136,6 +136,7 @@ export interface LearningSnapshot {
     nodes: number;
     edges: number;
     routes_reused: number;
+    waypoints_advanced?: number;
     last_path_nodes: number;
     last_target_gap: number | null;
     writable: boolean;
