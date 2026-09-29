@@ -314,14 +314,18 @@ class ContinuousController:
             self._enqueue_rollout(observation, done=reward.done)
 
         final_target = target_point(game, self.intent)
-        route_hint = (
-            self.route_graph.next_waypoint(game, final_target)
-            if (
-                final_target is not None
-                and self.intent.mode in {"navigate", "explore", "observe"}
+        if (
+            final_target is not None
+            and self.intent.mode in {"navigate", "explore", "observe"}
+        ):
+            route_hint = self.route_graph.next_waypoint(
+                game,
+                final_target,
             )
-            else None
-        )
+        elif self.intent.mode == "explore":
+            route_hint = self.route_graph.exploration_waypoint(game)
+        else:
+            route_hint = None
         guidance = goal_guidance(
             game,
             self.intent,
