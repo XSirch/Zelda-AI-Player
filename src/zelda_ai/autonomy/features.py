@@ -249,17 +249,21 @@ def goal_guidance(
         else:
             target_yaw = math.atan2(dx, dz)
             stick = _camera_relative_stick(game, player, target_yaw)
-            detour_stick, detour_info = _collision_detour(
-                game,
-                player,
-                target_yaw,
-            )
-            blocked = bool(detour_info["blocked"])
-            detour = detour_info["detour"]
-            direct_probe = detour_info["direct_probe"]
-            if detour_stick is not None:
-                stick = detour_stick
-                source = f"{source}:detour:{detour}"
+            # Explicit vertical affordances (ladder/climbable wall/stairs) may
+            # intentionally terminate at collision.  Do not steer away from the
+            # very surface the observer identified as the traversal target.
+            if not source.startswith("traversal:"):
+                detour_stick, detour_info = _collision_detour(
+                    game,
+                    player,
+                    target_yaw,
+                )
+                blocked = bool(detour_info["blocked"])
+                detour = detour_info["detour"]
+                direct_probe = detour_info["direct_probe"]
+                if detour_stick is not None:
+                    stick = detour_stick
+                    source = f"{source}:detour:{detour}"
 
         base_strength = {
             "navigate": 0.86,
