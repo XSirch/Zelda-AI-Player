@@ -5,6 +5,7 @@ import time
 
 import pytest
 
+from zelda_ai.autonomy.controller import ContinuousController
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
@@ -155,6 +156,41 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     assert runtime.controller.route_graph.stats()["nodes"] >= 1
     await runtime.control("stop")
     second_provider.release.set()
+
+
+@pytest.mark.asyncio
+async def test_route_memory_is_saved_during_active_long_run(
+    tmp_path, store, state, monkeypatch
+):
+    monkeypatch.setattr(
+        ContinuousController,
+        "route_save_interval_s",
+        0.02,
+    )
+    bridge = connected(state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(
+        bridge,
+        store,
+        {"codex": provider},
+        tmp_path / "ml",
+    )
+
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    route_graph = tmp_path / "ml" / "route-graph-v1.json"
+
+    for _ in range(30):
+        if route_graph.is_file():
+            break
+        await asyncio.sleep(0.01)
+
+    assert runtime.state == "running"
+    assert route_graph.is_file()
+    assert runtime.controller.route_graph.stats()["nodes"] >= 1
+    assert runtime.controller.route_save_error == ""
+
+    await runtime.control("stop")
 
 
 def test_paused_observations_are_not_promoted_to_memory(tmp_path, store, state):
