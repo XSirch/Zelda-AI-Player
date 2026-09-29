@@ -165,6 +165,52 @@ def test_goal_guidance_fades_unreachable_target_after_long_dwell(state):
     assert guidance["button_quiet"] < 0.05
 
 
+def test_goal_guidance_keeps_explicit_climbable_wall_target(state):
+    from zelda_ai.models import TraversalAffordanceObservation
+
+    state.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=True,
+            wall_distance=30.0,
+        ),
+        NavigationProbe(
+            direction="forward_right",
+            distance=70.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+    state.traversal_affordances = [
+        TraversalAffordanceObservation(
+            kind="climbable_wall_up",
+            direction="up",
+            approach_position=(0.0, 0.0, 40.0),
+            target_position=(0.0, 100.0, 70.0),
+            distance=40.0,
+            height_delta=100.0,
+            wall_flags=1,
+        )
+    ]
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "direction": "up",
+    })
+
+    guidance = goal_guidance(state, intent)
+
+    assert guidance["source"] == "traversal:climbable_wall_up:target"
+    assert guidance["blocked"] is False
+    assert guidance["detour"] is None
+    assert guidance["stick"][1] > 0.9
+
+
 def test_goal_guidance_uses_observed_vertical_traversal(state):
     from zelda_ai.models import TraversalAffordanceObservation
 
