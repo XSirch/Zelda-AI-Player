@@ -98,6 +98,9 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
           {thought.guidance.frontier_active
             ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}`
             : ''}
+          {thought.guidance.exit_active
+            ? ` · saída observada #${thought.guidance.exit_index ?? '?'}${thought.guidance.exit_direct_reachable ? ' direta' : ' via rota'}`
+            : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
         </strong>
       </div>}
@@ -189,6 +192,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const exploration = learning?.exploration;
   const resources = learning?.resources;
   const routeMemory = learning?.route_memory;
+  const interactionLearning = learning?.interaction_learning;
   const expectedButtons = learning?.expected_button_count ?? 0;
   const guidanceMix = learning?.guidance_mix ?? 0;
   const explorationDecay = learning?.exploration_decay ?? 0;
@@ -231,7 +235,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
       </span>
       {bestChampion && <span>BEST TIME <b>{bestChampion.id}</b> · {durationLabel(bestChampion.elapsed_s)}</span>}
       {routeMemory && <span>
-        ROTAS APRENDIDAS <b>{compact(routeMemory.nodes)}</b> nós · <b>{compact(routeMemory.edges)}</b> trechos · <b>{compact(routeMemory.routes_reused)}</b> reusos · <b>{compact(routeMemory.waypoints_advanced ?? 0)}</b> avanços
+        ROTAS APRENDIDAS <b>{compact(routeMemory.nodes)}</b> nós · <b>{compact(routeMemory.edges)}</b> trechos · <b>{compact(routeMemory.routes_reused)}</b> reusos · <b>{compact(routeMemory.waypoints_advanced ?? 0)}</b> avanços · <b>{compact(routeMemory.learned_interactions ?? 0)}</b> interações
       </span>}
     </div>
     <div className="resource-strip">
@@ -244,6 +248,9 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
       <span>
         PPO <b>{expectedButtons.toFixed(2)}</b> botões esperados · guidance <b>{Math.round(guidanceMix * 100)}%</b> · exploração <b>{Math.round((1 - explorationDecay) * 100)}%</b>
       </span>
+      {interactionLearning && <span>
+        INTERAÇÃO <b>{interactionLearning.learned}</b> aprendidas · <b>{interactionLearning.probe_successes}</b> sucessos · {interactionLearning.pending ? 'testando botão' : interactionLearning.last}
+      </span>}
     </div>
     <div className="learning-body">
       <div className="achievements">
