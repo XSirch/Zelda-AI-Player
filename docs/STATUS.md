@@ -41,11 +41,12 @@ Before calling this autonomous completion-capable, reproduce on real SoH:
 2. confirm ML checkpoint update count grows during play and survives restart;
 3. confirm the policy discovers useful button effects from reward rather than hard-coded mappings;
 4. verify structured Luna waypoints produce active motor guidance, distance falls, `intent_target_reached` advances the waypoint, and navigation improves without human commands;
-5. verify combat behaviour improves across repeated enemy encounters;
-6. verify **PARAR** produces immediate neutral input even during provider inference or PPO training;
-7. verify token totals and Codex remaining quota update independently of motor control;
-8. after a real completion, verify a champion is created only after final PPO work settles;
-9. evaluate that champion from a new save and confirm `run_updates == 0`, the champion SHA stays unchanged, and repeat performance is measurable.
+5. deliberately traverse a non-straight detour around collision, confirm route nodes/edges grow, then revisit the same target and verify `rota aprendida` follows the observed multi-waypoint path instead of returning to the direct wall attractor;
+6. verify combat behaviour improves across repeated enemy encounters;
+7. verify **PARAR** produces immediate neutral input even during provider inference or PPO training;
+8. verify token totals and Codex remaining quota update independently of motor control;
+9. after a real completion, verify both policy and route-memory champion files are created only after final work settles;
+10. evaluate that champion from a new save and confirm `run_updates == 0`, policy/route SHA values stay unchanged, and repeat performance is measurable.
 
 ## Current limitation
 
