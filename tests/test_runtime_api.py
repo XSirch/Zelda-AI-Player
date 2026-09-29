@@ -3,10 +3,23 @@ import time
 from fastapi.testclient import TestClient
 
 from conftest import free_udp_port
-from zelda_ai.app import create_app
+from zelda_ai.app import create_app, default_run_config
 from zelda_ai.config import Settings
 from zelda_ai.models import RunConfig
 from zelda_ai.store import Store
+
+
+def test_demo_default_run_config_drops_production_reasoning_effort(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path,
+        agent_provider="demo",
+        agent_model="deterministic-demo",
+        agent_effort="xhigh",
+    )
+    config = default_run_config(settings)
+    assert config.provider == "demo"
+    assert config.model == "deterministic-demo"
+    assert config.effort is None
 
 
 def test_metrics_and_memory_isolation(store):
