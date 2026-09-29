@@ -171,3 +171,7 @@ def test_panel_shows_actionable_goal_guidance():
     assert "exploração" in main
     assert "frontier_active?: boolean" in types
     assert "frontier observado" in main
+    assert "exit_active?: boolean" in types
+    assert "saída observada" in main
+    assert "interaction_learning?:" in types
+    assert "INTERAÇÃO" in main

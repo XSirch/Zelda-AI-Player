@@ -24,7 +24,7 @@ Quando existe guidance forte de navegação, a distribuição de botões também
 
 Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
 
-Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis, priorizando células ainda não visitadas e depois as menos visitadas. Esse frontier vira guidance temporário; nenhum mapa oculto é consultado.
+Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis, priorizando células ainda não visitadas e depois as menos visitadas. Se a mesma scene/room ficar sem expansão por ~20 s e o bridge expuser `scene_exits`, a saída observada passa a ter prioridade sobre continuar varrendo o interior. Se houver uma rota já percorrida até perto da saída, ela é reutilizada; caso contrário o guidance aponta para a própria superfície de transição. Nenhum mapa oculto é consultado.
 
 ### Rotas aprendidas
 
@@ -34,7 +34,9 @@ Quando a cognição pede um `target_position`/ator, o controlador procura no **g
 
 Uma rota parcial não pode virar outro ímã: ao chegar ao fim conhecido de um ramo que ainda não alcança o alvo, esse endpoint fica marcado como esgotado para aquele objetivo e não é reproduzido novamente até o grafo ganhar novos nós/trechos. A memória também separa rotas por scene/room, idade de Link e mundo normal/espelhado. Ela nunca inventa arestas reversas, atalhos ou o restante de uma rota não observada.
 
-A memória é incremental e persistente entre runs. Avançar por uma rota conhecida conta como progresso operacional, mas **não zera `local_dwell`** nem reabre `frontier_progress`; assim, uma volta A → B → C → A não consegue mascarar um loop. Runs de avaliação carregam a cópia read-only congelada junto com o champion, para que uma avaliação posterior não seja alterada por rotas aprendidas depois.
+A memória é incremental e persistente entre runs. Avançar por uma rota conhecida conta como progresso operacional, mas **não zera `local_dwell`** nem reabre `frontier_progress`; assim, uma volta A → B → C → A não consegue mascarar um loop.
+
+A mesma `route-graph-v1.json` também guarda **affordances de interação aprendidas empiricamente**. Quando Link chega a uma saída/porta e existe `context_action`, o controlador não assume que "Open = A": ele testa um botão físico por vez (sem START), observa se houve transição de scene/room, diálogo ou outro efeito durável e só então grava a associação. Uma associação conhecida é reutilizada; após três falhas consecutivas ela é descartada e volta a ser explorada. Como isso fica no route graph, o snapshot do champion congela também essas affordances. Runs de avaliação carregam a cópia read-only congelada junto com o champion.
 
 ## Reward
 
@@ -119,7 +121,8 @@ A interface principal mostra somente:
 - cache e reasoning tokens;
 - custo API quando o provider reporta USD (ou custo parcial conhecido em runs mistas);
 - cota restante do Codex/ChatGPT;
-- route memory (nós, trechos e reusos) e indicação `rota aprendida` quando o guidance estiver reproduzindo um caminho observado;
+- route memory (nós, trechos, reusos e interações aprendidas), indicação `rota aprendida`, `frontier observado` ou `saída observada` conforme o guidance ativo;
+- aprendizado contextual de interação, incluindo quando o bot está testando um botão físico e quantas associações já foram aprendidas;
 - diagnóstico PPO ao vivo: botões esperados, percentual efetivo de guidance e quanto da fase de exploração ainda resta;
 - **INICIAR / PARAR** e **AVALIAR CHAMPION** quando houver um completion salvo.
 

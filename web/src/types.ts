@@ -116,6 +116,12 @@ export interface LearningSnapshot {
   button_probability_mean?: number;
   expected_button_count?: number;
   guidance_mix?: number;
+  interaction_learning?: {
+    learned: number;
+    probe_successes: number;
+    pending: boolean;
+    last: string;
+  };
   stick_entropy?: number;
   button_entropy?: number;
   stick_entropy_coef?: number;
@@ -145,6 +151,7 @@ export interface LearningSnapshot {
   route_memory?: {
     nodes: number;
     edges: number;
+    learned_interactions?: number;
     routes_reused: number;
     waypoints_advanced?: number;
     last_path_nodes: number;
@@ -230,6 +237,9 @@ export interface MotorGuidance {
   route_partial?: boolean;
   frontier_active?: boolean;
   frontier_direction?: string | null;
+  exit_active?: boolean;
+  exit_index?: number | null;
+  exit_direct_reachable?: boolean;
 }
 
 export interface Snapshot {

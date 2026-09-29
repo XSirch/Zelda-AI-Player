@@ -5,11 +5,11 @@ import time
 
 import pytest
 
-from zelda_ai.autonomy.controller import ContinuousController
+from zelda_ai.autonomy.controller import ContinuousController, Setpoint
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
-from zelda_ai.models import ModelInfo, NavigationProbe, RunConfig, Usage
+from zelda_ai.models import ActorObservation, ModelInfo, NavigationProbe, RunConfig, Usage
 from zelda_ai.providers.base import InferenceResult
 
 
@@ -156,6 +156,64 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     assert runtime.controller.route_graph.stats()["nodes"] >= 1
     await runtime.control("stop")
     second_provider.release.set()
+
+
+def test_contextual_interaction_probes_one_button_and_learns_success(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.context_action.code = 1
+    game.context_action.label = "open"
+    game.context_actor = ActorObservation(
+        actor_uid="door-1",
+        actor_id=9,
+        name="Door",
+        category=10,
+        category_name="door",
+        params=0,
+        position=(0.0, 0.0, 20.0),
+        distance=20.0,
+    )
+    bridge = connected(game)
+    controller = ContinuousController(
+        bridge,
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    sample = {
+        "stick": [0.0, 1.0],
+        "policy_stick": [0.0, 0.0],
+        "buttons": [0.0 for _ in range(9)],
+        "log_prob": 0.0,
+        "value": 0.0,
+        "guidance_strength": 0.9,
+        "button_quiet_strength": 0.0,
+    }
+    setpoint, executed, overridden = controller._interaction_override(
+        game,
+        {"exit_active": True},
+        Setpoint(stick_y=80, reason="ml_policy"),
+        sample,
+    )
+
+    assert overridden is True
+    assert setpoint.reason == "interaction_probe"
+    assert setpoint.stick_x == 0
+    assert setpoint.stick_y == 0
+    assert executed["stick"] == [0.0, 0.0]
+    assert sum(1 for value in executed["buttons"] if value > 0.5) == 1
+    probe = dict(controller.pending_interaction_probe)
+    assert probe["button"] != "START"
+
+    transitioned = game.model_copy(deep=True)
+    transitioned.room = 1
+
+    class Reward:
+        breakdown = {"new_world_transition": 0.8}
+
+    controller._observe_interaction_outcome(transitioned, Reward())
+    assert controller.pending_interaction_probe is None
+    assert controller.route_graph.interaction_button(probe["key"]) == probe["button"]
 
 
 @pytest.mark.asyncio

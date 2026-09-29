@@ -271,6 +271,41 @@ def test_targetless_explore_uses_observed_frontier_guidance(state):
     assert guidance["strength"] > 0.5
 
 
+def test_targetless_explore_prioritizes_observed_scene_exit(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "target_position": None,
+        "direction": None,
+    })
+    state.camera_input_yaw = 0
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        route_hint={
+            "waypoint": (0.0, 0.0, 120.0),
+            "waypoint_id": "exit:85:0:1:10",
+            "path_nodes": 1,
+            "confidence": 1.0,
+            "partial": False,
+            "exit": True,
+            "exit_index": 1,
+            "entrance_index": 10,
+            "exit_position": (0.0, 0.0, 120.0),
+            "direct_reachable": True,
+        },
+    )
+
+    assert guidance["active"] is True
+    assert guidance["source"] == "scene_exit"
+    assert guidance["exit_active"] is True
+    assert guidance["exit_index"] == 1
+    assert guidance["exit_direct_reachable"] is True
+    assert guidance["stick"][1] > 0.95
+    assert guidance["strength"] > 0.8
+    assert guidance["button_quiet"] < 0.2
+
+
 def test_goal_guidance_uses_observed_vertical_traversal(state):
     from zelda_ai.models import TraversalAffordanceObservation
 

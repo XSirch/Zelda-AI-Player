@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import time
 from collections import deque
 from collections.abc import Callable
@@ -35,6 +36,16 @@ BUTTON_MASKS = {
     "C_DOWN": 0x0004,
     "C_RIGHT": 0x0001,
 }
+
+# Contextual interaction discovery probes one physical button at a time.
+# START is excluded because opening the pause menu is not a useful contextual
+# interaction probe and can take controller authority away from the current task.
+INTERACTION_PROBE_BUTTONS = tuple(
+    name for name in BUTTON_NAMES if name != "START"
+)
+EXIT_PRIORITY_DWELL_S = 20.0
+INTERACTION_PROBE_COOLDOWN_S = 0.35
+INTERACTION_OUTCOME_WINDOW_S = 1.5
 
 
 @dataclass(frozen=True)
@@ -103,6 +114,11 @@ class ContinuousController:
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
         self.route_save_error = ""
+        self.interaction_probe_index: dict[str, int] = {}
+        self.interaction_last_probe_at = 0.0
+        self.pending_interaction_probe: dict | None = None
+        self.interaction_probe_successes = 0
+        self.last_interaction_source = "none"
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -124,6 +140,9 @@ class ContinuousController:
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "exit_active": False,
+            "exit_index": None,
+            "exit_direct_reachable": False,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
@@ -138,6 +157,10 @@ class ContinuousController:
         self.last_setpoint = Setpoint()
         self.last_stick = (0.0, 0.0)
         self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+        self.interaction_probe_index.clear()
+        self.interaction_last_probe_at = 0.0
+        self.pending_interaction_probe = None
+        self.last_interaction_source = "none"
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -159,6 +182,9 @@ class ContinuousController:
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "exit_active": False,
+            "exit_index": None,
+            "exit_direct_reachable": False,
         }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
@@ -199,6 +225,9 @@ class ContinuousController:
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "exit_active": False,
+            "exit_index": None,
+            "exit_direct_reachable": False,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
@@ -209,6 +238,204 @@ class ContinuousController:
             if active > 0.5:
                 mask |= BUTTON_MASKS[name]
         return mask
+
+    @staticmethod
+    def _interaction_key(game) -> str | None:
+        action = game.context_action
+        label = (action.label or "").strip()
+        if label == "none" or action.code == 0:
+            return None
+        actor = game.context_actor
+        category = (
+            (actor.category_name or "").strip().lower()
+            if actor is not None
+            else "none"
+        )
+        actor_id = actor.actor_id if actor is not None else -1
+        return f"{action.code}:{label.lower()}:{category}:{actor_id}"[:200]
+
+    @staticmethod
+    def _interaction_probe_order(key: str) -> list[str]:
+        return sorted(
+            INTERACTION_PROBE_BUTTONS,
+            key=lambda name: hashlib.sha256(
+                f"{key}|{name}".encode("utf-8")
+            ).digest(),
+        )
+
+    def _observe_interaction_outcome(self, game, reward):
+        probe = self.pending_interaction_probe
+        if probe is None:
+            return
+
+        now = time.monotonic()
+        current_key = self._interaction_key(game)
+        major_keys = {
+            "new_world_transition",
+            "new_dialogue",
+            "durable_progress",
+            "objective_milestone",
+            "native_event",
+        }
+        major_effect = any(
+            reward.breakdown.get(key, 0.0) > 0
+            for key in major_keys
+        )
+        scene_changed = (
+            (game.scene, game.room)
+            != (probe["scene"], probe["room"])
+        )
+        dialogue_started = (
+            game.dialogue.active and not probe["dialogue_active"]
+        )
+        exit_context_changed = bool(
+            (
+                probe.get("exit_active")
+                or probe.get("actor_is_door")
+            )
+            and current_key != probe["key"]
+        )
+        success = (
+            scene_changed
+            or dialogue_started
+            or major_effect
+            or exit_context_changed
+        )
+
+        if success:
+            self.route_graph.record_interaction_success(
+                probe["key"],
+                probe["button"],
+            )
+            self.interaction_probe_successes += 1
+            self.last_interaction_source = (
+                f"learned:{probe['key']}->{probe['button']}"
+            )
+            self.pending_interaction_probe = None
+            return
+
+        if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
+            if probe.get("known"):
+                self.route_graph.record_interaction_failure(
+                    probe["key"],
+                    probe["button"],
+                )
+            self.pending_interaction_probe = None
+
+    def _interaction_override(
+        self,
+        game,
+        guidance: dict,
+        setpoint: Setpoint,
+        sample: dict,
+    ) -> tuple[Setpoint, dict, bool]:
+        key = self._interaction_key(game)
+        if (
+            key is None
+            or game.dialogue.active
+            or game.pause_menu.active
+            or game.cutscene_active
+        ):
+            self.last_interaction_source = "none"
+            return setpoint, sample, False
+
+        actor = game.context_actor
+        actor_is_door = bool(
+            actor is not None
+            and (actor.category_name or "").strip().lower() == "door"
+        )
+        should_interact = bool(
+            guidance.get("exit_active")
+            or actor_is_door
+            or self.intent.mode == "interact"
+        )
+        if not should_interact:
+            self.last_interaction_source = "none"
+            return setpoint, sample, False
+
+        # While an earlier probe is waiting for an observable result, release
+        # all buttons so causality stays one-button-at-a-time.
+        now = time.monotonic()
+        if self.pending_interaction_probe is not None:
+            executed_buttons = [0.0 for _ in BUTTON_NAMES]
+            sample = {
+                **sample,
+                "stick": [0.0, 0.0],
+                "buttons": executed_buttons,
+            }
+            return (
+                Setpoint(
+                    buttons=0,
+                    stick_x=0,
+                    stick_y=0,
+                    reason="interaction_wait",
+                ),
+                sample,
+                True,
+            )
+
+        if now - self.interaction_last_probe_at < INTERACTION_PROBE_COOLDOWN_S:
+            executed_buttons = [0.0 for _ in BUTTON_NAMES]
+            sample = {
+                **sample,
+                "stick": [0.0, 0.0],
+                "buttons": executed_buttons,
+            }
+            return (
+                Setpoint(
+                    buttons=0,
+                    stick_x=0,
+                    stick_y=0,
+                    reason="interaction_wait",
+                ),
+                sample,
+                True,
+            )
+
+        known_button = self.route_graph.interaction_button(key)
+        using_known = known_button in BUTTON_MASKS
+        if using_known:
+            button = known_button
+            source = "interaction_memory"
+        else:
+            order = self._interaction_probe_order(key)
+            index = self.interaction_probe_index.get(key, 0)
+            button = order[index % len(order)]
+            self.interaction_probe_index[key] = index + 1
+            source = "interaction_probe"
+
+        executed_buttons = [
+            1.0 if name == button else 0.0
+            for name in BUTTON_NAMES
+        ]
+        self.interaction_last_probe_at = now
+        self.pending_interaction_probe = {
+            "key": key,
+            "button": button,
+            "at": now,
+            "scene": game.scene,
+            "room": game.room,
+            "dialogue_active": bool(game.dialogue.active),
+            "exit_active": bool(guidance.get("exit_active")),
+            "actor_is_door": bool(actor_is_door),
+            "known": bool(using_known),
+        }
+        self.last_interaction_source = f"{source}:{key}->{button}"
+        sample = {
+            **sample,
+            "stick": [0.0, 0.0],
+            "buttons": executed_buttons,
+        }
+        return (
+            Setpoint(
+                buttons=BUTTON_MASKS[button],
+                stick_x=0,
+                stick_y=0,
+                reason=source,
+            ),
+            sample,
+            True,
+        )
 
     def _sample_setpoint(
         self,
@@ -268,6 +495,7 @@ class ContinuousController:
             pressed_buttons=self.last_setpoint.buttons,
             guidance=self.last_guidance,
         )
+        self._observe_interaction_outcome(game, reward)
         self.last_reward = reward.reward
         self.total_reward += reward.reward
         self.reward_window.append(reward.reward)
@@ -305,7 +533,11 @@ class ContinuousController:
             if self.on_achievement is not None:
                 self.on_achievement(dict(row))
 
-        if self.training_enabled and self.pending is not None:
+        if (
+            self.training_enabled
+            and self.pending is not None
+            and self.pending.get("trainable", True)
+        ):
             transition = {
                 **self.pending,
                 "reward": reward.reward,
@@ -329,7 +561,27 @@ class ContinuousController:
                 final_target,
             )
         elif self.intent.mode == "explore":
-            route_hint = self.route_graph.exploration_waypoint(game)
+            actor_is_door = bool(
+                game.context_actor is not None
+                and (
+                    game.context_actor.category_name or ""
+                ).strip().lower() == "door"
+            )
+            prefer_exit = bool(
+                game.scene_exits
+                and (
+                    self.reward_tracker.local_dwell_seconds
+                    >= EXIT_PRIORITY_DWELL_S
+                    or actor_is_door
+                )
+            )
+            route_hint = (
+                self.route_graph.exit_waypoint(game)
+                if prefer_exit
+                else None
+            )
+            if route_hint is None:
+                route_hint = self.route_graph.exploration_waypoint(game)
         else:
             route_hint = None
         guidance = goal_guidance(
@@ -339,6 +591,12 @@ class ContinuousController:
             route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
+        setpoint, sample, interaction_override = self._interaction_override(
+            game,
+            guidance,
+            setpoint,
+            sample,
+        )
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -363,6 +621,7 @@ class ContinuousController:
             "guidance_stick": sample.get("guidance_stick", [0.0, 0.0]),
             "guidance_strength": sample.get("guidance_strength", 0.0),
             "button_quiet_strength": sample.get("button_quiet_strength", 0.0),
+            "trainable": not interaction_override,
         }
         self.actions_sampled += 1
 
@@ -599,6 +858,12 @@ class ContinuousController:
                     6,
                 ),
                 "guidance_mix": round(self.last_guidance_mix, 6),
+                "interaction_learning": {
+                    "learned": len(self.route_graph.interactions),
+                    "probe_successes": self.interaction_probe_successes,
+                    "pending": bool(self.pending_interaction_probe),
+                    "last": self.last_interaction_source,
+                },
                 "useful_progress_rate": round(
                     sum(1 for value in self.useful_progress_window if value)
                     / len(self.useful_progress_window),

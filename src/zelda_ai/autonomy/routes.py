@@ -68,6 +68,7 @@ class LearnedRouteGraph:
         self.writable = writable
         self.nodes: dict[str, dict] = {}
         self.edges: dict[str, dict[str, dict]] = {}
+        self.interactions: dict[str, dict] = {}
         self.by_scene: dict[tuple[int, int, bool, str], set[str]] = {}
         self.last_node_id: str | None = None
         self.last_position: tuple[float, float, float] | None = None
@@ -106,7 +107,12 @@ class LearnedRouteGraph:
                 raise ValueError("unsupported route graph version")
             nodes = data.get("nodes")
             edges = data.get("edges")
-            if not isinstance(nodes, dict) or not isinstance(edges, dict):
+            interactions = data.get("interactions") or {}
+            if (
+                not isinstance(nodes, dict)
+                or not isinstance(edges, dict)
+                or not isinstance(interactions, dict)
+            ):
                 raise ValueError("invalid route graph payload")
             for node_id, row in nodes.items():
                 if not isinstance(row, dict):
@@ -147,9 +153,22 @@ class LearnedRouteGraph:
                         "traversals": max(1, int(edge.get("traversals") or 1)),
                         "updated_at": float(edge.get("updated_at") or 0.0),
                     }
+            for key, row in interactions.items():
+                if not isinstance(key, str) or not isinstance(row, dict):
+                    continue
+                button = row.get("button")
+                if not isinstance(button, str) or not button:
+                    continue
+                self.interactions[key[:200]] = {
+                    "button": button[:32],
+                    "successes": max(1, int(row.get("successes") or 1)),
+                    "failures": max(0, int(row.get("failures") or 0)),
+                    "updated_at": float(row.get("updated_at") or 0.0),
+                }
         except (OSError, ValueError, TypeError) as exc:
             self.nodes = {}
             self.edges = {}
+            self.interactions = {}
             self.by_scene = {}
             self.load_error = f"{type(exc).__name__}: {str(exc)[:160]}"
 
@@ -322,6 +341,10 @@ class LearnedRouteGraph:
                 "version": ROUTE_GRAPH_VERSION,
                 "nodes": nodes,
                 "edges": edges,
+                "interactions": {
+                    key: dict(row)
+                    for key, row in self.interactions.items()
+                },
                 "saved_at": time.time(),
             }
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -589,6 +612,134 @@ class LearnedRouteGraph:
             ),
         }
 
+    def interaction_button(self, key: str) -> str | None:
+        row = self.interactions.get(str(key)[:200])
+        if not row:
+            return None
+        button = row.get("button")
+        return str(button) if button else None
+
+    def record_interaction_success(
+        self,
+        key: str,
+        button: str,
+        *,
+        now_s: float | None = None,
+    ):
+        if not self.writable:
+            return
+        key = str(key)[:200]
+        button = str(button)[:32]
+        if not key or not button:
+            return
+        now_s = time.time() if now_s is None else float(now_s)
+        current = self.interactions.get(key)
+        if current and current.get("button") == button:
+            current["successes"] = max(
+                1,
+                int(current.get("successes") or 1),
+            ) + 1
+            current["failures"] = 0
+            current["updated_at"] = now_s
+        else:
+            self.interactions[key] = {
+                "button": button,
+                "successes": 1,
+                "failures": 0,
+                "updated_at": now_s,
+            }
+        self.persistence_revision += 1
+        self.dirty = True
+
+    def record_interaction_failure(
+        self,
+        key: str,
+        button: str,
+        *,
+        now_s: float | None = None,
+    ):
+        if not self.writable:
+            return
+        key = str(key)[:200]
+        button = str(button)[:32]
+        current = self.interactions.get(key)
+        if not current or current.get("button") != button:
+            return
+        failures = max(0, int(current.get("failures") or 0)) + 1
+        if failures >= 3:
+            self.interactions.pop(key, None)
+        else:
+            current["failures"] = failures
+            current["updated_at"] = (
+                time.time() if now_s is None else float(now_s)
+            )
+        self.persistence_revision += 1
+        self.dirty = True
+
+    def exit_waypoint(self, game: GameState) -> dict | None:
+        """Choose an observed scene-exit surface, optionally via learned route."""
+        if not game.player or not game.scene_exits:
+            return None
+
+        player_position = game.player.position
+        exits = sorted(
+            game.scene_exits,
+            key=lambda row: (
+                0 if row.direct_reachable else 1,
+                _distance(player_position, row.position),
+                -row.samples,
+                row.exit_index,
+            ),
+        )
+        exit_row = exits[0]
+
+        if not exit_row.direct_reachable:
+            routed = self.next_waypoint(game, exit_row.position)
+            if routed is not None:
+                return {
+                    **routed,
+                    "exit": True,
+                    "exit_index": exit_row.exit_index,
+                    "entrance_index": exit_row.entrance_index,
+                    "exit_position": tuple(exit_row.position),
+                    "direct_reachable": False,
+                }
+
+            context_door = bool(
+                game.context_actor is not None
+                and (
+                    game.context_actor.category_name or ""
+                ).strip().lower() == "door"
+            )
+            nearby_door = any(
+                (actor.category_name or "").strip().lower() == "door"
+                and _distance(actor.position, exit_row.position) <= 220.0
+                for actor in game.room_actors
+            )
+            if not context_door and not nearby_door:
+                # An exit surface behind unrelated collision is evidence of a
+                # destination, not of a currently traversable straight line.
+                # Keep exploring local frontiers until a real route is observed.
+                return None
+
+        return {
+            "waypoint": tuple(exit_row.position),
+            "waypoint_id": (
+                f"exit:{game.scene}:{game.room}:"
+                f"{exit_row.exit_index}:{exit_row.entrance_index}"
+            ),
+            "path_nodes": 1,
+            "waypoint_index": 0,
+            "target_gap": 0.0,
+            "confidence": 1.0 if exit_row.direct_reachable else 0.65,
+            "partial": not exit_row.direct_reachable,
+            "exit": True,
+            "exit_index": exit_row.exit_index,
+            "entrance_index": exit_row.entrance_index,
+            "exit_position": tuple(exit_row.position),
+            "direct_reachable": bool(exit_row.direct_reachable),
+        }
+
     def exploration_waypoint(self, game: GameState) -> dict | None:
         """Choose a local walkable frontier instead of random-stick exploration.
 
@@ -672,6 +823,7 @@ class LearnedRouteGraph:
         return {
             "nodes": len(self.nodes),
             "edges": edge_count,
+            "learned_interactions": len(self.interactions),
             "routes_reused": self.routes_reused,
             "last_path_nodes": self.last_path_nodes,
             "cached_path_nodes": len(self.active_path),
