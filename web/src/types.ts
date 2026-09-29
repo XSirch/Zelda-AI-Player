@@ -228,6 +228,8 @@ export interface MotorGuidance {
   route_waypoint?: number[] | null;
   route_waypoint_id?: string | null;
   route_partial?: boolean;
+  frontier_active?: boolean;
+  frontier_direction?: string | null;
 }
 
 export interface Snapshot {
