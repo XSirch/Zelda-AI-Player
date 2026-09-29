@@ -6,11 +6,12 @@
 - Continuous motor loop independent from LLM latency.
 - Raw-action PPO actor-critic: analog stick + physical button bits.
 - Goal-conditioned camera-relative steering prior inside the PPO stick distribution, with learned residual control and a mild navigation button-quiet prior.
+- Collision-aware local goal guidance: observed probes bend a blocked direct heading toward a walkable side direction, hard blockage weakens the prior, prolonged dwell fades stale-target attraction, and cognition can replan on `guidance_blocked`.
 - One-shot `intent_target_reached` replanning so completed waypoints do not remain stale.
 - Four-frame structured-state stack for temporal behaviour and combat timing.
 - Online PPO learner with GAE and separate actor/learner weights.
 - RND intrinsic curiosity.
-- Observable reward shaping without a scripted Zelda quest path, including escalating coarse-area dwell penalties, frontier exploration, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
+- Observable reward shaping without a scripted Zelda quest path, including escalating coarse-area dwell penalties, frontier exploration, stale-waypoint `intent_progress` fadeout, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
 - Native one-shot chest-open telemetry from `FLAG_SCENE_TREASURE`, surfaced as `chest_opened`.
 - Persistent atomic PyTorch training checkpoint plus immutable completion champions under `.local/ml/champions/`.
 - High-level `AgentIntent` cognition contract with no skill/action selector.
