@@ -62,6 +62,7 @@ class LearnedRouteGraph:
         self.last_position: tuple[float, float, float] | None = None
         self.last_context: tuple[int, int, bool, str] | None = None
         self.dirty = False
+        self.persistence_revision = 0
         self.revision = 0
         self.last_failed_search: tuple[str, str, int] | None = None
         self.routes_reused = 0
@@ -186,6 +187,7 @@ class LearnedRouteGraph:
             self.nodes[node_id] = row
             self._index_node(node_id, row)
             self.revision += 1
+            self.persistence_revision += 1
             self.last_failed_search = None
             self.dirty = True
         else:
@@ -199,6 +201,7 @@ class LearnedRouteGraph:
             ]
             existing["visits"] = visits + 1
             existing["updated_at"] = now_s
+            self.persistence_revision += 1
             self.dirty = True
         return node_id
 
@@ -256,6 +259,7 @@ class LearnedRouteGraph:
                         "updated_at": now_s,
                     }
                     self.revision += 1
+                    self.persistence_revision += 1
                     self.last_failed_search = None
                     edge_added = True
                 else:
@@ -265,6 +269,7 @@ class LearnedRouteGraph:
                     ) / (traversals + 1)
                     edge["traversals"] = traversals + 1
                     edge["updated_at"] = now_s
+                    self.persistence_revision += 1
                 self.dirty = True
 
         self.last_node_id = node_id
@@ -277,22 +282,55 @@ class LearnedRouteGraph:
             return
         if not self.dirty and (not force or self.path.is_file()):
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
-            "version": ROUTE_GRAPH_VERSION,
-            "nodes": self.nodes,
-            "edges": self.edges,
-            "saved_at": time.time(),
-        }
+
+        save_revision = self.persistence_revision
         temporary = self.path.with_name(
             self.path.name + ".tmp-" + uuid.uuid4().hex
         )
-        temporary.write_text(
-            json.dumps(payload, separators=(",", ":"), sort_keys=True),
-            encoding="utf-8",
-        )
-        os.replace(temporary, self.path)
-        self.dirty = False
+        try:
+            # The saver runs in a worker thread while the realtime actor keeps
+            # observing. Copy into an immutable snapshot first. If a structural
+            # mutation races the copy, Python raises RuntimeError; the caller
+            # records it and retries on the next interval. Atomic replacement
+            # means a failed snapshot never damages the last durable graph.
+            nodes = {
+                node_id: {
+                    **row,
+                    "position": list(row.get("position") or []),
+                }
+                for node_id, row in self.nodes.items()
+            }
+            edges = {
+                source: {
+                    target: dict(edge)
+                    for target, edge in destinations.items()
+                }
+                for source, destinations in self.edges.items()
+            }
+            payload = {
+                "version": ROUTE_GRAPH_VERSION,
+                "nodes": nodes,
+                "edges": edges,
+                "saved_at": time.time(),
+            }
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            temporary.write_text(
+                json.dumps(payload, separators=(",", ":"), sort_keys=True),
+                encoding="utf-8",
+            )
+            os.replace(temporary, self.path)
+        except Exception:
+            try:
+                temporary.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+
+        # Mutations that happened while the worker was serializing were not
+        # necessarily captured. Keep dirty=True so the next background pass
+        # writes them instead of silently losing route memory.
+        if self.persistence_revision == save_revision:
+            self.dirty = False
 
     def _nearest_node(
         self,
@@ -550,6 +588,8 @@ class LearnedRouteGraph:
             "cached_path_nodes": len(self.active_path),
             "exhausted_partial_nodes": len(self.exhausted_partial_nodes),
             "revision": self.revision,
+            "persistence_revision": self.persistence_revision,
+            "dirty": self.dirty,
             "last_target_gap": (
                 round(self.last_target_gap, 1)
                 if isinstance(self.last_target_gap, (int, float))
