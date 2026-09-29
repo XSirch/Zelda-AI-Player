@@ -649,10 +649,30 @@ class RewardTracker:
                 and new_dist is not None
             ):
                 improvement = max(-60.0, min(60.0, old_dist - new_dist))
-                b["intent_progress"] = max(
+                raw_intent_progress = max(
                     -0.4,
                     min(0.4, improvement / 150.0),
                 )
+                # A stale waypoint must not pay forever.  Otherwise wandering
+                # away and returning to an unreachable target becomes a
+                # repeatable reward loop.  Fade both positive and negative
+                # target shaping after prolonged residence so exploration can
+                # break the attractor; real macro expansion/progress resets it.
+                dwell_age = (
+                    max(0.0, now_s - self.local_progress_at)
+                    if self.local_progress_at is not None
+                    else 0.0
+                )
+                if dwell_age <= LOCAL_DWELL_GRACE_S:
+                    intent_progress_scale = 1.0
+                else:
+                    intent_progress_scale = max(
+                        0.0,
+                        1.0 - (dwell_age - LOCAL_DWELL_GRACE_S) / 120.0,
+                    )
+                shaped_progress = raw_intent_progress * intent_progress_scale
+                if abs(shaped_progress) > 1e-9:
+                    b["intent_progress"] = shaped_progress
 
         major_progress_keys = {
             "new_world_transition",
