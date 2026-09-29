@@ -162,6 +162,7 @@ class LearnedRouteGraph:
                 self.interactions[key[:200]] = {
                     "button": button[:32],
                     "successes": max(1, int(row.get("successes") or 1)),
+                    "failures": max(0, int(row.get("failures") or 0)),
                     "updated_at": float(row.get("updated_at") or 0.0),
                 }
         except (OSError, ValueError, TypeError) as exc:
@@ -637,13 +638,40 @@ class LearnedRouteGraph:
                 1,
                 int(current.get("successes") or 1),
             ) + 1
+            current["failures"] = 0
             current["updated_at"] = now_s
         else:
             self.interactions[key] = {
                 "button": button,
                 "successes": 1,
+                "failures": 0,
                 "updated_at": now_s,
             }
+        self.persistence_revision += 1
+        self.dirty = True
+
+    def record_interaction_failure(
+        self,
+        key: str,
+        button: str,
+        *,
+        now_s: float | None = None,
+    ):
+        if not self.writable:
+            return
+        key = str(key)[:200]
+        button = str(button)[:32]
+        current = self.interactions.get(key)
+        if not current or current.get("button") != button:
+            return
+        failures = max(0, int(current.get("failures") or 0)) + 1
+        if failures >= 3:
+            self.interactions.pop(key, None)
+        else:
+            current["failures"] = failures
+            current["updated_at"] = (
+                time.time() if now_s is None else float(now_s)
+            )
         self.persistence_revision += 1
         self.dirty = True
 
