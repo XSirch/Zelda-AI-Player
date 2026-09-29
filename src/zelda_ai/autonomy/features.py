@@ -441,6 +441,8 @@ def goal_guidance(
         "route_waypoint": None,
         "route_waypoint_id": None,
         "route_partial": False,
+        "frontier_active": False,
+        "frontier_direction": None,
     }
 
 def encode_state(
