@@ -338,7 +338,7 @@ def goal_guidance(
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
 
         dwell = max(0.0, float(local_dwell_seconds or 0.0))
-        if route_active or dwell <= 90.0:
+        if dwell <= 90.0:
             stuck_scale = 1.0
         else:
             stuck_scale = max(
