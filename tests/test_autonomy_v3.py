@@ -240,6 +240,37 @@ def test_goal_guidance_replays_learned_route_waypoint(state):
     assert guidance["distance"] == pytest.approx(500.0)
 
 
+def test_partial_learned_route_does_not_collapse_under_long_dwell(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (0.0, 0.0, 1000.0),
+    })
+    state.camera_input_yaw = 0
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        local_dwell_seconds=400.0,
+        route_hint={
+            "waypoint": (80.0, 0.0, 0.0),
+            "waypoint_id": "normal:child:85:0:1:0:0",
+            "path_nodes": 22,
+            "target_gap": 500.0,
+            "confidence": 0.25,
+            "partial": True,
+        },
+    )
+
+    # Screenshot regression: the old generic proximity+dwell fade reduced this
+    # to roughly 0.05, handing ~95% of stick authority back to PPO residual.
+    expected = (0.78 + 0.16 * 0.25) * 0.85
+    assert guidance["route_active"] is True
+    assert guidance["route_partial"] is True
+    assert guidance["stuck_scale"] == pytest.approx(1.0)
+    assert guidance["strength"] == pytest.approx(expected)
+    assert guidance["strength"] > 0.65
+
+
 def test_targetless_explore_uses_observed_frontier_guidance(state):
     intent = AgentIntent.bootstrap().model_copy(update={
         "mode": "explore",
