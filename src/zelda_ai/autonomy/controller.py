@@ -115,6 +115,7 @@ class ContinuousController:
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_partial": False,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
@@ -146,6 +147,7 @@ class ContinuousController:
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_partial": False,
         }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
@@ -179,6 +181,7 @@ class ContinuousController:
             "route_confidence": 0.0,
             "route_target_gap": None,
             "route_waypoint": None,
+            "route_partial": False,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
