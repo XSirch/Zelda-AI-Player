@@ -320,6 +320,7 @@ class LearnedRouteGraph:
         start_gap = _distance(self.nodes[start_id]["position"], target_position)
         best_gap = start_gap
         best_cost = 0.0
+        best_score = start_gap
 
         while queue:
             current_cost, current = heapq.heappop(queue)
@@ -327,13 +328,21 @@ class LearnedRouteGraph:
                 continue
 
             gap = _distance(self.nodes[current]["position"], target_position)
+            # A learned route should make meaningful geometric progress without
+            # preferring an enormous historical loop just to end a few units
+            # closer to the target.
+            score = gap + current_cost * 0.25
             if (
-                gap < best_gap - 1e-6
-                or (abs(gap - best_gap) <= 1e-6 and current_cost < best_cost)
+                score < best_score - 1e-6
+                or (
+                    abs(score - best_score) <= 1e-6
+                    and gap < best_gap
+                )
             ):
                 best_id = current
                 best_gap = gap
                 best_cost = current_cost
+                best_score = score
 
             for neighbor, edge in self.edges.get(current, {}).items():
                 if neighbor not in self.nodes:
