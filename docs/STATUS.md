@@ -7,6 +7,7 @@
 - Raw-action PPO actor-critic: analog stick + physical button bits.
 - Goal-conditioned camera-relative steering prior inside the PPO stick distribution, with learned residual control and a mild navigation button-quiet prior.
 - Collision-aware local goal guidance: observed probes bend a blocked direct heading toward a walkable side direction, hard blockage weakens the prior, prolonged dwell fades stale-target attraction, and cognition can replan on `guidance_blocked`.
+- Persistent route memory v1: directed topological nodes/edges are learned only from paths Link actually traverses, persisted across training runs, and reused as intermediate waypoints when a known route approaches the current structured target.
 - One-shot `intent_target_reached` replanning so completed waypoints do not remain stale.
 - Four-frame structured-state stack for temporal behaviour and combat timing.
 - Online PPO learner with GAE and separate actor/learner weights.
