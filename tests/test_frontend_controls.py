@@ -169,3 +169,5 @@ def test_panel_shows_actionable_goal_guidance():
     assert "exploration_decay?: number" in types
     assert "botões esperados" in main
     assert "exploração" in main
+    assert "frontier_active?: boolean" in types
+    assert "frontier observado" in main
