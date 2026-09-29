@@ -121,7 +121,8 @@ A interface principal mostra somente:
 - cache e reasoning tokens;
 - custo API quando o provider reporta USD (ou custo parcial conhecido em runs mistas);
 - cota restante do Codex/ChatGPT;
-- route memory (nós, trechos e reusos) e indicação `rota aprendida` quando o guidance estiver reproduzindo um caminho observado;
+- route memory (nós, trechos, reusos e interações aprendidas), indicação `rota aprendida`, `frontier observado` ou `saída observada` conforme o guidance ativo;
+- aprendizado contextual de interação, incluindo quando o bot está testando um botão físico e quantas associações já foram aprendidas;
 - diagnóstico PPO ao vivo: botões esperados, percentual efetivo de guidance e quanto da fase de exploração ainda resta;
 - **INICIAR / PARAR** e **AVALIAR CHAMPION** quando houver um completion salvo.
 
