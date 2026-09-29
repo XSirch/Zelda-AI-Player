@@ -58,10 +58,14 @@ class EvaluateInput(BaseModel):
 
 
 def default_run_config(settings: Settings) -> RunConfig:
+    provider = settings.agent_provider
     return RunConfig(
-        provider=settings.agent_provider,
+        provider=provider,
         model=settings.agent_model,
-        effort=settings.agent_effort,
+        # The deterministic demo provider has no reasoning-effort concept.
+        # Do not inherit the production Codex default (xhigh), otherwise the
+        # explicit simulator correctly rejects its own test model as unsupported.
+        effort=None if provider == "demo" else settings.agent_effort,
         goal="Play Ocarina of Time autonomously, discover how to control Link, learn from experience, and progress as far as possible.",
     )
 
