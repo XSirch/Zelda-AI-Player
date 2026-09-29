@@ -15,10 +15,12 @@ from .features import (
     encode_state,
     goal_guidance,
     stack_frames,
+    target_point,
 )
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .reward import RewardTracker
+from .routes import LearnedRouteGraph
 
 # Physical N64 controller wiring only.  These are not semantic skills and the
 # policy is never told what any button does.
@@ -48,6 +50,7 @@ class ContinuousController:
 
     tick_s = 0.05
     action_repeat_ticks = 2
+    route_save_interval_s = 20.0
 
     def __init__(
         self,
@@ -57,6 +60,7 @@ class ContinuousController:
         rollout_size: int = 256,
         on_achievement: Callable[[dict], None] | None = None,
         training_enabled: bool = True,
+        route_graph_path: Path | None = None,
     ):
         self.bridge = bridge
         self.policy = OnlinePPO(
@@ -68,6 +72,10 @@ class ContinuousController:
         self.rollout_size = rollout_size
         self.on_achievement = on_achievement
         self.training_enabled = training_enabled
+        self.route_graph = LearnedRouteGraph(
+            route_graph_path or checkpoint.parent / "route-graph-v1.json",
+            writable=training_enabled,
+        )
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
@@ -91,6 +99,7 @@ class ContinuousController:
         self.last_useful_progress_at = time.monotonic()
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
+        self.route_save_error = ""
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -103,11 +112,19 @@ class ContinuousController:
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
+            "route_waypoint_id": None,
+            "route_partial": False,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
     def reset_episode_state(self):
         self.reward_tracker = RewardTracker()
+        self.route_graph.reset_trace()
         self.feature_history.clear()
         self.novelty_history.clear()
         self.pending = None
@@ -128,6 +145,13 @@ class ContinuousController:
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
+            "route_waypoint_id": None,
+            "route_partial": False,
         }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
@@ -156,6 +180,13 @@ class ContinuousController:
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
+            "route_waypoint_id": None,
+            "route_partial": False,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
@@ -205,6 +236,7 @@ class ContinuousController:
         self.training_queue.put_nowait(batch)
 
     def _ml_step(self, game) -> Setpoint:
+        self.route_graph.observe(game)
         base_observation = encode_state(
             game,
             self.intent,
@@ -232,6 +264,7 @@ class ContinuousController:
             "new_space",
             "new_macro_region",
             "frontier_progress",
+            "route_waypoint",
             "new_actor",
             "new_dialogue",
             "new_context",
@@ -247,6 +280,7 @@ class ContinuousController:
         }
         useful = any(reward.breakdown.get(key, 0.0) > 0 for key in useful_keys)
         useful = useful or reward.breakdown.get("intent_progress", 0.0) > 0.01
+        useful = useful or self.reward_tracker.route_waypoint_advanced
         self.useful_progress_window.append(bool(useful))
         if useful:
             self.last_useful_progress_at = time.monotonic()
@@ -273,10 +307,20 @@ class ContinuousController:
         ):
             self._enqueue_rollout(observation, done=reward.done)
 
+        final_target = target_point(game, self.intent)
+        route_hint = (
+            self.route_graph.next_waypoint(game, final_target)
+            if (
+                final_target is not None
+                and self.intent.mode in {"navigate", "explore", "observe"}
+            )
+            else None
+        )
         guidance = goal_guidance(
             game,
             self.intent,
             local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
+            route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
         self.last_guidance = guidance
@@ -346,9 +390,47 @@ class ContinuousController:
                 }
                 publish()
 
+    async def _route_saver_loop(
+        self,
+        stop_event: asyncio.Event,
+        publish: Callable[[], None],
+    ):
+        """Persist route learning outside the realtime control loop."""
+        while not stop_event.is_set():
+            try:
+                await asyncio.wait_for(
+                    stop_event.wait(),
+                    timeout=self.route_save_interval_s,
+                )
+                break
+            except asyncio.TimeoutError:
+                pass
+
+            if not self.route_graph.writable or not self.route_graph.dirty:
+                continue
+            try:
+                await asyncio.to_thread(self.route_graph.save)
+                self.route_save_error = ""
+            except Exception as exc:
+                # The graph remains dirty and the next interval retries.
+                # LearnedRouteGraph.save uses atomic replacement, so a failed
+                # snapshot cannot corrupt the last durable route file.
+                self.route_save_error = (
+                    f"{type(exc).__name__}: {str(exc)[:180]}"
+                )
+            publish()
+
     async def run(self, active: Callable[[], bool], publish: Callable[[], None]):
         learner = (
             asyncio.create_task(self._learner_loop(active, publish))
+            if self.training_enabled
+            else None
+        )
+        route_stop = asyncio.Event()
+        route_saver = (
+            asyncio.create_task(
+                self._route_saver_loop(route_stop, publish)
+            )
             if self.training_enabled
             else None
         )
@@ -363,6 +445,7 @@ class ContinuousController:
                     self.feature_history.clear()
                     self.novelty_history.clear()
                     self.reward_tracker.break_causal_chain()
+                    self.route_graph.reset_trace()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
                     self.last_stick = (0.0, 0.0)
                     self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
@@ -375,6 +458,7 @@ class ContinuousController:
                 # During a non-interactive cutscene there is no useful control
                 # transition to learn; neutral input avoids polluting the rollout.
                 if game.cutscene_active and not game.dialogue.active:
+                    self.route_graph.reset_trace()
                     self.last_setpoint = Setpoint(reason="cutscene")
                     self.last_motor_summary = "Cutscene owns Link; ML actor remains live and resumes immediately."
                 elif self.tick % self.action_repeat_ticks == 1 or self.pending is None:
@@ -394,6 +478,21 @@ class ContinuousController:
                 await asyncio.sleep(self.tick_s)
         finally:
             self.bridge.release()
+            if route_saver is not None:
+                route_stop.set()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await route_saver
+            if self.route_graph.writable:
+                try:
+                    await asyncio.to_thread(
+                        self.route_graph.save,
+                        force=True,
+                    )
+                    self.route_save_error = ""
+                except (OSError, ValueError, RuntimeError) as exc:
+                    self.route_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
             # Let queued/in-flight batches finish after input authority is gone.
             # This cannot move Link because the controller loop has already ended.
             if learner is not None:
@@ -503,6 +602,11 @@ class ContinuousController:
                     ),
                 },
                 "reward_breakdown": self.last_reward_breakdown,
+                "route_memory": {
+                    **self.route_graph.stats(),
+                    "waypoints_advanced": self.reward_tracker.route_waypoints_advanced,
+                    "save_error": self.route_save_error or None,
+                },
                 "last_update": self.last_training_stats,
             },
         }

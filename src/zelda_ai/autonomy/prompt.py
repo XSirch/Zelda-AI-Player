@@ -38,10 +38,13 @@ IMPORTANT ARCHITECTURE:
 - If trigger_reasons contains intent_target_reached, select the next observed
   waypoint/objective instead of returning the same completed point.
 - motor.guidance reports the local steering prior. If guidance.blocked is true,
-  collision telemetry says the direct heading is obstructed. A non-null detour
+  collision telemetry says the current heading is obstructed. A non-null detour
   means the local controller found a walkable side heading and may keep trying it.
-  If guidance_blocked is a trigger, or local_area_stuck persists around a blocked
-  target, do not keep returning the same obstructed coordinate. Select another
+  guidance.route_active means the controller is replaying a directed path Link
+  actually traversed before; the intermediate route waypoint is motor-level and
+  does not mean the strategic objective changed. If guidance_blocked is a trigger,
+  or local_area_stuck persists around a blocked target with no usable learned
+  route, do not keep returning the same obstructed coordinate. Select another
   observed intermediate waypoint/traversal/exit, or use explore with no fixed
   target until new reachable evidence appears.
 - target_actor_id/params/uid must identify an actually observed actor.

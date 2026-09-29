@@ -5,6 +5,7 @@ import time
 
 import pytest
 
+from zelda_ai.autonomy.controller import ContinuousController
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
@@ -142,15 +143,54 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     runtime.controller.policy.save()
     assert checkpoint.is_file()
     await runtime.control("stop")
+    route_graph = tmp_path / "ml" / "route-graph-v1.json"
     provider.release.set()
     await runtime._settle_previous_controller()
+    assert route_graph.is_file()
 
     second_provider = SlowCognition()
     runtime.providers["codex"] = second_provider
     await runtime.start(unlimited())
     assert runtime.controller.policy.checkpoint == checkpoint
+    assert runtime.controller.route_graph.path == route_graph
+    assert runtime.controller.route_graph.stats()["nodes"] >= 1
     await runtime.control("stop")
     second_provider.release.set()
+
+
+@pytest.mark.asyncio
+async def test_route_memory_is_saved_during_active_long_run(
+    tmp_path, store, state, monkeypatch
+):
+    monkeypatch.setattr(
+        ContinuousController,
+        "route_save_interval_s",
+        0.02,
+    )
+    bridge = connected(state)
+    provider = CountingCognition()
+    runtime = AutonomyRuntime(
+        bridge,
+        store,
+        {"codex": provider},
+        tmp_path / "ml",
+    )
+
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    route_graph = tmp_path / "ml" / "route-graph-v1.json"
+
+    for _ in range(30):
+        if route_graph.is_file():
+            break
+        await asyncio.sleep(0.01)
+
+    assert runtime.state == "running"
+    assert route_graph.is_file()
+    assert runtime.controller.route_graph.stats()["nodes"] >= 1
+    assert runtime.controller.route_save_error == ""
+
+    await runtime.control("stop")
 
 
 def test_paused_observations_are_not_promoted_to_memory(tmp_path, store, state):
@@ -358,6 +398,12 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     champion_path = tmp_path / "ml" / "champions" / "completion-0001.pt"
     assert champion_path.is_file()
     frozen_bytes = champion_path.read_bytes()
+    assert champion["route_graph_file"] == "completion-0001.routes.json"
+    champion_routes = (
+        tmp_path / "ml" / "champions" / champion["route_graph_file"]
+    )
+    assert champion_routes.is_file()
+    frozen_route_bytes = champion_routes.read_bytes()
 
     evaluation_provider = CountingCognition()
     runtime.providers["codex"] = evaluation_provider
@@ -371,6 +417,8 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     assert runtime.config.champion_id == "completion-0001"
     assert runtime.controller.training_enabled is False
     assert runtime.controller.policy.checkpoint == champion_path
+    assert runtime.controller.route_graph.writable is False
+    assert runtime.controller.route_graph.path == champion_routes
     snapshot = runtime.snapshot()
     assert snapshot["run_mode"] == "evaluation"
     assert snapshot["active_champion"]["id"] == "completion-0001"
@@ -380,6 +428,7 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     await asyncio.sleep(0.2)
     await runtime.control("stop")
     assert champion_path.read_bytes() == frozen_bytes
+    assert champion_routes.read_bytes() == frozen_route_bytes
 
 
 @pytest.mark.asyncio

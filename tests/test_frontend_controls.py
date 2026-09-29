@@ -160,3 +160,7 @@ def test_panel_shows_actionable_goal_guidance():
     assert "BLOQUEADO" in main
     assert "desvio local" in main
     assert "anti-loop" in main
+    assert "rota aprendida" in main
+    assert "route_active?: boolean" in types
+    assert "route_memory?:" in types
+    assert "ROTAS APRENDIDAS" in main

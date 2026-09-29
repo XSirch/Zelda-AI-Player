@@ -92,6 +92,9 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
           {thought.guidance.stuck_scale != null && thought.guidance.stuck_scale < 0.999
             ? ` · anti-loop ${Math.round(thought.guidance.stuck_scale * 100)}%`
             : ''}
+          {thought.guidance.route_active
+            ? ` · rota aprendida${thought.guidance.route_partial ? ' parcial' : ''} ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%`
+            : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
         </strong>
       </div>}
@@ -182,6 +185,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const usefulProgressRate = learning?.useful_progress_rate ?? 0;
   const exploration = learning?.exploration;
   const resources = learning?.resources;
+  const routeMemory = learning?.route_memory;
   const rewardBreakdown = Object.entries(learning?.reward_breakdown ?? {})
     .filter(([, value]) => value !== 0)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -220,6 +224,9 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
             : 'nenhum completion salvo'}
       </span>
       {bestChampion && <span>BEST TIME <b>{bestChampion.id}</b> · {durationLabel(bestChampion.elapsed_s)}</span>}
+      {routeMemory && <span>
+        ROTAS APRENDIDAS <b>{compact(routeMemory.nodes)}</b> nós · <b>{compact(routeMemory.edges)}</b> trechos · <b>{compact(routeMemory.routes_reused)}</b> reusos · <b>{compact(routeMemory.waypoints_advanced ?? 0)}</b> avanços
+      </span>}
     </div>
     <div className="resource-strip">
       <span>COLETAS</span>

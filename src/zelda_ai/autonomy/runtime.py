@@ -22,7 +22,7 @@ from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v4/ppo-rnd-v2/reward-v6"
+CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v5/route-memory-v1/ppo-rnd-v2/reward-v6"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -525,6 +525,7 @@ class AutonomyRuntime:
 
     def _make_controller(self, config: RunConfig) -> ContinuousController:
         checkpoint = self.training_checkpoint
+        route_graph_path = self.model_dir / "route-graph-v1.json"
         training_enabled = True
         self.active_champion = None
         if config.run_mode == "evaluation":
@@ -533,19 +534,30 @@ class AutonomyRuntime:
                 raise ValueError(
                     "Champion contract is incompatible with the current motor architecture"
                 )
+            frozen_routes = self.champions.resolve_route_graph(champion)
+            if frozen_routes is None:
+                raise ValueError("Champion route graph metadata is missing")
+            route_graph_path = frozen_routes
             self.active_champion = champion
             training_enabled = False
 
         try:
-            return ContinuousController(
+            controller = ContinuousController(
                 self.bridge,
                 checkpoint,
                 on_achievement=lambda achievement: self.log(
                     "ml_achievement", achievement
                 ),
                 training_enabled=training_enabled,
+                route_graph_path=route_graph_path,
             )
-        except RuntimeError as exc:
+            if config.run_mode == "evaluation" and controller.route_graph.load_error:
+                raise ValueError(
+                    "Champion route graph is invalid: "
+                    + controller.route_graph.load_error
+                )
+            return controller
+        except (RuntimeError, ValueError) as exc:
             if config.run_mode == "evaluation":
                 raise ValueError(str(exc)) from None
             raise
@@ -572,6 +584,7 @@ class AutonomyRuntime:
             return
         try:
             await asyncio.to_thread(controller.policy.save)
+            await asyncio.to_thread(controller.route_graph.save, force=True)
             telemetry = controller.telemetry()
             learning = telemetry.get("learning") or {}
             summary = await asyncio.to_thread(self.store.benchmark, run_id)
@@ -619,11 +632,13 @@ class AutonomyRuntime:
                     metrics.get("unknown_cost_calls") or 0
                 ),
                 "usage_by_model": metrics.get("usage_by_model") or [],
+                "route_memory": learning.get("route_memory") or {},
             }
             champion = await asyncio.to_thread(
                 self.champions.capture,
                 self.training_checkpoint,
                 metadata,
+                controller.route_graph.path,
             )
             self.completion_champion_saved_run_id = run_id
             self.last_champion_error = ""
@@ -634,6 +649,7 @@ class AutonomyRuntime:
                     "champion_id": champion["id"],
                     "elapsed_s": champion["elapsed_s"],
                     "sha256": champion["sha256"],
+                    "route_graph_sha256": champion.get("route_graph_sha256"),
                 },
             )
         except Exception as exc:
@@ -940,6 +956,7 @@ class AutonomyRuntime:
                     "local_frontier_radius", 0.0
                 ),
                 "reward_breakdown": learning.get("reward_breakdown", {}),
+                "route_memory": learning.get("route_memory", {}),
                 "recent_achievements": (learning.get("achievements") or [])[-4:],
             }
             recent_for_model = [

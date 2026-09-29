@@ -189,6 +189,7 @@ def goal_guidance(
     intent: AgentIntent,
     *,
     local_dwell_seconds: float = 0.0,
+    route_hint: dict | None = None,
 ) -> dict:
     """Convert a structured high-level goal into collision-aware analog guidance.
 
@@ -211,14 +212,29 @@ def goal_guidance(
             "detour": None,
             "direct_probe": None,
             "stuck_scale": 1.0,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
+            "route_waypoint_id": None,
+            "route_partial": False,
         }
 
     point = target_point(game, intent)
+    final_point = point
     source = (
         "target_actor"
         if intent.target_actor_uid is not None or intent.target_actor_id is not None
         else "target_position"
     )
+    route_active = False
+    route_path_nodes = 0
+    route_confidence = 0.0
+    route_target_gap = None
+    route_waypoint = None
+    route_waypoint_id = None
+    route_partial = False
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
@@ -237,11 +253,44 @@ def goal_guidance(
                 point = affordance.target_position
                 source = f"traversal:{affordance.kind}:target"
 
+    if (
+        point is not None
+        and route_hint
+        and intent.mode in {"navigate", "explore", "observe"}
+        and not source.startswith("traversal:")
+    ):
+        waypoint = route_hint.get("waypoint")
+        if (
+            isinstance(waypoint, (list, tuple))
+            and len(waypoint) == 3
+            and all(isinstance(value, (int, float)) and math.isfinite(value) for value in waypoint)
+        ):
+            route_active = True
+            route_waypoint = tuple(float(value) for value in waypoint)
+            waypoint_id = route_hint.get("waypoint_id")
+            route_waypoint_id = (
+                str(waypoint_id)[:160]
+                if waypoint_id is not None
+                else None
+            )
+            point = route_waypoint
+            source = "learned_route"
+            route_path_nodes = max(0, int(route_hint.get("path_nodes") or 0))
+            route_confidence = max(
+                0.0, min(1.0, float(route_hint.get("confidence") or 0.0))
+            )
+            gap = route_hint.get("target_gap")
+            route_target_gap = float(gap) if isinstance(gap, (int, float)) else None
+            route_partial = bool(route_hint.get("partial"))
+
     if point is not None:
         dx = point[0] - player.position[0]
         dz = point[2] - player.position[2]
         horizontal = math.hypot(dx, dz)
-        distance = math.dist(player.position, point)
+        distance = math.dist(
+            player.position,
+            final_point if final_point is not None else point,
+        )
         blocked = False
         detour = None
         direct_probe = None
@@ -269,12 +318,21 @@ def goal_guidance(
                     stick = detour_stick
                     source = f"{source}:detour:{detour}"
 
-        base_strength = {
-            "navigate": 0.86,
-            "interact": 0.78,
-            "explore": 0.74,
-            "observe": 0.62,
-        }.get(intent.mode, 0.68)
+        if route_active:
+            # A route observed once is useful evidence, not certainty. Repeated
+            # successful traversal raises confidence and therefore steering
+            # authority. Partial routes stay deliberately weaker so a frontier
+            # guess cannot become another hard attractor.
+            base_strength = (
+                0.52 + 0.30 * route_confidence
+            ) * (0.75 if route_partial else 1.0)
+        else:
+            base_strength = {
+                "navigate": 0.86,
+                "interact": 0.78,
+                "explore": 0.74,
+                "observe": 0.62,
+            }.get(intent.mode, 0.68)
         # Fade the steering prior near the waypoint so learned interaction/
         # traversal behaviour can take over instead of orbiting the point.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
@@ -304,6 +362,13 @@ def goal_guidance(
             "detour": detour,
             "direct_probe": direct_probe,
             "stuck_scale": stuck_scale,
+            "route_active": route_active,
+            "route_path_nodes": route_path_nodes,
+            "route_confidence": route_confidence,
+            "route_target_gap": route_target_gap,
+            "route_waypoint": route_waypoint,
+            "route_waypoint_id": route_waypoint_id,
+            "route_partial": route_partial,
         }
 
     direction_sticks = {
@@ -331,6 +396,13 @@ def goal_guidance(
             "detour": None,
             "direct_probe": None,
             "stuck_scale": stuck_scale,
+            "route_active": False,
+            "route_path_nodes": 0,
+            "route_confidence": 0.0,
+            "route_target_gap": None,
+            "route_waypoint": None,
+            "route_waypoint_id": None,
+            "route_partial": False,
         }
 
     return {
@@ -345,6 +417,13 @@ def goal_guidance(
         "detour": None,
         "direct_probe": None,
         "stuck_scale": 1.0,
+        "route_active": False,
+        "route_path_nodes": 0,
+        "route_confidence": 0.0,
+        "route_target_gap": None,
+        "route_waypoint": None,
+        "route_waypoint_id": None,
+        "route_partial": False,
     }
 
 def encode_state(

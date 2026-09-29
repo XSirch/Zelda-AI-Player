@@ -132,6 +132,22 @@ export interface LearningSnapshot {
     local_dwell_penalty?: number;
   };
   reward_breakdown?: Record<string, number>;
+  route_memory?: {
+    nodes: number;
+    edges: number;
+    routes_reused: number;
+    waypoints_advanced?: number;
+    last_path_nodes: number;
+    cached_path_nodes?: number;
+    exhausted_partial_nodes?: number;
+    revision?: number;
+    persistence_revision?: number;
+    dirty?: boolean;
+    last_target_gap: number | null;
+    writable: boolean;
+    load_error?: string | null;
+    save_error?: string | null;
+  };
   last_update?: Record<string, unknown>;
   checkpoint_load_error?: string;
   training_enabled?: boolean;
@@ -168,6 +184,9 @@ export interface ChampionSummary {
   unknown_usage_calls?: number;
   unknown_cost_calls?: number;
   usage_by_model?: RunUsageBreakdown[];
+  route_memory?: LearningSnapshot['route_memory'];
+  route_graph_file?: string;
+  route_graph_sha256?: string;
   sha256?: string;
 }
 
@@ -192,6 +211,13 @@ export interface MotorGuidance {
   detour?: string | null;
   direct_probe?: string | null;
   stuck_scale?: number;
+  route_active?: boolean;
+  route_path_nodes?: number;
+  route_confidence?: number;
+  route_target_gap?: number | null;
+  route_waypoint?: number[] | null;
+  route_waypoint_id?: string | null;
+  route_partial?: boolean;
 }
 
 export interface Snapshot {

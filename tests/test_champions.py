@@ -4,6 +4,8 @@ from zelda_ai.autonomy.champions import ChampionStore
 def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     source = tmp_path / "training.pt"
     source.write_bytes(b"policy-v1")
+    routes = tmp_path / "route-graph-v1.json"
+    routes.write_bytes(b'{"version":1,"nodes":{},"edges":{}}')
     store = ChampionStore(tmp_path / "champions")
 
     first = store.capture(
@@ -19,6 +21,7 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
             "total_tokens": 1500,
             "cost_usd": 0.042,
         },
+        routes,
     )
     source.write_bytes(b"policy-v2")
     second = store.capture(
@@ -36,6 +39,9 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     assert first["output_tokens"] == 300
     assert first["total_tokens"] == 1500
     assert first["cost_usd"] == 0.042
+    assert first["route_graph_file"] == "completion-0001.routes.json"
+    assert first["route_graph_sha256"]
+    assert (store.root / first["route_graph_file"]).read_bytes() == routes.read_bytes()
     assert second["id"] == "completion-0002"
     assert (store.root / "completion-0001.pt").read_bytes() == b"policy-v1"
     assert (store.root / "completion-0002.pt").read_bytes() == b"policy-v2"
@@ -57,6 +63,9 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     explicit, explicit_path = store.resolve("completion-0001")
     assert explicit["run_id"] == "run-1"
     assert explicit_path.read_bytes() == b"policy-v1"
+    explicit_routes = store.resolve_route_graph(explicit)
+    assert explicit_routes is not None
+    assert explicit_routes.read_bytes() == routes.read_bytes()
 
 
 def test_champion_store_rejects_missing_or_invalid_ids(tmp_path):
@@ -89,15 +98,37 @@ def test_champion_checksum_detects_tampering(tmp_path):
         raise AssertionError("tampered champion unexpectedly resolved")
 
 
+def test_champion_route_graph_checksum_detects_tampering(tmp_path):
+    source = tmp_path / "training.pt"
+    source.write_bytes(b"trusted-policy")
+    routes = tmp_path / "routes.json"
+    routes.write_bytes(b'{"version":1,"nodes":{},"edges":{}}')
+    store = ChampionStore(tmp_path / "champions")
+    champion = store.capture(
+        source,
+        {"run_id": "run-1", "elapsed_s": 100.0},
+        routes,
+    )
+    route_path = store.root / champion["route_graph_file"]
+    route_path.write_bytes(b"tampered-routes")
+
+    try:
+        store.resolve(champion["id"])
+    except ValueError as exc:
+        assert "route graph checksum mismatch" in str(exc)
+    else:
+        raise AssertionError("tampered champion route graph unexpectedly resolved")
+
+
 def test_orphan_champion_number_is_never_reused(tmp_path):
     source = tmp_path / "training.pt"
     source.write_bytes(b"new-policy")
     store = ChampionStore(tmp_path / "champions")
-    (store.root / "completion-0007.pt").write_bytes(b"orphan-policy")
+    (store.root / "completion-0007.routes.json").write_bytes(b"orphan-routes")
 
     champion = store.capture(
         source,
         {"run_id": "run-8", "elapsed_s": 80.0},
     )
     assert champion["id"] == "completion-0008"
-    assert (store.root / "completion-0007.pt").read_bytes() == b"orphan-policy"
+    assert (store.root / "completion-0007.routes.json").read_bytes() == b"orphan-routes"
