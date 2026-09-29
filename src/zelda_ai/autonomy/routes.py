@@ -26,12 +26,20 @@ def _distance(a, b) -> float:
     return math.dist(tuple(a), tuple(b))
 
 
-def _node_id(scene: int, room: int, position) -> str:
+def _node_id(
+    scene: int,
+    room: int,
+    position,
+    *,
+    mirrored: bool = False,
+    age: str = "child",
+) -> str:
     x, y, z = position
     gx = round(float(x) / ROUTE_CELL_XZ)
     gy = round(float(y) / ROUTE_CELL_Y)
     gz = round(float(z) / ROUTE_CELL_XZ)
-    return f"{scene}:{room}:{gx}:{gy}:{gz}"
+    age_key = "adult" if age == "adult" else "child"
+    return f"{int(bool(mirrored))}:{age_key}:{scene}:{room}:{gx}:{gy}:{gz}"
 
 
 class LearnedRouteGraph:
@@ -48,7 +56,7 @@ class LearnedRouteGraph:
         self.writable = writable
         self.nodes: dict[str, dict] = {}
         self.edges: dict[str, dict[str, dict]] = {}
-        self.by_scene: dict[tuple[int, int], set[str]] = {}
+        self.by_scene: dict[tuple[int, int, bool, str], set[str]] = {}
         self.last_node_id: str | None = None
         self.last_position: tuple[float, float, float] | None = None
         self.last_scene_room: tuple[int, int] | None = None
@@ -66,7 +74,12 @@ class LearnedRouteGraph:
         self._load()
 
     def _index_node(self, node_id: str, row: dict):
-        key = (int(row["scene"]), int(row["room"]))
+        key = (
+            int(row["scene"]),
+            int(row["room"]),
+            bool(row.get("mirrored", False)),
+            "adult" if row.get("age") == "adult" else "child",
+        )
         self.by_scene.setdefault(key, set()).add(node_id)
 
     def _load(self):
@@ -97,6 +110,8 @@ class LearnedRouteGraph:
                 normalized = {
                     "scene": scene,
                     "room": room,
+                    "mirrored": bool(row.get("mirrored", False)),
+                    "age": "adult" if row.get("age") == "adult" else "child",
                     "position": [float(v) for v in position],
                     "visits": max(1, int(row.get("visits") or 1)),
                     "updated_at": float(row.get("updated_at") or 0.0),
@@ -133,8 +148,23 @@ class LearnedRouteGraph:
         self.counted_route_target_signature = None
         self.last_failed_search = None
 
-    def _touch_node(self, scene: int, room: int, position, now_s: float) -> str:
-        node_id = _node_id(scene, room, position)
+    def _touch_node(
+        self,
+        scene: int,
+        room: int,
+        position,
+        now_s: float,
+        *,
+        mirrored: bool,
+        age: str,
+    ) -> str:
+        node_id = _node_id(
+            scene,
+            room,
+            position,
+            mirrored=mirrored,
+            age=age,
+        )
         existing = self.nodes.get(node_id)
         if existing is None:
             if len(self.nodes) >= ROUTE_MAX_NODES:
@@ -142,6 +172,8 @@ class LearnedRouteGraph:
             row = {
                 "scene": int(scene),
                 "room": int(room),
+                "mirrored": bool(mirrored),
+                "age": "adult" if age == "adult" else "child",
                 "position": [float(v) for v in position],
                 "visits": 1,
                 "updated_at": now_s,
@@ -171,13 +203,26 @@ class LearnedRouteGraph:
         now_s = time.time() if now_s is None else float(now_s)
         position = tuple(float(v) for v in game.player.position)
         scene_room = (int(game.scene), int(game.room))
-        node_id = _node_id(game.scene, game.room, position)
+        node_id = _node_id(
+            game.scene,
+            game.room,
+            position,
+            mirrored=game.mirrored_world,
+            age=game.player.age,
+        )
 
         if node_id == self.last_node_id and scene_room == self.last_scene_room:
             self.last_position = position
             return False
 
-        node_id = self._touch_node(game.scene, game.room, position, now_s)
+        node_id = self._touch_node(
+            game.scene,
+            game.room,
+            position,
+            now_s,
+            mirrored=game.mirrored_world,
+            age=game.player.age,
+        )
         edge_added = False
         if (
             self.last_node_id is not None
@@ -239,8 +284,22 @@ class LearnedRouteGraph:
         os.replace(temporary, self.path)
         self.dirty = False
 
-    def _nearest_node(self, scene: int, room: int, position, radius: float):
-        candidates = self.by_scene.get((int(scene), int(room))) or ()
+    def _nearest_node(
+        self,
+        scene: int,
+        room: int,
+        position,
+        radius: float,
+        *,
+        mirrored: bool,
+        age: str,
+    ):
+        candidates = self.by_scene.get((
+            int(scene),
+            int(room),
+            bool(mirrored),
+            "adult" if age == "adult" else "child",
+        )) or ()
         best_id = None
         best_distance = float("inf")
         for node_id in candidates:
@@ -340,13 +399,21 @@ class LearnedRouteGraph:
             self.last_target_gap = None
             return None
 
-        start_id = _node_id(game.scene, game.room, game.player.position)
+        start_id = _node_id(
+            game.scene,
+            game.room,
+            game.player.position,
+            mirrored=game.mirrored_world,
+            age=game.player.age,
+        )
         if start_id not in self.nodes:
             start_id, _ = self._nearest_node(
                 game.scene,
                 game.room,
                 game.player.position,
                 ROUTE_START_RADIUS,
+                mirrored=game.mirrored_world,
+                age=game.player.age,
             )
         if start_id is None:
             self.active_path = []
@@ -358,6 +425,8 @@ class LearnedRouteGraph:
             game.scene,
             game.room,
             target_position,
+            mirrored=game.mirrored_world,
+            age=game.player.age,
         )
         if self.active_target_signature != target_signature:
             self.active_target_signature = target_signature
