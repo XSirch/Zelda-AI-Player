@@ -200,14 +200,16 @@ class ChampionStore:
                 if _sha256(best_source) == best.get("sha256"):
                     _atomic_copy(best_source, self.root / "best-completion.pt")
                     best_route_metadata = {}
+                    best_route_alias = self.root / "best-completion.routes.json"
                     best_route = self.resolve_route_graph(best)
                     if best_route is not None:
-                        best_route_alias = self.root / "best-completion.routes.json"
                         _atomic_copy(best_route, best_route_alias)
                         best_route_metadata = {
                             "route_graph_file": best_route_alias.name,
                             "route_graph_sha256": _sha256(best_route_alias),
                         }
+                    else:
+                        best_route_alias.unlink(missing_ok=True)
                     _atomic_json(
                         self.root / "best-completion.json",
                         {
