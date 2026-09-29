@@ -177,6 +177,9 @@ export interface ChampionSummary {
   unknown_usage_calls?: number;
   unknown_cost_calls?: number;
   usage_by_model?: RunUsageBreakdown[];
+  route_memory?: LearningSnapshot['route_memory'];
+  route_graph_file?: string;
+  route_graph_sha256?: string;
   sha256?: string;
 }
 
