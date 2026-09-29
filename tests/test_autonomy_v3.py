@@ -986,6 +986,7 @@ def test_long_local_dwell_penalizes_circling_even_when_link_keeps_moving(state):
         now_s=300.0,
     )
     assert late.breakdown["local_dwell"] < first_penalty
+    assert late.breakdown["local_dwell"] >= -0.020001
     assert tracker.local_dwell_seconds == 300.0
 
 
