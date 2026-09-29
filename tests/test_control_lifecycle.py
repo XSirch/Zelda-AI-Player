@@ -136,7 +136,7 @@ async def test_controller_checkpoint_is_reused_between_runs(tmp_path, store, sta
     bridge = connected(state)
     provider = SlowCognition()
     runtime = AutonomyRuntime(bridge, store, {"codex": provider}, tmp_path / "ml")
-    checkpoint = tmp_path / "ml" / "raw-controller-ppo-rnd-v2.pt"
+    checkpoint = tmp_path / "ml" / "raw-controller-ppo-rnd-v3.pt"
 
     await runtime.start(unlimited())
     await asyncio.wait_for(provider.entered.wait(), timeout=1.0)
