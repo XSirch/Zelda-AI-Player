@@ -98,6 +98,7 @@ class ContinuousController:
         self.last_useful_progress_at = time.monotonic()
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
+        self.route_save_error = ""
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -388,9 +389,44 @@ class ContinuousController:
                 }
                 publish()
 
+    async def _route_saver_loop(
+        self,
+        stop_event: asyncio.Event,
+        publish: Callable[[], None],
+    ):
+        """Persist route learning outside the realtime control loop."""
+        while not stop_event.is_set():
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=20.0)
+                break
+            except asyncio.TimeoutError:
+                pass
+
+            if not self.route_graph.writable or not self.route_graph.dirty:
+                continue
+            try:
+                await asyncio.to_thread(self.route_graph.save)
+                self.route_save_error = ""
+            except Exception as exc:
+                # The graph remains dirty and the next interval retries.
+                # LearnedRouteGraph.save uses atomic replacement, so a failed
+                # snapshot cannot corrupt the last durable route file.
+                self.route_save_error = (
+                    f"{type(exc).__name__}: {str(exc)[:180]}"
+                )
+            publish()
+
     async def run(self, active: Callable[[], bool], publish: Callable[[], None]):
         learner = (
             asyncio.create_task(self._learner_loop(active, publish))
+            if self.training_enabled
+            else None
+        )
+        route_stop = asyncio.Event()
+        route_saver = (
+            asyncio.create_task(
+                self._route_saver_loop(route_stop, publish)
+            )
             if self.training_enabled
             else None
         )
@@ -438,9 +474,21 @@ class ContinuousController:
                 await asyncio.sleep(self.tick_s)
         finally:
             self.bridge.release()
+            if route_saver is not None:
+                route_stop.set()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await route_saver
             if self.route_graph.writable:
-                with contextlib.suppress(OSError, ValueError):
-                    await asyncio.to_thread(self.route_graph.save, force=True)
+                try:
+                    await asyncio.to_thread(
+                        self.route_graph.save,
+                        force=True,
+                    )
+                    self.route_save_error = ""
+                except (OSError, ValueError, RuntimeError) as exc:
+                    self.route_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
             # Let queued/in-flight batches finish after input authority is gone.
             # This cannot move Link because the controller loop has already ended.
             if learner is not None:
@@ -553,6 +601,7 @@ class ContinuousController:
                 "route_memory": {
                     **self.route_graph.stats(),
                     "waypoints_advanced": self.reward_tracker.route_waypoints_advanced,
+                    "save_error": self.route_save_error or None,
                 },
                 "last_update": self.last_training_stats,
             },
