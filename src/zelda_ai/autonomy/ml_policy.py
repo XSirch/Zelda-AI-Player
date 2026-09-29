@@ -595,6 +595,9 @@ class OnlinePPO:
             "rnd_error_ema": round(self.rnd_error_ema, 8) if self.rnd_error_ema is not None else None,
             "rnd_last_error": round(self.last_intrinsic_error, 8),
             "rnd_last_novelty": round(self.last_intrinsic_reward, 6),
+            **self.last_stats,
+            # Current schedule values must win over the coefficients recorded
+            # at the start of the previous update.
             "current_stick_entropy_coef": round(
                 current_stick_entropy_coef,
                 8,
@@ -604,5 +607,4 @@ class OnlinePPO:
                 8,
             ),
             "exploration_decay": round(exploration_decay, 6),
-            **self.last_stats,
         }
