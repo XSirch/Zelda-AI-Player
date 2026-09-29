@@ -26,9 +26,11 @@ Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_re
 
 A route memory v1 transforma deslocamento real em um **grafo topológico dirigido**. Aproximadamente a cada célula de 80×50×80 unidades realmente atravessada, o controlador registra um nó e conecta somente o trecho que Link de fato percorreu. Não são criadas arestas reversas automaticamente, atalhos através de paredes nem conhecimento de collision que nunca foi visitado.
 
-Quando a cognição pede um `target_position`/ator e existe uma sequência já percorrida que termina perto desse alvo, o controlador calcula o caminho de menor custo no **grafo observado** e usa o próximo waypoint aprendido como guidance. Isso permite que um contorno descoberto por exploração aleatória seja repetido depois como A → B → C → D, em vez de voltar a apontar em linha reta para a parede. Trechos percorridos mais vezes recebem uma preferência pequena por confiabilidade.
+Quando a cognição pede um `target_position`/ator, o controlador procura no **grafo observado** uma sequência que realmente tenha sido percorrida e que aproxime Link do objetivo. Se já existir um caminho até perto do alvo, ele reutiliza os waypoints completos; se o alvo ainda for inédito, pode reutilizar apenas um trecho parcial que produza avanço geométrico relevante. Isso permite repetir um contorno descoberto por exploração como A → B → C → D em vez de voltar a apontar em linha reta para a parede. Trechos percorridos mais vezes recebem maior confiança, e a força do guidance cresce gradualmente com essa evidência.
 
-A memória é incremental e persistente entre runs. Ela não consegue inventar uma rota para uma área nunca alcançada: nesse caso continuam valendo exploração, probes locais de colisão e cognição. Runs de avaliação carregam a cópia read-only congelada junto com o champion, para que uma avaliação posterior não seja alterada por rotas aprendidas depois.
+Uma rota parcial não pode virar outro ímã: ao chegar ao fim conhecido de um ramo que ainda não alcança o alvo, esse endpoint fica marcado como esgotado para aquele objetivo e não é reproduzido novamente até o grafo ganhar novos nós/trechos. A memória também separa rotas por scene/room, idade de Link e mundo normal/espelhado. Ela nunca inventa arestas reversas, atalhos ou o restante de uma rota não observada.
+
+A memória é incremental e persistente entre runs. Avançar por uma rota conhecida conta como progresso operacional, mas **não zera `local_dwell`** nem reabre `frontier_progress`; assim, uma volta A → B → C → A não consegue mascarar um loop. Runs de avaliação carregam a cópia read-only congelada junto com o champion, para que uma avaliação posterior não seja alterada por rotas aprendidas depois.
 
 ## Reward
 
