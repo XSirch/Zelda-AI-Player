@@ -50,6 +50,8 @@ class ChampionStore:
     def _rows(self) -> list[dict]:
         rows = []
         for path in self.root.glob("completion-*.json"):
+            if path.name.endswith(".routes.json"):
+                continue
             match = _CHAMPION_ID.match(path.stem)
             if not match:
                 continue
@@ -157,7 +159,12 @@ class ChampionStore:
         existing_ids = set()
         for pattern in ("completion-*.pt", "completion-*.json", "completion-*.routes.json"):
             for path in self.root.glob(pattern):
-                if match := _CHAMPION_ID.match(path.stem):
+                candidate = (
+                    path.name[: -len(".routes.json")]
+                    if path.name.endswith(".routes.json")
+                    else path.stem
+                )
+                if match := _CHAMPION_ID.match(candidate):
                     existing_ids.add(int(match.group(1)))
         sequence = max(existing_ids, default=0) + 1
         champion_id = f"completion-{sequence:04d}"
