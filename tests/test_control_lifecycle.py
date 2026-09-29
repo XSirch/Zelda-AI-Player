@@ -294,6 +294,15 @@ async def test_hard_blocked_guidance_triggers_early_sparse_replan(
     await asyncio.wait_for(provider.called.wait(), timeout=1.0)
     assert provider.calls == 1
 
+    # CountingCognition sets its event when think() starts, before the runtime
+    # necessarily applies the returned initial intent. Wait for that first turn
+    # to settle so it cannot overwrite the explicit blocked target below.
+    for _ in range(100):
+        if runtime.cognition_state == "acting" and runtime.last_cognition_at > 0:
+            break
+        await asyncio.sleep(0.01)
+    assert runtime.cognition_state == "acting"
+
     runtime.controller.set_intent(
         AgentIntent.bootstrap().model_copy(update={
             "mode": "navigate",
@@ -450,11 +459,11 @@ async def test_new_run_waits_for_completion_champion_capture(
     capture_started = threading.Event()
     release_capture = threading.Event()
 
-    def slow_capture(source, metadata):
+    def slow_capture(source, metadata, route_graph_source=None):
         capture_started.set()
         if not release_capture.wait(timeout=2.0):
             raise RuntimeError("test capture release timed out")
-        return original_capture(source, metadata)
+        return original_capture(source, metadata, route_graph_source)
 
     runtime.champions.capture = slow_capture
     completion = asyncio.create_task(
