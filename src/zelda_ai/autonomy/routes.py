@@ -55,7 +55,10 @@ class LearnedRouteGraph:
         self.new_edges_since_save = 0
         self.last_save_at = 0.0
         self.routes_reused = 0
-        self.active_route_target_id: str | None = None
+        self.active_target_signature: str | None = None
+        self.active_target_node_id: str | None = None
+        self.active_path: list[str] = []
+        self.counted_route_target_id: str | None = None
         self.last_path_nodes = 0
         self.last_target_gap: float | None = None
         self.load_error = ""
@@ -123,7 +126,10 @@ class LearnedRouteGraph:
         self.last_node_id = None
         self.last_position = None
         self.last_scene_room = None
-        self.active_route_target_id = None
+        self.active_target_signature = None
+        self.active_target_node_id = None
+        self.active_path = []
+        self.counted_route_target_id = None
 
     def _touch_node(self, scene: int, room: int, position, now_s: float) -> str:
         node_id = _node_id(scene, room, position)
@@ -290,31 +296,72 @@ class LearnedRouteGraph:
 
     def next_waypoint(self, game: GameState, target_position) -> dict | None:
         if not game.player or target_position is None:
-            self.active_route_target_id = None
+            self.active_target_signature = None
+            self.active_target_node_id = None
+            self.active_path = []
+            self.counted_route_target_id = None
             self.last_path_nodes = 0
             self.last_target_gap = None
             return None
-        start_id, _ = self._nearest_node(
-            game.scene,
-            game.room,
-            game.player.position,
-            ROUTE_START_RADIUS,
-        )
-        target_id, target_gap = self._nearest_node(
+
+        start_id = _node_id(game.scene, game.room, game.player.position)
+        if start_id not in self.nodes:
+            start_id, _ = self._nearest_node(
+                game.scene,
+                game.room,
+                game.player.position,
+                ROUTE_START_RADIUS,
+            )
+
+        target_signature = _node_id(
             game.scene,
             game.room,
             target_position,
-            ROUTE_TARGET_RADIUS,
         )
+        if (
+            self.active_target_signature == target_signature
+            and self.active_target_node_id in self.nodes
+        ):
+            target_id = self.active_target_node_id
+            target_gap = _distance(
+                self.nodes[target_id]["position"],
+                target_position,
+            )
+        else:
+            target_id, target_gap = self._nearest_node(
+                game.scene,
+                game.room,
+                target_position,
+                ROUTE_TARGET_RADIUS,
+            )
+            self.active_target_signature = target_signature
+            self.active_target_node_id = target_id
+            self.active_path = []
+            self.counted_route_target_id = None
+
         if start_id is None or target_id is None:
-            self.active_route_target_id = None
+            self.active_path = []
+            self.counted_route_target_id = None
             self.last_path_nodes = 0
             self.last_target_gap = target_gap
             return None
 
-        path = self._shortest_path(start_id, target_id)
+        path = None
+        if self.active_path and self.active_path[-1] == target_id:
+            try:
+                start_index = self.active_path.index(start_id)
+            except ValueError:
+                start_index = -1
+            if start_index >= 0:
+                path = self.active_path[start_index:]
+
+        if path is None:
+            path = self._shortest_path(start_id, target_id)
+            self.active_path = list(path or ())
+
         if not path or len(path) < 2:
-            self.active_route_target_id = None
+            self.active_path = list(path or ())
+            self.counted_route_target_id = None
             self.last_path_nodes = len(path or ())
             self.last_target_gap = target_gap
             return None
@@ -336,9 +383,9 @@ class LearnedRouteGraph:
                 traversals.append(max(1, int(edge.get("traversals") or 1)))
         confidence = min(1.0, (min(traversals) if traversals else 1) / 4.0)
 
-        if self.active_route_target_id != target_id:
+        if self.counted_route_target_id != target_id:
             self.routes_reused += 1
-            self.active_route_target_id = target_id
+            self.counted_route_target_id = target_id
         self.last_path_nodes = len(path)
         self.last_target_gap = target_gap
         return {
@@ -357,6 +404,7 @@ class LearnedRouteGraph:
             "edges": edge_count,
             "routes_reused": self.routes_reused,
             "last_path_nodes": self.last_path_nodes,
+            "cached_path_nodes": len(self.active_path),
             "last_target_gap": (
                 round(self.last_target_gap, 1)
                 if isinstance(self.last_target_gap, (int, float))
