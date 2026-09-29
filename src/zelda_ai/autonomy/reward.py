@@ -644,12 +644,18 @@ class RewardTracker:
                         ))
 
             old_dist, new_dist = previous["target_distance"], current["target_distance"]
-            guidance_blocked = bool(guidance and guidance.get("blocked"))
+            straight_line_shaping_suppressed = bool(
+                guidance
+                and (
+                    guidance.get("blocked")
+                    or guidance.get("route_active")
+                )
+            )
             if (
                 previous["intent_key"] == current["intent_key"]
                 and old_dist is not None
                 and new_dist is not None
-                and not guidance_blocked
+                and not straight_line_shaping_suppressed
             ):
                 improvement = max(-60.0, min(60.0, old_dist - new_dist))
                 raw_intent_progress = max(
