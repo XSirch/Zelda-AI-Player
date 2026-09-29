@@ -198,6 +198,9 @@ def test_contextual_interaction_probes_one_button_and_learns_success(
 
     assert overridden is True
     assert setpoint.reason == "interaction_probe"
+    assert setpoint.stick_x == 0
+    assert setpoint.stick_y == 0
+    assert executed["stick"] == [0.0, 0.0]
     assert sum(1 for value in executed["buttons"] if value > 0.5) == 1
     probe = dict(controller.pending_interaction_probe)
     assert probe["button"] != "START"
