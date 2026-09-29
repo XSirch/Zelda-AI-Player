@@ -15,7 +15,7 @@
 - RND intrinsic curiosity.
 - Observable reward shaping without a scripted Zelda quest path, including coarse-area dwell pressure rescaled so it remains an anti-loop signal without dominating PPO returns, frontier exploration, stale-waypoint `intent_progress` fadeout, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
 - Native one-shot chest-open telemetry from `FLAG_SCENE_TREASURE`, surfaced as `chest_opened`.
-- Persistent atomic PyTorch training checkpoint plus route graph and immutable completion champions under `.local/ml/champions/`; each new champion freezes both policy and the route-memory snapshot used by evaluation.
+- Persistent atomic PyTorch V3 training checkpoint (`.local/ml/raw-controller-ppo-rnd-v3.pt`) plus route graph and immutable completion champions under `.local/ml/champions/`; the incompatible V2 checkpoint is left untouched and each new champion freezes both policy and route-memory snapshot used by evaluation.
 - High-level `AgentIntent` cognition contract with no skill/action selector.
 - Codex and OpenRouter intent providers.
 - Codex token usage accounting and independent quota polling.
