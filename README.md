@@ -24,7 +24,7 @@ Quando existe guidance forte de navegação, a distribuição de botões também
 
 Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
 
-Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis, priorizando células ainda não visitadas e depois as menos visitadas. Esse frontier vira guidance temporário; nenhum mapa oculto é consultado.
+Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis, priorizando células ainda não visitadas e depois as menos visitadas. Se a mesma scene/room ficar sem expansão por ~20 s e o bridge expuser `scene_exits`, a saída observada passa a ter prioridade sobre continuar varrendo o interior. Se houver uma rota já percorrida até perto da saída, ela é reutilizada; caso contrário o guidance aponta para a própria superfície de transição. Nenhum mapa oculto é consultado.
 
 ### Rotas aprendidas
 
