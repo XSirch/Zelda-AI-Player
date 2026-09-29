@@ -27,6 +27,8 @@ COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
 COGNITION_STUCK_COOLDOWN_S = 180.0
+COGNITION_BLOCKED_AFTER_S = 20.0
+COGNITION_BLOCKED_COOLDOWN_S = 60.0
 
 
 class AutonomyRuntime:
@@ -95,6 +97,8 @@ class AutonomyRuntime:
         self.cognition_seen_dialogue_triggers: set[tuple] = set()
         self.cognition_seen_target_reached: set[tuple] = set()
         self.last_stuck_replan_at = 0.0
+        self.guidance_blocked_since: float | None = None
+        self.last_blocked_replan_at = 0.0
         self.metrics_cache: dict | None = None
         self.metrics_at = 0.0
         self.provider_usage: dict = {"available": False, "windows": []}
@@ -682,6 +686,8 @@ class AutonomyRuntime:
             self.last_cognition_at = 0.0
             self.last_cognition_reasons = []
             self.last_stuck_replan_at = 0.0
+            self.guidance_blocked_since = None
+            self.last_blocked_replan_at = 0.0
             self.recent.clear()
             self.dialogue_transcript.clear()
             self.seen_events = {f"{game.instance_id}:{event.id}" for event in game.events}
@@ -833,9 +839,32 @@ class AutonomyRuntime:
 
             if not self.controller:
                 continue
-            learning = self.controller.telemetry().get("learning", {})
+            telemetry = self.controller.telemetry()
+            learning = telemetry.get("learning", {})
+            guidance = telemetry.get("guidance") or {}
             stuck_age_s, stuck_reason = self._stuck_signal(learning)
             now = time.monotonic()
+
+            hard_blocked = bool(
+                guidance.get("blocked")
+                and not guidance.get("detour")
+                and guidance.get("active")
+            )
+            if hard_blocked:
+                if self.guidance_blocked_since is None:
+                    self.guidance_blocked_since = now
+                blocked_age = now - self.guidance_blocked_since
+                if (
+                    blocked_age >= COGNITION_BLOCKED_AFTER_S
+                    and now - self.last_blocked_replan_at >= COGNITION_BLOCKED_COOLDOWN_S
+                    and now - self.last_cognition_at >= COGNITION_BLOCKED_AFTER_S
+                ):
+                    self.last_blocked_replan_at = now
+                    self._request_cognition("guidance_blocked")
+                    continue
+            else:
+                self.guidance_blocked_since = None
+
             if (
                 stuck_age_s >= COGNITION_STUCK_AFTER_S
                 and now - self.last_stuck_replan_at >= COGNITION_STUCK_COOLDOWN_S
@@ -933,6 +962,7 @@ class AutonomyRuntime:
                     "seconds_since_useful_progress": learning.get(
                         "seconds_since_useful_progress", 0.0
                     ),
+                    "guidance": telemetry.get("guidance"),
                 },
                 ml_learning=compact_learning,
                 world_edges=world_edges,
