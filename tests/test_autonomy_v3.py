@@ -302,8 +302,29 @@ def test_targetless_explore_prioritizes_observed_scene_exit(state):
     assert guidance["exit_index"] == 1
     assert guidance["exit_direct_reachable"] is True
     assert guidance["stick"][1] > 0.95
-    assert guidance["strength"] > 0.8
+    assert guidance["strength"] == pytest.approx(0.92)
+    assert guidance["stuck_scale"] == pytest.approx(1.0)
     assert guidance["button_quiet"] < 0.2
+
+    late_guidance = goal_guidance(
+        state,
+        intent,
+        local_dwell_seconds=400.0,
+        route_hint={
+            "waypoint": (0.0, 0.0, 120.0),
+            "waypoint_id": "exit:85:0:1:10",
+            "path_nodes": 1,
+            "confidence": 1.0,
+            "partial": False,
+            "exit": True,
+            "exit_index": 1,
+            "entrance_index": 10,
+            "exit_position": (0.0, 0.0, 120.0),
+            "direct_reachable": True,
+        },
+    )
+    assert late_guidance["strength"] == pytest.approx(0.92)
+    assert late_guidance["stuck_scale"] == pytest.approx(1.0)
 
 
 def test_goal_guidance_uses_observed_vertical_traversal(state):
