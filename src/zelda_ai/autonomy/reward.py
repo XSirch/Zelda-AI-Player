@@ -731,7 +731,6 @@ class RewardTracker:
                         self.seen_route_waypoints.add(waypoint_id)
                         b["route_waypoint"] = 0.12
 
-        route_waypoint_progress = self.route_waypoint_advanced
         major_progress_keys = {
             "new_world_transition",
             "durable_progress",
@@ -789,17 +788,6 @@ class RewardTracker:
             # expansion or useful game progress. Circling through already-known
             # nearby regions does not buy another frontier reward cycle.
             self._reset_local_pressure(current, now_s)
-        elif route_waypoint_progress:
-            # Reaching a new learned-route node proves the bot is advancing
-            # along an acyclic observed path, so reset dwell age without
-            # resetting frontier radius/anchor and accidentally farming it.
-            self.local_progress_at = now_s
-            self.local_dwell_seconds = 0.0
-            self.local_dwell_penalty = 0.0
-            self.local_anchor_distance = math.dist(
-                current_position,
-                self.local_anchor_position,
-            )
         else:
             self.local_anchor_distance = math.dist(
                 current_position,
