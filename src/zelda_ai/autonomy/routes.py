@@ -53,10 +53,8 @@ class LearnedRouteGraph:
         self.last_position: tuple[float, float, float] | None = None
         self.last_scene_room: tuple[int, int] | None = None
         self.dirty = False
-        self.new_edges_since_save = 0
         self.revision = 0
         self.last_failed_search: tuple[str, str, int] | None = None
-        self.last_save_at = 0.0
         self.routes_reused = 0
         self.active_target_signature: str | None = None
         self.active_target_node_id: str | None = None
@@ -202,7 +200,6 @@ class LearnedRouteGraph:
                         "traversals": 1,
                         "updated_at": now_s,
                     }
-                    self.new_edges_since_save += 1
                     self.revision += 1
                     self.last_failed_search = None
                     edge_added = True
@@ -220,18 +217,10 @@ class LearnedRouteGraph:
         self.last_scene_room = scene_room
         return edge_added
 
-    def should_save(self, *, now_s: float | None = None) -> bool:
-        if not self.writable or not self.dirty:
-            return False
-        now_s = time.time() if now_s is None else float(now_s)
-        return self.new_edges_since_save >= 16 or now_s - self.last_save_at >= 20.0
-
     def save(self, *, force: bool = False):
         if not self.writable:
             return
         if not self.dirty and (not force or self.path.is_file()):
-            return
-        if not force and not self.should_save():
             return
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
@@ -249,8 +238,6 @@ class LearnedRouteGraph:
         )
         os.replace(temporary, self.path)
         self.dirty = False
-        self.new_edges_since_save = 0
-        self.last_save_at = time.time()
 
     def _nearest_node(self, scene: int, room: int, position, radius: float):
         candidates = self.by_scene.get((int(scene), int(room))) or ()
