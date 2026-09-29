@@ -127,13 +127,19 @@ def test_route_graph_isolates_age_and_mirrored_world(tmp_path, state):
         (160.0, 0.0, 0.0),
     ) is not None
 
+    before_edges = graph.stats()["edges"]
+
     adult = _at(state, (0.0, 0.0, 0.0), 403)
     adult.player.age = "adult"
     assert graph.next_waypoint(adult, (160.0, 0.0, 0.0)) is None
+    graph.observe(adult, now_s=3.0)
+    assert graph.stats()["edges"] == before_edges
 
     mirrored = _at(state, (0.0, 0.0, 0.0), 404)
     mirrored.mirrored_world = True
     assert graph.next_waypoint(mirrored, (160.0, 0.0, 0.0)) is None
+    graph.observe(mirrored, now_s=4.0)
+    assert graph.stats()["edges"] == before_edges
 
 
 def test_read_only_route_graph_never_learns_or_writes(tmp_path, state):
