@@ -59,6 +59,7 @@ class ContinuousController:
         rollout_size: int = 256,
         on_achievement: Callable[[dict], None] | None = None,
         training_enabled: bool = True,
+        route_graph_path: Path | None = None,
     ):
         self.bridge = bridge
         self.policy = OnlinePPO(
@@ -71,7 +72,7 @@ class ContinuousController:
         self.on_achievement = on_achievement
         self.training_enabled = training_enabled
         self.route_graph = LearnedRouteGraph(
-            checkpoint.parent / "route-graph-v1.json",
+            route_graph_path or checkpoint.parent / "route-graph-v1.json",
             writable=training_enabled,
         )
         self.intent = AgentIntent.bootstrap()
