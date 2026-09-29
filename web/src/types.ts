@@ -209,6 +209,7 @@ export interface MotorGuidance {
   route_confidence?: number;
   route_target_gap?: number | null;
   route_waypoint?: number[] | null;
+  route_partial?: boolean;
 }
 
 export interface Snapshot {
