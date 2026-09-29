@@ -40,6 +40,8 @@ Experience ──► reward + RND curiosity ──► PPO learner thread
 
 The policy receives four structured frames, left-padded at episode start. It is not told semantic button meanings. When cognition supplies an observed target/actor/direction, `goal_guidance()` projects that objective into camera-relative stick space and adds it as prior concentration to the same Beta action distribution. PPO therefore learns residual corrections around an actionable goal rather than learning the camera transform from scratch.
 
+Route memory is a second, empirical navigation layer. `LearnedRouteGraph` quantizes only positions Link actually occupies, stores only directed transitions Link actually traverses, and persists them in `.local/ml/route-graph-v1.json`. When a current structured target is close to a previously visited node, a cached shortest-path query over this observed graph yields an intermediate learned waypoint. The guidance prior still collision-checks that waypoint locally. No reverse edge, hidden collision map or Zelda route is inferred.
+
 ### Waypoint completion
 
 Movement intents with structured targets are monitored against observed player position. Reaching the waypoint emits a deduplicated `intent_target_reached` strategic trigger; cognition then selects the next observed waypoint instead of leaving a stale point active. Interaction intents are not considered complete merely by proximity.
@@ -66,17 +68,18 @@ There is no forced Kokiri/Saria/Mido route. Milestones such as Kokiri Sword or s
 
 Long-horizon anti-loop shaping is separate from per-step stagnation. The tracker remembers coarse 500×160×500 scene/room macro-regions. After 60 seconds without a previously unseen macro-region or meaningful game progress, `local_dwell` becomes negative and ramps to roughly -0.35/action over the next 180 seconds. Fine-cell movement and revisits do not reset this timer, so walking circles remains costly. The same dwell age can trigger sparse cognition's `local_area_stuck` path after 90 seconds, subject to the existing 180-second stuck cooldown.
 
-Reward v5 adds a directional, game-generic exploration signal: `frontier_progress` only pays when Link sets a new maximum radius from the current local exploration anchor, and a first visit to a new coarse macro-region pays `new_macro_region`. Returning/circling at an already achieved radius cannot farm this reward. Observed intent-target distance shaping is also stronger, so a real target supplied by cognition provides a dense potential signal without encoding a Zelda route.
+Reward v6 adds a directional, game-generic exploration signal: `frontier_progress` only pays when Link sets a new maximum radius from the current local exploration anchor, and a first visit to a new coarse macro-region pays `new_macro_region`. Returning/circling at an already achieved radius cannot farm this reward. Straight-line target-distance shaping fades for stale targets and is disabled while collision detours or learned routes are active, because a correct path around an obstacle may temporarily increase Euclidean distance.
 
-Reward v5 also treats resource collection as observable state change rather than pickup intent: positive rupee/ammo/health/magic deltas earn small bounded rewards; unchanged values earn zero, which naturally suppresses pickups attempted at full capacity. New persistent inventory items remain on the stronger objective-milestone path. Native `FLAG_SCENE_TREASURE` transitions are surfaced as one-shot `chest_opened` events and rewarded separately from their contents.
+Reward v6 also treats resource collection as observable state change rather than pickup intent: positive rupee/ammo/health/magic deltas earn small bounded rewards; unchanged values earn zero, which naturally suppresses pickups attempted at full capacity. New persistent inventory items remain on the stronger objective-milestone path. Native `FLAG_SCENE_TREASURE` transitions are surfaced as one-shot `chest_opened` events and rewarded separately from their contents.
 
 ## Persistence
 
 - SQLAlchemy stores runs, calls, events, memories and empirically observed world edges.
 - Training weights/optimizer/RND state persist in `.local/ml/raw-controller-ppo-rnd-v2.pt`.
-- On a training `game_completed`, the runtime first waits for queued/in-flight PPO work and the final partial rollout to settle, then snapshots the resulting checkpoint under `.local/ml/champions/completion-XXXX.pt`.
-- Completion snapshots are immutable and have JSON metadata + SHA-256. `best-completion.pt` is a mutable convenience alias for the shortest observed completed run; the default evaluation candidate is the latest completion because it usually contains the newest training.
-- Evaluation loads a champion with strict checkpoint validation, disables all PPO/RND optimization and checkpoint writes, and uses deterministic actor actions (Beta mean for stick; Bernoulli probability threshold for buttons).
+- Directed route memory persists separately in `.local/ml/route-graph-v1.json`; it changes navigation behaviour without changing the PPO network shape.
+- On a training `game_completed`, the runtime first waits for queued/in-flight PPO work and the final partial rollout to settle, then snapshots the resulting checkpoint under `.local/ml/champions/completion-XXXX.pt` and route memory under `completion-XXXX.routes.json`, each with its own SHA-256.
+- Completion snapshots are immutable. `best-completion.pt` / `best-completion.routes.json` are mutable convenience aliases for the shortest observed completed run; the default evaluation candidate is the latest completion because it usually contains the newest training.
+- Evaluation loads both frozen artifacts, disables all PPO/RND optimization and route-memory writes, and uses deterministic actor actions (Beta mean for stick; Bernoulli probability threshold for buttons).
 - Checkpoint writes/copies use temporary-file replacement.
 - Existing SQLite tables from older versions may remain in an old database, but Autonomy V3 code no longer reads/writes skill trajectories or heuristic combat profiles.
 
