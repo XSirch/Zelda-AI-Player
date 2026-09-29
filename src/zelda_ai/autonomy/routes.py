@@ -210,7 +210,9 @@ class LearnedRouteGraph:
         return self.new_edges_since_save >= 16 or now_s - self.last_save_at >= 20.0
 
     def save(self, *, force: bool = False):
-        if not self.writable or not self.dirty:
+        if not self.writable:
+            return
+        if not self.dirty and (not force or self.path.is_file()):
             return
         if not force and not self.should_save():
             return
