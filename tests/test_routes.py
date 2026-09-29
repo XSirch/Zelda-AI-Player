@@ -66,6 +66,37 @@ def test_route_graph_reuses_partial_path_toward_unvisited_target(tmp_path, state
     assert hint["waypoint"][0] > 100.0
 
 
+def test_partial_route_is_not_replayed_until_graph_extends(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    positions = [
+        (0.0, 0.0, 0.0),
+        (80.0, 0.0, 0.0),
+        (160.0, 0.0, 0.0),
+    ]
+    for index, position in enumerate(positions, start=1):
+        graph.observe(_at(state, position, 500 + index), now_s=float(index))
+
+    target = (500.0, 0.0, 0.0)
+    start = _at(state, positions[0], 510)
+    first = graph.next_waypoint(start, target)
+    assert first is not None and first["partial"] is True
+
+    # Once the bot reaches the end of the known partial branch, that whole
+    # prefix is exhausted for this target instead of becoming a magnet.
+    endpoint = _at(state, positions[-1], 511)
+    assert graph.next_waypoint(endpoint, target) is None
+    assert graph.stats()["exhausted_partial_nodes"] >= len(positions)
+    assert graph.next_waypoint(start, target) is None
+
+    # A genuinely new observed continuation changes graph revision and makes
+    # the branch eligible again because it now reaches farther.
+    graph.observe(_at(state, (240.0, 0.0, 0.0), 512), now_s=10.0)
+    extended = graph.next_waypoint(start, target)
+    assert extended is not None
+    assert extended["partial"] is True
+    assert extended["target_gap"] < first["target_gap"]
+
+
 def test_route_graph_does_not_invent_reverse_or_unobserved_edges(tmp_path, state):
     graph = LearnedRouteGraph(tmp_path / "routes.json")
     positions = [
