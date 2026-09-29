@@ -358,6 +358,12 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     champion_path = tmp_path / "ml" / "champions" / "completion-0001.pt"
     assert champion_path.is_file()
     frozen_bytes = champion_path.read_bytes()
+    assert champion["route_graph_file"] == "completion-0001.routes.json"
+    champion_routes = (
+        tmp_path / "ml" / "champions" / champion["route_graph_file"]
+    )
+    assert champion_routes.is_file()
+    frozen_route_bytes = champion_routes.read_bytes()
 
     evaluation_provider = CountingCognition()
     runtime.providers["codex"] = evaluation_provider
@@ -371,6 +377,8 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     assert runtime.config.champion_id == "completion-0001"
     assert runtime.controller.training_enabled is False
     assert runtime.controller.policy.checkpoint == champion_path
+    assert runtime.controller.route_graph.writable is False
+    assert runtime.controller.route_graph.path == champion_routes
     snapshot = runtime.snapshot()
     assert snapshot["run_mode"] == "evaluation"
     assert snapshot["active_champion"]["id"] == "completion-0001"
@@ -380,6 +388,7 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     await asyncio.sleep(0.2)
     await runtime.control("stop")
     assert champion_path.read_bytes() == frozen_bytes
+    assert champion_routes.read_bytes() == frozen_route_bytes
 
 
 @pytest.mark.asyncio
