@@ -183,7 +183,10 @@ class LearnedRouteGraph:
             and node_id in self.nodes
             and self.last_node_id != node_id
         ):
-            distance = _distance(self.last_position, position)
+            distance = _distance(
+                self.nodes[self.last_node_id]["position"],
+                self.nodes[node_id]["position"],
+            )
             if 1.0 <= distance <= ROUTE_MAX_EDGE_DISTANCE:
                 bucket = self.edges.setdefault(self.last_node_id, {})
                 edge = bucket.get(node_id)
