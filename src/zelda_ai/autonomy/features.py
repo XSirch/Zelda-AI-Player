@@ -209,6 +209,7 @@ def goal_guidance(
             "target": None,
             "blocked": False,
             "detour": None,
+            "direct_probe": None,
             "stuck_scale": 1.0,
         }
 
