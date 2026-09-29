@@ -215,6 +215,21 @@ class OnlinePPO:
     def _actor_tensor(self, observation: list[float]):
         return torch.tensor(observation, dtype=torch.float32, device=self.actor_device)
 
+    def _exploration_coefficients(self) -> tuple[float, float, float]:
+        decay = min(
+            1.0,
+            self.samples_trained / float(self.exploration_decay_samples),
+        )
+        stick_entropy_coef = (
+            self.stick_entropy_start
+            + (self.stick_entropy_end - self.stick_entropy_start) * decay
+        )
+        button_entropy_coef = (
+            self.button_entropy_start
+            + (self.button_entropy_end - self.button_entropy_start) * decay
+        )
+        return stick_entropy_coef, button_entropy_coef, decay
+
     def sample(
         self,
         observation: list[float],
@@ -416,18 +431,11 @@ class OnlinePPO:
         advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-6)
 
         count = len(rollout)
-        decay = min(
-            1.0,
-            self.samples_trained / float(self.exploration_decay_samples),
-        )
-        stick_entropy_coef = (
-            self.stick_entropy_start
-            + (self.stick_entropy_end - self.stick_entropy_start) * decay
-        )
-        button_entropy_coef = (
-            self.button_entropy_start
-            + (self.button_entropy_end - self.button_entropy_start) * decay
-        )
+        (
+            stick_entropy_coef,
+            button_entropy_coef,
+            decay,
+        ) = self._exploration_coefficients()
         last_policy_loss = last_value_loss = 0.0
         last_stick_entropy = last_button_entropy = 0.0
         last_button_probability_mean = 0.0
@@ -573,6 +581,11 @@ class OnlinePPO:
         self.samples_trained = int(payload.get("samples_trained") or 0)
 
     def stats(self) -> dict:
+        (
+            current_stick_entropy_coef,
+            current_button_entropy_coef,
+            exploration_decay,
+        ) = self._exploration_coefficients()
         return {
             "learner_device": str(self.learner_device),
             "actor_device": str(self.actor_device),
@@ -582,5 +595,14 @@ class OnlinePPO:
             "rnd_error_ema": round(self.rnd_error_ema, 8) if self.rnd_error_ema is not None else None,
             "rnd_last_error": round(self.last_intrinsic_error, 8),
             "rnd_last_novelty": round(self.last_intrinsic_reward, 6),
+            "current_stick_entropy_coef": round(
+                current_stick_entropy_coef,
+                8,
+            ),
+            "current_button_entropy_coef": round(
+                current_button_entropy_coef,
+                8,
+            ),
+            "exploration_decay": round(exploration_decay, 6),
             **self.last_stats,
         }
