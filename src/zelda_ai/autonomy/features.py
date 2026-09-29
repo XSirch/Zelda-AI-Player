@@ -318,16 +318,21 @@ def goal_guidance(
                     stick = detour_stick
                     source = f"{source}:detour:{detour}"
 
-        base_strength = (
-            0.82
-            if route_active
-            else {
+        if route_active:
+            # A route observed once is useful evidence, not certainty. Repeated
+            # successful traversal raises confidence and therefore steering
+            # authority. Partial routes stay deliberately weaker so a frontier
+            # guess cannot become another hard attractor.
+            base_strength = (
+                0.52 + 0.30 * route_confidence
+            ) * (0.75 if route_partial else 1.0)
+        else:
+            base_strength = {
                 "navigate": 0.86,
                 "interact": 0.78,
                 "explore": 0.74,
                 "observe": 0.62,
             }.get(intent.mode, 0.68)
-        )
         # Fade the steering prior near the waypoint so learned interaction/
         # traversal behaviour can take over instead of orbiting the point.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
