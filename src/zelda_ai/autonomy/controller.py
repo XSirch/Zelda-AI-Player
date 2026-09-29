@@ -94,6 +94,9 @@ class ContinuousController:
         self.total_reward = 0.0
         self.last_reward = 0.0
         self.last_reward_breakdown: dict[str, float] = {}
+        self.last_button_probability_mean = 0.0
+        self.last_expected_button_count = 0.0
+        self.last_guidance_mix = 0.0
         self.reward_window = deque(maxlen=200)
         self.useful_progress_window = deque(maxlen=200)
         self.last_useful_progress_at = time.monotonic()
@@ -119,6 +122,8 @@ class ContinuousController:
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "frontier_active": False,
+            "frontier_direction": None,
         }
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
@@ -152,9 +157,14 @@ class ContinuousController:
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "frontier_active": False,
+            "frontier_direction": None,
         }
         self.last_reward = 0.0
         self.last_reward_breakdown = {}
+        self.last_button_probability_mean = 0.0
+        self.last_expected_button_count = 0.0
+        self.last_guidance_mix = 0.0
         self.reward_window.clear()
         self.useful_progress_window.clear()
         self.last_useful_progress_at = time.monotonic()
@@ -187,6 +197,8 @@ class ContinuousController:
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "frontier_active": False,
+            "frontier_direction": None,
         }
         self.last_motor_summary = "Controller input revoked; no buttons are being held."
 
@@ -308,14 +320,18 @@ class ContinuousController:
             self._enqueue_rollout(observation, done=reward.done)
 
         final_target = target_point(game, self.intent)
-        route_hint = (
-            self.route_graph.next_waypoint(game, final_target)
-            if (
-                final_target is not None
-                and self.intent.mode in {"navigate", "explore", "observe"}
+        if (
+            final_target is not None
+            and self.intent.mode in {"navigate", "explore", "observe"}
+        ):
+            route_hint = self.route_graph.next_waypoint(
+                game,
+                final_target,
             )
-            else None
-        )
+        elif self.intent.mode == "explore":
+            route_hint = self.route_graph.exploration_waypoint(game)
+        else:
+            route_hint = None
         guidance = goal_guidance(
             game,
             self.intent,
@@ -327,10 +343,20 @@ class ContinuousController:
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
         self.last_buttons = tuple(sample["buttons"])
+        self.last_button_probability_mean = float(
+            sample.get("button_probability_mean") or 0.0
+        )
+        self.last_expected_button_count = float(
+            sample.get("expected_button_count") or 0.0
+        )
+        self.last_guidance_mix = float(
+            sample.get("guidance_strength") or 0.0
+        )
         self.pending = {
             "observation": observation,
             "novelty_observation": novelty_observation,
             "stick": list(sample["stick"]),
+            "policy_stick": list(sample.get("policy_stick", sample["stick"])),
             "buttons": list(sample["buttons"]),
             "log_prob": sample["log_prob"],
             "value": sample["value"],
@@ -356,7 +382,7 @@ class ContinuousController:
             guidance_text = (
                 f" Goal guidance {guidance.get('source')}: "
                 f"({guidance['stick'][0]:+.2f}, {guidance['stick'][1]:+.2f}) "
-                f"strength {guidance['strength']:.2f}{distance_text}."
+                f"mix {sample.get('guidance_strength', 0.0):.2f}{distance_text}."
             )
         self.last_motor_summary = (
             f"ML policy sampled raw controller: stick "
@@ -564,6 +590,15 @@ class ContinuousController:
                     sum(1 for value in self.reward_window if value > 0) / len(self.reward_window),
                     4,
                 ) if self.reward_window else 0.0,
+                "button_probability_mean": round(
+                    self.last_button_probability_mean,
+                    6,
+                ),
+                "expected_button_count": round(
+                    self.last_expected_button_count,
+                    6,
+                ),
+                "guidance_mix": round(self.last_guidance_mix, 6),
                 "useful_progress_rate": round(
                     sum(1 for value in self.useful_progress_window if value)
                     / len(self.useful_progress_window),

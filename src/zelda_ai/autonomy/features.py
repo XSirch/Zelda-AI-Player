@@ -219,6 +219,8 @@ def goal_guidance(
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "frontier_active": False,
+            "frontier_direction": None,
         }
 
     point = target_point(game, intent)
@@ -235,6 +237,8 @@ def goal_guidance(
     route_waypoint = None
     route_waypoint_id = None
     route_partial = False
+    frontier_active = False
+    frontier_direction = None
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
@@ -254,10 +258,10 @@ def goal_guidance(
                 source = f"traversal:{affordance.kind}:target"
 
     if (
-        point is not None
-        and route_hint
+        route_hint
         and intent.mode in {"navigate", "explore", "observe"}
         and not source.startswith("traversal:")
+        and (point is not None or bool(route_hint.get("frontier")))
     ):
         waypoint = route_hint.get("waypoint")
         if (
@@ -265,7 +269,14 @@ def goal_guidance(
             and len(waypoint) == 3
             and all(isinstance(value, (int, float)) and math.isfinite(value) for value in waypoint)
         ):
-            route_active = True
+            is_frontier = bool(route_hint.get("frontier"))
+            route_active = not is_frontier
+            frontier_active = is_frontier
+            frontier_direction = (
+                str(route_hint.get("direction"))[:32]
+                if is_frontier and route_hint.get("direction") is not None
+                else None
+            )
             route_waypoint = tuple(float(value) for value in waypoint)
             waypoint_id = route_hint.get("waypoint_id")
             route_waypoint_id = (
@@ -274,7 +285,7 @@ def goal_guidance(
                 else None
             )
             point = route_waypoint
-            source = "learned_route"
+            source = "observed_frontier" if is_frontier else "learned_route"
             route_path_nodes = max(0, int(route_hint.get("path_nodes") or 0))
             route_confidence = max(
                 0.0, min(1.0, float(route_hint.get("confidence") or 0.0))
@@ -319,13 +330,15 @@ def goal_guidance(
                     source = f"{source}:detour:{detour}"
 
         if route_active:
-            # A route observed once is useful evidence, not certainty. Repeated
-            # successful traversal raises confidence and therefore steering
-            # authority. Partial routes stay deliberately weaker so a frontier
-            # guess cannot become another hard attractor.
+            # A route actually traversed by Link should be authoritative enough
+            # to replay, while still leaving a residual channel for corrections.
             base_strength = (
-                0.52 + 0.30 * route_confidence
-            ) * (0.75 if route_partial else 1.0)
+                0.78 + 0.16 * route_confidence
+            ) * (0.85 if route_partial else 1.0)
+        elif frontier_active:
+            # Targetless exploration should still have a stable local heading.
+            # The waypoint comes from an observed open probe, not hidden map data.
+            base_strength = 0.80
         else:
             base_strength = {
                 "navigate": 0.86,
@@ -369,6 +382,8 @@ def goal_guidance(
             "route_waypoint": route_waypoint,
             "route_waypoint_id": route_waypoint_id,
             "route_partial": route_partial,
+            "frontier_active": frontier_active,
+            "frontier_direction": frontier_direction,
         }
 
     direction_sticks = {
@@ -403,6 +418,8 @@ def goal_guidance(
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "frontier_active": False,
+            "frontier_direction": None,
         }
 
     return {
@@ -424,6 +441,8 @@ def goal_guidance(
         "route_waypoint": None,
         "route_waypoint_id": None,
         "route_partial": False,
+        "frontier_active": False,
+        "frontier_direction": None,
     }
 
 def encode_state(

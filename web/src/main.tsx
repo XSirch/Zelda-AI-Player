@@ -95,6 +95,9 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
           {thought.guidance.route_active
             ? ` · rota aprendida${thought.guidance.route_partial ? ' parcial' : ''} ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%`
             : ''}
+          {thought.guidance.frontier_active
+            ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}`
+            : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
         </strong>
       </div>}
@@ -186,6 +189,9 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const exploration = learning?.exploration;
   const resources = learning?.resources;
   const routeMemory = learning?.route_memory;
+  const expectedButtons = learning?.expected_button_count ?? 0;
+  const guidanceMix = learning?.guidance_mix ?? 0;
+  const explorationDecay = learning?.exploration_decay ?? 0;
   const rewardBreakdown = Object.entries(learning?.reward_breakdown ?? {})
     .filter(([, value]) => value !== 0)
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
@@ -235,6 +241,9 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
       <span><b>+{resources?.ammo_collected ?? 0}</b> ammo</span>
       <span><b>+{Math.round((resources?.health_recovered ?? 0) / 16 * 10) / 10}</b> corações</span>
       <span><b>+{resources?.magic_recovered ?? 0}</b> magic</span>
+      <span>
+        PPO <b>{expectedButtons.toFixed(2)}</b> botões esperados · guidance <b>{Math.round(guidanceMix * 100)}%</b> · exploração <b>{Math.round((1 - explorationDecay) * 100)}%</b>
+      </span>
     </div>
     <div className="learning-body">
       <div className="achievements">

@@ -18,7 +18,7 @@ else:
 
 from .features import BUTTON_NAMES, FEATURE_DIM
 
-CHECKPOINT_VERSION = 2
+CHECKPOINT_VERSION = 3
 
 
 def require_torch():
@@ -49,25 +49,18 @@ class HybridActorCritic(nn.Module if nn is not None else object):
     def distributions(
         self,
         observations,
-        guidance_stick=None,
-        guidance_strength=None,
+        *,
         button_quiet_strength=None,
     ):
         latent = self.trunk(observations)
+        # V3 learns a residual stick policy. Structured goal/route guidance is
+        # mixed with that residual outside the distribution, so a mature network
+        # cannot numerically overpower navigation guidance by driving Beta
+        # concentration arbitrarily high.
         alpha = torch.nn.functional.softplus(self.stick_alpha(latent)) + 1.05
         beta = torch.nn.functional.softplus(self.stick_beta(latent)) + 1.05
-
-        # Goal-conditioned steering is expressed as a prior on the same Beta
-        # distribution PPO samples from. This keeps behaviour-policy log-probs
-        # correct while letting the learned network supply residual corrections.
-        if guidance_stick is not None and guidance_strength is not None:
-            prior01 = ((guidance_stick + 1.0) * 0.5).clamp(0.001, 0.999)
-            strength = guidance_strength.reshape(-1, 1).clamp(0.0, 1.0)
-            prior_concentration = strength * 10.0
-            alpha = alpha + prior01 * prior_concentration
-            beta = beta + (1.0 - prior01) * prior_concentration
-
         stick_dist = Beta(alpha, beta)
+
         button_logits = self.button_logits(latent)
         if button_quiet_strength is not None:
             quiet = button_quiet_strength.reshape(-1, 1).clamp(0.0, 1.0)
@@ -79,22 +72,29 @@ class HybridActorCritic(nn.Module if nn is not None else object):
     def evaluate(
         self,
         observations,
-        stick_unit,
+        policy_stick_unit,
         buttons,
-        guidance_stick=None,
-        guidance_strength=None,
+        *,
         button_quiet_strength=None,
     ):
         stick_dist, button_dist, value, button_logits = self.distributions(
             observations,
-            guidance_stick=guidance_stick,
-            guidance_strength=guidance_strength,
             button_quiet_strength=button_quiet_strength,
         )
-        stick01 = ((stick_unit + 1.0) * 0.5).clamp(1e-5, 1.0 - 1e-5)
-        log_prob = stick_dist.log_prob(stick01).sum(-1) + button_dist.log_prob(buttons).sum(-1)
-        entropy = stick_dist.entropy().sum(-1) + button_dist.entropy().sum(-1)
-        return log_prob, entropy, value, button_logits
+        stick01 = ((policy_stick_unit + 1.0) * 0.5).clamp(1e-5, 1.0 - 1e-5)
+        log_prob = (
+            stick_dist.log_prob(stick01).sum(-1)
+            + button_dist.log_prob(buttons).sum(-1)
+        )
+        stick_entropy = stick_dist.entropy().sum(-1)
+        button_entropy = button_dist.entropy().sum(-1)
+        return (
+            log_prob,
+            stick_entropy,
+            button_entropy,
+            value,
+            button_logits,
+        )
 
 
 class RNDNetwork(nn.Module if nn is not None else object):
@@ -130,7 +130,12 @@ class OnlinePPO:
         gamma: float = 0.995,
         gae_lambda: float = 0.95,
         clip_ratio: float = 0.18,
-        entropy_coef: float = 0.012,
+        stick_entropy_start: float = 0.003,
+        stick_entropy_end: float = 0.0003,
+        button_entropy_start: float = 0.001,
+        button_entropy_end: float = 0.0,
+        exploration_decay_samples: int = 50_000,
+        button_activity_coef: float = 0.003,
         value_coef: float = 0.5,
         epochs: int = 4,
         minibatch_size: int = 64,
@@ -146,7 +151,12 @@ class OnlinePPO:
         self.gamma = gamma
         self.gae_lambda = gae_lambda
         self.clip_ratio = clip_ratio
-        self.entropy_coef = entropy_coef
+        self.stick_entropy_start = float(stick_entropy_start)
+        self.stick_entropy_end = float(stick_entropy_end)
+        self.button_entropy_start = float(button_entropy_start)
+        self.button_entropy_end = float(button_entropy_end)
+        self.exploration_decay_samples = max(1, int(exploration_decay_samples))
+        self.button_activity_coef = float(button_activity_coef)
         self.value_coef = value_coef
         self.epochs = epochs
         self.minibatch_size = minibatch_size
@@ -205,6 +215,21 @@ class OnlinePPO:
     def _actor_tensor(self, observation: list[float]):
         return torch.tensor(observation, dtype=torch.float32, device=self.actor_device)
 
+    def _exploration_coefficients(self) -> tuple[float, float, float]:
+        decay = min(
+            1.0,
+            self.samples_trained / float(self.exploration_decay_samples),
+        )
+        stick_entropy_coef = (
+            self.stick_entropy_start
+            + (self.stick_entropy_end - self.stick_entropy_start) * decay
+        )
+        button_entropy_coef = (
+            self.button_entropy_start
+            + (self.button_entropy_end - self.button_entropy_start) * decay
+        )
+        return stick_entropy_coef, button_entropy_coef, decay
+
     def sample(
         self,
         observation: list[float],
@@ -216,20 +241,7 @@ class OnlinePPO:
     ) -> dict:
         with self.actor_lock, torch.inference_mode():
             obs = self._actor_tensor(observation).unsqueeze(0)
-            guidance_tensor = None
-            strength_tensor = None
             quiet_tensor = None
-            if guidance_stick is not None and guidance_strength > 0.0:
-                guidance_tensor = torch.tensor(
-                    [guidance_stick],
-                    dtype=torch.float32,
-                    device=self.actor_device,
-                )
-                strength_tensor = torch.tensor(
-                    [guidance_strength],
-                    dtype=torch.float32,
-                    device=self.actor_device,
-                )
             if button_quiet_strength > 0.0:
                 quiet_tensor = torch.tensor(
                     [button_quiet_strength],
@@ -238,8 +250,6 @@ class OnlinePPO:
                 )
             stick_dist, button_dist, value, button_logits = self.actor.distributions(
                 obs,
-                guidance_stick=guidance_tensor,
-                guidance_strength=strength_tensor,
                 button_quiet_strength=quiet_tensor,
             )
             if deterministic:
@@ -250,18 +260,51 @@ class OnlinePPO:
             else:
                 sampled01 = stick_dist.sample()
                 buttons = button_dist.sample()
-            sampled = sampled01 * 2.0 - 1.0
-            # Quantize first so PPO trains on the exact N64 stick values that
-            # Bridge.send will deliver, not on an unobservable pre-rounding action.
-            stick = torch.round(sampled * 80.0) / 80.0
-            executed01 = ((stick + 1.0) * 0.5).clamp(1e-5, 1.0 - 1e-5)
+
+            residual = sampled01 * 2.0 - 1.0
+            # Quantize the latent residual before computing its log-prob. PPO is
+            # trained on this exact sampled latent action. The N64 action sent to
+            # the game is a deterministic transform of residual + guidance.
+            policy_stick = torch.round(residual * 80.0) / 80.0
+            policy01 = ((policy_stick + 1.0) * 0.5).clamp(
+                1e-5, 1.0 - 1e-5
+            )
+
+            mix = 0.0
+            executed = policy_stick
+            if guidance_stick is not None and guidance_strength > 0.0:
+                mix = max(0.0, min(1.0, float(guidance_strength)))
+                guidance_tensor = torch.tensor(
+                    [guidance_stick],
+                    dtype=torch.float32,
+                    device=self.actor_device,
+                ).clamp(-1.0, 1.0)
+                executed = (
+                    policy_stick * (1.0 - mix)
+                    + guidance_tensor * mix
+                ).clamp(-1.0, 1.0)
+
+            # Quantize only after mixing so telemetry and training reflect the
+            # exact stick delivered to Bridge.send.
+            stick = torch.round(executed * 80.0) / 80.0
             log_prob = (
-                stick_dist.log_prob(executed01).sum(-1)
+                stick_dist.log_prob(policy01).sum(-1)
                 + button_dist.log_prob(buttons).sum(-1)
             )
+            button_probabilities = torch.sigmoid(button_logits)
             return {
-                "stick": [float(v) for v in stick.squeeze(0).detach().cpu().tolist()],
-                "buttons": [float(v) for v in buttons.squeeze(0).detach().cpu().tolist()],
+                "stick": [
+                    float(v)
+                    for v in stick.squeeze(0).detach().cpu().tolist()
+                ],
+                "policy_stick": [
+                    float(v)
+                    for v in policy_stick.squeeze(0).detach().cpu().tolist()
+                ],
+                "buttons": [
+                    float(v)
+                    for v in buttons.squeeze(0).detach().cpu().tolist()
+                ],
                 "log_prob": float(log_prob.item()),
                 "value": float(value.item()),
                 "guidance_stick": (
@@ -269,8 +312,14 @@ class OnlinePPO:
                     if guidance_stick is not None
                     else [0.0, 0.0]
                 ),
-                "guidance_strength": float(guidance_strength),
+                "guidance_strength": float(mix),
                 "button_quiet_strength": float(button_quiet_strength),
+                "button_probability_mean": float(
+                    button_probabilities.mean().item()
+                ),
+                "expected_button_count": float(
+                    button_probabilities.sum().item()
+                ),
             }
 
     def actor_value(self, observation: list[float]) -> float:
@@ -334,21 +383,16 @@ class OnlinePPO:
             dtype=torch.float32,
             device=self.learner_device,
         )
-        sticks = torch.tensor(
-            [row["stick"] for row in rollout], dtype=torch.float32, device=self.learner_device
+        policy_sticks = torch.tensor(
+            [
+                row.get("policy_stick", row["stick"])
+                for row in rollout
+            ],
+            dtype=torch.float32,
+            device=self.learner_device,
         )
         buttons = torch.tensor(
             [row["buttons"] for row in rollout], dtype=torch.float32, device=self.learner_device
-        )
-        guidance_sticks = torch.tensor(
-            [row.get("guidance_stick", [0.0, 0.0]) for row in rollout],
-            dtype=torch.float32,
-            device=self.learner_device,
-        )
-        guidance_strengths = torch.tensor(
-            [row.get("guidance_strength", 0.0) for row in rollout],
-            dtype=torch.float32,
-            device=self.learner_device,
         )
         button_quiet_strengths = torch.tensor(
             [row.get("button_quiet_strength", 0.0) for row in rollout],
@@ -387,17 +431,29 @@ class OnlinePPO:
         advantages = (advantages - advantages.mean()) / (advantages.std(unbiased=False) + 1e-6)
 
         count = len(rollout)
-        last_policy_loss = last_value_loss = last_entropy = 0.0
+        (
+            stick_entropy_coef,
+            button_entropy_coef,
+            decay,
+        ) = self._exploration_coefficients()
+        last_policy_loss = last_value_loss = 0.0
+        last_stick_entropy = last_button_entropy = 0.0
+        last_button_probability_mean = 0.0
+        last_expected_button_count = 0.0
         for _ in range(self.epochs):
             permutation = torch.randperm(count, device=self.learner_device)
             for start in range(0, count, self.minibatch_size):
                 batch = permutation[start:start + self.minibatch_size]
-                new_log_probs, entropy, values, button_logits = self.learner.evaluate(
+                (
+                    new_log_probs,
+                    stick_entropy,
+                    button_entropy,
+                    values,
+                    button_logits,
+                ) = self.learner.evaluate(
                     observations[batch],
-                    sticks[batch],
+                    policy_sticks[batch],
                     buttons[batch],
-                    guidance_stick=guidance_sticks[batch],
-                    guidance_strength=guidance_strengths[batch],
                     button_quiet_strength=button_quiet_strengths[batch],
                 )
                 ratio = torch.exp(new_log_probs - old_log_probs[batch])
@@ -407,13 +463,16 @@ class OnlinePPO:
                 ) * advantages[batch]
                 policy_loss = -torch.min(unclipped, clipped).mean()
                 value_loss = torch.nn.functional.smooth_l1_loss(values, returns[batch])
-                entropy_mean = entropy.mean()
-                button_activity = torch.sigmoid(button_logits).mean()
+                stick_entropy_mean = stick_entropy.mean()
+                button_entropy_mean = button_entropy.mean()
+                button_probabilities = torch.sigmoid(button_logits)
+                expected_button_count = button_probabilities.sum(-1).mean()
                 loss = (
                     policy_loss
                     + self.value_coef * value_loss
-                    - self.entropy_coef * entropy_mean
-                    + 0.002 * button_activity
+                    - stick_entropy_coef * stick_entropy_mean
+                    - button_entropy_coef * button_entropy_mean
+                    + self.button_activity_coef * expected_button_count
                 )
                 self.optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -421,7 +480,18 @@ class OnlinePPO:
                 self.optimizer.step()
                 last_policy_loss = float(policy_loss.detach().item())
                 last_value_loss = float(value_loss.detach().item())
-                last_entropy = float(entropy_mean.detach().item())
+                last_stick_entropy = float(
+                    stick_entropy_mean.detach().item()
+                )
+                last_button_entropy = float(
+                    button_entropy_mean.detach().item()
+                )
+                last_button_probability_mean = float(
+                    button_probabilities.mean().detach().item()
+                )
+                last_expected_button_count = float(
+                    expected_button_count.detach().item()
+                )
 
         with torch.no_grad():
             rnd_target = self.learner_rnd_target(novelty_observations)
@@ -444,7 +514,17 @@ class OnlinePPO:
             "samples_trained": self.samples_trained,
             "policy_loss": round(last_policy_loss, 6),
             "value_loss": round(last_value_loss, 6),
-            "entropy": round(last_entropy, 6),
+            "stick_entropy": round(last_stick_entropy, 6),
+            "button_entropy": round(last_button_entropy, 6),
+            "stick_entropy_coef": round(stick_entropy_coef, 8),
+            "button_entropy_coef": round(button_entropy_coef, 8),
+            "button_probability_mean": round(
+                last_button_probability_mean, 6
+            ),
+            "expected_button_count": round(
+                last_expected_button_count, 6
+            ),
+            "exploration_decay": round(decay, 6),
             "rnd_loss": round(float(rnd_loss.detach().item()), 6),
             "mean_reward": round(float(rewards.mean().item()), 6),
         }
@@ -501,6 +581,11 @@ class OnlinePPO:
         self.samples_trained = int(payload.get("samples_trained") or 0)
 
     def stats(self) -> dict:
+        (
+            current_stick_entropy_coef,
+            current_button_entropy_coef,
+            exploration_decay,
+        ) = self._exploration_coefficients()
         return {
             "learner_device": str(self.learner_device),
             "actor_device": str(self.actor_device),
@@ -511,4 +596,15 @@ class OnlinePPO:
             "rnd_last_error": round(self.last_intrinsic_error, 8),
             "rnd_last_novelty": round(self.last_intrinsic_reward, 6),
             **self.last_stats,
+            # Current schedule values must win over the coefficients recorded
+            # at the start of the previous update.
+            "current_stick_entropy_coef": round(
+                current_stick_entropy_coef,
+                8,
+            ),
+            "current_button_entropy_coef": round(
+                current_button_entropy_coef,
+                8,
+            ),
+            "exploration_decay": round(exploration_decay, 6),
         }

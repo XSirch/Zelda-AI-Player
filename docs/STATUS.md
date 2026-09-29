@@ -4,17 +4,18 @@
 
 - Minimal realtime panel: connection, operational thought, raw N64 inputs, tokens/cost/quota, start/stop.
 - Continuous motor loop independent from LLM latency.
-- Raw-action PPO actor-critic: analog stick + physical button bits.
-- Goal-conditioned camera-relative steering prior inside the PPO stick distribution, with learned residual control and a mild navigation button-quiet prior.
+- Raw-action PPO actor-critic: residual analog stick + physical button bits.
+- Goal-conditioned camera-relative guidance is now mixed deterministically with the sampled residual stick, so structured navigation authority cannot be numerically overwhelmed by a mature Beta distribution.
+- Stick/button entropy are trained separately; button entropy anneals to zero over the first 50k trained samples and expected button count is explicitly regularized to stop indefinite button-mashing.
 - Collision-aware local goal guidance: observed probes bend a blocked direct heading toward a walkable side direction, hard blockage weakens the prior, prolonged dwell fades stale-target attraction, and cognition can replan on `guidance_blocked`.
-- Persistent route memory v1: directed topological nodes/edges are learned only from paths Link actually traverses, persisted across training runs, and reused as intermediate waypoints when a known route approaches the current structured target.
+- Persistent route memory v1: directed topological nodes/edges are learned only from paths Link actually traverses, persisted across training runs, and reused as intermediate waypoints when a known route approaches the current structured target. Targetless `explore` uses observed open probes to select an unvisited/low-visit local frontier instead of reverting to random-stick wandering.
 - One-shot `intent_target_reached` replanning so completed waypoints do not remain stale.
 - Four-frame structured-state stack for temporal behaviour and combat timing.
 - Online PPO learner with GAE and separate actor/learner weights.
 - RND intrinsic curiosity.
-- Observable reward shaping without a scripted Zelda quest path, including escalating coarse-area dwell penalties, frontier exploration, stale-waypoint `intent_progress` fadeout, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
+- Observable reward shaping without a scripted Zelda quest path, including coarse-area dwell pressure rescaled so it remains an anti-loop signal without dominating PPO returns, frontier exploration, stale-waypoint `intent_progress` fadeout, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
 - Native one-shot chest-open telemetry from `FLAG_SCENE_TREASURE`, surfaced as `chest_opened`.
-- Persistent atomic PyTorch training checkpoint plus route graph and immutable completion champions under `.local/ml/champions/`; each new champion freezes both policy and the route-memory snapshot used by evaluation.
+- Persistent atomic PyTorch V3 training checkpoint (`.local/ml/raw-controller-ppo-rnd-v3.pt`) plus route graph and immutable completion champions under `.local/ml/champions/`; the incompatible V2 checkpoint is left untouched and each new champion freezes both policy and route-memory snapshot used by evaluation.
 - High-level `AgentIntent` cognition contract with no skill/action selector.
 - Codex and OpenRouter intent providers.
 - Codex token usage accounting and independent quota polling.

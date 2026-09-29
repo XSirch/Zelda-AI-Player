@@ -164,3 +164,10 @@ def test_panel_shows_actionable_goal_guidance():
     assert "route_active?: boolean" in types
     assert "route_memory?:" in types
     assert "ROTAS APRENDIDAS" in main
+    assert "expected_button_count?: number" in types
+    assert "guidance_mix?: number" in types
+    assert "exploration_decay?: number" in types
+    assert "botões esperados" in main
+    assert "exploração" in main
+    assert "frontier_active?: boolean" in types
+    assert "frontier observado" in main

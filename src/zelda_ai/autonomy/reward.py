@@ -27,7 +27,7 @@ LOCAL_REGION_XZ = 500.0
 LOCAL_REGION_Y = 160.0
 LOCAL_DWELL_GRACE_S = 60.0
 LOCAL_DWELL_RAMP_S = 180.0
-LOCAL_DWELL_MAX_PENALTY = 0.35
+LOCAL_DWELL_MAX_PENALTY = 0.02
 NEW_MACRO_REGION_REWARD = 0.8
 FRONTIER_PROGRESS_MIN_DELTA = 6.0
 FRONTIER_PROGRESS_SCALE = 160.0
@@ -805,8 +805,8 @@ class RewardTracker:
                     / LOCAL_DWELL_RAMP_S,
                 )
                 self.local_dwell_penalty = -(
-                    0.02
-                    + (LOCAL_DWELL_MAX_PENALTY - 0.02) * ramp
+                    0.002
+                    + (LOCAL_DWELL_MAX_PENALTY - 0.002) * ramp
                 )
                 b["local_dwell"] = self.local_dwell_penalty
             else:

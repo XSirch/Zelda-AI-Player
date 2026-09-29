@@ -22,6 +22,17 @@ ROUTE_PARTIAL_MIN_GAIN = 80.0
 ROUTE_WAYPOINT_MIN_DISTANCE = 45.0
 ROUTE_MAX_NODES = 50_000
 
+_PROBE_YAW_OFFSETS = {
+    "forward": 0.0,
+    "forward_left": math.pi / 4.0,
+    "left": math.pi / 2.0,
+    "back_left": 3.0 * math.pi / 4.0,
+    "back": math.pi,
+    "back_right": -3.0 * math.pi / 4.0,
+    "right": -math.pi / 2.0,
+    "forward_right": -math.pi / 4.0,
+}
+
 
 def _distance(a, b) -> float:
     return math.dist(tuple(a), tuple(b))
@@ -576,6 +587,84 @@ class LearnedRouteGraph:
                 isinstance(target_gap, (int, float))
                 and target_gap > ROUTE_TARGET_REACHED_DISTANCE
             ),
+        }
+
+    def exploration_waypoint(self, game: GameState) -> dict | None:
+        """Choose a local walkable frontier instead of random-stick exploration.
+
+        Candidates come only from collision probes already observed by the
+        bridge. Prefer a 140u probe when available, unseen route cells first,
+        then lower-visit cells. This is local frontier selection, not a hidden
+        route solver.
+        """
+        if not game.player or not game.navigation_probes:
+            return None
+
+        probe_by_direction = {}
+        for probe in game.navigation_probes:
+            current = probe_by_direction.get(probe.direction)
+            # Longer probes produce useful steering horizon, while still
+            # requiring the bridge to have observed floor and no wall.
+            if current is None or probe.distance > current.distance:
+                probe_by_direction[probe.direction] = probe
+
+        player = game.player
+        player_yaw = player.yaw * math.pi / 32768.0
+        candidates = []
+        for name, offset in _PROBE_YAW_OFFSETS.items():
+            probe = probe_by_direction.get(name)
+            if probe is None or not probe.floor_found or probe.wall_hit:
+                continue
+            delta_y = float(probe.delta_y or 0.0)
+            if delta_y > 70.0 or delta_y < -90.0:
+                continue
+
+            yaw = player_yaw + offset
+            distance = float(probe.distance)
+            waypoint = (
+                float(player.position[0]) + math.sin(yaw) * distance,
+                float(probe.floor_y)
+                if probe.floor_y is not None
+                else float(player.position[1]),
+                float(player.position[2]) + math.cos(yaw) * distance,
+            )
+            node_id = _node_id(
+                game.scene,
+                game.room,
+                waypoint,
+                mirrored=game.mirrored_world,
+                age=player.age,
+            )
+            node = self.nodes.get(node_id)
+            unseen = node is None
+            visits = int((node or {}).get("visits") or 0)
+            alignment = math.cos(offset)
+            # Lexicographic priority: unseen > less visited > avoid reversing.
+            score = (
+                1 if unseen else 0,
+                -visits,
+                alignment,
+                distance,
+            )
+            candidates.append((score, name, waypoint, node_id, visits))
+
+        if not candidates:
+            return None
+
+        _, direction, waypoint, node_id, visits = max(
+            candidates,
+            key=lambda row: row[0],
+        )
+        return {
+            "waypoint": waypoint,
+            "waypoint_id": node_id,
+            "path_nodes": 1,
+            "waypoint_index": 0,
+            "target_gap": None,
+            "confidence": 1.0 if visits > 0 else 0.5,
+            "partial": True,
+            "frontier": True,
+            "direction": direction,
         }
 
     def stats(self) -> dict:

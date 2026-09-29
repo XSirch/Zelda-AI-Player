@@ -10,7 +10,9 @@ Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
 - **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor. A cognição é **sparse/event-driven**: uma chamada inicial e novas chamadas somente em eventos estratégicos (transição, progresso durável, escolha/resolução relevante de diálogo, morte/boss) ou após stuck sustentado. Não existe refresh periódico por `horizon_ms`.
 
-A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto. O steering prior é calculado apenas de coordenadas/direções observadas e da câmera atual; ele não conhece rotas ocultas. O checkpoint persistente continua em `.local/ml/raw-controller-ppo-rnd-v2.pt`, portanto o aprendizado existente é reaproveitado. Em paralelo, o controlador mantém uma memória topológica persistente em `.local/ml/route-graph-v1.json`, construída somente a partir de trajetos que Link realmente percorreu.
+A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto. A motor policy v3 não trata mais o guidance como uma sugestão fraca dentro da Beta: o PPO amostra um **stick residual**, e o stick realmente enviado ao jogo é uma mistura determinística entre esse residual e o guidance estruturado. Assim, quando existe um waypoint/rota com força 0,86, aproximadamente 86% do analógico executado vem do guidance e apenas 14% fica para correção/exploração aprendida.
+
+Essa mudança altera a semântica da ação, então o treino passa a usar `.local/ml/raw-controller-ppo-rnd-v3.pt`. O antigo `raw-controller-ppo-rnd-v2.pt` é preservado, mas não é reinterpretado. A route memory em `.local/ml/route-graph-v1.json` **é preservada e reutilizada**, pois contém apenas caminhos empiricamente percorridos e é independente dos pesos do PPO.
 
 ### Goal-conditioned motor
 
@@ -18,9 +20,11 @@ Texto do Luna em `summary` não controla Link. Para um destino ser acionável, a
 
 O guidance v4 também usa os oito probes locais de colisão já observados pela bridge. Se o heading direto para o alvo estiver bloqueado, ele escolhe apenas um **desvio local transitável** que continue aproximadamente alinhado ao destino; isso não é A*, não cria uma rota e não contém conhecimento de Zelda. Se não existir desvio seguro, a força do prior cai para 30% e a cognição recebe `guidance_blocked` após bloqueio sustentado. Além disso, depois de 90 s sem expansão/progresso a força do alvo começa a cair, chegando a 25%, para impedir que um waypoint inacessível vire um ímã permanente.
 
-Quando existe guidance forte de navegação, uma prior moderada também reduz a probabilidade-base de button-mashing, sem bloquear nenhum botão: logits aprendidos pelo PPO ainda podem superar esse viés. Perto de obstáculo essa supressão de botões é reduzida para deixar a política testar ações de travessia. Em `combat`, `dialogue` e `menu` o steering prior fica desligado.
+Quando existe guidance forte de navegação, a distribuição de botões também recebe um viés de quietude sem bloquear nenhum botão. A exploração PPO agora é **annealed**: stick e botões têm coeficientes de entropia separados, e a entropia dos botões cai de forma linear até zero nas primeiras ~50 mil amostras treinadas. Há ainda um custo pela **contagem esperada de botões ativos**, em vez da antiga penalidade minúscula sobre a média das probabilidades. Isso evita que os 9 Bernoullis independentes mantenham button-mashing indefinidamente. Em `combat`, `dialogue` e `menu` o guidance de stick continua desligado quando apropriado.
 
 Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
+
+Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis, priorizando células ainda não visitadas e depois as menos visitadas. Esse frontier vira guidance temporário; nenhum mapa oculto é consultado.
 
 ### Rotas aprendidas
 
@@ -49,7 +53,7 @@ Memórias persistentes são criadas somente a partir de evidência observada, co
 
 ### Pontos de conquista vs reward PPO
 
-Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v6, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
+Objetivos observáveis também geram uma pontuação humana separada do reward de treino. Exemplo: adquirir a **Kokiri Sword** vale **+100 pontos de conquista**, enquanto o PPO recebe um bônus escalado de **+3.0**. O reward total de um passo continua limitado a `[-5, +5]`, então a pontuação de UI não desestabiliza o treinamento. Na reward v7, curiosidade RND só paga surpresa acima do baseline e tem peso máximo pequeno; eventos genéricos e transições repetidas não geram reward.
 
 O painel diferencia:
 - pontos de conquista da run;
@@ -62,13 +66,13 @@ Progresso que já existia no save ao iniciar a run é tratado como baseline e n�
 
 ### Pressão contra ficar preso na mesma área
 
-Além da penalidade de ficar literalmente parado, a reward v6 acompanha **expansão espacial grossa**. O mundo observado é dividido em macro-regiões locais de aproximadamente 500×160×500 unidades por scene/room. Entrar pela primeira vez numa macro-região, obter progresso durável, iniciar diálogo novo relevante, causar dano ou alcançar outro marco útil reinicia o relógio.
+Além da penalidade de ficar literalmente parado, a reward v7 acompanha **expansão espacial grossa**. O mundo observado é dividido em macro-regiões locais de aproximadamente 500×160×500 unidades por scene/room. Entrar pela primeira vez numa macro-região, obter progresso durável, iniciar diálogo novo relevante, causar dano ou alcançar outro marco útil reinicia o relógio.
 
-Circular por células pequenas, revisitar macro-regiões já conhecidas ou apertar botões enquanto continua perto do mesmo lugar **não reinicia** esse relógio. Após 60 s sem expansão/progresso entra `local_dwell`; a penalidade cresce até cerca de `-0.35` por decisão ML após mais 180 s. O breakdown ao vivo mostra `local_dwell`, e o painel mostra o tempo `sem expansão`.
+Circular por células pequenas, revisitar macro-regiões já conhecidas ou apertar botões enquanto continua perto do mesmo lugar **não reinicia** esse relógio. Após 60 s sem expansão/progresso entra `local_dwell`. Na reward v7 ele continua escalando com o tempo, mas foi reescalado de cerca de `-0.35` para no máximo `-0.02` por decisão ML. O valor antigo dominava o retorno (até ~`-3.5/s` a 10 Hz) e transformava o treino em um grande sinal negativo quase independente da ação. O relógio/stuck continua forte; apenas o gradiente PPO deixa de ser esmagado por essa taxa. O breakdown ao vivo mostra `local_dwell`, e o painel mostra o tempo `sem expansão`.
 
 Esse mesmo relógio participa do detector de stuck da cognição: aos 90 s sem expansão local, o Luna pode receber um evento `local_area_stuck`, ainda sujeito ao cooldown de 180 s entre replans por stuck.
 
-**Frontier progress:** punição negativa sozinha não indica qual ação é melhor. A reward v6 também mantém o maior raio alcançado desde a última expansão/progresso. Aumentar esse raio pela primeira vez gera `frontier_progress`; andar em círculos no mesmo raio não paga. Entrar numa nova macro-região rende `new_macro_region +0.8`. Quando a cognição fornece um alvo observado, `intent_progress` é simétrico para aproximar/afastar. Se o guidance executado estava bloqueado por colisão **ou reproduzindo uma rota aprendida**, esse shaping de distância reta é suprimido imediatamente: um contorno correto pode aumentar temporariamente a distância Euclidiana até o destino. Fora desses casos ele começa a desaparecer após 60 s sem expansão/progresso e chega a zero após mais 120 s. Assim, afastar-se para contornar uma parede não é punido e voltar para o mesmo waypoint obstruído não forma um reward loop.
+**Frontier progress:** punição negativa sozinha não indica qual ação é melhor. A reward v7 também mantém o maior raio alcançado desde a última expansão/progresso. Aumentar esse raio pela primeira vez gera `frontier_progress`; andar em círculos no mesmo raio não paga. Entrar numa nova macro-região rende `new_macro_region +0.8`. Quando a cognição fornece um alvo observado, `intent_progress` é simétrico para aproximar/afastar. Se o guidance executado estava bloqueado por colisão **ou reproduzindo uma rota aprendida**, esse shaping de distância reta é suprimido imediatamente: um contorno correto pode aumentar temporariamente a distância Euclidiana até o destino. Fora desses casos ele começa a desaparecer após 60 s sem expansão/progresso e chega a zero após mais 120 s. Assim, afastar-se para contornar uma parede não é punido e voltar para o mesmo waypoint obstruído não forma um reward loop.
 
 **Coletas e baús:** a reward v6 também premia ganho observado de rupees, munição, vida e magia. O reward usa o **delta real do estado**: se a carteira, munição, vida ou magia já estiverem cheias e a coleta não aumentar o valor, o bônus é zero. Primeira aquisição de um item continua usando o milestone persistente mais forte, sem somar o bônus de ammo inicial. A bridge v3.1 emite `chest_opened` a partir do treasure flag nativo, uma única vez por baú, gerando reward e conquista próprios.
 
@@ -90,7 +94,7 @@ Cada completion guarda SHA-256 e metadados da run: tempo final, chamadas de cogn
 
 O benchmark da run também fica no banco. As métricas ao vivo continuam derivadas das chamadas/segmentos, mas ao encerrar normalmente a run o runtime grava um snapshot final em `run_summaries`, exposto como `benchmark` em `GET /api/runs/{run_id}`. Nele, `elapsed_s` fica congelado e os campos `input_tokens`, `output_tokens`, `total_tokens`, `known_cost_usd` e `usage_by_model` preservam o consumo final. `cost_usd` permanece `null` quando o custo total não pode ser conhecido (por exemplo, Codex autenticado via ChatGPT ou uma chamada OpenRouter sem custo retornado), evitando transformar custo desconhecido em zero.
 
-**INICIAR** continua usando o checkpoint de treino `.local/ml/raw-controller-ppo-rnd-v2.pt`. Quando existe um champion, **AVALIAR CHAMPION** carrega por padrão o completion mais recente, desativa PPO/RND training e usa decisões determinísticas do actor. A avaliação nunca salva sobre o champion nem cria um novo champion ao terminar.
+**INICIAR** continua usando o checkpoint de treino `.local/ml/raw-controller-ppo-rnd-v3.pt`. Quando existe um champion, **AVALIAR CHAMPION** carrega por padrão o completion mais recente, desativa PPO/RND training e usa decisões determinísticas do actor. A avaliação nunca salva sobre o champion nem cria um novo champion ao terminar.
 
 Para testar retenção desde o começo do jogo: mantenha `.local/ml/` e o banco de conhecimento, carregue um **save novo** do OoT e então clique **AVALIAR CHAMPION**. O sistema não cria/apaga saves do jogo automaticamente.
 
@@ -116,6 +120,7 @@ A interface principal mostra somente:
 - custo API quando o provider reporta USD (ou custo parcial conhecido em runs mistas);
 - cota restante do Codex/ChatGPT;
 - route memory (nós, trechos e reusos) e indicação `rota aprendida` quando o guidance estiver reproduzindo um caminho observado;
+- diagnóstico PPO ao vivo: botões esperados, percentual efetivo de guidance e quanto da fase de exploração ainda resta;
 - **INICIAR / PARAR** e **AVALIAR CHAMPION** quando houver um completion salvo.
 
 Para Codex autenticado por ChatGPT, o app-server fornece tokens, mas custo em USD permanece **—** quando não há cobrança API reportada. A cota é lida separadamente por `account/rateLimits/read`, sem chamada de modelo, e mostra somente as janelas realmente devolvidas pelo Codex.
