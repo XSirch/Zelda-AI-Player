@@ -1,5 +1,5 @@
 from zelda_ai.autonomy.routes import LearnedRouteGraph
-from zelda_ai.models import NavigationProbe
+from zelda_ai.models import NavigationProbe, SceneExitObservation
 
 
 def _at(state, position, seq):
@@ -176,6 +176,54 @@ def test_targetless_exploration_prefers_unseen_open_probe(tmp_path, state):
     assert hint["frontier"] is True
     assert hint["direction"] == "right"
     assert hint["waypoint"][0] < -120.0 or hint["waypoint"][0] > 120.0
+
+
+def test_exit_waypoint_prefers_direct_reachable_observed_exit(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    game = _at(state, (0.0, 0.0, 0.0), 700)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=1,
+            entrance_index=10,
+            position=(40.0, 0.0, 0.0),
+            samples=8,
+            direct_reachable=False,
+        ),
+        SceneExitObservation(
+            exit_index=2,
+            entrance_index=20,
+            position=(120.0, 0.0, 0.0),
+            samples=4,
+            direct_reachable=True,
+        ),
+    ]
+
+    hint = graph.exit_waypoint(game)
+
+    assert hint is not None
+    assert hint["exit"] is True
+    assert hint["exit_index"] == 2
+    assert hint["direct_reachable"] is True
+    assert hint["waypoint"] == (120.0, 0.0, 0.0)
+
+
+def test_interaction_button_memory_persists_and_recovers_from_failures(tmp_path):
+    path = tmp_path / "routes.json"
+    graph = LearnedRouteGraph(path)
+    key = "1:open:door:9"
+
+    assert graph.interaction_button(key) is None
+    graph.record_interaction_success(key, "A", now_s=1.0)
+    assert graph.interaction_button(key) == "A"
+    graph.save(force=True)
+
+    loaded = LearnedRouteGraph(path)
+    assert loaded.interaction_button(key) == "A"
+    loaded.record_interaction_failure(key, "A", now_s=2.0)
+    loaded.record_interaction_failure(key, "A", now_s=3.0)
+    assert loaded.interaction_button(key) == "A"
+    loaded.record_interaction_failure(key, "A", now_s=4.0)
+    assert loaded.interaction_button(key) is None
 
 
 def test_read_only_route_graph_never_learns_or_writes(tmp_path, state):
