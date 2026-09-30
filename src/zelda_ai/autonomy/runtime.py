@@ -387,6 +387,15 @@ class AutonomyRuntime:
     def _request_cognition(self, reason: str):
         if self.state != "running":
             return
+        if (
+            self.objective_tracker.trackable
+            and reason not in {"dialogue_choice"}
+        ):
+            # A trackable strategic objective is immutable until telemetry proves
+            # its completion. World transitions, stuck signals, reached local
+            # waypoints and incidental durable progress are motor evidence only.
+            self.objective_replan_suppressed += 1
+            return
         self.cognition_reasons.add(reason)
         self.cognition_trigger.set()
 
@@ -409,6 +418,8 @@ class AutonomyRuntime:
             asyncio.create_task(self.halt("paused", "game_instance_changed"))
             return
 
+        self._check_objective_completion(state)
+        self._restore_objective_operational_intent(state)
         self._check_intent_target_reached(state)
 
         if old and old.instance_id == state.instance_id and (
@@ -508,27 +519,29 @@ class AutonomyRuntime:
                     )
 
             if old.dialogue.active and not state.dialogue.active:
-                # Linear text/signposts normally do not need LLM calls. If the
-                # current intent explicitly waited on that text, one resolution
-                # trigger prevents the planner from remaining stuck on "observe".
-                waiting_on_dialogue = bool(
-                    self.controller
-                    and self.controller.intent.mode in {"dialogue", "observe"}
-                )
-                if (
-                    old.dialogue.speaker is not None
-                    or old.dialogue.choice_count > 0
-                    or waiting_on_dialogue
-                ):
-                    self._request_dialogue_cognition(
-                        "dialogue_resolved",
-                        (
-                            state.scene,
-                            state.room,
-                            old.dialogue.text_id,
-                            "resolved",
-                        ),
+                # Dialogue is a local sub-action under a sticky objective. Once
+                # it closes, resume the objective's operational intent directly.
+                if self.objective_tracker.trackable:
+                    self._restore_objective_operational_intent(state)
+                else:
+                    waiting_on_dialogue = bool(
+                        self.controller
+                        and self.controller.intent.mode in {"dialogue", "observe"}
                     )
+                    if (
+                        old.dialogue.speaker is not None
+                        or old.dialogue.choice_count > 0
+                        or waiting_on_dialogue
+                    ):
+                        self._request_dialogue_cognition(
+                            "dialogue_resolved",
+                            (
+                                state.scene,
+                                state.room,
+                                old.dialogue.text_id,
+                                "resolved",
+                            ),
+                        )
 
             if self._durable_progress_gained(old, state):
                 self._request_cognition("durable_progress")
