@@ -157,6 +157,10 @@ export interface LearningSnapshot {
     active_frontier?: string | null;
     frontier_completed?: number;
     frontier_abandoned?: number;
+    route_edge_completed?: number;
+    route_edge_abandoned?: number;
+    route_edges_cooling_down?: number;
+    active_route_edge?: string | null;
     last_path_nodes: number;
     cached_path_nodes?: number;
     exhausted_partial_nodes?: number;
@@ -238,6 +242,8 @@ export interface MotorGuidance {
   route_waypoint?: number[] | null;
   route_waypoint_id?: string | null;
   route_partial?: boolean;
+  route_edge_key?: string | null;
+  route_edge_failures?: number;
   frontier_active?: boolean;
   frontier_direction?: string | null;
   frontier_stable?: boolean;
