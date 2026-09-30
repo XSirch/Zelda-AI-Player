@@ -22,7 +22,7 @@ from .models import AgentIntent
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v7/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
+CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v8/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
