@@ -796,11 +796,19 @@ class ContinuousController:
                 f"({guidance['stick'][0]:+.2f}, {guidance['stick'][1]:+.2f}) "
                 f"mix {sample.get('guidance_strength', 0.0):.2f}{distance_text}."
             )
-        self.last_motor_summary = (
-            f"ML policy sampled raw controller: stick "
-            f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), buttons {buttons_text}."
-            + guidance_text
-        )
+        if setpoint.reason == "ml_policy":
+            self.last_motor_summary = (
+                f"ML policy sampled raw controller: stick "
+                f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), "
+                f"buttons {buttons_text}."
+                + guidance_text
+            )
+        else:
+            self.last_motor_summary = (
+                f"Local controller override {setpoint.reason}: stick "
+                f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), "
+                f"buttons {buttons_text}."
+            )
         return setpoint
 
     async def _learner_loop(self, active: Callable[[], bool], publish: Callable[[], None]):
