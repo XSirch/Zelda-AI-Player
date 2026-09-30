@@ -8,7 +8,7 @@ def test_panel_is_minimal_autonomy_instrument():
         "SHIP OF HARKINIAN",
         "BRIDGE REALTIME",
         "COGNIÇÃO IA",
-        "PENSAMENTO OPERACIONAL",
+        "OBJETIVO AUTÔNOMO",
         "CONTROLE AO VIVO",
         "INICIAR",
         "PARAR",
@@ -26,6 +26,17 @@ def test_panel_is_minimal_autonomy_instrument():
         "DIAGNÓSTICO LOCAL",
     ]:
         assert legacy not in text
+
+
+def test_panel_shows_locked_objective_completion_contract():
+    main = Path("web/src/main.tsx").read_text(encoding="utf-8")
+    types = Path("web/src/types.ts").read_text(encoding="utf-8")
+    assert "META TRAVADA" in main
+    assert "CONCLUSÃO:" in main
+    assert "verificação local" in main
+    assert "replans ignorados" in main
+    assert "completionLabel" in main
+    assert "ObjectiveCompletion" in types
 
 
 def test_panel_renders_raw_physical_controls_only():
@@ -56,6 +67,8 @@ def test_frontend_contract_is_compact():
     assert "interface Snapshot" in text
     assert "interface InputState" in text
     assert "interface AgentIntent" in text
+    assert "interface ObjectiveCompletion" in text
+    assert "objective_lock:" in text
     assert "button_names: string[]" in text
     assert "stick_x: number" in text
     assert "stick_y: number" in text
