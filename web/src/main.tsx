@@ -93,7 +93,7 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
             ? ` · anti-loop ${Math.round(thought.guidance.stuck_scale * 100)}%`
             : ''}
           {thought.guidance.route_active
-            ? ` · rota aprendida${thought.guidance.route_partial ? ' parcial' : ''} ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%`
+            ? ` · rota aprendida${thought.guidance.route_partial ? ' parcial' : ''} ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%${(thought.guidance.route_edge_failures ?? 0) > 0 ? ` · aresta falhou ${thought.guidance.route_edge_failures}x` : ''}`
             : ''}
           {thought.guidance.frontier_active
             ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}${thought.guidance.frontier_stable ? ` · mantido ${(thought.guidance.frontier_age_s ?? 0).toFixed(1)}s` : ''}`
@@ -238,7 +238,13 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
         ROTAS APRENDIDAS <b>{compact(routeMemory.nodes)}</b> nós · <b>{compact(routeMemory.edges)}</b> trechos · <b>{compact(routeMemory.routes_reused)}</b> reusos · <b>{compact(routeMemory.waypoints_advanced ?? 0)}</b> avanços · <b>{compact(routeMemory.learned_interactions ?? 0)}</b> interações
         {routeMemory.active_frontier ? <> · frontier <b>{routeMemory.active_frontier}</b></> : null}
         {(routeMemory.frontier_completed ?? 0) || (routeMemory.frontier_abandoned ?? 0)
-          ? <> · <b>{compact(routeMemory.frontier_completed ?? 0)}</b> concluídos / <b>{compact(routeMemory.frontier_abandoned ?? 0)}</b> abandonados</>
+          ? <> · <b>{compact(routeMemory.frontier_completed ?? 0)}</b> frontiers concluídos / <b>{compact(routeMemory.frontier_abandoned ?? 0)}</b> abandonados</>
+          : null}
+        {(routeMemory.route_edge_completed ?? 0) || (routeMemory.route_edge_abandoned ?? 0)
+          ? <> · arestas <b>{compact(routeMemory.route_edge_completed ?? 0)}</b> ok / <b>{compact(routeMemory.route_edge_abandoned ?? 0)}</b> falhas</>
+          : null}
+        {(routeMemory.route_edges_cooling_down ?? 0) > 0
+          ? <> · <b>{compact(routeMemory.route_edges_cooling_down ?? 0)}</b> em cooldown</>
           : null}
       </span>}
     </div>

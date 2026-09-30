@@ -180,3 +180,8 @@ def test_panel_shows_actionable_goal_guidance():
     assert "mantido" in main
     assert "frontier_completed?: number" in types
     assert "frontier_abandoned?: number" in types
+    assert "route_edge_failures?: number" in types
+    assert "route_edge_abandoned?: number" in types
+    assert "route_edges_cooling_down?: number" in types
+    assert "aresta falhou" in main
+    assert "em cooldown" in main

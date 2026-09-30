@@ -138,6 +138,8 @@ class ContinuousController:
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "route_edge_key": None,
+            "route_edge_failures": 0,
             "frontier_active": False,
             "frontier_direction": None,
             "frontier_stable": False,
@@ -182,6 +184,8 @@ class ContinuousController:
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "route_edge_key": None,
+            "route_edge_failures": 0,
             "frontier_active": False,
             "frontier_direction": None,
             "frontier_stable": False,
@@ -227,6 +231,8 @@ class ContinuousController:
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "route_edge_key": None,
+            "route_edge_failures": 0,
             "frontier_active": False,
             "frontier_direction": None,
             "frontier_stable": False,
@@ -704,11 +710,26 @@ class ContinuousController:
             final_target is not None
             and self.intent.mode in {"navigate", "explore", "observe"}
         ):
-            self.route_graph.clear_frontier()
             route_hint = self.route_graph.next_waypoint(
                 game,
                 final_target,
             )
+            if route_hint is not None:
+                self.route_graph.clear_frontier()
+            elif (
+                self.route_graph.route_recovery_needed()
+                or self.route_graph.active_frontier is not None
+            ):
+                # A learned directed edge just failed in real execution. Do not
+                # immediately fall back to the same straight-line cognition
+                # target; recover from current observed evidence instead.
+                route_hint = (
+                    self.route_graph.exit_waypoint(game)
+                    if game.scene_exits
+                    else None
+                )
+                if route_hint is None:
+                    route_hint = self.route_graph.exploration_waypoint(game)
         elif self.intent.mode == "explore":
             actor_is_door = bool(
                 game.context_actor is not None
