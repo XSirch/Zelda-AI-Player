@@ -270,6 +270,12 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
         {(routeMemory.frontier_completed ?? 0) || (routeMemory.frontier_abandoned ?? 0)
           ? <> · <b>{compact(routeMemory.frontier_completed ?? 0)}</b> frontiers concluídos / <b>{compact(routeMemory.frontier_abandoned ?? 0)}</b> abandonados</>
           : null}
+        {(routeMemory.frontier_failed_cells ?? 0) > 0
+          ? <> · <b>{compact(routeMemory.frontier_failed_cells ?? 0)}</b> células penalizadas / <b>{compact(routeMemory.frontier_failure_total ?? 0)}</b> falhas persistentes</>
+          : null}
+        {(routeMemory.room_failure_pressure ?? 0) > 0
+          ? <> · pressão sala <b>{compact(routeMemory.room_failure_pressure ?? 0)}</b></>
+          : null}
         {(routeMemory.route_edge_completed ?? 0) || (routeMemory.route_edge_abandoned ?? 0)
           ? <> · arestas <b>{compact(routeMemory.route_edge_completed ?? 0)}</b> ok / <b>{compact(routeMemory.route_edge_abandoned ?? 0)}</b> falhas</>
           : null}
