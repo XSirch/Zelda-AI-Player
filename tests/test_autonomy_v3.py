@@ -358,6 +358,35 @@ def test_targetless_explore_prioritizes_observed_scene_exit(state):
     assert late_guidance["stuck_scale"] == pytest.approx(1.0)
 
 
+def test_active_dialogue_suppresses_navigation_guidance(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "target_position": None,
+        "direction": None,
+    })
+    state.dialogue.active = True
+    state.dialogue.can_advance = True
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        route_hint={
+            "waypoint": (0.0, 0.0, 140.0),
+            "waypoint_id": "frontier-node",
+            "path_nodes": 1,
+            "confidence": 0.5,
+            "partial": True,
+            "frontier": True,
+            "direction": "forward",
+        },
+    )
+
+    assert guidance["active"] is False
+    assert guidance["source"] == "dialogue_hold"
+    assert guidance["stick"] == (0.0, 0.0)
+    assert guidance["frontier_active"] is False
+
+
 def test_goal_guidance_uses_observed_vertical_traversal(state):
     from zelda_ai.models import TraversalAffordanceObservation
 
