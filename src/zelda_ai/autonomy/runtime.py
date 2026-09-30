@@ -1227,12 +1227,10 @@ class AutonomyRuntime:
                 )
                 self.cognition_state = "error"
                 self.cognition_error = str(exc)[:240]
-                self.thought = (
-                    "Cognition failed: "
-                    + self.cognition_error
-                    + " The ML motor actor keeps playing with the last intent; "
-                    "stop and start the run to explicitly retry the provider."
-                )
+                if self.objective_tracker.intent is not None:
+                    self.thought = self.objective_tracker.intent.objective
+                else:
+                    self.thought = "Falha ao selecionar o próximo objetivo."
                 self.publish(True)
                 return
 
@@ -1247,22 +1245,78 @@ class AutonomyRuntime:
                 )
 
             self.last_cognition_at = time.monotonic()
-            self.controller.set_intent(intent)
-            self.thought = intent.summary
+            active_strategic = self.objective_tracker.intent
+            dialogue_choice_call = bool(
+                "dialogue_choice" in trigger_reasons
+                and self.objective_tracker.trackable
+                and active_strategic is not None
+            )
+
+            if dialogue_choice_call:
+                # Dialogue choice is a transient sub-action under the same
+                # strategic objective. It may not rename or replace the goal.
+                operational = self._objective_operational_intent(
+                    active_strategic,
+                    game,
+                )
+                operational = operational.model_copy(update={
+                    "mode": "dialogue",
+                    "choice_index": intent.choice_index,
+                    "summary": active_strategic.objective,
+                })
+                self.controller.set_intent(operational)
+                self.thought = active_strategic.objective
+                self.log(
+                    "dialogue_choice_selected",
+                    {
+                        "objective": active_strategic.objective,
+                        "choice_index": intent.choice_index,
+                    },
+                )
+            elif self.objective_tracker.trackable:
+                # Defensive guard for an already-running provider call that
+                # completed after the objective became locked.
+                self._restore_objective_operational_intent(game)
+                self.thought = self.objective_tracker.intent.objective
+                self.objective_replan_suppressed += 1
+            else:
+                self.objective_tracker.assign(intent, game)
+                status = self.objective_tracker.evaluate(game)
+                if status.completed:
+                    # Reject objectives whose completion predicate is already
+                    # true; immediately ask for the next unmet objective.
+                    self.objective_tracker.complete(status)
+                    self.thought = f"Concluído: {intent.objective}"
+                    self.log(
+                        "objective_rejected_already_complete",
+                        {
+                            "objective": intent.objective,
+                            "completion": intent.completion.model_dump(),
+                            "reason": status.reason,
+                            "evidence": status.evidence or {},
+                        },
+                    )
+                    self._request_cognition("objective_completed")
+                else:
+                    self.controller.set_intent(
+                        self._objective_operational_intent(intent, game)
+                    )
+                    self.thought = intent.objective
+                    self.log(
+                        "objective_locked",
+                        {
+                            "objective": intent.objective,
+                            "completion": intent.completion.model_dump(),
+                            "trackable": intent.completion.kind != "manual",
+                        },
+                    )
+
             self.cognition_state = "acting"
             self.cognition_error = ""
             self.thinking_since = None
-            self.log(
-                "intent_updated",
-                {
-                    "objective": intent.objective,
-                    "mode": intent.mode,
-                    "summary": intent.summary,
-                },
-            )
 
-            # No horizon-based refresh here. The next iteration blocks until a
-            # strategic trigger or sustained stuck condition requests replanning.
+            # No horizon-based refresh. Trackable objectives are immutable until
+            # their structured completion predicate is observed.
 
     async def halt(self, state: str, reason: str):
         completion_controller: ContinuousController | None = None
