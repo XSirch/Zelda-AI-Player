@@ -23,7 +23,7 @@ from .objectives import ObjectiveTracker
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/frontier-negative-memory-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
+CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/frontier-negative-memory-v1/dialogue-reentry-guard-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -534,6 +534,8 @@ class AutonomyRuntime:
                     )
 
             if old.dialogue.active and not state.dialogue.active:
+                if self.controller:
+                    self.controller.note_dialogue_closed(old, state)
                 # Dialogue is a local sub-action under a sticky objective. Once
                 # it closes, resume the objective's operational intent directly.
                 if self.objective_tracker.trackable:

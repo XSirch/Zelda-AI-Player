@@ -241,6 +241,108 @@ def test_contextual_interaction_probes_one_button_and_learns_success(
     assert controller.route_graph.interaction_button(probe["key"]) == probe["button"]
 
 
+def test_dialogue_close_releases_button_and_blocks_immediate_reentry(
+    tmp_path, state
+):
+    old = state.model_copy(deep=True)
+    old.dialogue.active = True
+    old.dialogue.can_advance = True
+    old.dialogue.text_id = 321
+    old.dialogue.text = "Final page"
+    old.dialogue.speaker = ActorObservation(
+        actor_uid="shopkeeper-1",
+        actor_id=77,
+        name="Shopkeeper",
+        description="Shopkeeper",
+        category=5,
+        category_name="npc",
+        params=0,
+        position=(0.0, 0.0, 20.0),
+        distance=20.0,
+    )
+
+    closed = old.model_copy(deep=True)
+    closed.seq += 1
+    closed.dialogue.active = False
+    closed.dialogue.can_advance = False
+    closed.dialogue.text = ""
+
+    controller = ContinuousController(
+        connected(closed),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.last_setpoint = Setpoint(
+        buttons=BUTTON_MASKS["A"],
+        stick_x=40,
+        stick_y=20,
+        reason="dialogue_probe",
+    )
+    controller.last_buttons = tuple(
+        1.0 if name == "A" else 0.0
+        for name in (
+            "A", "B", "Z", "R", "START",
+            "C_UP", "C_LEFT", "C_DOWN", "C_RIGHT",
+        )
+    )
+    controller.pending_interaction_probe = {
+        "kind": "dialogue",
+        "key": "dialogue:advance",
+        "button": "A",
+        "at": 0.0,
+    }
+
+    controller.note_dialogue_closed(old, closed)
+
+    assert controller.dialogue_reentry_guard is not None
+    assert controller.last_setpoint.buttons == 0
+    assert controller.last_setpoint.reason == "dialogue_disengage"
+    assert controller.route_graph.interaction_button("dialogue:advance") == "A"
+
+    sample = {
+        "stick": [0.5, -0.25],
+        "policy_stick": [0.5, -0.25],
+        "buttons": [1.0 for _ in range(9)],
+        "log_prob": 0.0,
+        "value": 0.0,
+        "guidance_strength": 0.8,
+        "button_quiet_strength": 0.0,
+    }
+    guarded, guarded_sample, overridden = controller._dialogue_reentry_override(
+        closed,
+        Setpoint(
+            buttons=0xFFFF,
+            stick_x=40,
+            stick_y=-20,
+            reason="ml_policy",
+        ),
+        sample,
+    )
+
+    assert overridden is True
+    assert guarded.reason == "dialogue_disengage"
+    assert guarded.buttons == 0
+    assert guarded.stick_x == 40
+    assert guarded.stick_y == -20
+    assert not any(guarded_sample["buttons"])
+
+    escaped = closed.model_copy(deep=True)
+    escaped.player.position = (
+        closed.player.position[0] + 140.0,
+        closed.player.position[1],
+        closed.player.position[2],
+    )
+    released, released_sample, overridden = controller._dialogue_reentry_override(
+        escaped,
+        Setpoint(buttons=BUTTON_MASKS["A"], stick_x=20, reason="ml_policy"),
+        sample,
+    )
+    assert overridden is False
+    assert controller.dialogue_reentry_guard is None
+    assert released.buttons == BUTTON_MASKS["A"]
+    assert released_sample["buttons"] == sample["buttons"]
+
+
 def test_trackable_objective_prefers_exit_after_persistent_room_failures(
     tmp_path, state
 ):

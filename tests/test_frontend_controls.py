@@ -188,6 +188,10 @@ def test_panel_shows_actionable_goal_guidance():
     assert "saída observada" in main
     assert "interaction_learning?:" in types
     assert "INTERAÇÃO" in main
+    assert "dialogue_reentry_guard?: boolean" in types
+    assert "dialogue_reentry_suppressed?: number" in types
+    assert "desengatando diálogo" in main
+    assert "reentradas bloqueadas" in main
     assert "frontier_stable?: boolean" in types
     assert "frontier_age_s?: number | null" in types
     assert "mantido" in main
