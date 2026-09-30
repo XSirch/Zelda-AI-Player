@@ -135,6 +135,8 @@ export interface LearningSnapshot {
     probe_successes: number;
     pending: boolean;
     last: string;
+    dialogue_reentry_guard?: boolean;
+    dialogue_reentry_suppressed?: number;
   };
   stick_entropy?: number;
   button_entropy?: number;
