@@ -1531,6 +1531,23 @@ class AutonomyRuntime:
                 "thinking_ms": round((time.monotonic() - self.thinking_since) * 1000)
                     if self.thinking_since else 0,
                 "intent": controller.get("intent"),
+                "objective_lock": {
+                    "active": self.objective_tracker.active,
+                    "trackable": self.objective_tracker.trackable,
+                    "objective": (
+                        self.objective_tracker.intent.objective
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "completion": (
+                        self.objective_tracker.intent.completion.model_dump()
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "completed_count": self.objective_tracker.completed_count,
+                    "last_completion": self.objective_tracker.last_completion,
+                    "replans_suppressed": self.objective_replan_suppressed,
+                },
                 "motor": controller.get("motor"),
                 "guidance": controller.get("guidance"),
                 "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
