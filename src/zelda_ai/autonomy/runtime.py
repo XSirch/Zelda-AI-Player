@@ -822,7 +822,7 @@ class AutonomyRuntime:
             self.started = time.monotonic()
             self.cognition_state = "connecting"
             self.cognition_error = ""
-            self.thought = "Starting ML actor immediately; cognition is connecting in parallel."
+            self.thought = "Selecionando próximo objetivo."
             self.thinking_since = None
             self.last_cognition_at = 0.0
             self.last_cognition_reasons = []
@@ -836,6 +836,10 @@ class AutonomyRuntime:
             self.cognition_reasons = {"run_started"}
             self.cognition_seen_dialogue_triggers.clear()
             self.cognition_seen_target_reached.clear()
+            self.objective_tracker.clear()
+            self.objective_tracker.completed_count = 0
+            self.objective_tracker.last_completion = None
+            self.objective_replan_suppressed = 0
             self.cognition_trigger.set()
 
             fingerprint = hashlib.sha256(
