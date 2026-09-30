@@ -234,6 +234,111 @@ class AutonomyRuntime:
                 return True
         return False
 
+    @staticmethod
+    def _actor_matches_objective(actor, completion) -> bool:
+        if actor is None:
+            return False
+        if (
+            completion.actor_id is not None
+            and actor.actor_id == completion.actor_id
+        ):
+            return True
+        wanted = " ".join(
+            (completion.actor_name or "").strip().casefold().split()
+        )
+        if not wanted:
+            return False
+        observed = " ".join(
+            (actor.description or actor.name or "").strip().casefold().split()
+        )
+        return observed == wanted
+
+    def _objective_operational_intent(self, strategic: AgentIntent, game) -> AgentIntent:
+        """Translate one sticky objective into local motor intent.
+
+        Trackable objectives intentionally discard cognition-provided waypoints.
+        Navigation/frontiers/routes/interactions remain local and may change
+        continuously without changing the strategic objective shown to the user.
+        """
+        if strategic.completion.kind == "manual":
+            return strategic.model_copy(
+                update={"summary": strategic.objective}
+            )
+
+        actor = None
+        for candidate in [
+            game.context_actor,
+            game.target_candidate,
+            game.target_actor,
+            *list(game.room_actors),
+        ]:
+            if self._actor_matches_objective(
+                candidate,
+                strategic.completion,
+            ):
+                actor = candidate
+                break
+
+        update = {
+            "summary": strategic.objective,
+            "mode": "explore",
+            "target_actor_id": None,
+            "target_actor_params": None,
+            "target_actor_uid": None,
+            "target_position": None,
+            "target_item_id": strategic.completion.item_id,
+            "direction": None,
+            "choice_index": None,
+            "horizon_ms": 60000,
+        }
+        if actor is not None:
+            update.update({
+                "mode": "interact",
+                "target_actor_id": actor.actor_id,
+                "target_actor_params": actor.params,
+                "target_actor_uid": actor.actor_uid,
+                "target_position": tuple(actor.position),
+            })
+        return strategic.model_copy(update=update)
+
+    def _restore_objective_operational_intent(self, game):
+        if (
+            not self.controller
+            or not self.objective_tracker.intent
+        ):
+            return
+        self.controller.set_intent(
+            self._objective_operational_intent(
+                self.objective_tracker.intent,
+                game,
+            )
+        )
+
+    def _check_objective_completion(self, state) -> bool:
+        if not self.objective_tracker.active:
+            return False
+        status = self.objective_tracker.evaluate(state)
+        if not status.completed:
+            return False
+
+        intent = self.objective_tracker.intent
+        assert intent is not None
+        completed_objective = intent.objective
+        completion_contract = intent.completion.model_dump()
+        self.objective_tracker.complete(status)
+        self.thought = f"Concluído: {completed_objective}"
+        self.log(
+            "objective_completed",
+            {
+                "objective": completed_objective,
+                "completion": completion_contract,
+                "reason": status.reason,
+                "evidence": status.evidence or {},
+            },
+        )
+        self._request_cognition("objective_completed")
+        return True
+
     def _request_dialogue_cognition(self, reason: str, key: tuple):
         if key in self.cognition_seen_dialogue_triggers:
             return
