@@ -28,6 +28,13 @@ async def test_openrouter_valid_intent_and_effort():
     assert result.usage.cost_usd == .01
     assert bodies[0]["reasoning"] == {"effort": "high", "exclude": True}
     assert bodies[0]["response_format"]["json_schema"]["strict"] is True
+    schema = bodies[0]["response_format"]["json_schema"]["schema"]
+    completion_ref = schema["properties"]["completion"]["$ref"]
+    completion_name = completion_ref.rsplit("/", 1)[-1]
+    completion_schema = schema["$defs"][completion_name]
+    assert set(completion_schema["required"]) == set(
+        completion_schema["properties"]
+    )
     assert not bodies[0]["provider"]["allow_fallbacks"]
     await provider.close()
 
