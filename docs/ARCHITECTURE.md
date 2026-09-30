@@ -60,11 +60,11 @@ Stopping revokes bridge authority first. An already-running gradient update may 
 
 ## Cognition
 
-`AgentIntent` contains objective, short spectator summary, mode, optional observed actor/coordinate target, optional direction/choice and a bounded horizon. It contains no skill name and no raw controller action.
+`AgentIntent` now carries a strategic `objective` plus a machine-verifiable `ObjectiveCompletion` contract. For trackable objectives, all movement fields are operationally neutralized: local route/frontier/interaction systems own execution. `summary` is kept equal to the objective for compatibility, not as an independent thought stream.
 
-The cognition prompt uses a compact strategic subset of structured game state, dialogue, observed actors, ML progress, learned world edges and recent events. Unknown transitions remain unknown until observed.
+`ObjectiveTracker` is the authority for strategic replanning. A trackable objective remains immutable across scene/room transitions, stuck signals, local waypoint completion, route failures and unrelated durable progress. Completion predicates cover equipment/inventory/quest items, story flags, scene/room arrival or departure, counters, magic acquisition, dialogue with an actor, native event kinds and game completion. The next strategic call happens only after the predicate becomes true.
 
-Cognition is sparse and event-driven. There is one initial call; subsequent calls are requested only by strategic evidence such as a scene/room transition, durable progress, semantic dialogue choice/resolution, death/game-over, boss defeat, or sustained motor stagnation. Target/context-action churn does not trigger cognition, and `AgentIntent.horizon_ms` is not a periodic refresh timer. Stuck replanning starts only after 90 seconds without useful progress and is rate-limited to at most one stuck-triggered request per 180 seconds.
+Semantic dialogue choices are the only transient cognition exception: the model may select `choice_index`, but runtime preserves the same locked objective/completion and automatically resumes its local operational intent when dialogue closes. Manual/untrackable objectives retain legacy event-driven reconsideration as a fallback.
 
 ## Reward
 
@@ -104,7 +104,7 @@ Codex/ChatGPT uses the official isolated Codex app-server profile. Token usage c
 The React panel intentionally exposes only:
 
 - SoH/bridge/cognition connection;
-- operational thought/intention;
+- locked strategic objective + completion predicate;
 - raw stick and currently pressed physical buttons;
 - run tokens/cache/reasoning;
 - API cost when the provider reports USD;

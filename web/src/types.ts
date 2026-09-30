@@ -1,5 +1,19 @@
+export interface ObjectiveCompletion {
+  kind: 'equipment' | 'inventory_item' | 'quest_item' | 'story_flag' | 'scene' | 'scene_room' | 'leave_scene_room' | 'rupees_at_least' | 'heart_pieces_at_least' | 'skull_tokens_at_least' | 'small_keys_at_least' | 'magic_acquired' | 'dialogue_actor' | 'event_kind' | 'game_completed' | 'manual';
+  name: string | null;
+  item_id: number | null;
+  flag: string | null;
+  scene: number | null;
+  room: number | null;
+  threshold: number | null;
+  actor_id: number | null;
+  actor_name: string | null;
+  event_kind: string | null;
+}
+
 export interface AgentIntent {
   objective: string;
+  completion: ObjectiveCompletion;
   summary: string;
   mode: 'explore' | 'navigate' | 'interact' | 'combat' | 'dialogue' | 'menu' | 'observe';
   target_actor_id: number | null;
@@ -275,6 +289,15 @@ export interface Snapshot {
     state: string;
     thinking_ms: number;
     intent: AgentIntent | null;
+    objective_lock: {
+      active: boolean;
+      trackable: boolean;
+      objective: string | null;
+      completion: ObjectiveCompletion | null;
+      completed_count: number;
+      last_completion: Record<string, unknown> | null;
+      replans_suppressed: number;
+    };
     motor: string;
     guidance: MotorGuidance | null;
     trigger: string | null;

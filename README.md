@@ -8,7 +8,7 @@ Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 
 - **ML actor goal-conditioned:** PPO local em PyTorch continua emitindo analógico N64 e bits físicos dos botões, mas um prior geométrico camera-relative transforma `target_position`/ator/direção observados em viés da própria distribuição do stick. O PPO aprende correções residuais e todos os botões. Não existe `navigate_to`, rota de Zelda ou mapping semântico de botão.
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
-- **Cognição LLM:** Codex/ChatGPT ou OpenRouter mantém apenas objetivo/intenção de alto nível. Uma inferência lenta não interrompe o controle motor. A cognição é **sparse/event-driven**: uma chamada inicial e novas chamadas somente em eventos estratégicos (transição, progresso durável, escolha/resolução relevante de diálogo, morte/boss) ou após stuck sustentado. Não existe refresh periódico por `horizon_ms`.
+- **Cognição LLM:** Codex/ChatGPT ou OpenRouter escolhe apenas o **próximo objetivo estratégico**. Quando a meta tem condição verificável, o runtime trava `objective + completion` até a telemetria provar conclusão. Troca de sala, stuck, waypoint local, progresso parcial e recuperação de rota não podem substituir a meta. A única exceção transitória é uma escolha semântica de diálogo, que não altera o objetivo. Não existe refresh periódico por `horizon_ms`.
 
 A política recebe quatro frames estruturados consecutivos e contexto espacial absoluto. A motor policy v3 não trata mais o guidance como uma sugestão fraca dentro da Beta: o PPO amostra um **stick residual**, e o stick realmente enviado ao jogo é uma mistura determinística entre esse residual e o guidance estruturado. Assim, quando existe um waypoint/rota com força 0,86, aproximadamente 86% do analógico executado vem do guidance e apenas 14% fica para correção/exploração aprendida.
 
@@ -16,13 +16,13 @@ Essa mudança altera a semântica da ação, então o treino passa a usar `.loca
 
 ### Goal-conditioned motor
 
-Texto do Luna em `summary` não controla Link. Para um destino ser acionável, a cognição precisa preencher `target_position`, `target_actor_*` ou uma direção estruturada. O motor converte esse objetivo para um vetor de analógico relativo à câmera e o injeta como prior na **mesma distribuição Beta usada pelo PPO**; os log-probs continuam coerentes para treino on-policy.
+A cognição não fornece mais waypoints operacionais para metas rastreáveis. Ela entrega uma meta como `Obtain the Kokiri Sword` junto de um contrato de conclusão como `equipment:name=Kokiri Sword`. O runtime converte essa meta em intenção local neutra; route memory, frontiers, scene exits, atores observados e affordances físicas decidem o caminho sem mudar o objetivo. `summary` é mantido igual ao texto da meta apenas por compatibilidade do contrato.
 
 O guidance v4 também usa os oito probes locais de colisão já observados pela bridge. Se o heading direto para o alvo estiver bloqueado, ele escolhe apenas um **desvio local transitável** que continue aproximadamente alinhado ao destino; isso não é A*, não cria uma rota e não contém conhecimento de Zelda. Se não existir desvio seguro, a força do prior cai para 30% e a cognição recebe `guidance_blocked` após bloqueio sustentado. Além disso, depois de 90 s sem expansão/progresso a força do alvo começa a cair, chegando a 25%, para impedir que um waypoint inacessível vire um ímã permanente.
 
 Quando existe guidance forte de navegação, a distribuição de botões também recebe um viés de quietude sem bloquear nenhum botão. A exploração PPO agora é **annealed**: stick e botões têm coeficientes de entropia separados, e a entropia dos botões cai de forma linear até zero nas primeiras ~50 mil amostras treinadas. Há ainda um custo pela **contagem esperada de botões ativos**, em vez da antiga penalidade minúscula sobre a média das probabilidades. Isso evita que os 9 Bernoullis independentes mantenham button-mashing indefinidamente. Em `combat`, `dialogue` e `menu` o guidance de stick continua desligado quando apropriado.
 
-Ao entrar no raio de um waypoint de movimento, o runtime emite `intent_target_reached` uma única vez e chama a cognição sparse para escolher o próximo ponto observado. Isso impede que um waypoint já atravessado continue puxando o motor para trás.
+Ao entrar no raio de um waypoint local, o controlador apenas avança sua execução local. Se houver uma meta rastreável travada, `intent_target_reached`, `world_transition`, `local_area_stuck`, `guidance_blocked` e progresso parcial **não chamam a IA para trocar a meta**. A próxima chamada estratégica ocorre quando o `ObjectiveTracker` confirma a condição de conclusão.
 
 Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis. O frontier escolhido vira um pequeno objetivo em coordenadas do mundo e fica **mantido** até ser alcançado, ficar ~2,5 s sem progresso ou expirar em ~7 s; ele não é recalculado a cada decisão ML. Direções `back/back_left/back_right` só são consideradas quando não existe nenhuma opção frontal/lateral transitável. Frontiers que travam entram em cooldown curto antes de poderem ser escolhidos outra vez. Se a mesma scene/room ficar sem expansão por ~20 s e o bridge expuser `scene_exits`, a saída observada passa a ter prioridade sobre continuar varrendo o interior. Se houver uma rota já percorrida até perto da saída, ela é reutilizada; caso contrário o guidance aponta para a própria superfície de transição. Nenhum mapa oculto é consultado.
 
@@ -121,6 +121,7 @@ A interface principal mostra somente:
 - cache e reasoning tokens;
 - custo API quando o provider reporta USD (ou custo parcial conhecido em runs mistas);
 - cota restante do Codex/ChatGPT;
+- **META TRAVADA** e a condição local de conclusão, incluindo quantos replans foram ignorados enquanto a meta permaneceu ativa;
 - route memory (nós, trechos, reusos e interações aprendidas), indicação `rota aprendida`, `frontier observado` ou `saída observada` conforme o guidance ativo;
 - aprendizado contextual de interação, incluindo quando o bot está testando um botão físico e quantas associações já foram aprendidas;
 - diagnóstico PPO ao vivo: botões esperados, percentual efetivo de guidance e quanto da fase de exploração ainda resta;

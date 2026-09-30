@@ -6,7 +6,7 @@ import time
 import pytest
 
 from zelda_ai.autonomy.controller import BUTTON_MASKS, ContinuousController, Setpoint
-from zelda_ai.autonomy.models import AgentIntent
+from zelda_ai.autonomy.models import AgentIntent, ObjectiveCompletion
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
 from zelda_ai.models import ActorObservation, ModelInfo, NavigationProbe, RunConfig, Usage
@@ -46,6 +46,31 @@ class SlowCognition:
         await self.release.wait()
         return InferenceResult(
             AgentIntent.bootstrap().model_dump_json(),
+            Usage(input_tokens=3, output_tokens=4, actual_model="test"),
+        )
+
+
+class ObjectiveSequenceCognition:
+    def __init__(self, intents):
+        self.intents = list(intents)
+        self.calls = 0
+        self.prompts = []
+        self.called = asyncio.Event()
+
+    async def status(self):
+        return {"connected": True}
+
+    async def models(self):
+        return [ModelInfo(id="test", name="test")]
+
+    async def think(self, config, prompt):
+        self.prompts.append(json.loads(prompt))
+        index = min(self.calls, len(self.intents) - 1)
+        intent = self.intents[index]
+        self.calls += 1
+        self.called.set()
+        return InferenceResult(
+            intent.model_dump_json(),
             Usage(input_tokens=3, output_tokens=4, actual_model="test"),
         )
 
@@ -373,6 +398,121 @@ def test_paused_observations_are_not_promoted_to_memory(tmp_path, store, state):
 
     runtime.on_state(changed, state)
     assert store.recall(runtime.namespace) == []
+
+
+@pytest.mark.asyncio
+async def test_trackable_objective_stays_locked_until_completion(
+    tmp_path, store, state, monkeypatch
+):
+    import zelda_ai.autonomy.runtime as runtime_module
+    from zelda_ai.models import EquipmentObservation
+
+    monkeypatch.setattr(runtime_module, "COGNITION_EVENT_DEBOUNCE_S", 0.01)
+    monkeypatch.setattr(runtime_module, "COGNITION_MIN_INTERVAL_S", 0.0)
+    monkeypatch.setattr(runtime_module, "COGNITION_IDLE_POLL_S", 0.01)
+
+    sword = AgentIntent(
+        objective="Obtain the Kokiri Sword",
+        completion=ObjectiveCompletion(
+            kind="equipment",
+            name="Kokiri Sword",
+        ),
+        summary="Obtain the Kokiri Sword",
+        mode="navigate",
+        # Even if cognition tries to micromanage a waypoint, the objective lock
+        # strips it and lets the local motor own navigation.
+        target_position=(999.0, 0.0, 999.0),
+        horizon_ms=60000,
+    )
+    shield = AgentIntent(
+        objective="Obtain the Deku Shield",
+        completion=ObjectiveCompletion(
+            kind="equipment",
+            name="Deku Shield",
+        ),
+        summary="Obtain the Deku Shield",
+        mode="explore",
+        horizon_ms=60000,
+    )
+    provider = ObjectiveSequenceCognition([sword, shield])
+    bridge = connected(state)
+    runtime = AutonomyRuntime(
+        bridge,
+        store,
+        {"codex": provider},
+        tmp_path / "ml",
+    )
+
+    await runtime.start(unlimited())
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    for _ in range(100):
+        if runtime.objective_tracker.trackable:
+            break
+        await asyncio.sleep(0.01)
+
+    assert provider.calls == 1
+    assert runtime.objective_tracker.intent.objective == "Obtain the Kokiri Sword"
+    assert runtime.thought == "Obtain the Kokiri Sword"
+    assert runtime.controller.intent.objective == "Obtain the Kokiri Sword"
+    assert runtime.controller.intent.mode == "explore"
+    assert runtime.controller.intent.target_position is None
+
+    # Strategic noise that previously caused replanning must not replace the
+    # objective. This includes room changes, hard stuck requests and unrelated
+    # durable progress.
+    transitioned = state.model_copy(deep=True)
+    transitioned.seq += 1
+    transitioned.room += 1
+    transitioned.scene_epoch += 1
+    bridge.state = transitioned
+    runtime.on_state(transitioned, state)
+    runtime._request_cognition("local_area_stuck")
+
+    unrelated = transitioned.model_copy(deep=True)
+    unrelated.seq += 1
+    unrelated.progress.quest_items = ["Unrelated Quest Item"]
+    bridge.state = unrelated
+    runtime.on_state(unrelated, transitioned)
+    await asyncio.sleep(0.08)
+
+    assert provider.calls == 1
+    assert runtime.objective_tracker.intent.objective == "Obtain the Kokiri Sword"
+    assert runtime.objective_replan_suppressed >= 2
+
+    # Only the measurable completion predicate unlocks the next model call.
+    acquired = unrelated.model_copy(deep=True)
+    acquired.seq += 1
+    acquired.progress.equipment = [
+        EquipmentObservation(
+            item_id=1,
+            name="Kokiri Sword",
+            equipment_type="sword",
+            value=1,
+            equipped=False,
+        )
+    ]
+    acquired.progress.owned_equipment = ["Kokiri Sword"]
+    bridge.state = acquired
+    provider.called.clear()
+    runtime.on_state(acquired, unrelated)
+
+    await asyncio.wait_for(provider.called.wait(), timeout=1.0)
+    for _ in range(100):
+        if (
+            runtime.objective_tracker.intent
+            and runtime.objective_tracker.intent.objective
+            == "Obtain the Deku Shield"
+        ):
+            break
+        await asyncio.sleep(0.01)
+
+    assert provider.calls == 2
+    assert provider.prompts[-1]["trigger_reasons"] == ["objective_completed"]
+    assert runtime.objective_tracker.completed_count == 1
+    assert runtime.objective_tracker.intent.objective == "Obtain the Deku Shield"
+    assert runtime.thought == "Obtain the Deku Shield"
+
+    await runtime.control("stop")
 
 
 @pytest.mark.asyncio

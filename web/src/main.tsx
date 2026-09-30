@@ -66,18 +66,48 @@ function ControllerView({ snapshot }: { snapshot: Snapshot | null }) {
   </section>;
 }
 
+function completionLabel(completion: Snapshot['thought']['objective_lock']['completion']) {
+  if (!completion) return 'sem condição';
+  switch (completion.kind) {
+    case 'equipment': return `até equipamento: ${completion.name ?? completion.item_id ?? '?'}`;
+    case 'inventory_item': return `até inventário: ${completion.name ?? completion.item_id ?? '?'}`;
+    case 'quest_item': return `até quest item: ${completion.name ?? '?'}`;
+    case 'story_flag': return `até story flag: ${completion.flag ?? '?'}`;
+    case 'scene': return `até scene: ${completion.name ?? completion.scene ?? '?'}`;
+    case 'scene_room': return `até scene/room: ${completion.name ?? completion.scene ?? '?'} / ${completion.room ?? '?'}`;
+    case 'leave_scene_room': return `até sair de scene/room: ${completion.scene ?? 'atual'} / ${completion.room ?? 'atual'}`;
+    case 'rupees_at_least': return `até ≥ ${completion.threshold ?? '?'} rupees`;
+    case 'heart_pieces_at_least': return `até ≥ ${completion.threshold ?? '?'} heart pieces`;
+    case 'skull_tokens_at_least': return `até ≥ ${completion.threshold ?? '?'} skull tokens`;
+    case 'small_keys_at_least': return `até ≥ ${completion.threshold ?? '?'} small keys`;
+    case 'magic_acquired': return 'até Magic Meter adquirido';
+    case 'dialogue_actor': return `até diálogo com: ${completion.actor_name ?? completion.actor_id ?? '?'}`;
+    case 'event_kind': return `até evento: ${completion.event_kind ?? '?'}`;
+    case 'game_completed': return 'até game_completed';
+    default: return 'condição não rastreável';
+  }
+}
+
 function Thought({ snapshot }: { snapshot: Snapshot | null }) {
   const thought = snapshot?.thought;
   const intent = thought?.intent;
+  const objectiveLock = thought?.objective_lock;
   const thinking = thought?.state === 'thinking';
   return <section className="thought-panel">
     <div className="section-label">
-      PENSAMENTO OPERACIONAL
-      <span className={thinking ? 'thinking live' : 'thinking'}>{thinking ? 'PENSANDO' : (thought?.state ?? 'IDLE').toUpperCase()}</span>
+      OBJETIVO AUTÔNOMO
+      <span className={thinking ? 'thinking live' : 'thinking'}>{thinking ? 'ESCOLHENDO PRÓXIMO' : (thought?.state ?? 'IDLE').toUpperCase()}</span>
     </div>
     <div className="thought-copy">
-      <p>{thought?.summary ?? 'Aguardando início.'}</p>
-      {intent?.objective && <div className="objective"><span>OBJETIVO ATUAL</span><strong>{intent.objective}</strong></div>}
+      {(objectiveLock?.objective ?? intent?.objective) && <div className="objective">
+        <span>{objectiveLock?.trackable ? 'META TRAVADA' : 'OBJETIVO ATUAL'}</span>
+        <strong>{objectiveLock?.objective ?? intent?.objective}</strong>
+        {objectiveLock?.completion && <small>
+          CONCLUSÃO: {completionLabel(objectiveLock.completion)}
+          {objectiveLock.trackable ? ' · verificação local' : ''}
+          {objectiveLock.replans_suppressed > 0 ? ` · ${objectiveLock.replans_suppressed} replans ignorados` : ''}
+        </small>}
+      </div>}
       {thought?.trigger && <div className="planner-line"><span>ÚLTIMA CHAMADA IA</span><strong>{thought.trigger}</strong></div>}
       {thought?.guidance?.active && <div className="guidance-line">
         <span>GUIDANCE DO OBJETIVO</span>

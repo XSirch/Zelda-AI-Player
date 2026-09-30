@@ -10,14 +10,14 @@
 - Collision-aware local goal guidance: observed probes bend a blocked direct heading toward a walkable side direction, hard blockage weakens the prior, prolonged dwell fades stale-target attraction, and cognition can replan on `guidance_blocked`.
 - Persistent route memory v1: directed topological edges are learned only from paths Link actually traverses and replay through the real observed edge-entry gateway rather than coarse cell centroids. Active learned edges are health-checked during replay; stalled/expired edges accumulate failure cost, enter temporary cooldown and trigger alternate route/exit/frontier recovery instead of remaining permanent attractors. Learned routes/frontiers/exits keep structured steering authority under long dwell. Targetless `explore` commits to one observed world-space frontier until arrival/stall/expiry and prioritizes observed `scene_exits` after sustained local dwell.
 - Learned interaction affordances: doors/context actions are probed one physical button at a time, successful mappings are persisted in the route graph and replayed later, and mappings are evicted after repeated failure rather than hard-coding semantic button meanings. Active linear dialogue now preempts movement and learns its advance button causally from text changes instead of allowing exploration/PPO input underneath the message box.
-- One-shot `intent_target_reached` replanning so completed waypoints do not remain stale.
+- Sticky objective lock v1: trackable strategic goals are replaced only when their structured completion predicate becomes true; local waypoint completion/stuck/scene transitions no longer cause strategic churn.
 - Four-frame structured-state stack for temporal behaviour and combat timing.
 - Online PPO learner with GAE and separate actor/learner weights.
 - RND intrinsic curiosity.
 - Observable reward shaping without a scripted Zelda quest path, including coarse-area dwell pressure rescaled so it remains an anti-loop signal without dominating PPO returns, frontier exploration, stale-waypoint `intent_progress` fadeout, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
 - Native one-shot chest-open telemetry from `FLAG_SCENE_TREASURE`, surfaced as `chest_opened`.
 - Persistent atomic PyTorch V3 training checkpoint (`.local/ml/raw-controller-ppo-rnd-v3.pt`) plus route graph and immutable completion champions under `.local/ml/champions/`; the incompatible V2 checkpoint is left untouched and each new champion freezes both policy and route-memory snapshot used by evaluation.
-- High-level `AgentIntent` cognition contract with no skill/action selector.
+- High-level `AgentIntent` cognition contract with `ObjectiveCompletion`; the LLM chooses the next strategic objective, while local systems own transient movement/interactions.
 - Codex and OpenRouter intent providers.
 - Codex token usage accounting and independent quota polling.
 - Persisted run benchmark summary with frozen terminal elapsed time, input/output token totals, known/unknown cost semantics, per-provider/model usage breakdown, and the same benchmark fields embedded in completion champion metadata.

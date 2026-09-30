@@ -19,10 +19,11 @@ from .champions import ChampionStore
 from .controller import ContinuousController
 from .features import target_point
 from .models import AgentIntent
+from .objectives import ObjectiveTracker
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
+CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -100,6 +101,8 @@ class AutonomyRuntime:
         self.cognition_reasons: set[str] = set()
         self.cognition_seen_dialogue_triggers: set[tuple] = set()
         self.cognition_seen_target_reached: set[tuple] = set()
+        self.objective_tracker = ObjectiveTracker()
+        self.objective_replan_suppressed = 0
         self.last_stuck_replan_at = 0.0
         self.guidance_blocked_since: float | None = None
         self.last_blocked_replan_at = 0.0
@@ -231,6 +234,117 @@ class AutonomyRuntime:
                 return True
         return False
 
+    @staticmethod
+    def _actor_matches_objective(actor, completion) -> bool:
+        if actor is None:
+            return False
+        if (
+            completion.actor_id is not None
+            and actor.actor_id == completion.actor_id
+        ):
+            return True
+        wanted = " ".join(
+            (completion.actor_name or "").strip().casefold().split()
+        )
+        if not wanted:
+            return False
+        observed = " ".join(
+            (actor.description or actor.name or "").strip().casefold().split()
+        )
+        return observed == wanted
+
+    def _objective_operational_intent(self, strategic: AgentIntent, game) -> AgentIntent:
+        """Translate one sticky objective into local motor intent.
+
+        Trackable objectives intentionally discard cognition-provided waypoints.
+        Navigation/frontiers/routes/interactions remain local and may change
+        continuously without changing the strategic objective shown to the user.
+        """
+        if strategic.completion.kind == "manual":
+            return strategic.model_copy(
+                update={"summary": strategic.objective}
+            )
+
+        actor = None
+        for candidate in [
+            game.context_actor,
+            game.target_candidate,
+            game.target_actor,
+            *list(game.room_actors),
+        ]:
+            if self._actor_matches_objective(
+                candidate,
+                strategic.completion,
+            ):
+                actor = candidate
+                break
+
+        update = {
+            "summary": strategic.objective,
+            "mode": "explore",
+            "target_actor_id": None,
+            "target_actor_params": None,
+            "target_actor_uid": None,
+            "target_position": None,
+            "target_item_id": strategic.completion.item_id,
+            "direction": None,
+            "choice_index": None,
+            "horizon_ms": 60000,
+        }
+        if actor is not None:
+            update.update({
+                "mode": "interact",
+                "target_actor_id": actor.actor_id,
+                "target_actor_params": actor.params,
+                "target_actor_uid": actor.actor_uid,
+                "target_position": tuple(actor.position),
+            })
+        return strategic.model_copy(update=update)
+
+    def _restore_objective_operational_intent(self, game):
+        if (
+            not self.controller
+            or not self.objective_tracker.intent
+        ):
+            return
+        if (
+            game.dialogue.active
+            and self.controller.intent.mode == "dialogue"
+        ):
+            # Preserve a transient semantic choice until the modal closes.
+            return
+        candidate = self._objective_operational_intent(
+            self.objective_tracker.intent,
+            game,
+        )
+        if candidate != self.controller.intent:
+            self.controller.set_intent(candidate)
+
+    def _check_objective_completion(self, state) -> bool:
+        if not self.objective_tracker.active:
+            return False
+        status = self.objective_tracker.evaluate(state)
+        if not status.completed:
+            return False
+
+        intent = self.objective_tracker.intent
+        assert intent is not None
+        completed_objective = intent.objective
+        completion_contract = intent.completion.model_dump()
+        self.objective_tracker.complete(status)
+        self.thought = f"Concluído: {completed_objective}"
+        self.log(
+            "objective_completed",
+            {
+                "objective": completed_objective,
+                "completion": completion_contract,
+                "reason": status.reason,
+                "evidence": status.evidence or {},
+            },
+        )
+        self._request_cognition("objective_completed")
+        return True
+
     def _request_dialogue_cognition(self, reason: str, key: tuple):
         if key in self.cognition_seen_dialogue_triggers:
             return
@@ -279,6 +393,20 @@ class AutonomyRuntime:
     def _request_cognition(self, reason: str):
         if self.state != "running":
             return
+        if (
+            reason != "objective_completed"
+            and "objective_completed" in self.cognition_reasons
+        ):
+            return
+        if (
+            self.objective_tracker.trackable
+            and reason not in {"dialogue_choice"}
+        ):
+            # A trackable strategic objective is immutable until telemetry proves
+            # its completion. World transitions, stuck signals, reached local
+            # waypoints and incidental durable progress are motor evidence only.
+            self.objective_replan_suppressed += 1
+            return
         self.cognition_reasons.add(reason)
         self.cognition_trigger.set()
 
@@ -301,6 +429,8 @@ class AutonomyRuntime:
             asyncio.create_task(self.halt("paused", "game_instance_changed"))
             return
 
+        self._check_objective_completion(state)
+        self._restore_objective_operational_intent(state)
         self._check_intent_target_reached(state)
 
         if old and old.instance_id == state.instance_id and (
@@ -400,27 +530,29 @@ class AutonomyRuntime:
                     )
 
             if old.dialogue.active and not state.dialogue.active:
-                # Linear text/signposts normally do not need LLM calls. If the
-                # current intent explicitly waited on that text, one resolution
-                # trigger prevents the planner from remaining stuck on "observe".
-                waiting_on_dialogue = bool(
-                    self.controller
-                    and self.controller.intent.mode in {"dialogue", "observe"}
-                )
-                if (
-                    old.dialogue.speaker is not None
-                    or old.dialogue.choice_count > 0
-                    or waiting_on_dialogue
-                ):
-                    self._request_dialogue_cognition(
-                        "dialogue_resolved",
-                        (
-                            state.scene,
-                            state.room,
-                            old.dialogue.text_id,
-                            "resolved",
-                        ),
+                # Dialogue is a local sub-action under a sticky objective. Once
+                # it closes, resume the objective's operational intent directly.
+                if self.objective_tracker.trackable:
+                    self._restore_objective_operational_intent(state)
+                else:
+                    waiting_on_dialogue = bool(
+                        self.controller
+                        and self.controller.intent.mode in {"dialogue", "observe"}
                     )
+                    if (
+                        old.dialogue.speaker is not None
+                        or old.dialogue.choice_count > 0
+                        or waiting_on_dialogue
+                    ):
+                        self._request_dialogue_cognition(
+                            "dialogue_resolved",
+                            (
+                                state.scene,
+                                state.room,
+                                old.dialogue.text_id,
+                                "resolved",
+                            ),
+                        )
 
             if self._durable_progress_gained(old, state):
                 self._request_cognition("durable_progress")
@@ -701,7 +833,7 @@ class AutonomyRuntime:
             self.started = time.monotonic()
             self.cognition_state = "connecting"
             self.cognition_error = ""
-            self.thought = "Starting ML actor immediately; cognition is connecting in parallel."
+            self.thought = "Selecionando próximo objetivo."
             self.thinking_since = None
             self.last_cognition_at = 0.0
             self.last_cognition_reasons = []
@@ -715,6 +847,10 @@ class AutonomyRuntime:
             self.cognition_reasons = {"run_started"}
             self.cognition_seen_dialogue_triggers.clear()
             self.cognition_seen_target_reached.clear()
+            self.objective_tracker.clear()
+            self.objective_tracker.completed_count = 0
+            self.objective_tracker.last_completion = None
+            self.objective_replan_suppressed = 0
             self.cognition_trigger.set()
 
             fingerprint = hashlib.sha256(
@@ -862,6 +998,11 @@ class AutonomyRuntime:
 
             if not self.controller:
                 continue
+            if self.objective_tracker.trackable:
+                # Trackable objectives are not reconsidered because movement is
+                # hard, slow, blocked, or locally stuck. The local motor/route
+                # system owns recovery until the completion predicate is true.
+                continue
             telemetry = self.controller.telemetry()
             learning = telemetry.get("learning", {})
             guidance = telemetry.get("guidance") or {}
@@ -921,10 +1062,10 @@ class AutonomyRuntime:
                 except (ValueError, ProviderFailure, asyncio.TimeoutError) as exc:
                     self.cognition_state = "provider_unavailable"
                     self.cognition_error = str(exc)[:240]
-                    self.thought = (
-                        "ML motor policy is still playing; high-level cognition is unavailable: "
-                        + self.cognition_error
-                    )
+                    if self.objective_tracker.intent is not None:
+                        self.thought = self.objective_tracker.intent.objective
+                    else:
+                        self.thought = "Aguardando seleção do próximo objetivo."
                     self.publish(True)
                     await asyncio.sleep(3.0)
                     continue
@@ -994,6 +1135,21 @@ class AutonomyRuntime:
                 recent_events=recent_for_model,
                 dialogue_transcript=list(self.dialogue_transcript),
                 trigger_reasons=trigger_reasons,
+                objective_lock={
+                    "active": self.objective_tracker.active,
+                    "trackable": self.objective_tracker.trackable,
+                    "objective": (
+                        self.objective_tracker.intent.objective
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "completion": (
+                        self.objective_tracker.intent.completion.model_dump()
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "last_completion": self.objective_tracker.last_completion,
+                },
             )
             prompt = json.dumps(observation, ensure_ascii=False, separators=(",", ":"))
             reason = self._budget_reason(prompt)
@@ -1091,12 +1247,10 @@ class AutonomyRuntime:
                 )
                 self.cognition_state = "error"
                 self.cognition_error = str(exc)[:240]
-                self.thought = (
-                    "Cognition failed: "
-                    + self.cognition_error
-                    + " The ML motor actor keeps playing with the last intent; "
-                    "stop and start the run to explicitly retry the provider."
-                )
+                if self.objective_tracker.intent is not None:
+                    self.thought = self.objective_tracker.intent.objective
+                else:
+                    self.thought = "Falha ao selecionar o próximo objetivo."
                 self.publish(True)
                 return
 
@@ -1111,22 +1265,90 @@ class AutonomyRuntime:
                 )
 
             self.last_cognition_at = time.monotonic()
-            self.controller.set_intent(intent)
-            self.thought = intent.summary
+            active_strategic = self.objective_tracker.intent
+            dialogue_choice_call = bool(
+                "dialogue_choice" in trigger_reasons
+                and self.objective_tracker.trackable
+                and active_strategic is not None
+            )
+
+            if dialogue_choice_call:
+                # Dialogue choice is a transient sub-action under the same
+                # strategic objective. It may not rename or replace the goal.
+                operational = self._objective_operational_intent(
+                    active_strategic,
+                    game,
+                )
+                operational = operational.model_copy(update={
+                    "mode": "dialogue",
+                    "choice_index": intent.choice_index,
+                    "summary": active_strategic.objective,
+                })
+                self.controller.set_intent(operational)
+                self.thought = active_strategic.objective
+                self.log(
+                    "dialogue_choice_selected",
+                    {
+                        "objective": active_strategic.objective,
+                        "choice_index": intent.choice_index,
+                    },
+                )
+            elif self.objective_tracker.trackable:
+                # Defensive guard for an already-running provider call that
+                # completed after the objective became locked.
+                self._restore_objective_operational_intent(game)
+                self.thought = self.objective_tracker.intent.objective
+                self.objective_replan_suppressed += 1
+            else:
+                self.objective_tracker.assign(intent, game)
+                status = self.objective_tracker.evaluate(game)
+                if status.completed:
+                    # Reject objectives whose completion predicate is already
+                    # true; immediately ask for the next unmet objective.
+                    self.objective_tracker.complete(status)
+                    self.thought = f"Concluído: {intent.objective}"
+                    self.log(
+                        "objective_rejected_already_complete",
+                        {
+                            "objective": intent.objective,
+                            "completion": intent.completion.model_dump(),
+                            "reason": status.reason,
+                            "evidence": status.evidence or {},
+                        },
+                    )
+                    self._request_cognition("objective_completed")
+                else:
+                    self.controller.set_intent(
+                        self._objective_operational_intent(intent, game)
+                    )
+                    self.thought = intent.objective
+                    if self.objective_tracker.trackable:
+                        # Events accumulated while the provider was selecting
+                        # this objective cannot immediately cause a second
+                        # strategic call. A pending semantic dialogue choice is
+                        # the only allowed transient exception.
+                        self.cognition_reasons.intersection_update(
+                            {"dialogue_choice"}
+                        )
+                        if self.cognition_reasons:
+                            self.cognition_trigger.set()
+                        else:
+                            self.cognition_trigger.clear()
+                    self.log(
+                        "objective_locked",
+                        {
+                            "objective": intent.objective,
+                            "completion": intent.completion.model_dump(),
+                            "trackable": intent.completion.kind != "manual",
+                        },
+                    )
+
             self.cognition_state = "acting"
             self.cognition_error = ""
             self.thinking_since = None
-            self.log(
-                "intent_updated",
-                {
-                    "objective": intent.objective,
-                    "mode": intent.mode,
-                    "summary": intent.summary,
-                },
-            )
 
-            # No horizon-based refresh here. The next iteration blocks until a
-            # strategic trigger or sustained stuck condition requests replanning.
+            # No horizon-based refresh. Trackable objectives are immutable until
+            # their structured completion predicate is observed.
 
     async def halt(self, state: str, reason: str):
         completion_controller: ContinuousController | None = None
@@ -1341,6 +1563,23 @@ class AutonomyRuntime:
                 "thinking_ms": round((time.monotonic() - self.thinking_since) * 1000)
                     if self.thinking_since else 0,
                 "intent": controller.get("intent"),
+                "objective_lock": {
+                    "active": self.objective_tracker.active,
+                    "trackable": self.objective_tracker.trackable,
+                    "objective": (
+                        self.objective_tracker.intent.objective
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "completion": (
+                        self.objective_tracker.intent.completion.model_dump()
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "completed_count": self.objective_tracker.completed_count,
+                    "last_completion": self.objective_tracker.last_completion,
+                    "replans_suppressed": self.objective_replan_suppressed,
+                },
                 "motor": controller.get("motor"),
                 "guidance": controller.get("guidance"),
                 "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
