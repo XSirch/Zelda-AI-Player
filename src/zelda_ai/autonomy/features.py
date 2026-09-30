@@ -233,6 +233,8 @@ def goal_guidance(
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -254,6 +256,8 @@ def goal_guidance(
     route_partial = False
     frontier_active = False
     frontier_direction = None
+    frontier_stable = False
+    frontier_age_s = None
     exit_active = False
     exit_index = None
     exit_direct_reachable = False
@@ -309,6 +313,13 @@ def goal_guidance(
             frontier_direction = (
                 str(route_hint.get("direction"))[:32]
                 if is_frontier and route_hint.get("direction") is not None
+                else None
+            )
+            frontier_stable = bool(route_hint.get("stable")) if is_frontier else False
+            age_value = route_hint.get("age_s")
+            frontier_age_s = (
+                float(age_value)
+                if is_frontier and isinstance(age_value, (int, float))
                 else None
             )
             route_waypoint = tuple(float(value) for value in waypoint)
@@ -460,6 +471,8 @@ def goal_guidance(
             "route_partial": route_partial,
             "frontier_active": frontier_active,
             "frontier_direction": frontier_direction,
+            "frontier_stable": frontier_stable,
+            "frontier_age_s": frontier_age_s,
             "exit_active": exit_active,
             "exit_index": exit_index,
             "exit_direct_reachable": exit_direct_reachable,
@@ -499,6 +512,8 @@ def goal_guidance(
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -525,6 +540,8 @@ def goal_guidance(
         "route_partial": False,
         "frontier_active": False,
         "frontier_direction": None,
+        "frontier_stable": False,
+        "frontier_age_s": None,
         "exit_active": False,
         "exit_index": None,
         "exit_direct_reachable": False,
