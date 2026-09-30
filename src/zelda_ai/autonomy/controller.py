@@ -690,13 +690,15 @@ class ContinuousController:
 
         final_target = target_point(game, self.intent)
         if game.dialogue.active or game.pause_menu.active:
-            # Modal UI owns physical control. Do not age/reselect exploration
-            # frontiers underneath a message box or menu.
+            # Modal UI owns physical control. Drop the ephemeral frontier
+            # commitment without treating the modal pause as a navigation fail.
+            self.route_graph.clear_frontier()
             route_hint = None
         elif (
             final_target is not None
             and self.intent.mode in {"navigate", "explore", "observe"}
         ):
+            self.route_graph.clear_frontier()
             route_hint = self.route_graph.next_waypoint(
                 game,
                 final_target,
@@ -721,7 +723,9 @@ class ContinuousController:
                 if prefer_exit
                 else None
             )
-            if route_hint is None:
+            if route_hint is not None:
+                self.route_graph.clear_frontier()
+            else:
                 route_hint = self.route_graph.exploration_waypoint(game)
         else:
             route_hint = None
