@@ -16,7 +16,7 @@ Essa mudança altera a semântica da ação, então o treino passa a usar `.loca
 
 ### Goal-conditioned motor
 
-Texto do Luna em `summary` não controla Link. Para um destino ser acionável, a cognição precisa preencher `target_position`, `target_actor_*` ou uma direção estruturada. O motor converte esse objetivo para um vetor de analógico relativo à câmera e o injeta como prior na **mesma distribuição Beta usada pelo PPO**; os log-probs continuam coerentes para treino on-policy.
+A cognição não fornece mais waypoints operacionais para metas rastreáveis. Ela entrega uma meta como `Obtain the Kokiri Sword` junto de um contrato de conclusão como `equipment:name=Kokiri Sword`. O runtime converte essa meta em intenção local neutra; route memory, frontiers, scene exits, atores observados e affordances físicas decidem o caminho sem mudar o objetivo. `summary` é mantido igual ao texto da meta apenas por compatibilidade do contrato.
 
 O guidance v4 também usa os oito probes locais de colisão já observados pela bridge. Se o heading direto para o alvo estiver bloqueado, ele escolhe apenas um **desvio local transitável** que continue aproximadamente alinhado ao destino; isso não é A*, não cria uma rota e não contém conhecimento de Zelda. Se não existir desvio seguro, a força do prior cai para 30% e a cognição recebe `guidance_blocked` após bloqueio sustentado. Além disso, depois de 90 s sem expansão/progresso a força do alvo começa a cair, chegando a 25%, para impedir que um waypoint inacessível vire um ímã permanente.
 
