@@ -1062,10 +1062,10 @@ class AutonomyRuntime:
                 except (ValueError, ProviderFailure, asyncio.TimeoutError) as exc:
                     self.cognition_state = "provider_unavailable"
                     self.cognition_error = str(exc)[:240]
-                    self.thought = (
-                        "ML motor policy is still playing; high-level cognition is unavailable: "
-                        + self.cognition_error
-                    )
+                    if self.objective_tracker.intent is not None:
+                        self.thought = self.objective_tracker.intent.objective
+                    else:
+                        self.thought = "Aguardando seleção do próximo objetivo."
                     self.publish(True)
                     await asyncio.sleep(3.0)
                     continue
