@@ -623,6 +623,10 @@ class LearnedRouteGraph:
             ),
         }
 
+    def clear_frontier(self):
+        """Drop ephemeral frontier commitment without marking it failed."""
+        self.active_frontier = None
+
     def interaction_button(self, key: str) -> str | None:
         row = self.interactions.get(str(key)[:200])
         if not row:
