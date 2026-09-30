@@ -202,9 +202,18 @@ h1 {
   padding-top: 28px;
   border-top: 1px solid var(--line);
 }
+.objective { margin-top: 0; }
 .planner-line,
 .guidance-line,
 .motor-line { margin-top: 22px; }
+
+.objective small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font: 10px/1.5 ui-monospace, monospace;
+  letter-spacing: .2px;
+}
 
 .objective span,
 .planner-line span,
