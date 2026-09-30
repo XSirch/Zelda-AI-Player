@@ -191,15 +191,17 @@ def build_cognition_observation(
     recent_events: list[dict],
     dialogue_transcript: list[dict],
     trigger_reasons: list[str],
+    objective_lock: dict | None = None,
 ) -> dict:
     return {
         "trigger_reasons": trigger_reasons,
         "run_goal": objective,
         "current_intent": current_intent.model_dump(),
-        "objective_lock": {
+        "objective_lock": objective_lock or {
             "active": current_intent.completion.kind != "manual",
             "objective": current_intent.objective,
             "completion": current_intent.completion.model_dump(),
+            "last_completion": None,
         },
         "state": _game_payload(game),
         "motor": motor,
