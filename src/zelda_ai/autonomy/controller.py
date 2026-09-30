@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import math
 import time
 from collections import deque
 from collections.abc import Callable
