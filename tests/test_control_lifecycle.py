@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from zelda_ai.autonomy.controller import ContinuousController, Setpoint
+from zelda_ai.autonomy.controller import BUTTON_MASKS, ContinuousController, Setpoint
 from zelda_ai.autonomy.models import AgentIntent
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
@@ -214,6 +214,112 @@ def test_contextual_interaction_probes_one_button_and_learns_success(
     controller._observe_interaction_outcome(transitioned, Reward())
     assert controller.pending_interaction_probe is None
     assert controller.route_graph.interaction_button(probe["key"]) == probe["button"]
+
+
+def test_active_linear_dialogue_neutralizes_movement_and_learns_advance(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.dialogue.active = True
+    game.dialogue.can_advance = True
+    game.dialogue.choice_count = 0
+    game.dialogue.text_id = 100
+    game.dialogue.text = "Page one"
+
+    bridge = connected(game)
+    controller = ContinuousController(
+        bridge,
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    sample = {
+        "stick": [-0.8, 0.4],
+        "policy_stick": [-0.8, 0.4],
+        "buttons": [0.0, 0.0, 1.0] + [0.0 for _ in range(6)],
+        "log_prob": 0.0,
+        "value": 0.0,
+        "guidance_strength": 0.8,
+        "button_quiet_strength": 0.0,
+    }
+    setpoint, executed, overridden = controller._dialogue_override(
+        game,
+        Setpoint(buttons=0x2000, stick_x=-64, stick_y=32, reason="ml_policy"),
+        sample,
+    )
+
+    assert overridden is True
+    assert setpoint.reason == "dialogue_probe"
+    assert setpoint.stick_x == 0
+    assert setpoint.stick_y == 0
+    assert executed["stick"] == [0.0, 0.0]
+    assert sum(1 for value in executed["buttons"] if value > 0.5) == 1
+    probe = dict(controller.pending_interaction_probe)
+    assert probe["kind"] == "dialogue"
+    assert probe["button"] != "START"
+
+    advanced = game.model_copy(deep=True)
+    advanced.dialogue.text_id = 101
+    advanced.dialogue.text = "Page two"
+
+    class Reward:
+        breakdown = {}
+
+    controller._observe_interaction_outcome(advanced, Reward())
+    assert controller.pending_interaction_probe is None
+    assert (
+        controller.route_graph.interaction_button("dialogue:advance")
+        == probe["button"]
+    )
+
+    controller.interaction_last_probe_at = 0.0
+    replay, replay_sample, replay_override = controller._dialogue_override(
+        advanced,
+        Setpoint(stick_x=80, reason="ml_policy"),
+        sample,
+    )
+    assert replay_override is True
+    assert replay.reason == "dialogue_memory"
+    assert replay.stick_x == 0
+    assert replay.stick_y == 0
+    assert replay.buttons == BUTTON_MASKS[probe["button"]]
+    assert replay_sample["stick"] == [0.0, 0.0]
+
+
+def test_active_dialogue_that_cannot_advance_holds_all_inputs(tmp_path, state):
+    game = state.model_copy(deep=True)
+    game.dialogue.active = True
+    game.dialogue.can_advance = False
+    game.dialogue.choice_count = 0
+    game.dialogue.text_id = 200
+    game.dialogue.text = "Waiting"
+
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    sample = {
+        "stick": [1.0, -1.0],
+        "policy_stick": [1.0, -1.0],
+        "buttons": [1.0 for _ in range(9)],
+        "log_prob": 0.0,
+        "value": 0.0,
+        "guidance_strength": 0.0,
+        "button_quiet_strength": 0.0,
+    }
+    setpoint, executed, overridden = controller._dialogue_override(
+        game,
+        Setpoint(buttons=0xFFFF, stick_x=80, stick_y=-80, reason="ml_policy"),
+        sample,
+    )
+
+    assert overridden is True
+    assert setpoint.reason == "dialogue_wait"
+    assert setpoint.buttons == 0
+    assert setpoint.stick_x == 0
+    assert setpoint.stick_y == 0
+    assert executed["stick"] == [0.0, 0.0]
+    assert not any(executed["buttons"])
 
 
 @pytest.mark.asyncio
