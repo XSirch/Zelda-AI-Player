@@ -175,3 +175,8 @@ def test_panel_shows_actionable_goal_guidance():
     assert "saída observada" in main
     assert "interaction_learning?:" in types
     assert "INTERAÇÃO" in main
+    assert "frontier_stable?: boolean" in types
+    assert "frontier_age_s?: number | null" in types
+    assert "mantido" in main
+    assert "frontier_completed?: number" in types
+    assert "frontier_abandoned?: number" in types

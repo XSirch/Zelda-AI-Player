@@ -21,6 +21,11 @@ ROUTE_TARGET_REACHED_DISTANCE = 95.0
 ROUTE_PARTIAL_MIN_GAIN = 80.0
 ROUTE_WAYPOINT_MIN_DISTANCE = 45.0
 ROUTE_MAX_NODES = 50_000
+FRONTIER_REACHED_DISTANCE = 45.0
+FRONTIER_PROGRESS_DELTA = 8.0
+FRONTIER_STALL_S = 2.5
+FRONTIER_MAX_AGE_S = 7.0
+FRONTIER_RETRY_COOLDOWN_S = 12.0
 
 _PROBE_YAW_OFFSETS = {
     "forward": 0.0,
@@ -86,6 +91,10 @@ class LearnedRouteGraph:
         self.exhaustion_revision = 0
         self.last_path_nodes = 0
         self.last_target_gap: float | None = None
+        self.active_frontier: dict | None = None
+        self.frontier_retry_after: dict[str, float] = {}
+        self.frontier_completed = 0
+        self.frontier_abandoned = 0
         self.load_error = ""
         self._load()
 
@@ -183,6 +192,8 @@ class LearnedRouteGraph:
         self.exhausted_partial_nodes.clear()
         self.exhaustion_revision = self.revision
         self.last_failed_search = None
+        self.active_frontier = None
+        self.frontier_retry_after.clear()
 
     def _touch_node(
         self,
@@ -612,6 +623,10 @@ class LearnedRouteGraph:
             ),
         }
 
+    def clear_frontier(self):
+        """Drop ephemeral frontier commitment without marking it failed."""
+        self.active_frontier = None
+
     def interaction_button(self, key: str) -> str | None:
         row = self.interactions.get(str(key)[:200])
         if not row:
@@ -740,22 +755,100 @@ class LearnedRouteGraph:
             "direct_reachable": bool(exit_row.direct_reachable),
         }
 
-    def exploration_waypoint(self, game: GameState) -> dict | None:
-        """Choose a local walkable frontier instead of random-stick exploration.
+    def exploration_waypoint(
+        self,
+        game: GameState,
+        *,
+        now_s: float | None = None,
+    ) -> dict | None:
+        """Hold a local observed frontier until success, stall, or expiry.
 
-        Candidates come only from collision probes already observed by the
-        bridge. Prefer a 140u probe when available, unseen route cells first,
-        then lower-visit cells. This is local frontier selection, not a hidden
-        route solver.
+        Recomputing the best relative probe every motor tick lets the greedy
+        selector collapse into a permanent left/right bias. This method instead
+        turns one observed open probe into a short-lived world-space objective.
+        Rearward probes are considered only when no forward/side option exists.
         """
         if not game.player or not game.navigation_probes:
+            self.active_frontier = None
             return None
+
+        now_s = time.monotonic() if now_s is None else float(now_s)
+        context = (
+            int(game.scene),
+            int(game.room),
+            bool(game.mirrored_world),
+            "adult" if game.player.age == "adult" else "child",
+        )
+        player_position = tuple(float(v) for v in game.player.position)
+        current_node_id = _node_id(
+            game.scene,
+            game.room,
+            player_position,
+            mirrored=game.mirrored_world,
+            age=game.player.age,
+        )
+
+        # Expired failures become eligible again after Link has had time to
+        # discover a different approach.
+        self.frontier_retry_after = {
+            key: until
+            for key, until in self.frontier_retry_after.items()
+            if until > now_s
+        }
+
+        active = self.active_frontier
+        if active is not None and active.get("context") == context:
+            waypoint = tuple(active["waypoint"])
+            distance = _distance(player_position, waypoint)
+            reached = (
+                distance <= FRONTIER_REACHED_DISTANCE
+                or current_node_id == active.get("waypoint_id")
+            )
+            if reached:
+                self.frontier_completed += 1
+                self.active_frontier = None
+            else:
+                best_distance = float(active.get("best_distance", distance))
+                if distance <= best_distance - FRONTIER_PROGRESS_DELTA:
+                    active["best_distance"] = distance
+                    active["last_progress_at"] = now_s
+                stalled = (
+                    now_s - float(active.get("last_progress_at", now_s))
+                    >= FRONTIER_STALL_S
+                )
+                expired = (
+                    now_s - float(active.get("started_at", now_s))
+                    >= FRONTIER_MAX_AGE_S
+                )
+                if not stalled and not expired:
+                    return {
+                        "waypoint": waypoint,
+                        "waypoint_id": active["waypoint_id"],
+                        "path_nodes": 1,
+                        "waypoint_index": 0,
+                        "target_gap": None,
+                        "confidence": active["confidence"],
+                        "partial": True,
+                        "frontier": True,
+                        "direction": active["direction"],
+                        "stable": True,
+                        "age_s": round(
+                            now_s - float(active["started_at"]),
+                            3,
+                        ),
+                    }
+
+                self.frontier_abandoned += 1
+                self.frontier_retry_after[str(active["waypoint_id"])] = (
+                    now_s + FRONTIER_RETRY_COOLDOWN_S
+                )
+                self.active_frontier = None
+        elif active is not None:
+            self.active_frontier = None
 
         probe_by_direction = {}
         for probe in game.navigation_probes:
             current = probe_by_direction.get(probe.direction)
-            # Longer probes produce useful steering horizon, while still
-            # requiring the bridge to have observed floor and no wall.
             if current is None or probe.distance > current.distance:
                 probe_by_direction[probe.direction] = probe
 
@@ -786,36 +879,68 @@ class LearnedRouteGraph:
                 mirrored=game.mirrored_world,
                 age=player.age,
             )
+            if self.frontier_retry_after.get(node_id, 0.0) > now_s:
+                continue
             node = self.nodes.get(node_id)
             unseen = node is None
             visits = int((node or {}).get("visits") or 0)
             alignment = math.cos(offset)
-            # Lexicographic priority: unseen > less visited > avoid reversing.
-            score = (
-                1 if unseen else 0,
-                -visits,
-                alignment,
-                distance,
-            )
-            candidates.append((score, name, waypoint, node_id, visits))
+            candidates.append({
+                "name": name,
+                "offset": offset,
+                "waypoint": waypoint,
+                "node_id": node_id,
+                "visits": visits,
+                "unseen": unseen,
+                "alignment": alignment,
+                "distance": distance,
+            })
 
         if not candidates:
             return None
 
-        _, direction, waypoint, node_id, visits = max(
+        non_rear = [
+            row for row in candidates
+            if row["name"] not in {"back_left", "back", "back_right"}
+        ]
+        if non_rear:
+            candidates = non_rear
+
+        selected = max(
             candidates,
-            key=lambda row: row[0],
+            key=lambda row: (
+                1 if row["unseen"] else 0,
+                -row["visits"],
+                row["alignment"],
+                row["distance"],
+            ),
         )
+        confidence = 1.0 if selected["visits"] > 0 else 0.5
+        self.active_frontier = {
+            "context": context,
+            "waypoint": tuple(selected["waypoint"]),
+            "waypoint_id": selected["node_id"],
+            "direction": selected["name"],
+            "confidence": confidence,
+            "started_at": now_s,
+            "last_progress_at": now_s,
+            "best_distance": _distance(
+                player_position,
+                selected["waypoint"],
+            ),
+        }
         return {
-            "waypoint": waypoint,
-            "waypoint_id": node_id,
+            "waypoint": tuple(selected["waypoint"]),
+            "waypoint_id": selected["node_id"],
             "path_nodes": 1,
             "waypoint_index": 0,
             "target_gap": None,
-            "confidence": 1.0 if visits > 0 else 0.5,
+            "confidence": confidence,
             "partial": True,
             "frontier": True,
-            "direction": direction,
+            "direction": selected["name"],
+            "stable": True,
+            "age_s": 0.0,
         }
 
     def stats(self) -> dict:
@@ -825,6 +950,13 @@ class LearnedRouteGraph:
             "edges": edge_count,
             "learned_interactions": len(self.interactions),
             "routes_reused": self.routes_reused,
+            "active_frontier": (
+                self.active_frontier.get("direction")
+                if self.active_frontier
+                else None
+            ),
+            "frontier_completed": self.frontier_completed,
+            "frontier_abandoned": self.frontier_abandoned,
             "last_path_nodes": self.last_path_nodes,
             "cached_path_nodes": len(self.active_path),
             "exhausted_partial_nodes": len(self.exhausted_partial_nodes),

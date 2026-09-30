@@ -199,14 +199,26 @@ def goal_guidance(
     area also fades the prior so a stale target cannot become a permanent magnet.
     """
     player = game.player
-    if player is None or intent.mode in {"combat", "dialogue", "menu"}:
+    modal_source = (
+        "dialogue_hold"
+        if game.dialogue.active
+        else "menu_hold"
+        if game.pause_menu.active
+        else "none"
+    )
+    if (
+        player is None
+        or game.dialogue.active
+        or game.pause_menu.active
+        or intent.mode in {"combat", "dialogue", "menu"}
+    ):
         return {
             "active": False,
             "stick": (0.0, 0.0),
             "strength": 0.0,
             "button_quiet": 0.0,
             "distance": None,
-            "source": "none",
+            "source": modal_source,
             "target": None,
             "blocked": False,
             "detour": None,
@@ -221,6 +233,8 @@ def goal_guidance(
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -242,6 +256,8 @@ def goal_guidance(
     route_partial = False
     frontier_active = False
     frontier_direction = None
+    frontier_stable = False
+    frontier_age_s = None
     exit_active = False
     exit_index = None
     exit_direct_reachable = False
@@ -297,6 +313,13 @@ def goal_guidance(
             frontier_direction = (
                 str(route_hint.get("direction"))[:32]
                 if is_frontier and route_hint.get("direction") is not None
+                else None
+            )
+            frontier_stable = bool(route_hint.get("stable")) if is_frontier else False
+            age_value = route_hint.get("age_s")
+            frontier_age_s = (
+                float(age_value)
+                if is_frontier and isinstance(age_value, (int, float))
                 else None
             )
             route_waypoint = tuple(float(value) for value in waypoint)
@@ -448,6 +471,8 @@ def goal_guidance(
             "route_partial": route_partial,
             "frontier_active": frontier_active,
             "frontier_direction": frontier_direction,
+            "frontier_stable": frontier_stable,
+            "frontier_age_s": frontier_age_s,
             "exit_active": exit_active,
             "exit_index": exit_index,
             "exit_direct_reachable": exit_direct_reachable,
@@ -487,6 +512,8 @@ def goal_guidance(
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -513,6 +540,8 @@ def goal_guidance(
         "route_partial": False,
         "frontier_active": False,
         "frontier_direction": None,
+        "frontier_stable": False,
+        "frontier_age_s": None,
         "exit_active": False,
         "exit_index": None,
         "exit_direct_reachable": False,

@@ -140,6 +140,8 @@ class ContinuousController:
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -182,6 +184,8 @@ class ContinuousController:
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -225,6 +229,8 @@ class ContinuousController:
             "route_partial": False,
             "frontier_active": False,
             "frontier_direction": None,
+            "frontier_stable": False,
+            "frontier_age_s": None,
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
@@ -263,12 +269,148 @@ class ContinuousController:
             ).digest(),
         )
 
+    @staticmethod
+    def _dialogue_interaction_key(game) -> str:
+        # The mapping is learned empirically; the key names the observed
+        # affordance class, not a semantic button assumption.
+        return "dialogue:advance"
+
+    def _dialogue_override(
+        self,
+        game,
+        setpoint: Setpoint,
+        sample: dict,
+    ) -> tuple[Setpoint, dict, bool]:
+        if not game.dialogue.active:
+            return setpoint, sample, False
+
+        # Active text owns the controller. Exploration/navigation must never
+        # continue moving Link underneath a visible message box.
+        neutral_buttons = [0.0 for _ in BUTTON_NAMES]
+        neutral_sample = {
+            **sample,
+            "stick": [0.0, 0.0],
+            "buttons": neutral_buttons,
+        }
+
+        # Choice selection remains cognition-owned. Do not let stochastic PPO
+        # accidentally confirm a choice while cognition is deciding.
+        if game.dialogue.choice_count > 0:
+            desired = (
+                self.intent.choice_index
+                if self.intent.mode == "dialogue"
+                else None
+            )
+            if desired is None or desired != game.dialogue.choice_index:
+                self.last_interaction_source = "dialogue_choice_wait"
+                return (
+                    Setpoint(reason="dialogue_choice_wait"),
+                    neutral_sample,
+                    True,
+                )
+
+        if not game.dialogue.can_advance:
+            self.last_interaction_source = "dialogue_wait"
+            return (
+                Setpoint(reason="dialogue_wait"),
+                neutral_sample,
+                True,
+            )
+
+        now = time.monotonic()
+        if self.pending_interaction_probe is not None:
+            return (
+                Setpoint(reason="dialogue_probe_wait"),
+                neutral_sample,
+                True,
+            )
+        if now - self.interaction_last_probe_at < INTERACTION_PROBE_COOLDOWN_S:
+            return (
+                Setpoint(reason="dialogue_probe_wait"),
+                neutral_sample,
+                True,
+            )
+
+        key = self._dialogue_interaction_key(game)
+        known_button = self.route_graph.interaction_button(key)
+        using_known = known_button in BUTTON_MASKS
+        if using_known:
+            button = known_button
+            source = "dialogue_memory"
+        else:
+            order = self._interaction_probe_order(key)
+            index = self.interaction_probe_index.get(key, 0)
+            button = order[index % len(order)]
+            self.interaction_probe_index[key] = index + 1
+            source = "dialogue_probe"
+
+        executed_buttons = [
+            1.0 if name == button else 0.0
+            for name in BUTTON_NAMES
+        ]
+        self.interaction_last_probe_at = now
+        self.pending_interaction_probe = {
+            "kind": "dialogue",
+            "key": key,
+            "button": button,
+            "at": now,
+            "scene": game.scene,
+            "room": game.room,
+            "dialogue_active": True,
+            "dialogue_text_id": game.dialogue.text_id,
+            "dialogue_text": game.dialogue.text,
+            "dialogue_choice_count": game.dialogue.choice_count,
+            "known": bool(using_known),
+        }
+        self.last_interaction_source = f"{source}:{button}"
+        return (
+            Setpoint(
+                buttons=BUTTON_MASKS[button],
+                stick_x=0,
+                stick_y=0,
+                reason=source,
+            ),
+            {
+                **neutral_sample,
+                "buttons": executed_buttons,
+            },
+            True,
+        )
+
     def _observe_interaction_outcome(self, game, reward):
         probe = self.pending_interaction_probe
         if probe is None:
             return
 
         now = time.monotonic()
+        if probe.get("kind") == "dialogue":
+            text_changed = bool(
+                not game.dialogue.active
+                or game.dialogue.text_id != probe.get("dialogue_text_id")
+                or game.dialogue.text != probe.get("dialogue_text")
+                or game.dialogue.choice_count
+                != probe.get("dialogue_choice_count")
+            )
+            if text_changed:
+                self.route_graph.record_interaction_success(
+                    probe["key"],
+                    probe["button"],
+                )
+                self.interaction_probe_successes += 1
+                self.last_interaction_source = (
+                    f"learned:{probe['key']}->{probe['button']}"
+                )
+                self.pending_interaction_probe = None
+                return
+            if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
+                if probe.get("known"):
+                    self.route_graph.record_interaction_failure(
+                        probe["key"],
+                        probe["button"],
+                    )
+                self.pending_interaction_probe = None
+            return
+
         current_key = self._interaction_key(game)
         major_keys = {
             "new_world_transition",
@@ -410,6 +552,7 @@ class ContinuousController:
         ]
         self.interaction_last_probe_at = now
         self.pending_interaction_probe = {
+            "kind": "context",
             "key": key,
             "button": button,
             "at": now,
@@ -552,10 +695,16 @@ class ContinuousController:
             self._enqueue_rollout(observation, done=reward.done)
 
         final_target = target_point(game, self.intent)
-        if (
+        if game.dialogue.active or game.pause_menu.active:
+            # Modal UI owns physical control. Drop the ephemeral frontier
+            # commitment without treating the modal pause as a navigation fail.
+            self.route_graph.clear_frontier()
+            route_hint = None
+        elif (
             final_target is not None
             and self.intent.mode in {"navigate", "explore", "observe"}
         ):
+            self.route_graph.clear_frontier()
             route_hint = self.route_graph.next_waypoint(
                 game,
                 final_target,
@@ -580,7 +729,9 @@ class ContinuousController:
                 if prefer_exit
                 else None
             )
-            if route_hint is None:
+            if route_hint is not None:
+                self.route_graph.clear_frontier()
+            else:
                 route_hint = self.route_graph.exploration_waypoint(game)
         else:
             route_hint = None
@@ -591,12 +742,20 @@ class ContinuousController:
             route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
-        setpoint, sample, interaction_override = self._interaction_override(
+        setpoint, sample, dialogue_override = self._dialogue_override(
             game,
-            guidance,
             setpoint,
             sample,
         )
+        if dialogue_override:
+            interaction_override = True
+        else:
+            setpoint, sample, interaction_override = self._interaction_override(
+                game,
+                guidance,
+                setpoint,
+                sample,
+            )
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -643,11 +802,19 @@ class ContinuousController:
                 f"({guidance['stick'][0]:+.2f}, {guidance['stick'][1]:+.2f}) "
                 f"mix {sample.get('guidance_strength', 0.0):.2f}{distance_text}."
             )
-        self.last_motor_summary = (
-            f"ML policy sampled raw controller: stick "
-            f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), buttons {buttons_text}."
-            + guidance_text
-        )
+        if setpoint.reason == "ml_policy":
+            self.last_motor_summary = (
+                f"ML policy sampled raw controller: stick "
+                f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), "
+                f"buttons {buttons_text}."
+                + guidance_text
+            )
+        else:
+            self.last_motor_summary = (
+                f"Local controller override {setpoint.reason}: stick "
+                f"({setpoint.stick_x:+d}, {setpoint.stick_y:+d}), "
+                f"buttons {buttons_text}."
+            )
         return setpoint
 
     async def _learner_loop(self, active: Callable[[], bool], publish: Callable[[], None]):

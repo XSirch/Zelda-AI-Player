@@ -154,6 +154,9 @@ export interface LearningSnapshot {
     learned_interactions?: number;
     routes_reused: number;
     waypoints_advanced?: number;
+    active_frontier?: string | null;
+    frontier_completed?: number;
+    frontier_abandoned?: number;
     last_path_nodes: number;
     cached_path_nodes?: number;
     exhausted_partial_nodes?: number;
@@ -237,6 +240,8 @@ export interface MotorGuidance {
   route_partial?: boolean;
   frontier_active?: boolean;
   frontier_direction?: string | null;
+  frontier_stable?: boolean;
+  frontier_age_s?: number | null;
   exit_active?: boolean;
   exit_index?: number | null;
   exit_direct_reachable?: boolean;
