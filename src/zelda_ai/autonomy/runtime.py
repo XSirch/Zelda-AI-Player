@@ -1135,6 +1135,21 @@ class AutonomyRuntime:
                 recent_events=recent_for_model,
                 dialogue_transcript=list(self.dialogue_transcript),
                 trigger_reasons=trigger_reasons,
+                objective_lock={
+                    "active": self.objective_tracker.active,
+                    "trackable": self.objective_tracker.trackable,
+                    "objective": (
+                        self.objective_tracker.intent.objective
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "completion": (
+                        self.objective_tracker.intent.completion.model_dump()
+                        if self.objective_tracker.intent
+                        else None
+                    ),
+                    "last_completion": self.objective_tracker.last_completion,
+                },
             )
             prompt = json.dumps(observation, ensure_ascii=False, separators=(",", ":"))
             reason = self._budget_reason(prompt)
