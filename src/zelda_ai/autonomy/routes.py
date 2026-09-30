@@ -484,11 +484,13 @@ class LearnedRouteGraph:
         target_position,
         *,
         excluded_endpoints: set[str] | None = None,
+        now_s: float | None = None,
     ) -> tuple[list[str] | None, float | None]:
         if start_id not in self.nodes:
             return None, None
 
         excluded_endpoints = excluded_endpoints or set()
+        now_s = time.monotonic() if now_s is None else float(now_s)
         queue: list[tuple[float, str]] = [(0.0, start_id)]
         costs = {start_id: 0.0}
         previous: dict[str, str] = {}
@@ -523,6 +525,9 @@ class LearnedRouteGraph:
             for neighbor, edge in self.edges.get(current, {}).items():
                 if neighbor not in self.nodes:
                     continue
+                edge_key = self._edge_key(current, neighbor)
+                if self.route_edge_retry_after.get(edge_key, 0.0) > now_s:
+                    continue
                 new_cost = current_cost + self._edge_cost(edge)
                 if new_cost >= costs.get(neighbor, float("inf")):
                     continue
@@ -550,9 +555,112 @@ class LearnedRouteGraph:
         return path, best_gap
 
 
-    def next_waypoint(self, game: GameState, target_position) -> dict | None:
+    def _record_route_edge_success(self):
+        if self.active_route_edge is None:
+            return
+        self.route_edge_completed += 1
+        self.active_route_edge = None
+
+    def _record_route_edge_failure(
+        self,
+        *,
+        now_s: float,
+    ):
+        active = self.active_route_edge
+        if active is None:
+            return
+        source = str(active["source"])
+        target = str(active["target"])
+        edge_key = self._edge_key(source, target)
+        self.route_edge_retry_after[edge_key] = (
+            now_s + ROUTE_EDGE_RETRY_COOLDOWN_S
+        )
+        edge = self.edges.get(source, {}).get(target)
+        if edge is not None and self.writable:
+            edge["failures"] = max(
+                0,
+                int(edge.get("failures") or 0),
+            ) + 1
+            edge["updated_at"] = time.time()
+            self.persistence_revision += 1
+            self.dirty = True
+        self.route_edge_abandoned += 1
+        self.last_route_failure_at = now_s
+        self.active_route_edge = None
+        self.active_path = []
+        self.last_failed_search = None
+
+    def _update_route_edge_attempt(
+        self,
+        game: GameState,
+        start_id: str,
+        *,
+        now_s: float,
+    ) -> bool:
+        """Return True when the current directed edge was just abandoned."""
+        active = self.active_route_edge
+        if active is None or game.player is None:
+            return False
+
+        if start_id == active.get("target"):
+            self._record_route_edge_success()
+            return False
+
+        waypoint = tuple(active["waypoint"])
+        distance = _distance(game.player.position, waypoint)
+        if distance <= ROUTE_WAYPOINT_MIN_DISTANCE:
+            self._record_route_edge_success()
+            return False
+
+        best_distance = float(active.get("best_distance", distance))
+        if distance <= best_distance - ROUTE_EDGE_PROGRESS_DELTA:
+            active["best_distance"] = distance
+            active["last_progress_at"] = now_s
+
+        stalled = (
+            now_s - float(active.get("last_progress_at", now_s))
+            >= ROUTE_EDGE_STALL_S
+        )
+        expired = (
+            now_s - float(active.get("started_at", now_s))
+            >= ROUTE_EDGE_MAX_AGE_S
+        )
+        if stalled or expired:
+            self._record_route_edge_failure(now_s=now_s)
+            return True
+        return False
+
+    def route_recovery_needed(
+        self,
+        *,
+        now_s: float | None = None,
+        window_s: float = 5.0,
+    ) -> bool:
+        if self.last_route_failure_at is None:
+            return False
+        now_s = time.monotonic() if now_s is None else float(now_s)
+        return now_s - self.last_route_failure_at <= window_s
+
+    def next_waypoint(
+        self,
+        game: GameState,
+        target_position,
+        *,
+        now_s: float | None = None,
+    ) -> dict | None:
+        now_s = time.monotonic() if now_s is None else float(now_s)
+        expired_keys = [
+            key for key, until in self.route_edge_retry_after.items()
+            if until <= now_s
+        ]
+        if expired_keys:
+            for key in expired_keys:
+                self.route_edge_retry_after.pop(key, None)
+            self.last_failed_search = None
+
         if not game.player or target_position is None:
             self.active_target_signature = None
+            self.active_route_edge = None
             self.active_target_node_id = None
             self.active_path = []
             self.counted_route_target_signature = None
@@ -579,9 +687,16 @@ class LearnedRouteGraph:
             )
         if start_id is None:
             self.active_path = []
+            self.active_route_edge = None
             self.last_path_nodes = 0
             self.last_target_gap = None
             return None
+
+        self._update_route_edge_attempt(
+            game,
+            start_id,
+            now_s=now_s,
+        )
 
         target_signature = _node_id(
             game.scene,
@@ -594,6 +709,7 @@ class LearnedRouteGraph:
             self.active_target_signature = target_signature
             self.active_target_node_id = None
             self.active_path = []
+            self.active_route_edge = None
             self.counted_route_target_signature = None
             self.exhausted_partial_nodes.clear()
             self.exhaustion_revision = self.revision
@@ -643,6 +759,7 @@ class LearnedRouteGraph:
                 start_id,
                 target_position,
                 excluded_endpoints=self.exhausted_partial_nodes,
+                now_s=now_s,
             )
             self.active_path = list(path or ())
             self.active_target_node_id = path[-1] if path else None
@@ -655,20 +772,42 @@ class LearnedRouteGraph:
             return None
 
         player_position = game.player.position
+        # Follow one observed directed edge at a time. Its crossing point is a
+        # stronger waypoint than the coarse target-cell centroid.
         waypoint_index = 1
-        while waypoint_index < len(path) - 1:
-            candidate = self.nodes[path[waypoint_index]]["position"]
-            if _distance(player_position, candidate) >= ROUTE_WAYPOINT_MIN_DISTANCE:
-                break
-            waypoint_index += 1
-
-        waypoint_id = path[waypoint_index]
-        waypoint = tuple(self.nodes[waypoint_id]["position"])
+        source_id = path[0]
+        waypoint_id = path[1]
+        edge = self.edges.get(source_id, {}).get(waypoint_id)
+        if edge is None:
+            self.active_path = []
+            self.active_route_edge = None
+            return None
+        waypoint = self._edge_waypoint(
+            edge,
+            self.nodes[waypoint_id],
+        )
+        edge_key = self._edge_key(source_id, waypoint_id)
+        if (
+            self.active_route_edge is None
+            or self.active_route_edge.get("key") != edge_key
+        ):
+            distance_to_waypoint = _distance(player_position, waypoint)
+            self.active_route_edge = {
+                "key": edge_key,
+                "source": source_id,
+                "target": waypoint_id,
+                "waypoint": waypoint,
+                "started_at": now_s,
+                "last_progress_at": now_s,
+                "best_distance": distance_to_waypoint,
+            }
         traversals = []
         for source, target in zip(path[:-1], path[1:]):
-            edge = self.edges.get(source, {}).get(target)
-            if edge:
-                traversals.append(max(1, int(edge.get("traversals") or 1)))
+            route_edge = self.edges.get(source, {}).get(target)
+            if route_edge:
+                traversals.append(
+                    max(1, int(route_edge.get("traversals") or 1))
+                )
         confidence = min(1.0, (min(traversals) if traversals else 1) / 4.0)
 
         if self.counted_route_target_signature != target_signature:
@@ -687,6 +826,11 @@ class LearnedRouteGraph:
                 isinstance(target_gap, (int, float))
                 and target_gap > ROUTE_TARGET_REACHED_DISTANCE
             ),
+            "edge_key": edge_key,
+            "edge_source": source_id,
+            "edge_target": waypoint_id,
+            "edge_failures": max(0, int(edge.get("failures") or 0)),
+            "edge_entry_position": tuple(waypoint),
         }
 
     def clear_frontier(self):
@@ -1023,6 +1167,14 @@ class LearnedRouteGraph:
             ),
             "frontier_completed": self.frontier_completed,
             "frontier_abandoned": self.frontier_abandoned,
+            "route_edge_completed": self.route_edge_completed,
+            "route_edge_abandoned": self.route_edge_abandoned,
+            "route_edges_cooling_down": len(self.route_edge_retry_after),
+            "active_route_edge": (
+                self.active_route_edge.get("key")
+                if self.active_route_edge
+                else None
+            ),
             "last_path_nodes": self.last_path_nodes,
             "cached_path_nodes": len(self.active_path),
             "exhausted_partial_nodes": len(self.exhausted_partial_nodes),
