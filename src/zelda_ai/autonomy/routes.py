@@ -602,7 +602,14 @@ class LearnedRouteGraph:
         if active is None or game.player is None:
             return False
 
-        if start_id == active.get("target"):
+        target_id = active.get("target")
+        passed_target = False
+        if self.active_path and target_id in self.active_path and start_id in self.active_path:
+            passed_target = (
+                self.active_path.index(start_id)
+                >= self.active_path.index(target_id)
+            )
+        if start_id == target_id or passed_target:
             self._record_route_edge_success()
             return False
 
@@ -749,6 +756,7 @@ class LearnedRouteGraph:
                     # here until newly observed graph structure changes it.
                     self.exhausted_partial_nodes.update(self.active_path)
                     self.active_path = []
+                    self.active_route_edge = None
                     self.last_failed_search = None
 
         if path is None:
@@ -768,6 +776,7 @@ class LearnedRouteGraph:
 
         if not path or len(path) < 2:
             self.active_path = list(path or ())
+            self.active_route_edge = None
             self.last_path_nodes = len(path or ())
             self.last_target_gap = target_gap
             return None
