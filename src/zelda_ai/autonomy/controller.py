@@ -587,6 +587,25 @@ class ContinuousController:
             True,
         )
 
+    def _should_prefer_observed_exit(
+        self,
+        game,
+        *,
+        actor_is_door: bool,
+    ) -> bool:
+        if not game.scene_exits:
+            return False
+        room_failure_pressure = self.route_graph.room_failure_pressure(game)
+        trackable_objective = self.intent.completion.kind != "manual"
+        return bool(
+            self.reward_tracker.local_dwell_seconds >= EXIT_PRIORITY_DWELL_S
+            or actor_is_door
+            or (
+                trackable_objective
+                and room_failure_pressure >= ROOM_FAILURE_EXIT_PRESSURE
+            )
+        )
+
     def _sample_setpoint(
         self,
         observation: list[float],
@@ -738,22 +757,9 @@ class ContinuousController:
                     game.context_actor.category_name or ""
                 ).strip().lower() == "door"
             )
-            room_failure_pressure = self.route_graph.room_failure_pressure(game)
-            trackable_objective = (
-                self.intent.completion.kind != "manual"
-            )
-            prefer_exit = bool(
-                game.scene_exits
-                and (
-                    self.reward_tracker.local_dwell_seconds
-                    >= EXIT_PRIORITY_DWELL_S
-                    or actor_is_door
-                    or (
-                        trackable_objective
-                        and room_failure_pressure
-                        >= ROOM_FAILURE_EXIT_PRESSURE
-                    )
-                )
+            prefer_exit = self._should_prefer_observed_exit(
+                game,
+                actor_is_door=actor_is_door,
             )
             route_hint = (
                 self.route_graph.exit_waypoint(game)
