@@ -66,8 +66,11 @@ class ObjectiveCompletion(BaseModel):
             raise ValueError("story_flag completion needs flag")
         if self.kind == "scene" and self.scene is None and not self.name:
             raise ValueError("scene completion needs scene or name")
-        if self.kind == "scene_room" and self.room is None:
-            raise ValueError("scene_room completion needs room")
+        if self.kind == "scene_room" and (
+            self.room is None
+            or (self.scene is None and not self.name)
+        ):
+            raise ValueError("scene_room completion needs scene/name and room")
         if self.kind.endswith("_at_least") and self.threshold is None:
             raise ValueError(f"{self.kind} completion needs threshold")
         if (
