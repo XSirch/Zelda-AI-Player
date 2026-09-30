@@ -17,7 +17,7 @@
 - Observable reward shaping without a scripted Zelda quest path, including coarse-area dwell pressure rescaled so it remains an anti-loop signal without dominating PPO returns, frontier exploration, stale-waypoint `intent_progress` fadeout, and delta-based resource rewards (rupees/ammo/health/magic) that naturally suppress full-capacity pickups.
 - Native one-shot chest-open telemetry from `FLAG_SCENE_TREASURE`, surfaced as `chest_opened`.
 - Persistent atomic PyTorch V3 training checkpoint (`.local/ml/raw-controller-ppo-rnd-v3.pt`) plus route graph and immutable completion champions under `.local/ml/champions/`; the incompatible V2 checkpoint is left untouched and each new champion freezes both policy and route-memory snapshot used by evaluation.
-- High-level `AgentIntent` cognition contract with no skill/action selector.
+- High-level `AgentIntent` cognition contract with `ObjectiveCompletion`; the LLM chooses the next strategic objective, while local systems own transient movement/interactions.
 - Codex and OpenRouter intent providers.
 - Codex token usage accounting and independent quota polling.
 - Persisted run benchmark summary with frozen terminal elapsed time, input/output token totals, known/unknown cost semantics, per-provider/model usage breakdown, and the same benchmark fields embedded in completion champion metadata.
