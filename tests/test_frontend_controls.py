@@ -196,5 +196,10 @@ def test_panel_shows_actionable_goal_guidance():
     assert "route_edge_failures?: number" in types
     assert "route_edge_abandoned?: number" in types
     assert "route_edges_cooling_down?: number" in types
+    assert "frontier_failed_cells?: number" in types
+    assert "frontier_failure_total?: number" in types
+    assert "room_failure_pressure?: number" in types
     assert "aresta falhou" in main
     assert "em cooldown" in main
+    assert "células penalizadas" in main
+    assert "pressão sala" in main
