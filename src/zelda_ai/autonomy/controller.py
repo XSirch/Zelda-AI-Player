@@ -47,6 +47,8 @@ EXIT_PRIORITY_DWELL_S = 20.0
 ROOM_FAILURE_EXIT_PRESSURE = 6
 INTERACTION_PROBE_COOLDOWN_S = 0.35
 INTERACTION_OUTCOME_WINDOW_S = 1.5
+DIALOGUE_REENTRY_GUARD_S = 8.0
+DIALOGUE_REENTRY_CLEAR_DISTANCE = 120.0
 
 
 @dataclass(frozen=True)
@@ -120,6 +122,8 @@ class ContinuousController:
         self.pending_interaction_probe: dict | None = None
         self.interaction_probe_successes = 0
         self.last_interaction_source = "none"
+        self.dialogue_reentry_guard: dict | None = None
+        self.dialogue_reentry_suppressed = 0
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -166,6 +170,8 @@ class ContinuousController:
         self.interaction_last_probe_at = 0.0
         self.pending_interaction_probe = None
         self.last_interaction_source = "none"
+        self.dialogue_reentry_guard = None
+        self.dialogue_reentry_suppressed = 0
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -274,6 +280,101 @@ class ContinuousController:
             key=lambda name: hashlib.sha256(
                 f"{key}|{name}".encode("utf-8")
             ).digest(),
+        )
+
+    def note_dialogue_closed(self, old_game, game):
+        """Release the closing button and prevent immediate dialogue re-entry."""
+        if not old_game.dialogue.active or game.dialogue.active:
+            return
+        now = time.monotonic()
+        position = (
+            tuple(float(v) for v in game.player.position)
+            if game.player is not None
+            else tuple(float(v) for v in old_game.player.position)
+            if old_game.player is not None
+            else None
+        )
+        speaker = old_game.dialogue.speaker
+        closing_button = None
+        if (
+            self.pending_interaction_probe is not None
+            and self.pending_interaction_probe.get("kind") == "dialogue"
+        ):
+            closing_button = self.pending_interaction_probe.get("button")
+        if closing_button is None:
+            closing_button = self.route_graph.interaction_button(
+                "dialogue:advance"
+            )
+
+        self.dialogue_reentry_guard = {
+            "scene": int(game.scene),
+            "room": int(game.room),
+            "anchor": position,
+            "speaker_uid": speaker.actor_uid if speaker is not None else None,
+            "speaker_id": speaker.actor_id if speaker is not None else None,
+            "text_id": old_game.dialogue.text_id,
+            "closing_button": closing_button,
+            "started_at": now,
+            "until": now + DIALOGUE_REENTRY_GUARD_S,
+        }
+        self.pending_interaction_probe = None
+        self.interaction_last_probe_at = now
+
+        # Dialogue may close between repeated-action ticks. Explicitly release
+        # the closing button now so the old lease cannot reopen the same text
+        # before the next ML decision.
+        self.last_setpoint = Setpoint(
+            buttons=0,
+            stick_x=self.last_setpoint.stick_x,
+            stick_y=self.last_setpoint.stick_y,
+            reason="dialogue_disengage",
+        )
+        self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+        self.last_interaction_source = "dialogue_disengage"
+
+    def _dialogue_reentry_override(
+        self,
+        game,
+        setpoint: Setpoint,
+        sample: dict,
+    ) -> tuple[Setpoint, dict, bool]:
+        guard = self.dialogue_reentry_guard
+        if guard is None or game.dialogue.active:
+            return setpoint, sample, False
+
+        now = time.monotonic()
+        if (
+            int(game.scene) != int(guard["scene"])
+            or int(game.room) != int(guard["room"])
+            or now >= float(guard["until"])
+        ):
+            self.dialogue_reentry_guard = None
+            return setpoint, sample, False
+
+        anchor = guard.get("anchor")
+        if anchor is not None and game.player is not None:
+            if math.dist(game.player.position, anchor) >= DIALOGUE_REENTRY_CLEAR_DISTANCE:
+                self.dialogue_reentry_guard = None
+                return setpoint, sample, False
+
+        # Preserve stick authority so route/frontier/exit logic can move Link
+        # away, but suppress all buttons while still in the re-entry zone. This
+        # avoids assuming which semantic button started the conversation.
+        neutral_buttons = [0.0 for _ in BUTTON_NAMES]
+        self.dialogue_reentry_suppressed += 1
+        self.last_interaction_source = "dialogue_disengage"
+        return (
+            Setpoint(
+                buttons=0,
+                stick_x=setpoint.stick_x,
+                stick_y=setpoint.stick_y,
+                reason="dialogue_disengage",
+            ),
+            {
+                **sample,
+                "buttons": neutral_buttons,
+            },
+            True,
         )
 
     @staticmethod
@@ -787,12 +888,24 @@ class ContinuousController:
         if dialogue_override:
             interaction_override = True
         else:
-            setpoint, sample, interaction_override = self._interaction_override(
+            (
+                setpoint,
+                sample,
+                dialogue_reentry_override,
+            ) = self._dialogue_reentry_override(
                 game,
-                guidance,
                 setpoint,
                 sample,
             )
+            if dialogue_reentry_override:
+                interaction_override = True
+            else:
+                setpoint, sample, interaction_override = self._interaction_override(
+                    game,
+                    guidance,
+                    setpoint,
+                    sample,
+                )
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -1067,6 +1180,8 @@ class ContinuousController:
                     "probe_successes": self.interaction_probe_successes,
                     "pending": bool(self.pending_interaction_probe),
                     "last": self.last_interaction_source,
+                    "dialogue_reentry_guard": bool(self.dialogue_reentry_guard),
+                    "dialogue_reentry_suppressed": self.dialogue_reentry_suppressed,
                 },
                 "useful_progress_rate": round(
                     sum(1 for value in self.useful_progress_window if value)
