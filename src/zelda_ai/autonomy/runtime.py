@@ -534,6 +534,8 @@ class AutonomyRuntime:
                     )
 
             if old.dialogue.active and not state.dialogue.active:
+                if self.controller:
+                    self.controller.note_dialogue_closed(old, state)
                 # Dialogue is a local sub-action under a sticky objective. Once
                 # it closes, resume the objective's operational intent directly.
                 if self.objective_tracker.trackable:
