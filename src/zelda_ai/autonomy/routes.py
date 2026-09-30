@@ -608,10 +608,9 @@ class LearnedRouteGraph:
 
         waypoint = tuple(active["waypoint"])
         distance = _distance(game.player.position, waypoint)
-        if distance <= ROUTE_WAYPOINT_MIN_DISTANCE:
-            self._record_route_edge_success()
-            return False
-
+        # entry_position was sampled after Link actually crossed into the
+        # target cell. Reaching "near" it is not sufficient; keep steering
+        # until the current coarse node really changes to the edge target.
         best_distance = float(active.get("best_distance", distance))
         if distance <= best_distance - ROUTE_EDGE_PROGRESS_DELTA:
             active["best_distance"] = distance
@@ -692,12 +691,6 @@ class LearnedRouteGraph:
             self.last_target_gap = None
             return None
 
-        self._update_route_edge_attempt(
-            game,
-            start_id,
-            now_s=now_s,
-        )
-
         target_signature = _node_id(
             game.scene,
             game.room,
@@ -705,7 +698,8 @@ class LearnedRouteGraph:
             mirrored=game.mirrored_world,
             age=game.player.age,
         )
-        if self.active_target_signature != target_signature:
+        target_changed = self.active_target_signature != target_signature
+        if target_changed:
             self.active_target_signature = target_signature
             self.active_target_node_id = None
             self.active_path = []
@@ -714,7 +708,14 @@ class LearnedRouteGraph:
             self.exhausted_partial_nodes.clear()
             self.exhaustion_revision = self.revision
             self.last_failed_search = None
-        elif self.exhaustion_revision != self.revision:
+        else:
+            self._update_route_edge_attempt(
+                game,
+                start_id,
+                now_s=now_s,
+            )
+
+        if not target_changed and self.exhaustion_revision != self.revision:
             # New observed nodes/edges may extend a formerly dead-end branch.
             self.exhausted_partial_nodes.clear()
             self.exhaustion_revision = self.revision
