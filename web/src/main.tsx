@@ -296,6 +296,12 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
       </span>
       {interactionLearning && <span>
         INTERAÇÃO <b>{interactionLearning.learned}</b> aprendidas · <b>{interactionLearning.probe_successes}</b> sucessos · {interactionLearning.pending ? 'testando botão' : interactionLearning.last}
+        {interactionLearning.dialogue_reentry_guard
+          ? <> · <b>desengatando diálogo</b></>
+          : null}
+        {(interactionLearning.dialogue_reentry_suppressed ?? 0) > 0
+          ? <> · <b>{compact(interactionLearning.dialogue_reentry_suppressed ?? 0)}</b> reentradas bloqueadas</>
+          : null}
       </span>}
     </div>
     <div className="learning-body">
