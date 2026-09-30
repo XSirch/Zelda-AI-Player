@@ -25,6 +25,7 @@ CompletionKind = Literal[
     "scene",
     "scene_room",
     "leave_scene_room",
+    "leave_scene_room",
     "rupees_at_least",
     "heart_pieces_at_least",
     "skull_tokens_at_least",
