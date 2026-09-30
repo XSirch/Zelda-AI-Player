@@ -1307,6 +1307,18 @@ class AutonomyRuntime:
                         self._objective_operational_intent(intent, game)
                     )
                     self.thought = intent.objective
+                    if self.objective_tracker.trackable:
+                        # Events accumulated while the provider was selecting
+                        # this objective cannot immediately cause a second
+                        # strategic call. A pending semantic dialogue choice is
+                        # the only allowed transient exception.
+                        self.cognition_reasons.intersection_update(
+                            {"dialogue_choice"}
+                        )
+                        if self.cognition_reasons:
+                            self.cognition_trigger.set()
+                        else:
+                            self.cognition_trigger.clear()
                     self.log(
                         "objective_locked",
                         {
