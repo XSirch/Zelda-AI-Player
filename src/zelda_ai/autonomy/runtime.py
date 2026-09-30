@@ -394,6 +394,11 @@ class AutonomyRuntime:
         if self.state != "running":
             return
         if (
+            reason != "objective_completed"
+            and "objective_completed" in self.cognition_reasons
+        ):
+            return
+        if (
             self.objective_tracker.trackable
             and reason not in {"dialogue_choice"}
         ):
