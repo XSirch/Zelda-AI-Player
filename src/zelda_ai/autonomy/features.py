@@ -199,14 +199,26 @@ def goal_guidance(
     area also fades the prior so a stale target cannot become a permanent magnet.
     """
     player = game.player
-    if player is None or intent.mode in {"combat", "dialogue", "menu"}:
+    modal_source = (
+        "dialogue_hold"
+        if game.dialogue.active
+        else "menu_hold"
+        if game.pause_menu.active
+        else "none"
+    )
+    if (
+        player is None
+        or game.dialogue.active
+        or game.pause_menu.active
+        or intent.mode in {"combat", "dialogue", "menu"}
+    ):
         return {
             "active": False,
             "stick": (0.0, 0.0),
             "strength": 0.0,
             "button_quiet": 0.0,
             "distance": None,
-            "source": "none",
+            "source": modal_source,
             "target": None,
             "blocked": False,
             "detour": None,
