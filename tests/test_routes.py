@@ -48,6 +48,74 @@ def test_route_graph_learns_persists_and_reuses_observed_detour(tmp_path, state)
     assert loaded.stats()["routes_reused"] == 1
 
 
+def test_route_replay_uses_actual_observed_edge_entry_not_cell_average(
+    tmp_path, state
+):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    start = (0.0, 0.0, 0.0)
+    crossed = (81.0, 0.0, 10.0)
+    graph.observe(_at(state, start, 1000), now_s=1.0)
+    graph.observe(_at(state, crossed, 1001), now_s=2.0)
+
+    source_id = next(iter(graph.edges))
+    target_id = next(iter(graph.edges[source_id]))
+    edge = graph.edges[source_id][target_id]
+    assert tuple(edge["entry_position"]) == crossed
+
+    # Simulate the coarse target node representative drifting toward another
+    # part of the same 80u cell. Replay must still aim at the actually traversed
+    # crossing point rather than this potentially unsafe centroid.
+    graph.nodes[target_id]["position"] = [81.0, 0.0, 70.0]
+    graph.reset_trace()
+
+    hint = graph.next_waypoint(
+        _at(state, start, 1002),
+        (160.0, 0.0, 0.0),
+        now_s=0.0,
+    )
+
+    assert hint is not None
+    assert hint["edge_target"] == target_id
+    assert hint["waypoint"] == crossed
+    assert hint["edge_entry_position"] == crossed
+
+
+def test_stalled_learned_edge_is_cooled_down_and_alternate_route_is_used(
+    tmp_path, state
+):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    start = (0.0, 0.0, 0.0)
+    preferred = (81.0, 0.0, 0.0)
+    alternate = (81.0, 0.0, 81.0)
+
+    graph.observe(_at(state, start, 1100), now_s=1.0)
+    graph.observe(_at(state, preferred, 1101), now_s=2.0)
+    graph.reset_trace()
+    graph.observe(_at(state, start, 1102), now_s=3.0)
+    graph.observe(_at(state, alternate, 1103), now_s=4.0)
+    graph.reset_trace()
+
+    target = (240.0, 0.0, 0.0)
+    stationary = _at(state, start, 1104)
+    first = graph.next_waypoint(stationary, target, now_s=0.0)
+    assert first is not None
+    preferred_edge = first["edge_key"]
+
+    held = graph.next_waypoint(stationary, target, now_s=1.0)
+    assert held is not None
+    assert held["edge_key"] == preferred_edge
+
+    recovered = graph.next_waypoint(stationary, target, now_s=3.0)
+    assert recovered is not None
+    assert recovered["edge_key"] != preferred_edge
+    assert graph.stats()["route_edge_abandoned"] == 1
+    assert graph.stats()["route_edges_cooling_down"] == 1
+    assert graph.route_recovery_needed(now_s=3.0) is True
+
+    source, target_id = preferred_edge.split("->", 1)
+    assert graph.edges[source][target_id]["failures"] == 1
+
+
 def test_route_graph_reuses_partial_path_toward_unvisited_target(tmp_path, state):
     graph = LearnedRouteGraph(tmp_path / "routes.json")
     positions = [
