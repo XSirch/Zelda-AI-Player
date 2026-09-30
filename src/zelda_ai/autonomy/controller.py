@@ -302,6 +302,12 @@ class ContinuousController:
             and self.pending_interaction_probe.get("kind") == "dialogue"
         ):
             closing_button = self.pending_interaction_probe.get("button")
+            if closing_button:
+                self.route_graph.record_interaction_success(
+                    "dialogue:advance",
+                    str(closing_button),
+                )
+                self.interaction_probe_successes += 1
         if closing_button is None:
             closing_button = self.route_graph.interaction_button(
                 "dialogue:advance"
