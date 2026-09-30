@@ -96,7 +96,7 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
             ? ` · rota aprendida${thought.guidance.route_partial ? ' parcial' : ''} ${thought.guidance.route_path_nodes ?? 0} nós · confiança ${Math.round((thought.guidance.route_confidence ?? 0) * 100)}%`
             : ''}
           {thought.guidance.frontier_active
-            ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}`
+            ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}${thought.guidance.frontier_stable ? ` · mantido ${(thought.guidance.frontier_age_s ?? 0).toFixed(1)}s` : ''}`
             : ''}
           {thought.guidance.exit_active
             ? ` · saída observada #${thought.guidance.exit_index ?? '?'}${thought.guidance.exit_direct_reachable ? ' direta' : ' via rota'}`
@@ -236,6 +236,10 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
       {bestChampion && <span>BEST TIME <b>{bestChampion.id}</b> · {durationLabel(bestChampion.elapsed_s)}</span>}
       {routeMemory && <span>
         ROTAS APRENDIDAS <b>{compact(routeMemory.nodes)}</b> nós · <b>{compact(routeMemory.edges)}</b> trechos · <b>{compact(routeMemory.routes_reused)}</b> reusos · <b>{compact(routeMemory.waypoints_advanced ?? 0)}</b> avanços · <b>{compact(routeMemory.learned_interactions ?? 0)}</b> interações
+        {routeMemory.active_frontier ? <> · frontier <b>{routeMemory.active_frontier}</b></> : null}
+        {(routeMemory.frontier_completed ?? 0) || (routeMemory.frontier_abandoned ?? 0)
+          ? <> · <b>{compact(routeMemory.frontier_completed ?? 0)}</b> concluídos / <b>{compact(routeMemory.frontier_abandoned ?? 0)}</b> abandonados</>
+          : null}
       </span>}
     </div>
     <div className="resource-strip">
