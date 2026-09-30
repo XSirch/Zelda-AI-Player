@@ -19,10 +19,11 @@ from .champions import ChampionStore
 from .controller import ContinuousController
 from .features import target_point
 from .models import AgentIntent
+from .objectives import ObjectiveTracker
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
+CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -100,6 +101,8 @@ class AutonomyRuntime:
         self.cognition_reasons: set[str] = set()
         self.cognition_seen_dialogue_triggers: set[tuple] = set()
         self.cognition_seen_target_reached: set[tuple] = set()
+        self.objective_tracker = ObjectiveTracker()
+        self.objective_replan_suppressed = 0
         self.last_stuck_replan_at = 0.0
         self.guidance_blocked_since: float | None = None
         self.last_blocked_replan_at = 0.0
