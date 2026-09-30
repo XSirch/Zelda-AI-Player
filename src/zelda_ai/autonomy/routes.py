@@ -218,6 +218,7 @@ class LearnedRouteGraph:
             self.nodes = {}
             self.edges = {}
             self.interactions = {}
+            self.frontier_failures = {}
             self.by_scene = {}
             self.load_error = f"{type(exc).__name__}: {str(exc)[:160]}"
 
