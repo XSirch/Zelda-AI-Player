@@ -178,6 +178,95 @@ def test_targetless_exploration_prefers_unseen_open_probe(tmp_path, state):
     assert hint["waypoint"][0] < -120.0 or hint["waypoint"][0] > 120.0
 
 
+def test_frontier_commitment_does_not_flip_each_motor_tick(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    game = _at(state, (0.0, 0.0, 0.0), 650)
+    game.player.yaw = 0
+    game.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+        NavigationProbe(
+            direction="left",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+
+    first = graph.exploration_waypoint(game, now_s=0.0)
+    assert first is not None
+    assert first["direction"] == "forward"
+
+    # Even if the current probes now make left the only fresh candidate, hold
+    # the world-space frontier briefly instead of greedily flipping directions.
+    game.navigation_probes = [
+        NavigationProbe(
+            direction="left",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+    held = graph.exploration_waypoint(game, now_s=1.0)
+    assert held is not None
+    assert held["direction"] == "forward"
+    assert held["waypoint"] == first["waypoint"]
+    assert held["stable"] is True
+
+    # With no progress, the commitment expires and the failed frontier is
+    # temporarily blacklisted; only then may the selector choose left.
+    replacement = graph.exploration_waypoint(game, now_s=3.0)
+    assert replacement is not None
+    assert replacement["direction"] == "left"
+    assert graph.stats()["frontier_abandoned"] == 1
+
+
+def test_frontier_does_not_choose_rearward_when_front_or_side_is_open(
+    tmp_path, state
+):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    origin = _at(state, (0.0, 0.0, 0.0), 660)
+    visited_forward = _at(state, (0.0, 0.0, 140.0), 661)
+    graph.observe(origin, now_s=1.0)
+    graph.observe(visited_forward, now_s=2.0)
+    graph.reset_trace()
+
+    origin.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+        NavigationProbe(
+            direction="back_left",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+
+    hint = graph.exploration_waypoint(origin, now_s=10.0)
+    assert hint is not None
+    # back_left is unseen, while forward was visited, but reverse exploration
+    # still loses when any non-rear walkable option exists.
+    assert hint["direction"] == "forward"
+
+
 def test_exit_waypoint_prefers_direct_reachable_observed_exit(tmp_path, state):
     graph = LearnedRouteGraph(tmp_path / "routes.json")
     game = _at(state, (0.0, 0.0, 0.0), 700)
