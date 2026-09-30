@@ -171,6 +171,9 @@ export interface LearningSnapshot {
     active_frontier?: string | null;
     frontier_completed?: number;
     frontier_abandoned?: number;
+    frontier_failed_cells?: number;
+    frontier_failure_total?: number;
+    room_failure_pressure?: number;
     route_edge_completed?: number;
     route_edge_abandoned?: number;
     route_edges_cooling_down?: number;
