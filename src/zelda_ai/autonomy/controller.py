@@ -689,7 +689,11 @@ class ContinuousController:
             self._enqueue_rollout(observation, done=reward.done)
 
         final_target = target_point(game, self.intent)
-        if (
+        if game.dialogue.active or game.pause_menu.active:
+            # Modal UI owns physical control. Do not age/reselect exploration
+            # frontiers underneath a message box or menu.
+            route_hint = None
+        elif (
             final_target is not None
             and self.intent.mode in {"navigate", "explore", "observe"}
         ):
