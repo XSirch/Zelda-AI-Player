@@ -26,6 +26,7 @@ FRONTIER_PROGRESS_DELTA = 8.0
 FRONTIER_STALL_S = 2.5
 FRONTIER_MAX_AGE_S = 7.0
 FRONTIER_RETRY_COOLDOWN_S = 12.0
+FRONTIER_AVOID_FAILURES = 3
 ROUTE_EDGE_PROGRESS_DELTA = 8.0
 ROUTE_EDGE_STALL_S = 2.5
 ROUTE_EDGE_MAX_AGE_S = 8.0
@@ -97,6 +98,7 @@ class LearnedRouteGraph:
         self.last_target_gap: float | None = None
         self.active_frontier: dict | None = None
         self.frontier_retry_after: dict[str, float] = {}
+        self.frontier_failures: dict[str, int] = {}
         self.frontier_completed = 0
         self.frontier_abandoned = 0
         self.active_route_edge: dict | None = None
@@ -126,10 +128,12 @@ class LearnedRouteGraph:
             nodes = data.get("nodes")
             edges = data.get("edges")
             interactions = data.get("interactions") or {}
+            frontier_failures = data.get("frontier_failures") or {}
             if (
                 not isinstance(nodes, dict)
                 or not isinstance(edges, dict)
                 or not isinstance(interactions, dict)
+                or not isinstance(frontier_failures, dict)
             ):
                 raise ValueError("invalid route graph payload")
             for node_id, row in nodes.items():
@@ -201,10 +205,20 @@ class LearnedRouteGraph:
                     "failures": max(0, int(row.get("failures") or 0)),
                     "updated_at": float(row.get("updated_at") or 0.0),
                 }
+            for key, value in frontier_failures.items():
+                if not isinstance(key, str):
+                    continue
+                try:
+                    failures = max(0, int(value))
+                except (TypeError, ValueError):
+                    continue
+                if failures > 0:
+                    self.frontier_failures[key[:200]] = failures
         except (OSError, ValueError, TypeError) as exc:
             self.nodes = {}
             self.edges = {}
             self.interactions = {}
+            self.frontier_failures = {}
             self.by_scene = {}
             self.load_error = f"{type(exc).__name__}: {str(exc)[:160]}"
 
@@ -402,6 +416,7 @@ class LearnedRouteGraph:
                     key: dict(row)
                     for key, row in self.interactions.items()
                 },
+                "frontier_failures": dict(self.frontier_failures),
                 "saved_at": time.time(),
             }
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -1026,6 +1041,16 @@ class LearnedRouteGraph:
             )
             if reached:
                 self.frontier_completed += 1
+                waypoint_id = str(active["waypoint_id"])
+                previous_failures = self.frontier_failures.get(waypoint_id, 0)
+                if previous_failures > 0:
+                    if previous_failures == 1:
+                        self.frontier_failures.pop(waypoint_id, None)
+                    else:
+                        self.frontier_failures[waypoint_id] = previous_failures - 1
+                    if self.writable:
+                        self.persistence_revision += 1
+                        self.dirty = True
                 self.active_frontier = None
             else:
                 best_distance = float(active.get("best_distance", distance))
@@ -1059,9 +1084,16 @@ class LearnedRouteGraph:
                     }
 
                 self.frontier_abandoned += 1
-                self.frontier_retry_after[str(active["waypoint_id"])] = (
+                failed_id = str(active["waypoint_id"])
+                self.frontier_retry_after[failed_id] = (
                     now_s + FRONTIER_RETRY_COOLDOWN_S
                 )
+                self.frontier_failures[failed_id] = (
+                    self.frontier_failures.get(failed_id, 0) + 1
+                )
+                if self.writable:
+                    self.persistence_revision += 1
+                    self.dirty = True
                 self.active_frontier = None
         elif active is not None:
             self.active_frontier = None
@@ -1104,6 +1136,7 @@ class LearnedRouteGraph:
             node = self.nodes.get(node_id)
             unseen = node is None
             visits = int((node or {}).get("visits") or 0)
+            failures = max(0, int(self.frontier_failures.get(node_id, 0)))
             alignment = math.cos(offset)
             candidates.append({
                 "name": name,
@@ -1111,6 +1144,7 @@ class LearnedRouteGraph:
                 "waypoint": waypoint,
                 "node_id": node_id,
                 "visits": visits,
+                "failures": failures,
                 "unseen": unseen,
                 "alignment": alignment,
                 "distance": distance,
@@ -1126,9 +1160,17 @@ class LearnedRouteGraph:
         if non_rear:
             candidates = non_rear
 
+        healthy = [
+            row for row in candidates
+            if row["failures"] < FRONTIER_AVOID_FAILURES
+        ]
+        if healthy:
+            candidates = healthy
+
         selected = max(
             candidates,
             key=lambda row: (
+                -row["failures"],
                 1 if row["unseen"] else 0,
                 -row["visits"],
                 row["alignment"],
@@ -1142,6 +1184,7 @@ class LearnedRouteGraph:
             "waypoint_id": selected["node_id"],
             "direction": selected["name"],
             "confidence": confidence,
+            "failures": selected["failures"],
             "started_at": now_s,
             "last_progress_at": now_s,
             "best_distance": _distance(
@@ -1159,9 +1202,33 @@ class LearnedRouteGraph:
             "partial": True,
             "frontier": True,
             "direction": selected["name"],
+            "frontier_failures": selected["failures"],
             "stable": True,
             "age_s": 0.0,
         }
+
+    def room_failure_pressure(self, game: GameState) -> int:
+        if game.player is None:
+            return 0
+        age_key = "adult" if game.player.age == "adult" else "child"
+        prefix = (
+            f"{int(bool(game.mirrored_world))}:{age_key}:"
+            f"{int(game.scene)}:{int(game.room)}:"
+        )
+        frontier_pressure = sum(
+            min(FRONTIER_AVOID_FAILURES, max(0, int(value)))
+            for key, value in self.frontier_failures.items()
+            if key.startswith(prefix)
+        )
+        edge_pressure = 0
+        for source, destinations in self.edges.items():
+            if not source.startswith(prefix):
+                continue
+            edge_pressure += sum(
+                min(3, max(0, int(edge.get("failures") or 0)))
+                for edge in destinations.values()
+            )
+        return frontier_pressure + edge_pressure
 
     def stats(self) -> dict:
         edge_count = sum(len(rows) for rows in self.edges.values())
@@ -1177,6 +1244,8 @@ class LearnedRouteGraph:
             ),
             "frontier_completed": self.frontier_completed,
             "frontier_abandoned": self.frontier_abandoned,
+            "frontier_failed_cells": len(self.frontier_failures),
+            "frontier_failure_total": sum(self.frontier_failures.values()),
             "route_edge_completed": self.route_edge_completed,
             "route_edge_abandoned": self.route_edge_abandoned,
             "route_edges_cooling_down": len(self.route_edge_retry_after),

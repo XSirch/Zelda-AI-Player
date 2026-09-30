@@ -9,7 +9,7 @@ from zelda_ai.autonomy.controller import BUTTON_MASKS, ContinuousController, Set
 from zelda_ai.autonomy.models import AgentIntent, ObjectiveCompletion
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
-from zelda_ai.models import ActorObservation, ModelInfo, NavigationProbe, RunConfig, Usage
+from zelda_ai.models import ActorObservation, ModelInfo, NavigationProbe, RunConfig, SceneExitObservation, Usage
 from zelda_ai.providers.base import InferenceResult
 
 
@@ -239,6 +239,58 @@ def test_contextual_interaction_probes_one_button_and_learns_success(
     controller._observe_interaction_outcome(transitioned, Reward())
     assert controller.pending_interaction_probe is None
     assert controller.route_graph.interaction_button(probe["key"]) == probe["button"]
+
+
+def test_trackable_objective_prefers_exit_after_persistent_room_failures(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=1,
+            entrance_index=2,
+            position=(100.0, 0.0, 0.0),
+            samples=4,
+            direct_reachable=True,
+        )
+    ]
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.set_intent(
+        AgentIntent(
+            objective="Obtain the Kokiri Sword",
+            completion=ObjectiveCompletion(
+                kind="equipment",
+                name="Kokiri Sword",
+            ),
+            summary="Obtain the Kokiri Sword",
+            mode="explore",
+            horizon_ms=60000,
+        )
+    )
+    age = "adult" if game.player.age == "adult" else "child"
+    prefix = (
+        f"{int(bool(game.mirrored_world))}:{age}:"
+        f"{game.scene}:{game.room}:"
+    )
+    controller.route_graph.frontier_failures[prefix + "1:0:0"] = 3
+    controller.route_graph.frontier_failures[prefix + "2:0:0"] = 3
+
+    assert controller.reward_tracker.local_dwell_seconds == 0.0
+    assert controller.route_graph.room_failure_pressure(game) >= 6
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is True
+
+    controller.set_intent(AgentIntent.bootstrap())
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is False
 
 
 def test_active_linear_dialogue_neutralizes_movement_and_learns_advance(

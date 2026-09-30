@@ -299,6 +299,71 @@ def test_frontier_commitment_does_not_flip_each_motor_tick(tmp_path, state):
     assert graph.stats()["frontier_abandoned"] == 1
 
 
+def test_failed_frontier_penalty_persists_and_changes_future_choice(
+    tmp_path, state
+):
+    path = tmp_path / "routes.json"
+    graph = LearnedRouteGraph(path)
+    game = _at(state, (0.0, 0.0, 0.0), 655)
+    game.player.yaw = 0
+    game.navigation_probes = [
+        NavigationProbe(
+            direction="forward",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+        NavigationProbe(
+            direction="right",
+            distance=140.0,
+            floor_found=True,
+            floor_y=0.0,
+            delta_y=0.0,
+            wall_hit=False,
+        ),
+    ]
+
+    first = graph.exploration_waypoint(game, now_s=0.0)
+    assert first is not None
+    assert first["direction"] == "forward"
+    failed_id = first["waypoint_id"]
+
+    # No movement for > stall threshold marks this projected cell as a real
+    # negative-memory frontier, not merely a 12-second transient cooldown.
+    replacement = graph.exploration_waypoint(game, now_s=3.0)
+    assert replacement is not None
+    assert replacement["direction"] == "right"
+    assert graph.frontier_failures[failed_id] == 1
+
+    graph.save(force=True)
+    loaded = LearnedRouteGraph(path)
+    loaded_hint = loaded.exploration_waypoint(game, now_s=100.0)
+    assert loaded_hint is not None
+    assert loaded_hint["direction"] == "right"
+    assert loaded.frontier_failures[failed_id] == 1
+    assert loaded.stats()["frontier_failed_cells"] >= 1
+
+
+def test_room_failure_pressure_is_context_local(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    game = _at(state, (0.0, 0.0, 0.0), 656)
+    age = "adult" if game.player.age == "adult" else "child"
+    current_prefix = (
+        f"{int(bool(game.mirrored_world))}:{age}:"
+        f"{game.scene}:{game.room}:"
+    )
+    graph.frontier_failures[current_prefix + "1:0:0"] = 3
+    graph.frontier_failures[current_prefix + "2:0:0"] = 2
+    graph.frontier_failures[
+        f"{int(bool(game.mirrored_world))}:{age}:"
+        f"{game.scene}:{game.room + 1}:1:0:0"
+    ] = 20
+
+    assert graph.room_failure_pressure(game) == 5
+
+
 def test_frontier_does_not_choose_rearward_when_front_or_side_is_open(
     tmp_path, state
 ):
