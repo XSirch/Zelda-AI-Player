@@ -26,6 +26,10 @@ FRONTIER_PROGRESS_DELTA = 8.0
 FRONTIER_STALL_S = 2.5
 FRONTIER_MAX_AGE_S = 7.0
 FRONTIER_RETRY_COOLDOWN_S = 12.0
+ROUTE_EDGE_PROGRESS_DELTA = 8.0
+ROUTE_EDGE_STALL_S = 2.5
+ROUTE_EDGE_MAX_AGE_S = 8.0
+ROUTE_EDGE_RETRY_COOLDOWN_S = 20.0
 
 _PROBE_YAW_OFFSETS = {
     "forward": 0.0,
@@ -95,6 +99,11 @@ class LearnedRouteGraph:
         self.frontier_retry_after: dict[str, float] = {}
         self.frontier_completed = 0
         self.frontier_abandoned = 0
+        self.active_route_edge: dict | None = None
+        self.route_edge_retry_after: dict[str, float] = {}
+        self.route_edge_completed = 0
+        self.route_edge_abandoned = 0
+        self.last_route_failure_at: float | None = None
         self.load_error = ""
         self._load()
 
@@ -157,9 +166,27 @@ class LearnedRouteGraph:
                     distance = edge.get("distance")
                     if not isinstance(distance, (int, float)) or not math.isfinite(distance) or distance <= 0:
                         continue
+                    entry_position = edge.get("entry_position")
+                    if (
+                        isinstance(entry_position, list)
+                        and len(entry_position) == 3
+                        and all(
+                            isinstance(v, (int, float)) and math.isfinite(v)
+                            for v in entry_position
+                        )
+                    ):
+                        normalized_entry = [
+                            float(v) for v in entry_position
+                        ]
+                    else:
+                        normalized_entry = list(
+                            self.nodes[target]["position"]
+                        )
                     self.edges.setdefault(source, {})[target] = {
                         "distance": float(distance),
                         "traversals": max(1, int(edge.get("traversals") or 1)),
+                        "failures": max(0, int(edge.get("failures") or 0)),
+                        "entry_position": normalized_entry,
                         "updated_at": float(edge.get("updated_at") or 0.0),
                     }
             for key, row in interactions.items():
@@ -194,6 +221,9 @@ class LearnedRouteGraph:
         self.last_failed_search = None
         self.active_frontier = None
         self.frontier_retry_after.clear()
+        self.active_route_edge = None
+        self.route_edge_retry_after.clear()
+        self.last_route_failure_at = None
 
     def _touch_node(
         self,
@@ -297,6 +327,12 @@ class LearnedRouteGraph:
                     bucket[node_id] = {
                         "distance": distance,
                         "traversals": 1,
+                        "failures": 0,
+                        # Store the actual observed crossing point. A coarse
+                        # cell centroid/average can lie on the wrong side of a
+                        # corner even though the directed transition itself was
+                        # genuinely traversed.
+                        "entry_position": [float(v) for v in position],
                         "updated_at": now_s,
                     }
                     self.revision += 1
@@ -309,6 +345,16 @@ class LearnedRouteGraph:
                         float(edge["distance"]) * traversals + distance
                     ) / (traversals + 1)
                     edge["traversals"] = traversals + 1
+                    edge["failures"] = max(
+                        0,
+                        int(edge.get("failures") or 0) - 1,
+                    )
+                    # Most recent successful crossing is safer than averaging
+                    # gateway positions from potentially disconnected parts of
+                    # the same coarse cell.
+                    edge["entry_position"] = [
+                        float(v) for v in position
+                    ]
                     edge["updated_at"] = now_s
                     self.persistence_revision += 1
                 self.dirty = True
@@ -409,8 +455,28 @@ class LearnedRouteGraph:
     def _edge_cost(edge: dict) -> float:
         distance = max(1.0, float(edge.get("distance") or 1.0))
         traversals = max(1, int(edge.get("traversals") or 1))
+        failures = max(0, int(edge.get("failures") or 0))
         confidence_discount = min(0.30, math.log1p(traversals) * 0.07)
-        return distance * (1.0 - confidence_discount)
+        failure_penalty = min(1.5, failures * 0.25)
+        return distance * (1.0 - confidence_discount) * (1.0 + failure_penalty)
+
+    @staticmethod
+    def _edge_key(source: str, target: str) -> str:
+        return f"{source}->{target}"
+
+    @staticmethod
+    def _edge_waypoint(edge: dict, target_node: dict):
+        value = edge.get("entry_position")
+        if (
+            isinstance(value, (list, tuple))
+            and len(value) == 3
+            and all(
+                isinstance(v, (int, float)) and math.isfinite(v)
+                for v in value
+            )
+        ):
+            return tuple(float(v) for v in value)
+        return tuple(float(v) for v in target_node["position"])
 
     def _best_reachable_path(
         self,
