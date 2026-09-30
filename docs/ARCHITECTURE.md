@@ -104,7 +104,7 @@ Codex/ChatGPT uses the official isolated Codex app-server profile. Token usage c
 The React panel intentionally exposes only:
 
 - SoH/bridge/cognition connection;
-- operational thought/intention;
+- locked strategic objective + completion predicate;
 - raw stick and currently pressed physical buttons;
 - run tokens/cache/reasoning;
 - API cost when the provider reports USD;
