@@ -231,6 +231,8 @@ def goal_guidance(
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "route_edge_key": None,
+            "route_edge_failures": 0,
             "frontier_active": False,
             "frontier_direction": None,
             "frontier_stable": False,
@@ -254,6 +256,8 @@ def goal_guidance(
     route_waypoint = None
     route_waypoint_id = None
     route_partial = False
+    route_edge_key = None
+    route_edge_failures = 0
     frontier_active = False
     frontier_direction = None
     frontier_stable = False
@@ -360,6 +364,14 @@ def goal_guidance(
             gap = route_hint.get("target_gap")
             route_target_gap = float(gap) if isinstance(gap, (int, float)) else None
             route_partial = bool(route_hint.get("partial"))
+            edge_key = route_hint.get("edge_key")
+            route_edge_key = (
+                str(edge_key)[:240] if edge_key is not None else None
+            )
+            route_edge_failures = max(
+                0,
+                int(route_hint.get("edge_failures") or 0),
+            )
 
     if point is not None:
         dx = point[0] - player.position[0]
@@ -469,6 +481,8 @@ def goal_guidance(
             "route_waypoint": route_waypoint,
             "route_waypoint_id": route_waypoint_id,
             "route_partial": route_partial,
+            "route_edge_key": route_edge_key,
+            "route_edge_failures": route_edge_failures,
             "frontier_active": frontier_active,
             "frontier_direction": frontier_direction,
             "frontier_stable": frontier_stable,
@@ -510,6 +524,8 @@ def goal_guidance(
             "route_waypoint": None,
             "route_waypoint_id": None,
             "route_partial": False,
+            "route_edge_key": None,
+            "route_edge_failures": 0,
             "frontier_active": False,
             "frontier_direction": None,
             "frontier_stable": False,
@@ -538,6 +554,8 @@ def goal_guidance(
         "route_waypoint": None,
         "route_waypoint_id": None,
         "route_partial": False,
+        "route_edge_key": None,
+        "route_edge_failures": 0,
         "frontier_active": False,
         "frontier_direction": None,
         "frontier_stable": False,
