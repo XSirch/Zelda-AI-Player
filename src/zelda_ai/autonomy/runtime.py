@@ -307,12 +307,18 @@ class AutonomyRuntime:
             or not self.objective_tracker.intent
         ):
             return
-        self.controller.set_intent(
-            self._objective_operational_intent(
-                self.objective_tracker.intent,
-                game,
-            )
+        if (
+            game.dialogue.active
+            and self.controller.intent.mode == "dialogue"
+        ):
+            # Preserve a transient semantic choice until the modal closes.
+            return
+        candidate = self._objective_operational_intent(
+            self.objective_tracker.intent,
+            game,
         )
+        if candidate != self.controller.intent:
+            self.controller.set_intent(candidate)
 
     def _check_objective_completion(self, state) -> bool:
         if not self.objective_tracker.active:
@@ -986,6 +992,11 @@ class AutonomyRuntime:
                 pass
 
             if not self.controller:
+                continue
+            if self.objective_tracker.trackable:
+                # Trackable objectives are not reconsidered because movement is
+                # hard, slow, blocked, or locally stuck. The local motor/route
+                # system owns recovery until the completion predicate is true.
                 continue
             telemetry = self.controller.telemetry()
             learning = telemetry.get("learning", {})
