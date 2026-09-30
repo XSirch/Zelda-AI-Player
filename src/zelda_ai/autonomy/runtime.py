@@ -305,7 +305,11 @@ class AutonomyRuntime:
         if (
             not self.controller
             or not self.objective_tracker.intent
+            or not self.objective_tracker.trackable
         ):
+            # Manual objectives intentionally keep legacy event-driven intent
+            # semantics. Do not overwrite transient observe/dialogue/navigation
+            # modes that may be waiting for a local event to resolve.
             return
         if (
             game.dialogue.active

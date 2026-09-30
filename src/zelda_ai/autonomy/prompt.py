@@ -11,6 +11,9 @@ private chain-of-thought.
 
 YOUR PRIMARY JOB IS ONLY TO SELECT THE NEXT STRATEGIC OBJECTIVE.
 
+You do NOT choose controller skills.
+You do NOT choose raw N64 buttons.
+
 OBJECTIVE LOCK:
 - The runtime locks a trackable objective until structured game telemetry proves
   its completion. Do not micromanage movement, waypoints, camera, doors, combat
