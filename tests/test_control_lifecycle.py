@@ -464,6 +464,46 @@ def test_room_dwell_prefers_observed_door_without_native_scene_exit(
     ) is True
 
 
+def test_room_escape_reuses_remembered_transition_when_current_scan_is_empty(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = []
+    game.room_actors = []
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+
+    controller.room_map.observe(game, now_s=1.0)
+    leaving = game.model_copy(deep=True)
+    leaving.player.position = (140.0, 0.0, 0.0)
+    controller.room_map.observe(leaving, now_s=2.0)
+    destination = leaving.model_copy(deep=True)
+    destination.room = 1
+    destination.player.position = (10.0, 0.0, 0.0)
+    controller.room_map.observe(destination, now_s=3.0)
+
+    revisit = game.model_copy(deep=True)
+    controller.room_map.reset_trace()
+    controller.reward_tracker.local_dwell_seconds = 25.0
+
+    assert controller.route_graph.has_observed_escape(revisit) is False
+    assert controller.room_map.has_known_escape(revisit) is True
+    assert controller._should_prefer_observed_exit(
+        revisit,
+        actor_is_door=False,
+    ) is True
+
+    hint = controller._escape_waypoint(revisit)
+    assert hint is not None
+    assert hint["remembered"] is True
+    assert hint["memory_kind"] == "transition"
+    assert hint["forced_escape"] is True
+    assert hint["waypoint"] == (140.0, 0.0, 0.0)
+
+
 def test_extreme_room_dwell_stops_redundant_ppo_training(
     tmp_path, state
 ):
