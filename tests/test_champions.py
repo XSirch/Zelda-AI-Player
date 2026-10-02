@@ -6,6 +6,8 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     source.write_bytes(b"policy-v1")
     routes = tmp_path / "route-graph-v1.json"
     routes.write_bytes(b'{"version":1,"nodes":{},"edges":{}}')
+    room_map = tmp_path / "room-map-v1.json"
+    room_map.write_bytes(b'{"version":1,"rooms":{}}')
     store = ChampionStore(tmp_path / "champions")
 
     first = store.capture(
@@ -22,6 +24,7 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
             "cost_usd": 0.042,
         },
         routes,
+        room_map,
     )
     source.write_bytes(b"policy-v2")
     second = store.capture(
@@ -42,6 +45,9 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     assert first["route_graph_file"] == "completion-0001.routes.json"
     assert first["route_graph_sha256"]
     assert (store.root / first["route_graph_file"]).read_bytes() == routes.read_bytes()
+    assert first["room_map_file"] == "completion-0001.room-map.json"
+    assert first["room_map_sha256"]
+    assert (store.root / first["room_map_file"]).read_bytes() == room_map.read_bytes()
     assert second["id"] == "completion-0002"
     assert (store.root / "completion-0001.pt").read_bytes() == b"policy-v1"
     assert (store.root / "completion-0002.pt").read_bytes() == b"policy-v2"
@@ -66,6 +72,9 @@ def test_champion_store_creates_immutable_completion_snapshots(tmp_path):
     explicit_routes = store.resolve_route_graph(explicit)
     assert explicit_routes is not None
     assert explicit_routes.read_bytes() == routes.read_bytes()
+    explicit_room_map = store.resolve_room_map(explicit)
+    assert explicit_room_map is not None
+    assert explicit_room_map.read_bytes() == room_map.read_bytes()
 
 
 def test_champion_store_rejects_missing_or_invalid_ids(tmp_path):
@@ -118,6 +127,31 @@ def test_champion_route_graph_checksum_detects_tampering(tmp_path):
         assert "route graph checksum mismatch" in str(exc)
     else:
         raise AssertionError("tampered champion route graph unexpectedly resolved")
+
+
+def test_champion_room_map_checksum_detects_tampering(tmp_path):
+    source = tmp_path / "training.pt"
+    source.write_bytes(b"trusted-policy")
+    routes = tmp_path / "routes.json"
+    routes.write_bytes(b'{"version":1,"nodes":{},"edges":{}}')
+    room_map = tmp_path / "room-map.json"
+    room_map.write_bytes(b'{"version":1,"rooms":{}}')
+    store = ChampionStore(tmp_path / "champions")
+    champion = store.capture(
+        source,
+        {"run_id": "run-1", "elapsed_s": 100.0},
+        routes,
+        room_map,
+    )
+    room_map_path = store.root / champion["room_map_file"]
+    room_map_path.write_bytes(b"tampered-room-map")
+
+    try:
+        store.resolve(champion["id"])
+    except ValueError as exc:
+        assert "room map checksum mismatch" in str(exc)
+    else:
+        raise AssertionError("tampered champion room map unexpectedly resolved")
 
 
 def test_orphan_champion_number_is_never_reused(tmp_path):

@@ -280,6 +280,7 @@ def test_observed_door_escape_gets_full_steering_authority(state):
             "partial": True,
             "exit": True,
             "door": True,
+            "forced_escape": True,
             "exit_position": (160.0, 0.0, 0.0),
             "direct_reachable": False,
         },

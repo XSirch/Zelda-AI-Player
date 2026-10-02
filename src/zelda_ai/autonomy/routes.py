@@ -1022,8 +1022,17 @@ class LearnedRouteGraph:
         """Prefer native scene exits, then fall back to observed room doors."""
         routed_exit = self.exit_waypoint(game)
         if routed_exit is not None:
-            return routed_exit
-        return self.door_waypoint(game)
+            return {
+                **routed_exit,
+                "forced_escape": True,
+            }
+        door = self.door_waypoint(game)
+        if door is not None:
+            return {
+                **door,
+                "forced_escape": True,
+            }
+        return None
 
     def exit_waypoint(self, game: GameState) -> dict | None:
         """Choose an observed scene-exit surface, optionally via learned route."""

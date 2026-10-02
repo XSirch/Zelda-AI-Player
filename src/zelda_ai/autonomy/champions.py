@@ -127,6 +127,8 @@ class ChampionStore:
             raise ValueError("Champion checkpoint checksum mismatch")
         if row.get("route_graph_file"):
             self.resolve_route_graph(row)
+        if row.get("room_map_file"):
+            self.resolve_room_map(row)
         return dict(row), checkpoint
 
     def resolve_route_graph(self, champion: dict) -> Path | None:
@@ -146,24 +148,48 @@ class ChampionStore:
             raise ValueError("Champion route graph checksum mismatch")
         return route_graph
 
+    def resolve_room_map(self, champion: dict) -> Path | None:
+        filename = champion.get("room_map_file")
+        if not filename:
+            return None
+        if not isinstance(filename, str) or Path(filename).name != filename:
+            raise ValueError("Champion room map filename is invalid")
+        room_map = self.root / filename
+        if not room_map.is_file():
+            raise ValueError("Champion room map is missing")
+        expected_hash = champion.get("room_map_sha256")
+        if (
+            not isinstance(expected_hash, str)
+            or _sha256(room_map) != expected_hash
+        ):
+            raise ValueError("Champion room map checksum mismatch")
+        return room_map
+
     def capture(
         self,
         source_checkpoint: Path,
         metadata: dict,
         route_graph_source: Path | None = None,
+        room_map_source: Path | None = None,
     ) -> dict:
         source_checkpoint = Path(source_checkpoint)
         if not source_checkpoint.is_file():
             raise ValueError("Training checkpoint is missing; champion was not created")
 
         existing_ids = set()
-        for pattern in ("completion-*.pt", "completion-*.json", "completion-*.routes.json"):
+        for pattern in (
+            "completion-*.pt",
+            "completion-*.json",
+            "completion-*.routes.json",
+            "completion-*.room-map.json",
+        ):
             for path in self.root.glob(pattern):
-                candidate = (
-                    path.name[: -len(".routes.json")]
-                    if path.name.endswith(".routes.json")
-                    else path.stem
-                )
+                if path.name.endswith(".routes.json"):
+                    candidate = path.name[: -len(".routes.json")]
+                elif path.name.endswith(".room-map.json"):
+                    candidate = path.name[: -len(".room-map.json")]
+                else:
+                    candidate = path.stem
                 if match := _CHAMPION_ID.match(candidate):
                     existing_ids.add(int(match.group(1)))
         sequence = max(existing_ids, default=0) + 1
@@ -171,6 +197,7 @@ class ChampionStore:
         checkpoint = self.root / f"{champion_id}.pt"
         metadata_path = self.root / f"{champion_id}.json"
         route_graph_path = self.root / f"{champion_id}.routes.json"
+        room_map_path = self.root / f"{champion_id}.room-map.json"
 
         _atomic_copy(source_checkpoint, checkpoint)
         route_metadata = {}
@@ -182,6 +209,16 @@ class ChampionStore:
                     "route_graph_file": route_graph_path.name,
                     "route_graph_sha256": _sha256(route_graph_path),
                 }
+        room_map_metadata = {}
+        if room_map_source is not None:
+            source_room_map = Path(room_map_source)
+            if source_room_map.is_file():
+                _atomic_copy(source_room_map, room_map_path)
+                room_map_metadata = {
+                    "room_map_file": room_map_path.name,
+                    "room_map_sha256": _sha256(room_map_path),
+                }
+
         row = {
             **metadata,
             "id": champion_id,
@@ -190,6 +227,7 @@ class ChampionStore:
             "checkpoint_file": checkpoint.name,
             "sha256": _sha256(checkpoint),
             **route_metadata,
+            **room_map_metadata,
         }
         _atomic_json(metadata_path, row)
 
@@ -210,6 +248,18 @@ class ChampionStore:
                         }
                     else:
                         best_route_alias.unlink(missing_ok=True)
+
+                    best_room_map_metadata = {}
+                    best_room_map_alias = self.root / "best-completion.room-map.json"
+                    best_room_map = self.resolve_room_map(best)
+                    if best_room_map is not None:
+                        _atomic_copy(best_room_map, best_room_map_alias)
+                        best_room_map_metadata = {
+                            "room_map_file": best_room_map_alias.name,
+                            "room_map_sha256": _sha256(best_room_map_alias),
+                        }
+                    else:
+                        best_room_map_alias.unlink(missing_ok=True)
                     _atomic_json(
                         self.root / "best-completion.json",
                         {
@@ -218,6 +268,7 @@ class ChampionStore:
                             "created_at": best.get("created_at"),
                             "sha256": best.get("sha256"),
                             **best_route_metadata,
+                            **best_room_map_metadata,
                         },
                     )
             except (OSError, ValueError):

@@ -24,6 +24,7 @@ from .features import (
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .reward import RewardTracker
+from .room_map import RoomMapMemory
 from .routes import LearnedRouteGraph
 
 # Physical N64 controller wiring only.  These are not semantic skills and the
@@ -88,6 +89,7 @@ class ContinuousController:
         on_achievement: Callable[[dict], None] | None = None,
         training_enabled: bool = True,
         route_graph_path: Path | None = None,
+        room_map_path: Path | None = None,
     ):
         self.bridge = bridge
         self.policy = OnlinePPO(
@@ -101,6 +103,10 @@ class ContinuousController:
         self.training_enabled = training_enabled
         self.route_graph = LearnedRouteGraph(
             route_graph_path or checkpoint.parent / "route-graph-v1.json",
+            writable=training_enabled,
+        )
+        self.room_map = RoomMapMemory(
+            room_map_path or checkpoint.parent / "room-map-v1.json",
             writable=training_enabled,
         )
         self.intent = AgentIntent.bootstrap()
@@ -130,6 +136,7 @@ class ContinuousController:
         self.achievements = deque(maxlen=64)
         self.last_training_stats: dict = {}
         self.route_save_error = ""
+        self.room_map_save_error = ""
         self.interaction_probe_index: dict[str, int] = {}
         self.interaction_last_probe_at = 0.0
         self.pending_interaction_probe: dict | None = None
@@ -176,6 +183,7 @@ class ContinuousController:
     def reset_episode_state(self):
         self.reward_tracker = RewardTracker()
         self.route_graph.reset_trace()
+        self.room_map.reset_trace()
         self.feature_history.clear()
         self.novelty_history.clear()
         self.pending = None
@@ -856,7 +864,10 @@ class ContinuousController:
         *,
         actor_is_door: bool,
     ) -> bool:
-        if not self.route_graph.has_observed_escape(game):
+        if not (
+            self.route_graph.has_observed_escape(game)
+            or self.room_map.has_known_escape(game)
+        ):
             return False
         room_failure_pressure = self.route_graph.room_failure_pressure(game)
         trackable_objective = self.intent.completion.kind != "manual"
@@ -890,6 +901,16 @@ class ContinuousController:
             # of the same failed room should not dominate the PPO checkpoint.
             return False
         return True
+
+    def _escape_waypoint(self, game) -> dict | None:
+        """Prefer current observations, then empirical memory from prior visits."""
+        current = self.route_graph.escape_waypoint(game)
+        if current is not None:
+            return current
+        return self.room_map.remembered_escape_waypoint(
+            game,
+            self.route_graph,
+        )
 
     def _sample_setpoint(
         self,
@@ -930,6 +951,7 @@ class ContinuousController:
 
     def _ml_step(self, game) -> Setpoint:
         self.route_graph.observe(game)
+        self.room_map.observe(game)
         base_observation = encode_state(
             game,
             self.intent,
@@ -1028,7 +1050,7 @@ class ContinuousController:
                 # A learned directed edge just failed in real execution. Do not
                 # immediately fall back to the same straight-line cognition
                 # target; recover from current observed evidence instead.
-                route_hint = self.route_graph.escape_waypoint(game)
+                route_hint = self._escape_waypoint(game)
                 if route_hint is not None:
                     self.route_graph.clear_frontier()
                 else:
@@ -1045,7 +1067,7 @@ class ContinuousController:
                 actor_is_door=actor_is_door,
             )
             route_hint = (
-                self.route_graph.escape_waypoint(game)
+                self._escape_waypoint(game)
                 if prefer_exit
                 else None
             )
@@ -1195,18 +1217,27 @@ class ContinuousController:
             except asyncio.TimeoutError:
                 pass
 
-            if not self.route_graph.writable or not self.route_graph.dirty:
+            route_dirty = self.route_graph.writable and self.route_graph.dirty
+            room_map_dirty = self.room_map.writable and self.room_map.dirty
+            if not route_dirty and not room_map_dirty:
                 continue
-            try:
-                await asyncio.to_thread(self.route_graph.save)
-                self.route_save_error = ""
-            except Exception as exc:
-                # The graph remains dirty and the next interval retries.
-                # LearnedRouteGraph.save uses atomic replacement, so a failed
-                # snapshot cannot corrupt the last durable route file.
-                self.route_save_error = (
-                    f"{type(exc).__name__}: {str(exc)[:180]}"
-                )
+            if route_dirty:
+                try:
+                    await asyncio.to_thread(self.route_graph.save)
+                    self.route_save_error = ""
+                except Exception as exc:
+                    # The graph remains dirty and the next interval retries.
+                    self.route_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
+            if room_map_dirty:
+                try:
+                    await asyncio.to_thread(self.room_map.save)
+                    self.room_map_save_error = ""
+                except Exception as exc:
+                    self.room_map_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
             publish()
 
     async def run(self, active: Callable[[], bool], publish: Callable[[], None]):
@@ -1235,6 +1266,7 @@ class ContinuousController:
                     self.novelty_history.clear()
                     self.reward_tracker.break_causal_chain()
                     self.route_graph.reset_trace()
+                    self.room_map.reset_trace()
                     self._reset_camera_guard()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
                     self.last_stick = (0.0, 0.0)
@@ -1249,6 +1281,9 @@ class ContinuousController:
                 # transition to learn; neutral input avoids polluting the rollout.
                 if game.cutscene_active and not game.dialogue.active:
                     self.route_graph.reset_trace()
+                    # Keep room-map trace across door/transition cutscenes so the
+                    # first playable frame in the next room can persist the real
+                    # departure point from the previous room.
                     self.last_setpoint = Setpoint(reason="cutscene")
                     self.last_motor_summary = "Cutscene owns Link; ML actor remains live and resumes immediately."
                 elif self.tick % self.action_repeat_ticks == 1 or self.pending is None:
@@ -1287,6 +1322,17 @@ class ContinuousController:
                     self.route_save_error = ""
                 except (OSError, ValueError, RuntimeError) as exc:
                     self.route_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
+            if self.room_map.writable:
+                try:
+                    await asyncio.to_thread(
+                        self.room_map.save,
+                        force=True,
+                    )
+                    self.room_map_save_error = ""
+                except (OSError, ValueError, RuntimeError) as exc:
+                    self.room_map_save_error = (
                         f"{type(exc).__name__}: {str(exc)[:180]}"
                     )
             # Let queued/in-flight batches finish after input authority is gone.
@@ -1356,6 +1402,10 @@ class ContinuousController:
             "learning": {
                 **self.policy.stats(),
                 "training_enabled": self.training_enabled,
+                "room_map": {
+                    **self.room_map.stats(self.bridge.state),
+                    "save_error": self.room_map_save_error or None,
+                },
                 "run_updates": max(0, self.policy.updates - self.starting_updates),
                 "run_samples_trained": max(
                     0, self.policy.samples_trained - self.starting_samples_trained

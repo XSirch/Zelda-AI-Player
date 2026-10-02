@@ -464,6 +464,46 @@ def test_room_dwell_prefers_observed_door_without_native_scene_exit(
     ) is True
 
 
+def test_room_escape_reuses_remembered_transition_when_current_scan_is_empty(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = []
+    game.room_actors = []
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+
+    controller.room_map.observe(game, now_s=1.0)
+    leaving = game.model_copy(deep=True)
+    leaving.player.position = (140.0, 0.0, 0.0)
+    controller.room_map.observe(leaving, now_s=2.0)
+    destination = leaving.model_copy(deep=True)
+    destination.room = 1
+    destination.player.position = (10.0, 0.0, 0.0)
+    controller.room_map.observe(destination, now_s=3.0)
+
+    revisit = game.model_copy(deep=True)
+    controller.room_map.reset_trace()
+    controller.reward_tracker.local_dwell_seconds = 25.0
+
+    assert controller.route_graph.has_observed_escape(revisit) is False
+    assert controller.room_map.has_known_escape(revisit) is True
+    assert controller._should_prefer_observed_exit(
+        revisit,
+        actor_is_door=False,
+    ) is True
+
+    hint = controller._escape_waypoint(revisit)
+    assert hint is not None
+    assert hint["remembered"] is True
+    assert hint["memory_kind"] == "transition"
+    assert hint["forced_escape"] is True
+    assert hint["waypoint"] == (140.0, 0.0, 0.0)
+
+
 def test_extreme_room_dwell_stops_redundant_ppo_training(
     tmp_path, state
 ):
@@ -1023,6 +1063,12 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     )
     assert champion_routes.is_file()
     frozen_route_bytes = champion_routes.read_bytes()
+    assert champion["room_map_file"] == "completion-0001.room-map.json"
+    champion_room_map = (
+        tmp_path / "ml" / "champions" / champion["room_map_file"]
+    )
+    assert champion_room_map.is_file()
+    frozen_room_map_bytes = champion_room_map.read_bytes()
 
     evaluation_provider = CountingCognition()
     runtime.providers["codex"] = evaluation_provider
@@ -1038,6 +1084,8 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     assert runtime.controller.policy.checkpoint == champion_path
     assert runtime.controller.route_graph.writable is False
     assert runtime.controller.route_graph.path == champion_routes
+    assert runtime.controller.room_map.writable is False
+    assert runtime.controller.room_map.path == champion_room_map
     snapshot = runtime.snapshot()
     assert snapshot["run_mode"] == "evaluation"
     assert snapshot["active_champion"]["id"] == "completion-0001"
@@ -1048,6 +1096,7 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     await runtime.control("stop")
     assert champion_path.read_bytes() == frozen_bytes
     assert champion_routes.read_bytes() == frozen_route_bytes
+    assert champion_room_map.read_bytes() == frozen_room_map_bytes
 
 
 @pytest.mark.asyncio
@@ -1069,11 +1118,21 @@ async def test_new_run_waits_for_completion_champion_capture(
     capture_started = threading.Event()
     release_capture = threading.Event()
 
-    def slow_capture(source, metadata, route_graph_source=None):
+    def slow_capture(
+        source,
+        metadata,
+        route_graph_source=None,
+        room_map_source=None,
+    ):
         capture_started.set()
         if not release_capture.wait(timeout=2.0):
             raise RuntimeError("test capture release timed out")
-        return original_capture(source, metadata, route_graph_source)
+        return original_capture(
+            source,
+            metadata,
+            route_graph_source,
+            room_map_source,
+        )
 
     runtime.champions.capture = slow_capture
     completion = asyncio.create_task(
