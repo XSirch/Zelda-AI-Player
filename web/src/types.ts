@@ -164,6 +164,31 @@ export interface LearningSnapshot {
     local_dwell_penalty?: number;
   };
   reward_breakdown?: Record<string, number>;
+  room_map?: {
+    rooms: number;
+    entries: number;
+    transitions: number;
+    exits: number;
+    doors: number;
+    walkable_cells: number;
+    blocked_cells: number;
+    affordances: number;
+    writable: boolean;
+    dirty?: boolean;
+    load_error?: string | null;
+    current_room?: {
+      scene: number;
+      room: number;
+      visits: number;
+      entries: number;
+      transitions: number;
+      exits: number;
+      doors: number;
+      walkable_cells: number;
+      blocked_cells: number;
+      affordances: number;
+    } | null;
+  };
   route_memory?: {
     nodes: number;
     edges: number;
@@ -228,7 +253,10 @@ export interface ChampionSummary {
   unknown_cost_calls?: number;
   usage_by_model?: RunUsageBreakdown[];
   route_memory?: LearningSnapshot['route_memory'];
+  room_map?: LearningSnapshot['room_map'];
   route_graph_file?: string;
+  room_map_file?: string;
+  room_map_sha256?: string;
   route_graph_sha256?: string;
   sha256?: string;
 }
@@ -270,6 +298,8 @@ export interface MotorGuidance {
   exit_active?: boolean;
   exit_index?: number | null;
   exit_direct_reachable?: boolean;
+  forced_escape?: boolean;
+  remembered_escape?: boolean;
 }
 
 export interface Snapshot {
