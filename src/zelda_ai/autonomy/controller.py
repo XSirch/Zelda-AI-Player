@@ -13,6 +13,8 @@ from pathlib import Path
 from ..bridge import Bridge
 from .features import (
     BUTTON_NAMES,
+    camera_relative_stick,
+    camera_world_yaw,
     encode_novelty_state,
     encode_state,
     goal_guidance,
@@ -50,6 +52,15 @@ INTERACTION_PROBE_COOLDOWN_S = 0.35
 INTERACTION_OUTCOME_WINDOW_S = 1.5
 DIALOGUE_REENTRY_GUARD_S = 8.0
 DIALOGUE_REENTRY_CLEAR_DISTANCE = 120.0
+
+# A camera mode switch can change what the same physical stick vector means
+# between two 10 Hz policy decisions.  Detect that at the 20 Hz motor loop,
+# briefly neutralize stale movement, then re-project the same world-space
+# heading against the new camera without asking the route planner to replan.
+CAMERA_TRANSITION_DELTA_RAD = math.radians(12.0)
+CAMERA_CUT_DELTA_RAD = math.radians(35.0)
+CAMERA_TRANSITION_SETTLE_TICKS = 1
+CAMERA_CUT_SETTLE_TICKS = 2
 
 
 @dataclass(frozen=True)
@@ -125,6 +136,11 @@ class ContinuousController:
         self.last_interaction_source = "none"
         self.dialogue_reentry_guard: dict | None = None
         self.dialogue_reentry_suppressed = 0
+        self.last_camera_yaw: float | None = None
+        self.camera_motion_state = "stable"
+        self.camera_guard_ticks = 0
+        self.camera_cut_count = 0
+        self.camera_transition_count = 0
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -173,6 +189,11 @@ class ContinuousController:
         self.last_interaction_source = "none"
         self.dialogue_reentry_guard = None
         self.dialogue_reentry_suppressed = 0
+        self.last_camera_yaw = None
+        self.camera_motion_state = "stable"
+        self.camera_guard_ticks = 0
+        self.camera_cut_count = 0
+        self.camera_transition_count = 0
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -216,7 +237,135 @@ class ContinuousController:
         self.intent = intent
         self.intent_updated_at = time.monotonic()
 
+    @staticmethod
+    def _angle_delta(current: float, previous: float) -> float:
+        return (current - previous + math.pi) % (2.0 * math.pi) - math.pi
+
+    def _reset_camera_guard(self):
+        self.last_camera_yaw = None
+        self.camera_motion_state = "stable"
+        self.camera_guard_ticks = 0
+
+    def _camera_state(self, game) -> str:
+        current_yaw = camera_world_yaw(game, game.player)
+        if current_yaw is None:
+            self._reset_camera_guard()
+            return self.camera_motion_state
+
+        previous_yaw = self.last_camera_yaw
+        self.last_camera_yaw = current_yaw
+        if previous_yaw is None:
+            self.camera_motion_state = "stable"
+            return self.camera_motion_state
+
+        delta = abs(self._angle_delta(current_yaw, previous_yaw))
+        if delta >= CAMERA_CUT_DELTA_RAD:
+            self.camera_motion_state = "cut"
+            self.camera_guard_ticks = CAMERA_CUT_SETTLE_TICKS
+            self.camera_cut_count += 1
+            return self.camera_motion_state
+
+        if delta >= CAMERA_TRANSITION_DELTA_RAD:
+            self.camera_motion_state = "transition"
+            self.camera_guard_ticks = max(
+                self.camera_guard_ticks,
+                CAMERA_TRANSITION_SETTLE_TICKS,
+            )
+            self.camera_transition_count += 1
+            return self.camera_motion_state
+
+        if self.camera_guard_ticks > 0:
+            self.camera_guard_ticks -= 1
+            self.camera_motion_state = "transition"
+            return self.camera_motion_state
+
+        self.camera_motion_state = "stable"
+        return self.camera_motion_state
+
+    @staticmethod
+    def _mixed_stick(
+        policy_stick,
+        guidance_stick,
+        guidance_strength: float,
+    ) -> tuple[int, int]:
+        mix = max(0.0, min(1.0, float(guidance_strength or 0.0)))
+        px, py = (float(policy_stick[0]), float(policy_stick[1]))
+        gx, gy = (float(guidance_stick[0]), float(guidance_stick[1]))
+        executed_x = max(-1.0, min(1.0, px * (1.0 - mix) + gx * mix))
+        executed_y = max(-1.0, min(1.0, py * (1.0 - mix) + gy * mix))
+        return (
+            max(-80, min(80, round(executed_x * 80.0))),
+            max(-80, min(80, round(executed_y * 80.0))),
+        )
+
+    def _refresh_camera_relative_setpoint(self, game):
+        """Refresh only camera projection; never choose/replan a waypoint here."""
+        camera_state = self._camera_state(game)
+
+        if camera_state != "stable":
+            if self.pending is not None:
+                # This action was partially replaced by the camera safety guard;
+                # keeping it out of PPO preserves latent-action/log-prob causality.
+                self.pending["trainable"] = False
+            self.last_setpoint = Setpoint(
+                buttons=self.last_setpoint.buttons,
+                stick_x=0,
+                stick_y=0,
+                reason=f"camera_{camera_state}",
+            )
+            self.last_stick = (0.0, 0.0)
+            self.last_motor_summary = (
+                f"Camera {camera_state}; stale movement neutralized while "
+                "preserving the current world-space waypoint."
+            )
+            return
+
+        if (
+            self.last_setpoint.reason != "ml_policy"
+            or self.pending is None
+            or not self.last_guidance.get("active")
+        ):
+            return
+
+        world_yaw = self.last_guidance.get("world_yaw")
+        policy_stick = self.pending.get("policy_stick")
+        if not isinstance(world_yaw, (int, float)) or not (
+            isinstance(policy_stick, (list, tuple)) and len(policy_stick) == 2
+        ):
+            return
+
+        guidance_stick = camera_relative_stick(
+            game,
+            game.player,
+            float(world_yaw),
+        )
+        guidance_strength = float(
+            self.pending.get(
+                "guidance_strength",
+                self.last_guidance.get("strength") or 0.0,
+            )
+            or 0.0
+        )
+        stick_x, stick_y = self._mixed_stick(
+            policy_stick,
+            guidance_stick,
+            guidance_strength,
+        )
+        self.last_setpoint = Setpoint(
+            buttons=self.last_setpoint.buttons,
+            stick_x=stick_x,
+            stick_y=stick_y,
+            reason="ml_policy",
+        )
+        executed = (stick_x / 80.0, stick_y / 80.0)
+        self.last_stick = executed
+        self.last_guidance["stick"] = guidance_stick
+        self.last_guidance["camera_yaw"] = camera_world_yaw(game, game.player)
+        self.pending["stick"] = list(executed)
+        self.pending["guidance_stick"] = list(guidance_stick)
+
     def neutralize(self, reason: str = "stopped"):
+        self._reset_camera_guard()
         self.last_setpoint = Setpoint(reason=reason)
         self.last_stick = (0.0, 0.0)
         self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
@@ -1055,6 +1204,7 @@ class ContinuousController:
                     self.novelty_history.clear()
                     self.reward_tracker.break_causal_chain()
                     self.route_graph.reset_trace()
+                    self._reset_camera_guard()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
                     self.last_stick = (0.0, 0.0)
                     self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
@@ -1072,6 +1222,12 @@ class ContinuousController:
                     self.last_motor_summary = "Cutscene owns Link; ML actor remains live and resumes immediately."
                 elif self.tick % self.action_repeat_ticks == 1 or self.pending is None:
                     self._ml_step(game)
+
+                if not (game.cutscene_active and not game.dialogue.active):
+                    # Policy residuals are still sampled at 10 Hz.  Camera-space
+                    # projection is refreshed at the 20 Hz motor cadence so a
+                    # fixed/indoor camera switch cannot reuse a stale stick.
+                    self._refresh_camera_relative_setpoint(game)
 
                 try:
                     self.bridge.send(
@@ -1145,6 +1301,17 @@ class ContinuousController:
             },
             "motor_ticks": self.motor_ticks,
             "actions_sampled": self.actions_sampled,
+            "camera_control": {
+                "state": self.camera_motion_state,
+                "yaw": (
+                    round(self.last_camera_yaw, 6)
+                    if self.last_camera_yaw is not None
+                    else None
+                ),
+                "guard_ticks": self.camera_guard_ticks,
+                "cuts": self.camera_cut_count,
+                "transitions": self.camera_transition_count,
+            },
             "setpoint": {
                 "buttons": self.last_setpoint.buttons,
                 "button_names": [
