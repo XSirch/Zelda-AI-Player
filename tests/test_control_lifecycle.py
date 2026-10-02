@@ -30,6 +30,96 @@ def connected(state):
     return bridge
 
 
+def test_camera_cut_neutralizes_then_reprojects_same_world_heading(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.camera_input_yaw = 0
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.last_guidance = {
+        "active": True,
+        "stick": (0.0, 1.0),
+        "strength": 1.0,
+        "target": (0.0, 0.0, 300.0),
+        "world_yaw": 0.0,
+        "camera_yaw": 0.0,
+    }
+    controller.pending = {
+        "policy_stick": [0.0, 0.0],
+        "guidance_strength": 1.0,
+        "guidance_stick": [0.0, 1.0],
+        "stick": [0.0, 1.0],
+        "trainable": True,
+    }
+    controller.last_setpoint = Setpoint(
+        stick_x=0,
+        stick_y=80,
+        reason="ml_policy",
+    )
+    controller.route_graph.active_path = ["source", "waypoint", "target"]
+
+    # Establish the current camera basis without changing the route.
+    controller._refresh_camera_relative_setpoint(game)
+    original_target = controller.last_guidance["target"]
+    original_path = list(controller.route_graph.active_path)
+
+    rotated = game.model_copy(deep=True)
+    rotated.camera_input_yaw = 0x4000
+    controller._refresh_camera_relative_setpoint(rotated)
+
+    assert controller.camera_motion_state == "cut"
+    assert controller.last_setpoint.reason == "camera_cut"
+    assert controller.last_setpoint.stick_x == 0
+    assert controller.last_setpoint.stick_y == 0
+    assert controller.pending["trainable"] is False
+    assert controller.last_guidance["target"] == original_target
+    assert controller.route_graph.active_path == original_path
+
+    # Two guard ticks absorb the abrupt indoor camera switch. Once stable, the
+    # same world-north heading is reprojected against a camera facing east.
+    controller._refresh_camera_relative_setpoint(rotated)
+    controller._refresh_camera_relative_setpoint(rotated)
+    controller._refresh_camera_relative_setpoint(rotated)
+
+    assert controller.camera_motion_state == "stable"
+    assert controller.last_setpoint.reason == "ml_policy"
+    assert controller.last_setpoint.stick_x < -75
+    assert abs(controller.last_setpoint.stick_y) <= 1
+    assert controller.last_guidance["target"] == original_target
+    assert controller.route_graph.active_path == original_path
+
+
+def test_camera_cut_does_not_override_interaction_authority(tmp_path, state):
+    game = state.model_copy(deep=True)
+    game.camera_input_yaw = 0
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.last_setpoint = Setpoint(
+        buttons=BUTTON_MASKS["A"],
+        stick_x=0,
+        stick_y=0,
+        reason="interaction_memory",
+    )
+
+    controller._refresh_camera_relative_setpoint(game)
+    rotated = game.model_copy(deep=True)
+    rotated.camera_input_yaw = 0x4000
+    controller._refresh_camera_relative_setpoint(rotated)
+
+    assert controller.camera_motion_state == "cut"
+    assert controller.last_setpoint.reason == "interaction_memory"
+    assert controller.last_setpoint.buttons == BUTTON_MASKS["A"]
+    assert controller.last_setpoint.stick_x == 0
+    assert controller.last_setpoint.stick_y == 0
+
+
 class SlowCognition:
     def __init__(self):
         self.entered = asyncio.Event()

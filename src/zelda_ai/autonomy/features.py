@@ -96,13 +96,35 @@ def _wrap_angle(value: float) -> float:
     return (value + math.pi) % (2.0 * math.pi) - math.pi
 
 
-def _camera_relative_stick(game: GameState, player, world_yaw: float) -> tuple[float, float]:
-    camera_raw = (
-        game.camera_input_yaw
-        if game.camera_input_yaw is not None
-        else player.yaw
-    )
-    camera_yaw = camera_raw * math.pi / 32768.0
+def camera_world_yaw(game: GameState, player=None) -> float | None:
+    """Return the world-space heading that N64 stick-forward currently means.
+
+    SoH exposes Camera_GetInputDirYaw directly.  The view vector is a fallback
+    for transient/legacy payloads where that field is unavailable; player yaw is
+    only the final fallback because fixed indoor cameras are not player-relative.
+    """
+    if game.camera_input_yaw is not None:
+        return game.camera_input_yaw * math.pi / 32768.0
+
+    if game.camera_eye is not None and game.camera_at is not None:
+        dx = float(game.camera_at[0]) - float(game.camera_eye[0])
+        dz = float(game.camera_at[2]) - float(game.camera_eye[2])
+        if math.hypot(dx, dz) > 1e-4:
+            return math.atan2(dx, dz)
+
+    if player is not None:
+        return player.yaw * math.pi / 32768.0
+    return None
+
+
+def camera_relative_stick(
+    game: GameState,
+    player,
+    world_yaw: float,
+) -> tuple[float, float]:
+    camera_yaw = camera_world_yaw(game, player)
+    if camera_yaw is None:
+        camera_yaw = player.yaw * math.pi / 32768.0
     relative = _wrap_angle(world_yaw - camera_yaw)
     return (
         max(-1.0, min(1.0, math.sin(relative))),
@@ -177,7 +199,7 @@ def _collision_detour(game: GameState, player, target_yaw: float) -> tuple[tuple
 
     _, _, selected_name, selected_offset = max(candidates)
     selected_yaw = _wrap_angle(player_yaw + selected_offset)
-    return _camera_relative_stick(game, player, selected_yaw), {
+    return camera_relative_stick(game, player, selected_yaw), {
         "blocked": True,
         "detour": selected_name,
         "direct_probe": direct_name,
@@ -384,11 +406,13 @@ def goal_guidance(
         blocked = False
         detour = None
         direct_probe = None
+        steering_yaw = None
         if horizontal < 1e-4:
             stick = (0.0, 0.0)
         else:
             target_yaw = math.atan2(dx, dz)
-            stick = _camera_relative_stick(game, player, target_yaw)
+            steering_yaw = target_yaw
+            stick = camera_relative_stick(game, player, target_yaw)
             # Explicit vertical affordances (ladder/climbable wall/stairs) may
             # intentionally terminate at collision.  Do not steer away from the
             # very surface the observer identified as the traversal target.
@@ -407,6 +431,11 @@ def goal_guidance(
                 direct_probe = detour_info["direct_probe"]
                 if detour_stick is not None:
                     stick = detour_stick
+                    if detour is not None:
+                        steering_yaw = _wrap_angle(
+                            player.yaw * math.pi / 32768.0
+                            + _PROBE_YAW_OFFSETS[detour]
+                        )
                     source = f"{source}:detour:{detour}"
 
         if route_active:
@@ -470,6 +499,8 @@ def goal_guidance(
             "distance": distance,
             "source": source,
             "target": tuple(point),
+            "world_yaw": steering_yaw,
+            "camera_yaw": camera_world_yaw(game, player),
             "blocked": blocked,
             "detour": detour,
             "direct_probe": direct_probe,

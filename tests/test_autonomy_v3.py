@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import pytest
@@ -90,6 +91,24 @@ def test_goal_guidance_is_camera_relative(state):
     rotated = goal_guidance(state, east)
     assert abs(rotated["stick"][0]) < 0.05
     assert rotated["stick"][1] > 0.95
+
+
+def test_goal_guidance_uses_view_heading_when_input_yaw_is_missing(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "navigate",
+        "target_position": (300.0, 0.0, 0.0),
+    })
+    state.camera_input_yaw = None
+    state.camera_eye = (-100.0, 100.0, 0.0)
+    state.camera_at = (0.0, 0.0, 0.0)
+
+    guidance = goal_guidance(state, intent)
+
+    # View forward is world +X, so the eastward world target is stick-forward.
+    assert guidance["active"] is True
+    assert abs(guidance["stick"][0]) < 0.05
+    assert guidance["stick"][1] > 0.95
+    assert guidance["world_yaw"] == pytest.approx(math.pi / 2.0)
 
 
 def test_goal_guidance_detours_around_observed_wall(state):
