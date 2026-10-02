@@ -433,6 +433,37 @@ def test_dialogue_close_releases_button_and_blocks_immediate_reentry(
     assert released_sample["buttons"] == sample["buttons"]
 
 
+def test_room_dwell_prefers_observed_door_without_native_scene_exit(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = []
+    game.room_actors = [
+        ActorObservation(
+            actor_uid="room-door",
+            actor_id=9,
+            name="Door",
+            category=10,
+            category_name="door",
+            params=0,
+            position=(160.0, 0.0, 0.0),
+            distance=160.0,
+        )
+    ]
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.reward_tracker.local_dwell_seconds = 25.0
+
+    assert controller.route_graph.has_observed_escape(game) is True
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is True
+
+
 def test_trackable_objective_prefers_exit_after_persistent_room_failures(
     tmp_path, state
 ):
