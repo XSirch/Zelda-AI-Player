@@ -1402,7 +1402,10 @@ class ContinuousController:
             "learning": {
                 **self.policy.stats(),
                 "training_enabled": self.training_enabled,
-                "room_map": self.room_map.stats(self.bridge.state),
+                "room_map": {
+                    **self.room_map.stats(self.bridge.state),
+                    "save_error": self.room_map_save_error or None,
+                },
                 "run_updates": max(0, self.policy.updates - self.starting_updates),
                 "run_samples_trained": max(
                     0, self.policy.samples_trained - self.starting_samples_trained
