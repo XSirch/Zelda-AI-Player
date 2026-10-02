@@ -324,6 +324,8 @@ def goal_guidance(
             is_frontier = bool(route_hint.get("frontier"))
             is_exit = bool(route_hint.get("exit"))
             is_door_escape = bool(route_hint.get("door"))
+            is_remembered_escape = bool(route_hint.get("remembered"))
+            forced_escape = bool(route_hint.get("forced_escape"))
             route_active = not is_frontier and not is_exit and int(
                 route_hint.get("path_nodes") or 0
             ) > 1
@@ -360,16 +362,24 @@ def goal_guidance(
             if is_frontier:
                 source = "observed_frontier"
             elif is_exit:
-                if is_door_escape:
+                path_nodes = int(route_hint.get("path_nodes") or 0)
+                if is_remembered_escape:
+                    memory_kind = str(route_hint.get("memory_kind") or "exit")
+                    source = (
+                        f"remembered_{memory_kind}"
+                        if path_nodes <= 1
+                        else f"remembered_{memory_kind}_route"
+                    )
+                elif is_door_escape:
                     source = (
                         "observed_door"
-                        if int(route_hint.get("path_nodes") or 0) <= 1
+                        if path_nodes <= 1
                         else "observed_door_route"
                     )
                 else:
                     source = (
                         "scene_exit"
-                        if int(route_hint.get("path_nodes") or 0) <= 1
+                        if path_nodes <= 1
                         else "scene_exit_route"
                     )
                 final_exit = route_hint.get("exit_position")
@@ -429,7 +439,10 @@ def goal_guidance(
                 and not source.startswith("traversal:")
                 and not source.startswith("scene_exit")
                 and not (
-                    source.startswith("observed_door")
+                    (
+                        source.startswith("observed_door")
+                        or source.startswith("remembered_door")
+                    )
                     and horizontal <= 120.0
                 )
             ):
@@ -457,10 +470,14 @@ def goal_guidance(
                 0.78 + 0.16 * route_confidence
             ) * (0.85 if route_partial else 1.0)
         elif exit_active:
-            # Once the room has failed long enough to enter escape mode, PPO
-            # residual steering must not pull Link back into the same room.
-            # Contextual door interaction is handled separately after sampling.
-            base_strength = 1.0
+            if forced_escape:
+                # Once room recovery explicitly commits to an escape, PPO
+                # residual steering must not pull Link back into the same room.
+                base_strength = 1.0
+            else:
+                # Normal observed scene-exit guidance keeps the historical mix;
+                # only explicit recovery/room-memory escape takes full authority.
+                base_strength = 0.92 if exit_direct_reachable else 0.84
         elif frontier_active:
             # Targetless exploration should still have a stable local heading.
             # The waypoint comes from an observed open probe, not hidden map data.
@@ -497,7 +514,7 @@ def goal_guidance(
             )
         obstacle_scale = (
             1.0
-            if exit_active and (not blocked or detour is not None)
+            if forced_escape and exit_active and (not blocked or detour is not None)
             else 0.82
             if detour is not None
             else 0.30
@@ -506,10 +523,9 @@ def goal_guidance(
         )
         strength = base_strength * proximity * stuck_scale * obstacle_scale
         if exit_active:
-            # Keep policy button noise quiet during escape approach. The
-            # interaction override still injects one empirically tested button
-            # when a door/context action is actually in range.
-            quiet_multiplier = 0.95
+            # Explicit room recovery suppresses policy button noise; normal
+            # exit guidance preserves the previous lower quieting behaviour.
+            quiet_multiplier = 0.95 if forced_escape else 0.12
         else:
             quiet_multiplier = (
                 0.45 if blocked else 0.9
@@ -544,6 +560,8 @@ def goal_guidance(
             "exit_active": exit_active,
             "exit_index": exit_index,
             "exit_direct_reachable": exit_direct_reachable,
+            "forced_escape": forced_escape if point is not None else False,
+            "remembered_escape": is_remembered_escape if point is not None else False,
         }
 
     direction_sticks = {
