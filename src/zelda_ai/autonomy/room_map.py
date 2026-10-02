@@ -264,7 +264,8 @@ class RoomMapMemory:
         destination = _context(destination_game)
         transition_key = (
             f"{int(destination[0])}:{destination[1]}:"
-            f"{destination[2]}:{destination[3]}"
+            f"{destination[2]}:{destination[3]}:"
+            f"{_cell_key(self.last_position)}"
         )
         return self._touch_position(
             previous["transitions"],
