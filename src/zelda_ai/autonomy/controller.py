@@ -48,6 +48,7 @@ INTERACTION_PROBE_BUTTONS = tuple(
 )
 EXIT_PRIORITY_DWELL_S = 20.0
 ROOM_FAILURE_EXIT_PRESSURE = 6
+NO_PROGRESS_TRAINING_CUTOFF_S = 180.0
 INTERACTION_PROBE_COOLDOWN_S = 0.35
 INTERACTION_OUTCOME_WINDOW_S = 1.5
 DIALOGUE_REENTRY_GUARD_S = 8.0
@@ -855,7 +856,7 @@ class ContinuousController:
         *,
         actor_is_door: bool,
     ) -> bool:
-        if not game.scene_exits:
+        if not self.route_graph.has_observed_escape(game):
             return False
         room_failure_pressure = self.route_graph.room_failure_pressure(game)
         trackable_objective = self.intent.completion.kind != "manual"
@@ -867,6 +868,28 @@ class ContinuousController:
                 and room_failure_pressure >= ROOM_FAILURE_EXIT_PRESSURE
             )
         )
+
+    def _ppo_transition_trainable(
+        self,
+        *,
+        interaction_override: bool,
+        guidance: dict,
+        sample: dict,
+    ) -> bool:
+        if interaction_override:
+            return False
+        if (
+            guidance.get("exit_active")
+            and float(sample.get("guidance_strength") or 0.0) >= 0.999
+        ):
+            # Full-authority escape steering is a structured intervention. The
+            # sampled residual did not cause the executed movement.
+            return False
+        if self.reward_tracker.local_dwell_seconds >= NO_PROGRESS_TRAINING_CUTOFF_S:
+            # A few minutes of negative anti-loop experience are enough. Hours
+            # of the same failed room should not dominate the PPO checkpoint.
+            return False
+        return True
 
     def _sample_setpoint(
         self,
@@ -1005,12 +1028,10 @@ class ContinuousController:
                 # A learned directed edge just failed in real execution. Do not
                 # immediately fall back to the same straight-line cognition
                 # target; recover from current observed evidence instead.
-                route_hint = (
-                    self.route_graph.exit_waypoint(game)
-                    if game.scene_exits
-                    else None
-                )
-                if route_hint is None:
+                route_hint = self.route_graph.escape_waypoint(game)
+                if route_hint is not None:
+                    self.route_graph.clear_frontier()
+                else:
                     route_hint = self.route_graph.exploration_waypoint(game)
         elif self.intent.mode == "explore":
             actor_is_door = bool(
@@ -1024,7 +1045,7 @@ class ContinuousController:
                 actor_is_door=actor_is_door,
             )
             route_hint = (
-                self.route_graph.exit_waypoint(game)
+                self.route_graph.escape_waypoint(game)
                 if prefer_exit
                 else None
             )
@@ -1067,6 +1088,11 @@ class ContinuousController:
                     setpoint,
                     sample,
                 )
+        transition_trainable = self._ppo_transition_trainable(
+            interaction_override=interaction_override,
+            guidance=guidance,
+            sample=sample,
+        )
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -1091,7 +1117,7 @@ class ContinuousController:
             "guidance_stick": sample.get("guidance_stick", [0.0, 0.0]),
             "guidance_strength": sample.get("guidance_strength", 0.0),
             "button_quiet_strength": sample.get("button_quiet_strength", 0.0),
-            "trainable": not interaction_override,
+            "trainable": transition_trainable,
         }
         self.actions_sampled += 1
 

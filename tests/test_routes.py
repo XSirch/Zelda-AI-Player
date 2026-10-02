@@ -463,6 +463,72 @@ def test_unreachable_exit_requires_route_or_door_evidence(tmp_path, state):
     assert hint["direct_reachable"] is False
 
 
+def test_escape_waypoint_falls_back_to_observed_door_without_scene_exit(
+    tmp_path, state
+):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    game = _at(state, (0.0, 0.0, 0.0), 715)
+    game.scene_exits = []
+    game.room_actors = [
+        ActorObservation(
+            actor_uid="house-door",
+            actor_id=9,
+            name="Door",
+            category=10,
+            category_name="door",
+            params=3,
+            position=(180.0, 0.0, 20.0),
+            distance=181.1,
+        )
+    ]
+
+    hint = graph.escape_waypoint(game)
+
+    assert hint is not None
+    assert hint["exit"] is True
+    assert hint["door"] is True
+    assert hint["waypoint"] == (180.0, 0.0, 20.0)
+    assert hint["exit_position"] == (180.0, 0.0, 20.0)
+    assert hint["waypoint_id"].startswith("door:")
+    assert graph.has_observed_escape(game) is True
+
+
+def test_escape_waypoint_still_prefers_native_scene_exit_over_door(
+    tmp_path, state
+):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    game = _at(state, (0.0, 0.0, 0.0), 716)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=4,
+            entrance_index=40,
+            position=(80.0, 0.0, 0.0),
+            samples=5,
+            direct_reachable=True,
+        )
+    ]
+    game.room_actors = [
+        ActorObservation(
+            actor_uid="other-door",
+            actor_id=9,
+            name="Door",
+            category=10,
+            category_name="door",
+            params=0,
+            position=(30.0, 0.0, 0.0),
+            distance=30.0,
+        )
+    ]
+
+    hint = graph.escape_waypoint(game)
+
+    assert hint is not None
+    assert hint["exit"] is True
+    assert hint.get("door") is not True
+    assert hint["exit_index"] == 4
+    assert hint["waypoint"] == (80.0, 0.0, 0.0)
+
+
 def test_interaction_button_memory_persists_and_recovers_from_failures(tmp_path):
     path = tmp_path / "routes.json"
     graph = LearnedRouteGraph(path)

@@ -259,6 +259,41 @@ def test_goal_guidance_replays_learned_route_waypoint(state):
     assert guidance["distance"] == pytest.approx(500.0)
 
 
+def test_observed_door_escape_gets_full_steering_authority(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "target_position": None,
+        "direction": None,
+    })
+    state.camera_input_yaw = 0
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        local_dwell_seconds=120.0,
+        route_hint={
+            "waypoint": (160.0, 0.0, 0.0),
+            "waypoint_id": "door:85:0:house-door",
+            "path_nodes": 1,
+            "target_gap": 0.0,
+            "confidence": 0.85,
+            "partial": True,
+            "exit": True,
+            "door": True,
+            "exit_position": (160.0, 0.0, 0.0),
+            "direct_reachable": False,
+        },
+    )
+
+    assert guidance["active"] is True
+    assert guidance["source"] == "observed_door"
+    assert guidance["exit_active"] is True
+    assert guidance["strength"] == pytest.approx(1.0)
+    assert guidance["button_quiet"] == pytest.approx(0.95)
+    assert guidance["stick"][0] > 0.95
+    assert abs(guidance["stick"][1]) < 0.05
+
+
 def test_partial_learned_route_does_not_collapse_under_long_dwell(state):
     intent = AgentIntent.bootstrap().model_copy(update={
         "mode": "navigate",

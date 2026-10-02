@@ -926,6 +926,105 @@ class LearnedRouteGraph:
         self.persistence_revision += 1
         self.dirty = True
 
+    @staticmethod
+    def _observed_doors(game: GameState) -> list:
+        """Return unique door actors already exposed by the structured observer."""
+        candidates = []
+        seen = set()
+        for actor in [game.context_actor, *list(game.room_actors)]:
+            if actor is None:
+                continue
+            if (actor.category_name or "").strip().lower() != "door":
+                continue
+            key = actor.actor_uid or (
+                int(actor.actor_id),
+                int(actor.params),
+                tuple(round(float(value), 1) for value in actor.position),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append(actor)
+        if game.player is None:
+            return candidates
+        player_position = game.player.position
+        context_uid = (
+            game.context_actor.actor_uid
+            if game.context_actor is not None
+            and (game.context_actor.category_name or "").strip().lower() == "door"
+            else None
+        )
+        candidates.sort(
+            key=lambda actor: (
+                0 if context_uid and actor.actor_uid == context_uid else 1,
+                _distance(player_position, actor.position),
+                actor.actor_id,
+                actor.params,
+            )
+        )
+        return candidates
+
+    def has_observed_escape(self, game: GameState) -> bool:
+        return bool(game.scene_exits or self._observed_doors(game))
+
+    def door_waypoint(self, game: GameState) -> dict | None:
+        """Use an observed door as a room-escape target when no exit surface works.
+
+        This is observation-driven rather than Zelda-specific route knowledge:
+        ACTORCAT_DOOR is already part of the bridge's generic actor telemetry.
+        A learned route is reused when available; otherwise collision-aware
+        guidance approaches the observed actor directly until context interaction
+        discovery can take over.
+        """
+        if not game.player:
+            return None
+        doors = self._observed_doors(game)
+        if not doors:
+            return None
+
+        door = doors[0]
+        door_position = tuple(float(value) for value in door.position)
+        routed = self.next_waypoint(game, door_position)
+        door_id = door.actor_uid or f"{door.actor_id}:{door.params}"
+        if routed is not None:
+            return {
+                **routed,
+                "exit": True,
+                "door": True,
+                "door_uid": door.actor_uid,
+                "door_actor_id": door.actor_id,
+                "door_params": door.params,
+                "exit_position": door_position,
+                "direct_reachable": False,
+            }
+
+        distance = _distance(game.player.position, door_position)
+        return {
+            "waypoint": door_position,
+            "waypoint_id": (
+                f"door:{game.scene}:{game.room}:{door_id}"
+            ),
+            "path_nodes": 1,
+            "waypoint_index": 0,
+            "target_gap": 0.0,
+            "confidence": 1.0 if distance <= 140.0 else 0.85,
+            "partial": distance > ROUTE_TARGET_REACHED_DISTANCE,
+            "exit": True,
+            "door": True,
+            "door_uid": door.actor_uid,
+            "door_actor_id": door.actor_id,
+            "door_params": door.params,
+            "exit_position": door_position,
+            "direct_reachable": distance <= 140.0,
+        }
+
+    def escape_waypoint(self, game: GameState) -> dict | None:
+        """Prefer native scene exits, then fall back to observed room doors."""
+        routed_exit = self.exit_waypoint(game)
+        if routed_exit is not None:
+            return routed_exit
+        return self.door_waypoint(game)
+
     def exit_waypoint(self, game: GameState) -> dict | None:
         """Choose an observed scene-exit surface, optionally via learned route."""
         if not game.player or not game.scene_exits:
