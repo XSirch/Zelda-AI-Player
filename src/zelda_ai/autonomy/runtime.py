@@ -23,7 +23,7 @@ from .objectives import ObjectiveTracker
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/frontier-negative-memory-v1/dialogue-reentry-guard-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/ppo-rnd-v3/reward-v7"
+CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/frontier-negative-memory-v1/dialogue-reentry-guard-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/room-map-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -667,6 +667,7 @@ class AutonomyRuntime:
     def _make_controller(self, config: RunConfig) -> ContinuousController:
         checkpoint = self.training_checkpoint
         route_graph_path = self.model_dir / "route-graph-v1.json"
+        room_map_path = self.model_dir / "room-map-v1.json"
         training_enabled = True
         self.active_champion = None
         if config.run_mode == "evaluation":
@@ -678,7 +679,11 @@ class AutonomyRuntime:
             frozen_routes = self.champions.resolve_route_graph(champion)
             if frozen_routes is None:
                 raise ValueError("Champion route graph metadata is missing")
+            frozen_room_map = self.champions.resolve_room_map(champion)
+            if frozen_room_map is None:
+                raise ValueError("Champion room map metadata is missing")
             route_graph_path = frozen_routes
+            room_map_path = frozen_room_map
             self.active_champion = champion
             training_enabled = False
 
@@ -691,11 +696,17 @@ class AutonomyRuntime:
                 ),
                 training_enabled=training_enabled,
                 route_graph_path=route_graph_path,
+                room_map_path=room_map_path,
             )
             if config.run_mode == "evaluation" and controller.route_graph.load_error:
                 raise ValueError(
                     "Champion route graph is invalid: "
                     + controller.route_graph.load_error
+                )
+            if config.run_mode == "evaluation" and controller.room_map.load_error:
+                raise ValueError(
+                    "Champion room map is invalid: "
+                    + controller.room_map.load_error
                 )
             return controller
         except (RuntimeError, ValueError) as exc:
@@ -726,6 +737,7 @@ class AutonomyRuntime:
         try:
             await asyncio.to_thread(controller.policy.save)
             await asyncio.to_thread(controller.route_graph.save, force=True)
+            await asyncio.to_thread(controller.room_map.save, force=True)
             telemetry = controller.telemetry()
             learning = telemetry.get("learning") or {}
             summary = await asyncio.to_thread(self.store.benchmark, run_id)
@@ -774,12 +786,14 @@ class AutonomyRuntime:
                 ),
                 "usage_by_model": metrics.get("usage_by_model") or [],
                 "route_memory": learning.get("route_memory") or {},
+                "room_map": learning.get("room_map") or {},
             }
             champion = await asyncio.to_thread(
                 self.champions.capture,
                 self.training_checkpoint,
                 metadata,
                 controller.route_graph.path,
+                controller.room_map.path,
             )
             self.completion_champion_saved_run_id = run_id
             self.last_champion_error = ""
@@ -791,6 +805,7 @@ class AutonomyRuntime:
                     "elapsed_s": champion["elapsed_s"],
                     "sha256": champion["sha256"],
                     "route_graph_sha256": champion.get("route_graph_sha256"),
+                    "room_map_sha256": champion.get("room_map_sha256"),
                 },
             )
         except Exception as exc:
