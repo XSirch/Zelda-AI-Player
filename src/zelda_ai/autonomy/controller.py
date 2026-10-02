@@ -1217,18 +1217,27 @@ class ContinuousController:
             except asyncio.TimeoutError:
                 pass
 
-            if not self.route_graph.writable or not self.route_graph.dirty:
+            route_dirty = self.route_graph.writable and self.route_graph.dirty
+            room_map_dirty = self.room_map.writable and self.room_map.dirty
+            if not route_dirty and not room_map_dirty:
                 continue
-            try:
-                await asyncio.to_thread(self.route_graph.save)
-                self.route_save_error = ""
-            except Exception as exc:
-                # The graph remains dirty and the next interval retries.
-                # LearnedRouteGraph.save uses atomic replacement, so a failed
-                # snapshot cannot corrupt the last durable route file.
-                self.route_save_error = (
-                    f"{type(exc).__name__}: {str(exc)[:180]}"
-                )
+            if route_dirty:
+                try:
+                    await asyncio.to_thread(self.route_graph.save)
+                    self.route_save_error = ""
+                except Exception as exc:
+                    # The graph remains dirty and the next interval retries.
+                    self.route_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
+            if room_map_dirty:
+                try:
+                    await asyncio.to_thread(self.room_map.save)
+                    self.room_map_save_error = ""
+                except Exception as exc:
+                    self.room_map_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
             publish()
 
     async def run(self, active: Callable[[], bool], publish: Callable[[], None]):
@@ -1311,6 +1320,17 @@ class ContinuousController:
                     self.route_save_error = ""
                 except (OSError, ValueError, RuntimeError) as exc:
                     self.route_save_error = (
+                        f"{type(exc).__name__}: {str(exc)[:180]}"
+                    )
+            if self.room_map.writable:
+                try:
+                    await asyncio.to_thread(
+                        self.room_map.save,
+                        force=True,
+                    )
+                    self.room_map_save_error = ""
+                except (OSError, ValueError, RuntimeError) as exc:
+                    self.room_map_save_error = (
                         f"{type(exc).__name__}: {str(exc)[:180]}"
                     )
             # Let queued/in-flight batches finish after input authority is gone.
