@@ -1065,6 +1065,10 @@ class ContinuousController:
                     setpoint,
                     sample,
                 )
+        structured_motor_override = bool(
+            guidance.get("exit_active")
+            and float(sample.get("guidance_strength") or 0.0) >= 0.999
+        )
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -1089,7 +1093,10 @@ class ContinuousController:
             "guidance_stick": sample.get("guidance_stick", [0.0, 0.0]),
             "guidance_strength": sample.get("guidance_strength", 0.0),
             "button_quiet_strength": sample.get("button_quiet_strength", 0.0),
-            "trainable": not interaction_override,
+            # Full-authority escape steering is a structured intervention: the
+            # latent residual stick did not cause the executed movement, so do
+            # not assign its PPO log-prob the resulting reward/penalty.
+            "trainable": not interaction_override and not structured_motor_override,
         }
         self.actions_sampled += 1
 
