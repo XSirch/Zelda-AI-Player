@@ -14,6 +14,8 @@ A política recebe quatro frames estruturados consecutivos e contexto espacial a
 
 Essa mudança altera a semântica da ação, então o treino passa a usar `.local/ml/raw-controller-ppo-rnd-v3.pt`. O antigo `raw-controller-ppo-rnd-v2.pt` é preservado, mas não é reinterpretado. A route memory em `.local/ml/route-graph-v1.json` **é preservada e reutilizada**, pois contém apenas caminhos empiricamente percorridos e é independente dos pesos do PPO.
 
+A **Room Map Memory v1** fica separada em `.local/ml/room-map-v1.json`. Ela acumula apenas geometria/landmarks observados: posições reais de entrada e transição, `scene_exits`, atores `door`, células transitadas/NavMesh/probes, endpoints bloqueados e affordances verticais. Ao voltar a uma room conhecida, esse mapa pode lembrar onde Link realmente saiu antes mesmo de a saída aparecer no snapshot atual; o `route-graph-v1.json` continua sendo a autoridade sobre quais caminhos dirigidos foram de fato percorridos.
+
 ### Goal-conditioned motor
 
 A cognição não fornece mais waypoints operacionais para metas rastreáveis. Ela entrega uma meta como `Obtain the Kokiri Sword` junto de um contrato de conclusão como `equipment:name=Kokiri Sword`. O runtime converte essa meta em intenção local neutra; route memory, frontiers, scene exits, atores observados e affordances físicas decidem o caminho sem mudar o objetivo. `summary` é mantido igual ao texto da meta apenas por compatibilidade do contrato.
@@ -25,6 +27,19 @@ Quando existe guidance forte de navegação, a distribuição de botões também
 Ao entrar no raio de um waypoint local, o controlador apenas avança sua execução local. Se houver uma meta rastreável travada, `intent_target_reached`, `world_transition`, `local_area_stuck`, `guidance_blocked` e progresso parcial **não chamam a IA para trocar a meta**. A próxima chamada estratégica ocorre quando o `ObjectiveTracker` confirma a condição de conclusão.
 
 Quando a cognição está em `explore` sem alvo/direção estruturada, o sistema também não entrega mais o analógico inteiro ao acaso: a route memory escolhe um **frontier local observado** entre os probes de colisão transitáveis. O frontier escolhido vira um pequeno objetivo em coordenadas do mundo e fica **mantido** até ser alcançado, ficar ~2,5 s sem progresso ou expirar em ~7 s; ele não é recalculado a cada decisão ML. Direções `back/back_left/back_right` só são consideradas quando não existe nenhuma opção frontal/lateral transitável. Frontiers que travam entram em cooldown e também acumulam **falha persistente** no `route-graph-v1.json`; candidatos que já falharam perdem prioridade mesmo em runs futuras, e um sucesso posterior reduz essa penalidade. Se a mesma scene/room ficar sem expansão por ~20 s, ou acumular pressão suficiente de frontiers/arestas falhos sob uma meta rastreável, `scene_exits` passam a ter prioridade mesmo que o timer tenha sido reiniciado por reposicionamento. Nenhum mapa oculto é consultado.
+
+### Memória persistente das rooms
+
+A `room-map-v1.json` é indexada por **mundo normal/espelhado + idade + scene + room**. Em cada room visitada ela mantém, de forma incremental:
+
+- entradas observadas e posições de spawn;
+- transições que Link realmente realizou para outra scene/room, incluindo o ponto de saída real;
+- `scene_exits` observados e portas `ACTORCAT_DOOR`;
+- células caminhadas e células transitáveis vistas pelo NavMesh/probes;
+- endpoints de probe bloqueados/sem piso;
+- escadas, ladders, ledges e paredes escaláveis observadas como traversal affordances.
+
+Isso não é um mapa pré-carregado do OoT. Na primeira visita, o agente só conhece o que o SoH já observou. Depois que Link sai de uma room, a posição da transição vira uma evidência forte de saída. Numa visita futura, se o scan atual não mostrar a saída, o controlador pode recuperar essa posição da Room Map Memory e pedir ao route graph uma rota já percorrida até ela; se ainda não houver rota completa, usa a posição lembrada como alvo collision-aware em vez de voltar a explorar a sala do zero.
 
 ### Rotas aprendidas
 
@@ -86,13 +101,19 @@ Quando uma run de **treino** emite o evento nativo `game_completed`, o runtime e
 .local/ml/champions/
   completion-0001.pt
   completion-0001.json
+  completion-0001.routes.json
+  completion-0001.room-map.json
   completion-0002.pt
   completion-0002.json
+  completion-0002.routes.json
+  completion-0002.room-map.json
   best-completion.pt
   best-completion.json
+  best-completion.routes.json
+  best-completion.room-map.json
 ```
 
-Cada completion guarda SHA-256 e metadados da run: tempo final, chamadas de cognição, tokens de input/output (além de cache/reasoning), custo reportado, breakdown por provider/modelo, updates, amostras, reward, modelo de cognição e estatísticas da route memory. O grafo de rotas usado naquele completion também é copiado para `completion-XXXX.routes.json` com SHA-256 próprio. `best-completion.pt` é apenas um alias atualizável para o menor tempo de conclusão observado; os arquivos individuais de policy/rotas nunca são sobrescritos.
+Cada completion guarda SHA-256 e metadados da run: tempo final, chamadas de cognição, tokens de input/output (além de cache/reasoning), custo reportado, breakdown por provider/modelo, updates, amostras, reward, modelo de cognição e estatísticas das memórias. O grafo de rotas é copiado para `completion-XXXX.routes.json` e a Room Map Memory para `completion-XXXX.room-map.json`, ambos com SHA-256 próprio. A avaliação usa essas cópias em modo read-only; conhecimento aprendido depois do champion não vaza para o benchmark. `best-completion.pt` é apenas um alias atualizável para o menor tempo de conclusão observado; os artefatos individuais nunca são sobrescritos.
 
 O benchmark da run também fica no banco. As métricas ao vivo continuam derivadas das chamadas/segmentos, mas ao encerrar normalmente a run o runtime grava um snapshot final em `run_summaries`, exposto como `benchmark` em `GET /api/runs/{run_id}`. Nele, `elapsed_s` fica congelado e os campos `input_tokens`, `output_tokens`, `total_tokens`, `known_cost_usd` e `usage_by_model` preservam o consumo final. `cost_usd` permanece `null` quando o custo total não pode ser conhecido (por exemplo, Codex autenticado via ChatGPT ou uma chamada OpenRouter sem custo retornado), evitando transformar custo desconhecido em zero.
 
