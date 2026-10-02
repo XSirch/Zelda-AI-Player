@@ -1023,6 +1023,12 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     )
     assert champion_routes.is_file()
     frozen_route_bytes = champion_routes.read_bytes()
+    assert champion["room_map_file"] == "completion-0001.room-map.json"
+    champion_room_map = (
+        tmp_path / "ml" / "champions" / champion["room_map_file"]
+    )
+    assert champion_room_map.is_file()
+    frozen_room_map_bytes = champion_room_map.read_bytes()
 
     evaluation_provider = CountingCognition()
     runtime.providers["codex"] = evaluation_provider
@@ -1038,6 +1044,8 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     assert runtime.controller.policy.checkpoint == champion_path
     assert runtime.controller.route_graph.writable is False
     assert runtime.controller.route_graph.path == champion_routes
+    assert runtime.controller.room_map.writable is False
+    assert runtime.controller.room_map.path == champion_room_map
     snapshot = runtime.snapshot()
     assert snapshot["run_mode"] == "evaluation"
     assert snapshot["active_champion"]["id"] == "completion-0001"
@@ -1048,6 +1056,7 @@ async def test_completion_creates_champion_and_evaluation_keeps_it_frozen(
     await runtime.control("stop")
     assert champion_path.read_bytes() == frozen_bytes
     assert champion_routes.read_bytes() == frozen_route_bytes
+    assert champion_room_map.read_bytes() == frozen_room_map_bytes
 
 
 @pytest.mark.asyncio
@@ -1069,11 +1078,21 @@ async def test_new_run_waits_for_completion_champion_capture(
     capture_started = threading.Event()
     release_capture = threading.Event()
 
-    def slow_capture(source, metadata, route_graph_source=None):
+    def slow_capture(
+        source,
+        metadata,
+        route_graph_source=None,
+        room_map_source=None,
+    ):
         capture_started.set()
         if not release_capture.wait(timeout=2.0):
             raise RuntimeError("test capture release timed out")
-        return original_capture(source, metadata, route_graph_source)
+        return original_capture(
+            source,
+            metadata,
+            route_graph_source,
+            room_map_source,
+        )
 
     runtime.champions.capture = slow_capture
     completion = asyncio.create_task(
