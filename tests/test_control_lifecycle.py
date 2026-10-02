@@ -464,6 +464,37 @@ def test_room_dwell_prefers_observed_door_without_native_scene_exit(
     ) is True
 
 
+def test_extreme_room_dwell_stops_redundant_ppo_training(
+    tmp_path, state
+):
+    controller = ContinuousController(
+        connected(state),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    normal_sample = {"guidance_strength": 0.8}
+
+    assert controller._ppo_transition_trainable(
+        interaction_override=False,
+        guidance={"exit_active": False},
+        sample=normal_sample,
+    ) is True
+
+    controller.reward_tracker.local_dwell_seconds = 181.0
+    assert controller._ppo_transition_trainable(
+        interaction_override=False,
+        guidance={"exit_active": False},
+        sample=normal_sample,
+    ) is False
+
+    controller.reward_tracker.local_dwell_seconds = 0.0
+    assert controller._ppo_transition_trainable(
+        interaction_override=False,
+        guidance={"exit_active": True},
+        sample={"guidance_strength": 1.0},
+    ) is False
+
+
 def test_trackable_objective_prefers_exit_after_persistent_room_failures(
     tmp_path, state
 ):
