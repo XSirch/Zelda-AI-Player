@@ -495,7 +495,15 @@ def goal_guidance(
                 0.25,
                 1.0 - min(1.0, (dwell - 90.0) / 180.0) * 0.75,
             )
-        obstacle_scale = 0.82 if detour is not None else 0.30 if blocked else 1.0
+        obstacle_scale = (
+            1.0
+            if exit_active and (not blocked or detour is not None)
+            else 0.82
+            if detour is not None
+            else 0.30
+            if blocked
+            else 1.0
+        )
         strength = base_strength * proximity * stuck_scale * obstacle_scale
         if exit_active:
             # Keep policy button noise quiet during escape approach. The
