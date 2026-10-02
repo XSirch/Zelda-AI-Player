@@ -323,6 +323,7 @@ def goal_guidance(
         ):
             is_frontier = bool(route_hint.get("frontier"))
             is_exit = bool(route_hint.get("exit"))
+            is_door_escape = bool(route_hint.get("door"))
             route_active = not is_frontier and not is_exit and int(
                 route_hint.get("path_nodes") or 0
             ) > 1
@@ -359,11 +360,18 @@ def goal_guidance(
             if is_frontier:
                 source = "observed_frontier"
             elif is_exit:
-                source = (
-                    "scene_exit"
-                    if int(route_hint.get("path_nodes") or 0) <= 1
-                    else "scene_exit_route"
-                )
+                if is_door_escape:
+                    source = (
+                        "observed_door"
+                        if int(route_hint.get("path_nodes") or 0) <= 1
+                        else "observed_door_route"
+                    )
+                else:
+                    source = (
+                        "scene_exit"
+                        if int(route_hint.get("path_nodes") or 0) <= 1
+                        else "scene_exit_route"
+                    )
                 final_exit = route_hint.get("exit_position")
                 if (
                     isinstance(final_exit, (list, tuple))
@@ -420,6 +428,10 @@ def goal_guidance(
                 intent.mode in {"navigate", "explore", "observe"}
                 and not source.startswith("traversal:")
                 and not source.startswith("scene_exit")
+                and not (
+                    source.startswith("observed_door")
+                    and horizontal <= 120.0
+                )
             ):
                 detour_stick, detour_info = _collision_detour(
                     game,
@@ -445,10 +457,10 @@ def goal_guidance(
                 0.78 + 0.16 * route_confidence
             ) * (0.85 if route_partial else 1.0)
         elif exit_active:
-            # A scene-exit surface is explicit bridge evidence of a transition.
-            # Give it high steering authority, but reduce button quieting near
-            # the threshold so a learned/contextual interaction can fire.
-            base_strength = 0.92 if exit_direct_reachable else 0.84
+            # Once the room has failed long enough to enter escape mode, PPO
+            # residual steering must not pull Link back into the same room.
+            # Contextual door interaction is handled separately after sampling.
+            base_strength = 1.0
         elif frontier_active:
             # Targetless exploration should still have a stable local heading.
             # The waypoint comes from an observed open probe, not hidden map data.
@@ -486,7 +498,10 @@ def goal_guidance(
         obstacle_scale = 0.82 if detour is not None else 0.30 if blocked else 1.0
         strength = base_strength * proximity * stuck_scale * obstacle_scale
         if exit_active:
-            quiet_multiplier = 0.12
+            # Keep policy button noise quiet during escape approach. The
+            # interaction override still injects one empirically tested button
+            # when a door/context action is actually in range.
+            quiet_multiplier = 0.95
         else:
             quiet_multiplier = (
                 0.45 if blocked else 0.9
