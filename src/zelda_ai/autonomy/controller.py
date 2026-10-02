@@ -303,6 +303,10 @@ class ContinuousController:
         camera_state = self._camera_state(game)
 
         if camera_state != "stable":
+            # Camera cuts only invalidate camera-relative navigation movement.
+            # Never steal authority from dialogue/interaction/modal overrides.
+            if self.last_setpoint.reason != "ml_policy":
+                return
             if self.pending is not None:
                 # This action was partially replaced by the camera safety guard;
                 # keeping it out of PPO preserves latent-action/log-prob causality.
@@ -321,7 +325,8 @@ class ContinuousController:
             return
 
         if (
-            self.last_setpoint.reason != "ml_policy"
+            self.last_setpoint.reason
+            not in {"ml_policy", "camera_cut", "camera_transition"}
             or self.pending is None
             or not self.last_guidance.get("active")
         ):
