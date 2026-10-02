@@ -287,6 +287,8 @@ def goal_guidance(
     exit_active = False
     exit_index = None
     exit_direct_reachable = False
+    forced_escape = False
+    is_remembered_escape = False
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
