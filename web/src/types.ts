@@ -176,6 +176,7 @@ export interface LearningSnapshot {
     writable: boolean;
     dirty?: boolean;
     load_error?: string | null;
+    save_error?: string | null;
     current_room?: {
       scene: number;
       room: number;
