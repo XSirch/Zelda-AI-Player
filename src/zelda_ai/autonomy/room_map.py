@@ -85,6 +85,7 @@ class RoomMapMemory:
         self.rooms: dict[str, dict] = {}
         self.last_context: str | None = None
         self.last_position: tuple[float, float, float] | None = None
+        self.last_full_seq: dict[str, int] = {}
         self.dirty = False
         self.persistence_revision = 0
         self.load_error = ""
@@ -233,6 +234,7 @@ class RoomMapMemory:
     def reset_trace(self):
         self.last_context = None
         self.last_position = None
+        self.last_full_seq.clear()
 
     def _ensure_room(
         self,
@@ -463,11 +465,17 @@ class RoomMapMemory:
             limit=ROOM_MAP_MAX_CELLS_PER_ROOM,
             extras={"source": "traversed"},
         ) or changed
-        changed = self._record_navmesh(game, room, now_s) or changed
+        slow_refresh = (
+            game.protocol == 1
+            or self.last_full_seq.get(key) != int(game.full_seq)
+        )
+        if slow_refresh:
+            changed = self._record_navmesh(game, room, now_s) or changed
+            changed = self._record_exits(game, room, now_s) or changed
+            changed = self._record_affordances(game, room, now_s) or changed
+            self.last_full_seq[key] = int(game.full_seq)
         changed = self._record_probes(game, room, now_s) or changed
-        changed = self._record_exits(game, room, now_s) or changed
         changed = self._record_doors(game, room, now_s) or changed
-        changed = self._record_affordances(game, room, now_s) or changed
 
         self.last_context = key
         self.last_position = tuple(float(v) for v in game.player.position)
