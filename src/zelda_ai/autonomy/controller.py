@@ -1281,7 +1281,9 @@ class ContinuousController:
                 # transition to learn; neutral input avoids polluting the rollout.
                 if game.cutscene_active and not game.dialogue.active:
                     self.route_graph.reset_trace()
-                    self.room_map.reset_trace()
+                    # Keep room-map trace across door/transition cutscenes so the
+                    # first playable frame in the next room can persist the real
+                    # departure point from the previous room.
                     self.last_setpoint = Setpoint(reason="cutscene")
                     self.last_motor_summary = "Cutscene owns Link; ML actor remains live and resumes immediately."
                 elif self.tick % self.action_repeat_ticks == 1 or self.pending is None:
