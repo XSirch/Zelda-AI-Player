@@ -48,6 +48,7 @@ INTERACTION_PROBE_BUTTONS = tuple(
 )
 EXIT_PRIORITY_DWELL_S = 20.0
 ROOM_FAILURE_EXIT_PRESSURE = 6
+NO_PROGRESS_TRAINING_CUTOFF_S = 180.0
 INTERACTION_PROBE_COOLDOWN_S = 0.35
 INTERACTION_OUTCOME_WINDOW_S = 1.5
 DIALOGUE_REENTRY_GUARD_S = 8.0
@@ -868,6 +869,28 @@ class ContinuousController:
             )
         )
 
+    def _ppo_transition_trainable(
+        self,
+        *,
+        interaction_override: bool,
+        guidance: dict,
+        sample: dict,
+    ) -> bool:
+        if interaction_override:
+            return False
+        if (
+            guidance.get("exit_active")
+            and float(sample.get("guidance_strength") or 0.0) >= 0.999
+        ):
+            # Full-authority escape steering is a structured intervention. The
+            # sampled residual did not cause the executed movement.
+            return False
+        if self.reward_tracker.local_dwell_seconds >= NO_PROGRESS_TRAINING_CUTOFF_S:
+            # A few minutes of negative anti-loop experience are enough. Hours
+            # of the same failed room should not dominate the PPO checkpoint.
+            return False
+        return True
+
     def _sample_setpoint(
         self,
         observation: list[float],
@@ -1065,9 +1088,10 @@ class ContinuousController:
                     setpoint,
                     sample,
                 )
-        structured_motor_override = bool(
-            guidance.get("exit_active")
-            and float(sample.get("guidance_strength") or 0.0) >= 0.999
+        transition_trainable = self._ppo_transition_trainable(
+            interaction_override=interaction_override,
+            guidance=guidance,
+            sample=sample,
         )
         self.last_guidance = guidance
         self.last_setpoint = setpoint
@@ -1093,10 +1117,7 @@ class ContinuousController:
             "guidance_stick": sample.get("guidance_stick", [0.0, 0.0]),
             "guidance_strength": sample.get("guidance_strength", 0.0),
             "button_quiet_strength": sample.get("button_quiet_strength", 0.0),
-            # Full-authority escape steering is a structured intervention: the
-            # latent residual stick did not cause the executed movement, so do
-            # not assign its PPO log-prob the resulting reward/penalty.
-            "trainable": not interaction_override and not structured_motor_override,
+            "trainable": transition_trainable,
         }
         self.actions_sampled += 1
 
