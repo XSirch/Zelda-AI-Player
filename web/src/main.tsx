@@ -129,7 +129,9 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
             ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}${thought.guidance.frontier_stable ? ` · mantido ${(thought.guidance.frontier_age_s ?? 0).toFixed(1)}s` : ''}`
             : ''}
           {thought.guidance.exit_active
-            ? ` · saída observada #${thought.guidance.exit_index ?? '?'}${thought.guidance.exit_direct_reachable ? ' direta' : ' via rota'}`
+            ? thought.guidance.remembered_escape
+              ? ` · saída lembrada${thought.guidance.forced_escape ? ' · ESCAPE' : ''}`
+              : ` · saída observada #${thought.guidance.exit_index ?? '?'}${thought.guidance.exit_direct_reachable ? ' direta' : ' via rota'}${thought.guidance.forced_escape ? ' · ESCAPE' : ''}`
             : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
         </strong>
@@ -222,6 +224,7 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
   const exploration = learning?.exploration;
   const resources = learning?.resources;
   const routeMemory = learning?.route_memory;
+  const roomMap = learning?.room_map;
   const interactionLearning = learning?.interaction_learning;
   const expectedButtons = learning?.expected_button_count ?? 0;
   const guidanceMix = learning?.guidance_mix ?? 0;
@@ -264,6 +267,12 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
             : 'nenhum completion salvo'}
       </span>
       {bestChampion && <span>BEST TIME <b>{bestChampion.id}</b> · {durationLabel(bestChampion.elapsed_s)}</span>}
+      {roomMap && <span>
+        MAPA <b>{compact(roomMap.rooms)}</b> salas · <b>{compact(roomMap.transitions)}</b> saídas percorridas · <b>{compact(roomMap.exits)}</b> exits · <b>{compact(roomMap.doors)}</b> portas · <b>{compact(roomMap.walkable_cells)}</b> células livres / <b>{compact(roomMap.blocked_cells)}</b> bloqueadas
+        {roomMap.current_room
+          ? <> · sala atual visitada <b>{compact(roomMap.current_room.visits)}</b>x · <b>{compact(roomMap.current_room.transitions)}</b> saídas lembradas</>
+          : null}
+      </span>}
       {routeMemory && <span>
         ROTAS APRENDIDAS <b>{compact(routeMemory.nodes)}</b> nós · <b>{compact(routeMemory.edges)}</b> trechos · <b>{compact(routeMemory.routes_reused)}</b> reusos · <b>{compact(routeMemory.waypoints_advanced ?? 0)}</b> avanços · <b>{compact(routeMemory.learned_interactions ?? 0)}</b> interações
         {routeMemory.active_frontier ? <> · frontier <b>{routeMemory.active_frontier}</b></> : null}
