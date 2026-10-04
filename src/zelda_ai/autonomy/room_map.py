@@ -557,14 +557,32 @@ class RoomMapMemory:
             return False
         return bool(room["transitions"] or room["exits"] or room["doors"])
 
-    def known_escape_candidates(self, game: GameState) -> list[dict]:
+    def has_remembered_transition(self, game: GameState) -> bool:
+        room = self.current_room(game)
+        return bool(room and room["transitions"])
+
+    def known_escape_candidates(
+        self,
+        game: GameState,
+        *,
+        kinds: set[str] | None = None,
+        excluded_keys: set[str] | None = None,
+    ) -> list[dict]:
         room = self.current_room(game)
         if room is None or game.player is None:
             return []
+        kinds = set(kinds or {"transition", "exit", "door"})
+        excluded_keys = set(excluded_keys or ())
         player_position = game.player.position
         candidates = []
 
-        for key, row in room["transitions"].items():
+        if "transition" in kinds:
+            transition_rows = room["transitions"].items()
+        else:
+            transition_rows = ()
+        for key, row in transition_rows:
+            if key in excluded_keys:
+                continue
             position = _finite_position(row.get("position"))
             if position is None:
                 continue
@@ -578,7 +596,13 @@ class RoomMapMemory:
                 "destination_room": row.get("destination_room"),
             })
 
-        for key, row in room["exits"].items():
+        if "exit" in kinds:
+            exit_rows = room["exits"].items()
+        else:
+            exit_rows = ()
+        for key, row in exit_rows:
+            if key in excluded_keys:
+                continue
             position = _finite_position(row.get("position"))
             if position is None:
                 continue
@@ -598,7 +622,13 @@ class RoomMapMemory:
                 "entrance_index": row.get("entrance_index"),
             })
 
-        for key, row in room["doors"].items():
+        if "door" in kinds:
+            door_rows = room["doors"].items()
+        else:
+            door_rows = ()
+        for key, row in door_rows:
+            if key in excluded_keys:
+                continue
             position = _finite_position(row.get("position"))
             if position is None:
                 continue
@@ -626,8 +656,19 @@ class RoomMapMemory:
         )
         return candidates
 
-    def remembered_escape_waypoint(self, game: GameState, route_graph) -> dict | None:
-        candidates = self.known_escape_candidates(game)
+    def remembered_escape_waypoint(
+        self,
+        game: GameState,
+        route_graph,
+        *,
+        kinds: set[str] | None = None,
+        excluded_keys: set[str] | None = None,
+    ) -> dict | None:
+        candidates = self.known_escape_candidates(
+            game,
+            kinds=kinds,
+            excluded_keys=excluded_keys,
+        )
         if not candidates or game.player is None:
             return None
         candidate = candidates[0]
