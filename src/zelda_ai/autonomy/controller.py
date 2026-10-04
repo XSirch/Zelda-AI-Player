@@ -1133,6 +1133,7 @@ class ContinuousController:
     def _ml_step(self, game) -> Setpoint:
         self.route_graph.observe(game)
         self.room_map.observe(game)
+        self._update_escape_attempt(game)
         base_observation = encode_state(
             game,
             self.intent,
@@ -1448,6 +1449,7 @@ class ContinuousController:
                     self.reward_tracker.break_causal_chain()
                     self.route_graph.reset_trace()
                     self.room_map.reset_trace()
+                    self.active_escape_attempt = None
                     self._reset_camera_guard()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
                     self.last_stick = (0.0, 0.0)
@@ -1569,6 +1571,26 @@ class ContinuousController:
                 "guard_ticks": self.camera_guard_ticks,
                 "cuts": self.camera_cut_count,
                 "transitions": self.camera_transition_count,
+            },
+            "escape_control": {
+                "active": bool(self.active_escape_attempt),
+                "key": (
+                    self.active_escape_attempt.get("key")
+                    if self.active_escape_attempt
+                    else None
+                ),
+                "age_s": (
+                    round(
+                        time.monotonic()
+                        - float(self.active_escape_attempt.get("started_at", time.monotonic())),
+                        1,
+                    )
+                    if self.active_escape_attempt
+                    else 0.0
+                ),
+                "failures": self.escape_failures,
+                "successes": self.escape_successes,
+                "cooling_down": len(self.escape_retry_after),
             },
             "setpoint": {
                 "buttons": self.last_setpoint.buttons,
