@@ -413,6 +413,45 @@ def test_targetless_explore_prioritizes_observed_scene_exit(state):
     assert late_guidance["stuck_scale"] == pytest.approx(1.0)
 
 
+def test_forced_escape_traversal_gets_full_authority_without_becoming_exit_interaction(state):
+    intent = AgentIntent.bootstrap().model_copy(update={
+        "mode": "explore",
+        "target_position": None,
+        "direction": None,
+    })
+    state.camera_input_yaw = 0
+
+    guidance = goal_guidance(
+        state,
+        intent,
+        route_hint={
+            "waypoint": (0.0, 0.0, 55.0),
+            "waypoint_id": "escape-traversal:ladder_down:approach",
+            "path_nodes": 1,
+            "confidence": 1.0,
+            "partial": True,
+            "traversal": True,
+            "traversal_kind": "ladder_down",
+            "traversal_direction": "down",
+            "traversal_phase": "approach",
+            "forced_escape": True,
+            "escape_key": "memory:transition:forest",
+            "escape_final_target": (0.0, -100.0, 180.0),
+        },
+    )
+
+    assert guidance["active"] is True
+    assert guidance["source"] == "escape_traversal:ladder_down:approach"
+    assert guidance["traversal_route_active"] is True
+    assert guidance["traversal_route_kind"] == "ladder_down"
+    assert guidance["exit_active"] is False
+    assert guidance["forced_escape"] is True
+    assert guidance["escape_key"] == "memory:transition:forest"
+    assert guidance["strength"] == pytest.approx(1.0)
+    assert guidance["button_quiet"] == pytest.approx(0.95)
+    assert guidance["stick"][1] > 0.95
+
+
 def test_active_dialogue_suppresses_navigation_guidance(state):
     intent = AgentIntent.bootstrap().model_copy(update={
         "mode": "explore",

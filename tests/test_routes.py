@@ -1,5 +1,5 @@
 from zelda_ai.autonomy.routes import LearnedRouteGraph
-from zelda_ai.models import ActorObservation, NavigationProbe, SceneExitObservation
+from zelda_ai.models import ActorObservation, NavigationProbe, SceneExitObservation, TraversalAffordanceObservation
 
 
 def _at(state, position, seq):
@@ -400,6 +400,42 @@ def test_frontier_does_not_choose_rearward_when_front_or_side_is_open(
     assert hint["direction"] == "forward"
 
 
+def test_unseen_vertical_traversal_beats_horizontal_frontier(tmp_path, state):
+    graph = LearnedRouteGraph(tmp_path / "routes.json")
+    game = _at(state, (0.0, 100.0, 0.0), 690)
+    game.traversal_affordances = [
+        TraversalAffordanceObservation(
+            kind="ladder_down",
+            direction="down",
+            approach_position=(0.0, 100.0, 40.0),
+            target_position=(0.0, 20.0, 70.0),
+            distance=40.0,
+            height_delta=0.0,
+            wall_flags=1,
+        )
+    ]
+
+    hint = graph.traversal_waypoint(game)
+
+    assert hint is not None
+    assert hint["traversal"] is True
+    assert hint["traversal_kind"] == "ladder_down"
+    assert hint["traversal_direction"] == "down"
+    assert hint["traversal_target_visited"] is False
+
+    graph.observe(game, now_s=1.0)
+    reached = _at(game, (0.0, 20.0, 70.0), 691)
+    graph.observe(reached, now_s=2.0)
+    graph.reset_trace()
+
+    # Once that vertical region is empirically visited it no longer preempts
+    # fresh horizontal exploration unless recovery explicitly allows revisits.
+    assert graph.traversal_waypoint(game) is None
+    replay = graph.traversal_waypoint(game, include_visited=True)
+    assert replay is not None
+    assert replay["traversal_target_visited"] is True
+
+
 def test_exit_waypoint_prefers_direct_reachable_observed_exit(tmp_path, state):
     graph = LearnedRouteGraph(tmp_path / "routes.json")
     game = _at(state, (0.0, 0.0, 0.0), 700)
@@ -443,6 +479,11 @@ def test_unreachable_exit_requires_route_or_door_evidence(tmp_path, state):
     ]
 
     assert graph.exit_waypoint(game) is None
+    recovery_hint = graph.exit_waypoint(game, allow_unreachable=True)
+    assert recovery_hint is not None
+    assert recovery_hint["exit"] is True
+    assert recovery_hint["direct_reachable"] is False
+    assert recovery_hint["waypoint"] == (300.0, 0.0, 0.0)
 
     game.room_actors = [
         ActorObservation(

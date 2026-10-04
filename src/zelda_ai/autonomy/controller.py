@@ -50,6 +50,10 @@ INTERACTION_PROBE_BUTTONS = tuple(
 EXIT_PRIORITY_DWELL_S = 20.0
 ROOM_FAILURE_EXIT_PRESSURE = 6
 NO_PROGRESS_TRAINING_CUTOFF_S = 180.0
+ESCAPE_PROGRESS_DELTA = 8.0
+ESCAPE_STALL_S = 3.5
+ESCAPE_MAX_AGE_S = 45.0
+ESCAPE_RETRY_COOLDOWN_S = 20.0
 INTERACTION_PROBE_COOLDOWN_S = 0.35
 INTERACTION_OUTCOME_WINDOW_S = 1.5
 DIALOGUE_REENTRY_GUARD_S = 8.0
@@ -144,6 +148,10 @@ class ContinuousController:
         self.last_interaction_source = "none"
         self.dialogue_reentry_guard: dict | None = None
         self.dialogue_reentry_suppressed = 0
+        self.active_escape_attempt: dict | None = None
+        self.escape_retry_after: dict[str, float] = {}
+        self.escape_failures = 0
+        self.escape_successes = 0
         self.last_camera_yaw: float | None = None
         self.camera_motion_state = "stable"
         self.camera_guard_ticks = 0
@@ -198,6 +206,10 @@ class ContinuousController:
         self.last_interaction_source = "none"
         self.dialogue_reentry_guard = None
         self.dialogue_reentry_suppressed = 0
+        self.active_escape_attempt = None
+        self.escape_retry_after.clear()
+        self.escape_failures = 0
+        self.escape_successes = 0
         self.last_camera_yaw = None
         self.camera_motion_state = "stable"
         self.camera_guard_ticks = 0
@@ -712,14 +724,32 @@ class ContinuousController:
             (
                 probe.get("exit_active")
                 or probe.get("actor_is_door")
+                or probe.get("traversal_active")
             )
             and current_key != probe["key"]
+        )
+        traversal_started = bool(
+            probe.get("traversal_active")
+            and game.player is not None
+            and (
+                (game.player.climbing_ladder and not probe.get("climbing_ladder"))
+                or (game.player.climbing_ledge and not probe.get("climbing_ledge"))
+                or (game.player.hanging_ledge and not probe.get("hanging_ledge"))
+                or (
+                    probe.get("player_position") is not None
+                    and math.dist(
+                        game.player.position,
+                        probe["player_position"],
+                    ) >= 12.0
+                )
+            )
         )
         success = (
             scene_changed
             or dialogue_started
             or major_effect
             or exit_context_changed
+            or traversal_started
         )
 
         if success:
@@ -766,6 +796,7 @@ class ContinuousController:
         )
         should_interact = bool(
             guidance.get("exit_active")
+            or guidance.get("traversal_route_active")
             or actor_is_door
             or self.intent.mode == "interact"
         )
@@ -838,7 +869,22 @@ class ContinuousController:
             "room": game.room,
             "dialogue_active": bool(game.dialogue.active),
             "exit_active": bool(guidance.get("exit_active")),
+            "traversal_active": bool(guidance.get("traversal_route_active")),
             "actor_is_door": bool(actor_is_door),
+            "player_position": (
+                tuple(float(value) for value in game.player.position)
+                if game.player is not None
+                else None
+            ),
+            "climbing_ladder": bool(
+                game.player.climbing_ladder if game.player is not None else False
+            ),
+            "climbing_ledge": bool(
+                game.player.climbing_ledge if game.player is not None else False
+            ),
+            "hanging_ledge": bool(
+                game.player.hanging_ledge if game.player is not None else False
+            ),
             "known": bool(using_known),
         }
         self.last_interaction_source = f"{source}:{key}->{button}"
@@ -858,6 +904,36 @@ class ContinuousController:
             True,
         )
 
+    @staticmethod
+    def _room_has_local_actionable_evidence(game) -> bool:
+        action = game.context_action
+        actor = game.context_actor
+        actor_is_door = bool(
+            actor is not None
+            and (actor.category_name or "").strip().lower() == "door"
+        )
+        action_label = (action.label or "").strip().lower()
+        traversal_action = action_label in {
+            "climb",
+            "down",
+            "jump",
+            "drop",
+            "enter",
+            "open",
+        }
+        if (
+            action.code != 0
+            and action_label not in {"", "none"}
+            and not actor_is_door
+            and not traversal_action
+        ):
+            return True
+        for candidate in game.room_actors:
+            category = (candidate.category_name or "").strip().lower()
+            if category in {"chest", "npc", "switch", "enemy", "boss"}:
+                return True
+        return False
+
     def _should_prefer_observed_exit(
         self,
         game,
@@ -871,6 +947,20 @@ class ContinuousController:
             return False
         room_failure_pressure = self.route_graph.room_failure_pressure(game)
         trackable_objective = self.intent.completion.kind != "manual"
+        strong_escape_evidence = bool(
+            self.room_map.has_remembered_transition(game)
+            or self.route_graph.has_observed_escape(game)
+        )
+        if (
+            trackable_objective
+            and self.intent.mode == "explore"
+            and strong_escape_evidence
+            and not self._room_has_local_actionable_evidence(game)
+        ):
+            # With a sticky strategic objective and no meaningful local actor,
+            # chest, switch or enemy to investigate, an observed/proven room
+            # boundary is more useful than another random frontier cycle.
+            return True
         return bool(
             self.reward_tracker.local_dwell_seconds >= EXIT_PRIORITY_DWELL_S
             or actor_is_door
@@ -879,6 +969,100 @@ class ContinuousController:
                 and room_failure_pressure >= ROOM_FAILURE_EXIT_PRESSURE
             )
         )
+
+    @staticmethod
+    def _escape_context(game) -> tuple[int, int, bool, str]:
+        return (
+            int(game.scene),
+            int(game.room),
+            bool(game.mirrored_world),
+            "adult" if game.player and game.player.age == "adult" else "child",
+        )
+
+    def _escape_on_cooldown(self, key: str | None, *, now: float) -> bool:
+        if not key:
+            return False
+        until = self.escape_retry_after.get(key)
+        if until is None:
+            return False
+        if until <= now:
+            self.escape_retry_after.pop(key, None)
+            return False
+        return True
+
+    def _update_escape_attempt(self, game):
+        now = time.monotonic()
+        self.escape_retry_after = {
+            key: until
+            for key, until in self.escape_retry_after.items()
+            if until > now
+        }
+        attempt = self.active_escape_attempt
+        context = self._escape_context(game)
+        if attempt is not None and attempt.get("context") != context:
+            self.escape_successes += 1
+            self.active_escape_attempt = None
+            return
+        if (
+            game.player is None
+            or game.dialogue.active
+            or game.pause_menu.active
+            or game.cutscene_active
+        ):
+            return
+
+        guidance = self.last_guidance
+        if not (
+            guidance.get("active")
+            and guidance.get("forced_escape")
+            and guidance.get("escape_key")
+            and guidance.get("target") is not None
+        ):
+            return
+
+        key = str(guidance["escape_key"])
+        target = tuple(float(value) for value in guidance["target"])
+        distance = math.dist(game.player.position, target)
+        if (
+            attempt is None
+            or attempt.get("key") != key
+            or attempt.get("context") != context
+        ):
+            self.active_escape_attempt = {
+                "key": key,
+                "context": context,
+                "target": target,
+                "started_at": now,
+                "last_progress_at": now,
+                "best_distance": distance,
+            }
+            return
+
+        if tuple(attempt.get("target") or ()) != target:
+            attempt["target"] = target
+            attempt["best_distance"] = distance
+            attempt["last_progress_at"] = now
+            return
+
+        best_distance = float(attempt.get("best_distance", distance))
+        if distance <= best_distance - ESCAPE_PROGRESS_DELTA:
+            attempt["best_distance"] = distance
+            attempt["last_progress_at"] = now
+            return
+
+        stalled = (
+            now - float(attempt.get("last_progress_at", now))
+            >= ESCAPE_STALL_S
+        )
+        expired = (
+            now - float(attempt.get("started_at", now))
+            >= ESCAPE_MAX_AGE_S
+        )
+        if stalled or expired:
+            self.escape_retry_after[key] = now + ESCAPE_RETRY_COOLDOWN_S
+            self.escape_failures += 1
+            self.active_escape_attempt = None
+            self.route_graph.clear_navigation_commitment()
 
     def _ppo_transition_trainable(
         self,
@@ -890,7 +1074,10 @@ class ContinuousController:
         if interaction_override:
             return False
         if (
-            guidance.get("exit_active")
+            (
+                guidance.get("forced_escape")
+                or guidance.get("traversal_route_active")
+            )
             and float(sample.get("guidance_strength") or 0.0) >= 0.999
         ):
             # Full-authority escape steering is a structured intervention. The
@@ -902,15 +1089,170 @@ class ContinuousController:
             return False
         return True
 
+    @staticmethod
+    def _escape_traversal_hint(game, escape_hint: dict) -> dict:
+        """Insert one observed vertical traversal step before an unreachable exit."""
+        if (
+            game.player is None
+            or bool(escape_hint.get("direct_reachable"))
+            or int(escape_hint.get("path_nodes") or 0) > 1
+            or not game.traversal_affordances
+        ):
+            return escape_hint
+
+        final_target = escape_hint.get("exit_position") or escape_hint.get("waypoint")
+        if not (
+            isinstance(final_target, (list, tuple))
+            and len(final_target) == 3
+        ):
+            return escape_hint
+        final_target = tuple(float(value) for value in final_target)
+        player_position = tuple(float(value) for value in game.player.position)
+        current_distance = math.dist(player_position, final_target)
+        current_vertical_gap = abs(final_target[1] - player_position[1])
+        desired_vertical = final_target[1] - player_position[1]
+
+        candidates = []
+        for row in game.traversal_affordances:
+            target = tuple(float(value) for value in row.target_position)
+            approach = tuple(float(value) for value in row.approach_position)
+            target_distance = math.dist(target, final_target)
+            vertical_gap = abs(final_target[1] - target[1])
+            improves_target = target_distance <= current_distance - 12.0
+            improves_vertical = vertical_gap <= current_vertical_gap - 8.0
+            if not improves_target and not improves_vertical:
+                continue
+
+            direction_penalty = 0.0
+            if desired_vertical <= -25.0 and row.direction != "down":
+                direction_penalty = 180.0
+            elif desired_vertical >= 25.0 and row.direction != "up":
+                direction_penalty = 180.0
+
+            kind_penalty = (
+                80.0
+                if row.kind == "ledge_down"
+                else 20.0
+                if row.kind in {"stairs_or_slope_up", "stairs_or_slope_down"}
+                else 0.0
+            )
+            approach_distance = math.dist(player_position, approach)
+            score = (
+                approach_distance
+                + target_distance
+                + direction_penalty
+                + kind_penalty
+            )
+            candidates.append((score, approach_distance, row, approach, target))
+
+        if not candidates:
+            return escape_hint
+
+        _, approach_distance, row, approach, target = min(
+            candidates,
+            key=lambda item: item[0],
+        )
+        if approach_distance > 55.0:
+            phase = "approach"
+            waypoint = approach
+        else:
+            phase = "target"
+            waypoint = target
+
+        escape_key = str(
+            escape_hint.get("escape_key")
+            or escape_hint.get("waypoint_id")
+            or "escape"
+        )
+        return {
+            "waypoint": waypoint,
+            "waypoint_id": (
+                f"escape-traversal:{row.kind}:{phase}:"
+                f"{round(waypoint[0], 1)}:{round(waypoint[1], 1)}:"
+                f"{round(waypoint[2], 1)}"
+            )[:220],
+            "path_nodes": 1,
+            "waypoint_index": 0,
+            "target_gap": math.dist(waypoint, final_target),
+            "confidence": 1.0,
+            "partial": True,
+            "traversal": True,
+            "traversal_kind": row.kind,
+            "traversal_direction": row.direction,
+            "traversal_phase": phase,
+            "forced_escape": True,
+            "escape_key": escape_key,
+            "escape_final_target": final_target,
+        }
+
     def _escape_waypoint(self, game) -> dict | None:
-        """Prefer current observations, then empirical memory from prior visits."""
-        current = self.route_graph.escape_waypoint(game)
-        if current is not None:
-            return current
-        return self.room_map.remembered_escape_waypoint(
+        """Choose a healthy escape target, preferring proven departures."""
+        now = time.monotonic()
+        excluded_memory = {
+            key.split(":", 2)[2]
+            for key, until in self.escape_retry_after.items()
+            if until > now and key.startswith("memory:") and key.count(":") >= 2
+        }
+
+        # A point where Link actually changed room/scene is stronger evidence
+        # than a merely detected exit surface and should win on revisits.
+        remembered_transition = self.room_map.remembered_escape_waypoint(
             game,
             self.route_graph,
+            kinds={"transition"},
+            excluded_keys=excluded_memory,
         )
+        if remembered_transition is not None:
+            key = str(remembered_transition.get("escape_key") or "")
+            if not self._escape_on_cooldown(key, now=now):
+                return self._escape_traversal_hint(
+                    game,
+                    remembered_transition,
+                )
+
+        observed_exit = self.route_graph.exit_waypoint(
+            game,
+            allow_unreachable=True,
+        )
+        if observed_exit is not None:
+            key = f"observed:{observed_exit.get('waypoint_id')}"
+            if not self._escape_on_cooldown(key, now=now):
+                return self._escape_traversal_hint(
+                    game,
+                    {
+                        **observed_exit,
+                        "forced_escape": True,
+                        "escape_key": key,
+                    },
+                )
+
+        observed_door = self.route_graph.door_waypoint(game)
+        if observed_door is not None:
+            key = f"observed:{observed_door.get('waypoint_id')}"
+            if not self._escape_on_cooldown(key, now=now):
+                return self._escape_traversal_hint(
+                    game,
+                    {
+                        **observed_door,
+                        "forced_escape": True,
+                        "escape_key": key,
+                    },
+                )
+
+        remembered_other = self.room_map.remembered_escape_waypoint(
+            game,
+            self.route_graph,
+            kinds={"exit", "door"},
+            excluded_keys=excluded_memory,
+        )
+        if remembered_other is not None:
+            key = str(remembered_other.get("escape_key") or "")
+            if not self._escape_on_cooldown(key, now=now):
+                return self._escape_traversal_hint(
+                    game,
+                    remembered_other,
+                )
+        return None
 
     def _sample_setpoint(
         self,
@@ -952,6 +1294,7 @@ class ContinuousController:
     def _ml_step(self, game) -> Setpoint:
         self.route_graph.observe(game)
         self.room_map.observe(game)
+        self._update_escape_attempt(game)
         base_observation = encode_state(
             game,
             self.intent,
@@ -1054,7 +1397,9 @@ class ContinuousController:
                 if route_hint is not None:
                     self.route_graph.clear_frontier()
                 else:
-                    route_hint = self.route_graph.exploration_waypoint(game)
+                    route_hint = self.route_graph.traversal_waypoint(game)
+                    if route_hint is None:
+                        route_hint = self.route_graph.exploration_waypoint(game)
         elif self.intent.mode == "explore":
             actor_is_door = bool(
                 game.context_actor is not None
@@ -1074,7 +1419,9 @@ class ContinuousController:
             if route_hint is not None:
                 self.route_graph.clear_frontier()
             else:
-                route_hint = self.route_graph.exploration_waypoint(game)
+                route_hint = self.route_graph.traversal_waypoint(game)
+                if route_hint is None:
+                    route_hint = self.route_graph.exploration_waypoint(game)
         else:
             route_hint = None
         guidance = goal_guidance(
@@ -1084,6 +1431,24 @@ class ContinuousController:
             route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
+        if (
+            guidance.get("forced_escape")
+            or guidance.get("traversal_route_active")
+        ):
+            # Structured room recovery/traversal owns movement. Suppress PPO
+            # button noise completely; contextual interaction discovery below
+            # may still inject one empirically tested physical button when the
+            # game exposes an actionable door/ladder/ledge context.
+            sample = {
+                **sample,
+                "buttons": [0.0 for _ in BUTTON_NAMES],
+            }
+            setpoint = Setpoint(
+                buttons=0,
+                stick_x=setpoint.stick_x,
+                stick_y=setpoint.stick_y,
+                reason=setpoint.reason,
+            )
         setpoint, sample, dialogue_override = self._dialogue_override(
             game,
             setpoint,
@@ -1267,6 +1632,7 @@ class ContinuousController:
                     self.reward_tracker.break_causal_chain()
                     self.route_graph.reset_trace()
                     self.room_map.reset_trace()
+                    self.active_escape_attempt = None
                     self._reset_camera_guard()
                     self.last_setpoint = Setpoint(reason="bridge_wait")
                     self.last_stick = (0.0, 0.0)
@@ -1388,6 +1754,26 @@ class ContinuousController:
                 "guard_ticks": self.camera_guard_ticks,
                 "cuts": self.camera_cut_count,
                 "transitions": self.camera_transition_count,
+            },
+            "escape_control": {
+                "active": bool(self.active_escape_attempt),
+                "key": (
+                    self.active_escape_attempt.get("key")
+                    if self.active_escape_attempt
+                    else None
+                ),
+                "age_s": (
+                    round(
+                        time.monotonic()
+                        - float(self.active_escape_attempt.get("started_at", time.monotonic())),
+                        1,
+                    )
+                    if self.active_escape_attempt
+                    else 0.0
+                ),
+                "failures": self.escape_failures,
+                "successes": self.escape_successes,
+                "cooling_down": len(self.escape_retry_after),
             },
             "setpoint": {
                 "buttons": self.last_setpoint.buttons,

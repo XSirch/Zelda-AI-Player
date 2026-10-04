@@ -23,7 +23,7 @@ from .objectives import ObjectiveTracker
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
 
 
-CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/frontier-negative-memory-v1/dialogue-reentry-guard-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/room-map-v1/ppo-rnd-v3/reward-v7"
+CONTRACT_VERSION = "autonomy-v3/objective-lock-v1/frontier-negative-memory-v1/dialogue-reentry-guard-v1/goal-conditioned-controller-v9/route-edge-health-v1/stable-frontier-v1/traversal-frontier-v1/escape-health-v1/dialogue-affordance-v1/interaction-affordance-v1/residual-stick-v1/route-memory-v1/room-map-v1/ppo-rnd-v3/reward-v7"
 COGNITION_EVENT_DEBOUNCE_S = 1.5
 COGNITION_MIN_INTERVAL_S = 8.0
 COGNITION_STUCK_AFTER_S = 90.0
@@ -1603,6 +1603,7 @@ class AutonomyRuntime:
                 },
                 "motor": controller.get("motor"),
                 "guidance": controller.get("guidance"),
+                "escape_control": controller.get("escape_control"),
                 "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
             },
             "input": controller.get("setpoint"),

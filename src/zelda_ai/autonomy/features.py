@@ -262,6 +262,9 @@ def goal_guidance(
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
+            "forced_escape": False,
+            "remembered_escape": False,
+            "escape_key": None,
         }
 
     point = target_point(game, intent)
@@ -287,8 +290,13 @@ def goal_guidance(
     exit_active = False
     exit_index = None
     exit_direct_reachable = False
+    traversal_route_active = False
+    traversal_route_kind = None
+    traversal_route_direction = None
+    traversal_route_phase = None
     forced_escape = False
     is_remembered_escape = False
+    escape_key = None
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
@@ -315,6 +323,7 @@ def goal_guidance(
             point is not None
             or bool(route_hint.get("frontier"))
             or bool(route_hint.get("exit"))
+            or bool(route_hint.get("traversal"))
         )
     ):
         waypoint = route_hint.get("waypoint")
@@ -325,14 +334,40 @@ def goal_guidance(
         ):
             is_frontier = bool(route_hint.get("frontier"))
             is_exit = bool(route_hint.get("exit"))
+            is_traversal_route = bool(route_hint.get("traversal"))
             is_door_escape = bool(route_hint.get("door"))
             is_remembered_escape = bool(route_hint.get("remembered"))
             forced_escape = bool(route_hint.get("forced_escape"))
+            raw_escape_key = route_hint.get("escape_key")
+            escape_key = (
+                str(raw_escape_key)[:240]
+                if raw_escape_key is not None
+                else None
+            )
             route_active = not is_frontier and not is_exit and int(
                 route_hint.get("path_nodes") or 0
             ) > 1
             frontier_active = is_frontier
             exit_active = is_exit
+            traversal_route_active = is_traversal_route
+            traversal_route_kind = (
+                str(route_hint.get("traversal_kind"))[:64]
+                if is_traversal_route
+                and route_hint.get("traversal_kind") is not None
+                else None
+            )
+            traversal_route_direction = (
+                str(route_hint.get("traversal_direction"))[:16]
+                if is_traversal_route
+                and route_hint.get("traversal_direction") is not None
+                else None
+            )
+            traversal_route_phase = (
+                str(route_hint.get("traversal_phase"))[:16]
+                if is_traversal_route
+                and route_hint.get("traversal_phase") is not None
+                else None
+            )
             exit_index = (
                 int(route_hint.get("exit_index"))
                 if is_exit and route_hint.get("exit_index") is not None
@@ -363,6 +398,27 @@ def goal_guidance(
             point = route_waypoint
             if is_frontier:
                 source = "observed_frontier"
+            elif is_traversal_route:
+                traversal_prefix = (
+                    "escape_traversal"
+                    if forced_escape
+                    else "observed_traversal"
+                )
+                source = (
+                    f"{traversal_prefix}:{traversal_route_kind}:"
+                    f"{traversal_route_phase}"
+                )
+                final_escape = route_hint.get("escape_final_target")
+                if (
+                    isinstance(final_escape, (list, tuple))
+                    and len(final_escape) == 3
+                    and all(
+                        isinstance(value, (int, float))
+                        and math.isfinite(value)
+                        for value in final_escape
+                    )
+                ):
+                    final_point = tuple(float(value) for value in final_escape)
             elif is_exit:
                 path_nodes = int(route_hint.get("path_nodes") or 0)
                 if is_remembered_escape:
@@ -439,7 +495,12 @@ def goal_guidance(
             if (
                 intent.mode in {"navigate", "explore", "observe"}
                 and not source.startswith("traversal:")
-                and not source.startswith("scene_exit")
+                and not source.startswith("escape_traversal:")
+                and not source.startswith("observed_traversal:")
+                and not (
+                    source.startswith("scene_exit")
+                    and exit_direct_reachable
+                )
                 and not (
                     (
                         source.startswith("observed_door")
@@ -465,7 +526,12 @@ def goal_guidance(
                         )
                     source = f"{source}:detour:{detour}"
 
-        if route_active:
+        if traversal_route_active:
+            # Observed stairs/ladders/ledges are physical navigation primitives,
+            # not PPO exploration suggestions. Give the low-level controller
+            # deterministic authority while traversing them.
+            base_strength = 1.0
+        elif route_active:
             # A route actually traversed by Link should be authoritative enough
             # to replay, while still leaving a residual channel for corrections.
             base_strength = (
@@ -496,11 +562,21 @@ def goal_guidance(
         # and native scene exits already have their own validity/expiry logic and
         # must remain authoritative until their current waypoint is actually hit.
         proximity = max(0.0, min(1.0, (horizontal - 45.0) / 120.0))
-        if route_active or frontier_active or exit_active:
+        if (
+            route_active
+            or frontier_active
+            or exit_active
+            or traversal_route_active
+        ):
             proximity = 1.0
 
         dwell = max(0.0, float(local_dwell_seconds or 0.0))
-        if route_active or frontier_active or exit_active:
+        if (
+            route_active
+            or frontier_active
+            or exit_active
+            or traversal_route_active
+        ):
             # A partial learned route is retired by route-memory endpoint
             # exhaustion; frontiers are recomputed from current probes; exits
             # are explicit native transition surfaces. Weakening any of these
@@ -516,7 +592,9 @@ def goal_guidance(
             )
         obstacle_scale = (
             1.0
-            if forced_escape and exit_active and (not blocked or detour is not None)
+            if forced_escape
+            and (exit_active or traversal_route_active)
+            and (not blocked or detour is not None)
             else 0.82
             if detour is not None
             else 0.30
@@ -524,7 +602,9 @@ def goal_guidance(
             else 1.0
         )
         strength = base_strength * proximity * stuck_scale * obstacle_scale
-        if exit_active:
+        if traversal_route_active:
+            quiet_multiplier = 0.95
+        elif exit_active:
             # Explicit room recovery suppresses policy button noise; normal
             # exit guidance preserves the previous lower quieting behaviour.
             quiet_multiplier = 0.95 if forced_escape else 0.12
@@ -562,8 +642,13 @@ def goal_guidance(
             "exit_active": exit_active,
             "exit_index": exit_index,
             "exit_direct_reachable": exit_direct_reachable,
+            "traversal_route_active": traversal_route_active,
+            "traversal_route_kind": traversal_route_kind,
+            "traversal_route_direction": traversal_route_direction,
+            "traversal_route_phase": traversal_route_phase,
             "forced_escape": forced_escape if point is not None else False,
             "remembered_escape": is_remembered_escape if point is not None else False,
+            "escape_key": escape_key if point is not None else None,
         }
 
     direction_sticks = {

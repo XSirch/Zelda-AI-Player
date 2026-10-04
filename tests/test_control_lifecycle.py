@@ -9,7 +9,7 @@ from zelda_ai.autonomy.controller import BUTTON_MASKS, ContinuousController, Set
 from zelda_ai.autonomy.models import AgentIntent, ObjectiveCompletion
 from zelda_ai.autonomy.runtime import AutonomyRuntime
 from zelda_ai.bridge import Bridge
-from zelda_ai.models import ActorObservation, ModelInfo, NavigationProbe, RunConfig, SceneExitObservation, Usage
+from zelda_ai.models import ActorObservation, ModelInfo, NavigationProbe, RunConfig, SceneExitObservation, TraversalAffordanceObservation, Usage
 from zelda_ai.providers.base import InferenceResult
 
 
@@ -331,6 +331,55 @@ def test_contextual_interaction_probes_one_button_and_learns_success(
     assert controller.route_graph.interaction_button(probe["key"]) == probe["button"]
 
 
+def test_traversal_context_probe_learns_when_ladder_state_starts(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.context_action.code = 12
+    game.context_action.label = "down"
+    game.context_actor = None
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    sample = {
+        "stick": [0.0, 1.0],
+        "policy_stick": [0.0, 0.0],
+        "buttons": [0.0 for _ in range(9)],
+        "log_prob": 0.0,
+        "value": 0.0,
+        "guidance_strength": 1.0,
+        "button_quiet_strength": 0.95,
+    }
+
+    setpoint, executed, overridden = controller._interaction_override(
+        game,
+        {"traversal_route_active": True},
+        Setpoint(stick_y=80, reason="ml_policy"),
+        sample,
+    )
+
+    assert overridden is True
+    assert setpoint.reason == "interaction_probe"
+    assert sum(1 for value in executed["buttons"] if value > 0.5) == 1
+    probe = dict(controller.pending_interaction_probe)
+    assert probe["traversal_active"] is True
+
+    climbing = game.model_copy(deep=True)
+    climbing.player.climbing_ladder = True
+
+    class Reward:
+        breakdown = {}
+
+    controller._observe_interaction_outcome(climbing, Reward())
+
+    assert controller.pending_interaction_probe is None
+    assert controller.route_graph.interaction_button(
+        probe["key"]
+    ) == probe["button"]
+
+
 def test_dialogue_close_releases_button_and_blocks_immediate_reentry(
     tmp_path, state
 ):
@@ -504,6 +553,266 @@ def test_room_escape_reuses_remembered_transition_when_current_scan_is_empty(
     assert hint["waypoint"] == (140.0, 0.0, 0.0)
 
 
+def test_known_room_with_trackable_objective_leaves_immediately_without_local_evidence(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = []
+    game.room_actors = []
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.set_intent(
+        AgentIntent(
+            objective="Obtain the Kokiri Sword",
+            completion=ObjectiveCompletion(
+                kind="equipment",
+                name="Kokiri Sword",
+            ),
+            summary="Obtain the Kokiri Sword",
+            mode="explore",
+            horizon_ms=60000,
+        )
+    )
+
+    controller.room_map.observe(game, now_s=1.0)
+    leaving = game.model_copy(deep=True)
+    leaving.player.position = (140.0, 0.0, 0.0)
+    controller.room_map.observe(leaving, now_s=2.0)
+    destination = leaving.model_copy(deep=True)
+    destination.room = 1
+    destination.player.position = (10.0, 0.0, 0.0)
+    controller.room_map.observe(destination, now_s=3.0)
+
+    revisit = game.model_copy(deep=True)
+    controller.room_map.reset_trace()
+    controller.reward_tracker.local_dwell_seconds = 0.0
+
+    assert controller.room_map.has_remembered_transition(revisit) is True
+    assert controller._should_prefer_observed_exit(
+        revisit,
+        actor_is_door=False,
+    ) is True
+
+
+def test_trackable_objective_uses_observed_exit_without_waiting_for_dwell(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=2,
+            entrance_index=20,
+            position=(120.0, 0.0, 0.0),
+            samples=5,
+            direct_reachable=False,
+        )
+    ]
+    game.room_actors = []
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.set_intent(
+        AgentIntent(
+            objective="Obtain the Kokiri Sword",
+            completion=ObjectiveCompletion(
+                kind="equipment",
+                name="Kokiri Sword",
+            ),
+            summary="Obtain the Kokiri Sword",
+            mode="explore",
+            horizon_ms=60000,
+        )
+    )
+
+    assert controller.reward_tracker.local_dwell_seconds == 0.0
+    assert controller.route_graph.room_failure_pressure(game) == 0
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is True
+    hint = controller._escape_waypoint(game)
+    assert hint is not None
+    assert hint["forced_escape"] is True
+    assert hint["exit"] is True
+    assert hint["waypoint"] == (120.0, 0.0, 0.0)
+
+
+def test_local_chest_delays_immediate_exit_but_not_stuck_recovery(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=5,
+            entrance_index=50,
+            position=(120.0, 0.0, 0.0),
+            samples=5,
+            direct_reachable=True,
+        )
+    ]
+    game.room_actors = [
+        ActorObservation(
+            actor_uid="chest-1",
+            actor_id=10,
+            name="Chest",
+            category=11,
+            category_name="chest",
+            params=0,
+            position=(60.0, 0.0, 0.0),
+            distance=60.0,
+        )
+    ]
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.set_intent(
+        AgentIntent(
+            objective="Obtain a useful item",
+            completion=ObjectiveCompletion(
+                kind="inventory_item",
+                name="Useful Item",
+            ),
+            summary="Obtain a useful item",
+            mode="explore",
+            horizon_ms=60000,
+        )
+    )
+
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is False
+
+    controller.reward_tracker.local_dwell_seconds = 21.0
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is True
+
+
+def test_escape_prefers_proven_transition_over_current_unproven_exit(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=7,
+            entrance_index=70,
+            position=(300.0, 0.0, 0.0),
+            samples=8,
+            direct_reachable=True,
+        )
+    ]
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+
+    memory_game = game.model_copy(deep=True)
+    memory_game.scene_exits = []
+    controller.room_map.observe(memory_game, now_s=1.0)
+    leaving = memory_game.model_copy(deep=True)
+    leaving.player.position = (120.0, 0.0, 0.0)
+    controller.room_map.observe(leaving, now_s=2.0)
+    destination = leaving.model_copy(deep=True)
+    destination.room = 1
+    destination.player.position = (10.0, 0.0, 0.0)
+    controller.room_map.observe(destination, now_s=3.0)
+    controller.room_map.reset_trace()
+
+    hint = controller._escape_waypoint(game)
+
+    assert hint is not None
+    assert hint["remembered"] is True
+    assert hint["memory_kind"] == "transition"
+    assert hint["exit_position"] == (120.0, 0.0, 0.0)
+    assert hint["escape_key"].startswith("memory:transition:")
+
+
+def test_unreachable_lower_exit_uses_observed_down_traversal(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.player.position = (0.0, 100.0, 0.0)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=3,
+            entrance_index=30,
+            position=(0.0, 0.0, 220.0),
+            samples=6,
+            direct_reachable=False,
+        )
+    ]
+    game.traversal_affordances = [
+        TraversalAffordanceObservation(
+            kind="ladder_down",
+            direction="down",
+            approach_position=(0.0, 100.0, 40.0),
+            target_position=(0.0, 20.0, 70.0),
+            distance=40.0,
+            height_delta=0.0,
+            wall_flags=1,
+        )
+    ]
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+
+    hint = controller._escape_waypoint(game)
+
+    assert hint is not None
+    assert hint["traversal"] is True
+    assert hint["traversal_kind"] == "ladder_down"
+    assert hint["traversal_direction"] == "down"
+    assert hint["forced_escape"] is True
+    assert hint["escape_key"].startswith("observed:exit:")
+    assert hint["waypoint"] in {
+        (0.0, 100.0, 40.0),
+        (0.0, 20.0, 70.0),
+    }
+
+
+def test_failed_escape_target_enters_cooldown_instead_of_attracting_forever(
+    tmp_path, state, monkeypatch
+):
+    import zelda_ai.autonomy.controller as controller_module
+
+    game = state.model_copy(deep=True)
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    now = [100.0]
+    monkeypatch.setattr(controller_module.time, "monotonic", lambda: now[0])
+    controller.last_guidance = {
+        "active": True,
+        "forced_escape": True,
+        "escape_key": "observed:exit:test",
+        "target": (200.0, 0.0, 0.0),
+    }
+
+    controller._update_escape_attempt(game)
+    assert controller.active_escape_attempt is not None
+
+    now[0] += 4.0
+    controller._update_escape_attempt(game)
+
+    assert controller.active_escape_attempt is None
+    assert controller.escape_failures == 1
+    assert controller.escape_retry_after["observed:exit:test"] > now[0]
+
+
 def test_extreme_room_dwell_stops_redundant_ppo_training(
     tmp_path, state
 ):
@@ -530,7 +839,12 @@ def test_extreme_room_dwell_stops_redundant_ppo_training(
     controller.reward_tracker.local_dwell_seconds = 0.0
     assert controller._ppo_transition_trainable(
         interaction_override=False,
-        guidance={"exit_active": True},
+        guidance={"exit_active": True, "forced_escape": True},
+        sample={"guidance_strength": 1.0},
+    ) is False
+    assert controller._ppo_transition_trainable(
+        interaction_override=False,
+        guidance={"traversal_route_active": True, "forced_escape": False},
         sample={"guidance_strength": 1.0},
     ) is False
 

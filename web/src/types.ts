@@ -301,6 +301,11 @@ export interface MotorGuidance {
   exit_direct_reachable?: boolean;
   forced_escape?: boolean;
   remembered_escape?: boolean;
+  escape_key?: string | null;
+  traversal_route_active?: boolean;
+  traversal_route_kind?: string | null;
+  traversal_route_direction?: string | null;
+  traversal_route_phase?: string | null;
 }
 
 export interface Snapshot {
@@ -336,6 +341,14 @@ export interface Snapshot {
     };
     motor: string;
     guidance: MotorGuidance | null;
+    escape_control?: {
+      active: boolean;
+      key: string | null;
+      age_s: number;
+      failures: number;
+      successes: number;
+      cooling_down: number;
+    } | null;
     trigger: string | null;
   };
   input: InputState;

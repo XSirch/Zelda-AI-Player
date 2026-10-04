@@ -128,12 +128,29 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
           {thought.guidance.frontier_active
             ? ` · frontier observado ${thought.guidance.frontier_direction ?? ''}${thought.guidance.frontier_stable ? ` · mantido ${(thought.guidance.frontier_age_s ?? 0).toFixed(1)}s` : ''}`
             : ''}
+          {thought.guidance.traversal_route_active
+            ? ` · travessia ${thought.guidance.traversal_route_kind ?? '?'} ${thought.guidance.traversal_route_phase ?? ''}${thought.guidance.forced_escape ? ' · ESCAPE' : ''}`
+            : ''}
           {thought.guidance.exit_active
             ? thought.guidance.remembered_escape
               ? ` · saída lembrada${thought.guidance.forced_escape ? ' · ESCAPE' : ''}`
               : ` · saída observada #${thought.guidance.exit_index ?? '?'}${thought.guidance.exit_direct_reachable ? ' direta' : ' via rota'}${thought.guidance.forced_escape ? ' · ESCAPE' : ''}`
             : ''}
           {thought.guidance.stick?.length >= 2 ? ` · stick (${thought.guidance.stick[0].toFixed(2)}, ${thought.guidance.stick[1].toFixed(2)})` : ''}
+        </strong>
+      </div>}
+      {thought?.escape_control && (
+        thought.escape_control.active
+        || thought.escape_control.failures > 0
+        || thought.escape_control.cooling_down > 0
+      ) && <div className="planner-line">
+        <span>ESCAPE DA SALA</span>
+        <strong>
+          {thought.escape_control.active ? `ativo ${thought.escape_control.age_s.toFixed(1)}s` : 'aguardando alternativa'}
+          {thought.escape_control.key ? ` · ${thought.escape_control.key}` : ''}
+          {thought.escape_control.failures ? ` · ${thought.escape_control.failures} falhas` : ''}
+          {thought.escape_control.cooling_down ? ` · ${thought.escape_control.cooling_down} em cooldown` : ''}
+          {thought.escape_control.successes ? ` · ${thought.escape_control.successes} saídas concluídas` : ''}
         </strong>
       </div>}
       {thought?.motor && <div className="motor-line"><span>MOTOR ML</span><strong>{thought.motor}</strong></div>}

@@ -239,6 +239,19 @@ class LearnedRouteGraph:
         self.route_edge_retry_after.clear()
         self.last_route_failure_at = None
 
+    def clear_navigation_commitment(self):
+        """Drop the current target/route/frontier without forgetting trace history."""
+        self.active_target_signature = None
+        self.active_target_node_id = None
+        self.active_path = []
+        self.counted_route_target_signature = None
+        self.exhausted_partial_nodes.clear()
+        self.exhaustion_revision = self.revision
+        self.last_failed_search = None
+        self.active_frontier = None
+        self.active_route_edge = None
+        self.last_route_failure_at = None
+
     def _touch_node(
         self,
         scene: int,
@@ -1034,8 +1047,18 @@ class LearnedRouteGraph:
             }
         return None
 
-    def exit_waypoint(self, game: GameState) -> dict | None:
-        """Choose an observed scene-exit surface, optionally via learned route."""
+    def exit_waypoint(
+        self,
+        game: GameState,
+        *,
+        allow_unreachable: bool = False,
+    ) -> dict | None:
+        """Choose an observed scene-exit surface, optionally via learned route.
+
+        Normal callers reject an unreachable raw exit without route/door evidence.
+        Forced room recovery may request that raw target so local traversal/collision
+        guidance can still try to discover a route instead of ignoring the exit.
+        """
         if not game.player or not game.scene_exits:
             return None
 
@@ -1074,7 +1097,7 @@ class LearnedRouteGraph:
                 and _distance(actor.position, exit_row.position) <= 220.0
                 for actor in game.room_actors
             )
-            if not context_door and not nearby_door:
+            if not context_door and not nearby_door and not allow_unreachable:
                 # An exit surface behind unrelated collision is evidence of a
                 # destination, not of a currently traversable straight line.
                 # Keep exploring local frontiers until a real route is observed.
@@ -1096,6 +1119,98 @@ class LearnedRouteGraph:
             "entrance_index": exit_row.entrance_index,
             "exit_position": tuple(exit_row.position),
             "direct_reachable": bool(exit_row.direct_reachable),
+        }
+
+    def traversal_waypoint(
+        self,
+        game: GameState,
+        *,
+        include_visited: bool = False,
+    ) -> dict | None:
+        """Choose an observed vertical traversal into new room-local space.
+
+        This is not hidden map knowledge: every candidate comes directly from
+        the current collision-derived traversal affordances. Prefer targets whose
+        coarse route cell Link has never occupied so ladders/stairs become useful
+        exploration frontiers instead of being ignored by the horizontal probes.
+        """
+        if not game.player or not game.traversal_affordances:
+            return None
+
+        player_position = tuple(float(value) for value in game.player.position)
+        candidates = []
+        for row in game.traversal_affordances:
+            target = tuple(float(value) for value in row.target_position)
+            approach = tuple(float(value) for value in row.approach_position)
+            target_id = _node_id(
+                game.scene,
+                game.room,
+                target,
+                mirrored=game.mirrored_world,
+                age=game.player.age,
+            )
+            visited = target_id in self.nodes
+            if visited and not include_visited:
+                continue
+
+            approach_distance = _distance(player_position, approach)
+            kind_penalty = (
+                90.0
+                if row.kind == "ledge_down"
+                else 20.0
+                if row.kind in {"stairs_or_slope_up", "stairs_or_slope_down"}
+                else 0.0
+            )
+            visited_penalty = 400.0 if visited else 0.0
+            score = approach_distance + kind_penalty + visited_penalty
+            candidates.append(
+                (
+                    score,
+                    approach_distance,
+                    row,
+                    approach,
+                    target,
+                    target_id,
+                    visited,
+                )
+            )
+
+        if not candidates:
+            return None
+
+        (
+            _,
+            approach_distance,
+            row,
+            approach,
+            target,
+            target_id,
+            visited,
+        ) = min(candidates, key=lambda item: item[0])
+        if approach_distance > 55.0:
+            phase = "approach"
+            waypoint = approach
+        else:
+            phase = "target"
+            waypoint = target
+
+        return {
+            "waypoint": waypoint,
+            "waypoint_id": (
+                f"traversal:{game.scene}:{game.room}:{row.kind}:"
+                f"{target_id}:{phase}"
+            )[:220],
+            "path_nodes": 1,
+            "waypoint_index": 0,
+            "target_gap": None,
+            "confidence": 1.0 if not visited else 0.70,
+            "partial": True,
+            "traversal": True,
+            "traversal_kind": row.kind,
+            "traversal_direction": row.direction,
+            "traversal_phase": phase,
+            "traversal_target_node": target_id,
+            "traversal_target_visited": visited,
         }
 
     def exploration_waypoint(
