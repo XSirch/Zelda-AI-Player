@@ -597,6 +597,51 @@ def test_known_room_with_trackable_objective_leaves_immediately_without_local_ev
     ) is True
 
 
+def test_trackable_objective_uses_observed_exit_without_waiting_for_dwell(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=2,
+            entrance_index=20,
+            position=(120.0, 0.0, 0.0),
+            samples=5,
+            direct_reachable=False,
+        )
+    ]
+    game.room_actors = []
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.set_intent(
+        AgentIntent(
+            objective="Obtain the Kokiri Sword",
+            completion=ObjectiveCompletion(
+                kind="equipment",
+                name="Kokiri Sword",
+            ),
+            summary="Obtain the Kokiri Sword",
+            mode="explore",
+            horizon_ms=60000,
+        )
+    )
+
+    assert controller.reward_tracker.local_dwell_seconds == 0.0
+    assert controller.route_graph.room_failure_pressure(game) == 0
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is True
+    hint = controller._escape_waypoint(game)
+    assert hint is not None
+    assert hint["forced_escape"] is True
+    assert hint["exit"] is True
+    assert hint["waypoint"] == (120.0, 0.0, 0.0)
+
+
 def test_local_chest_delays_immediate_exit_but_not_stuck_recovery(
     tmp_path, state
 ):
