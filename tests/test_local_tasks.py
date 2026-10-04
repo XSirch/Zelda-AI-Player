@@ -226,3 +226,165 @@ def test_body_contact_does_not_redirect_stale_wall_data_or_motion_away_from_wall
     task = LocalTask.observed_cell(state, target, now=0)
     task.observe(state, consumed=True, now=.1)
     assert task.detour is None
+
+
+def test_observed_corridor_keeps_its_unreached_world_waypoint_when_mesh_recenters(state):
+    from zelda_ai.models import NavigationMeshSnapshot
+
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 64), (-1, -1, 0., 0)],
+    )
+    task = LocalTask.observed_cell(state, (-70, 0, -70), now=0)
+    task.observe(state, consumed=True, now=.1)
+    assert task.steering_point(state) == (0, 0, -70)
+    state.player.position = (0, 0, -30)
+    state.seq += 1
+    # Native mesh origin follows Link; these newly sampled cells do not mean
+    # that the previous observed world waypoint has been reached.
+    state.navmesh.origin = state.player.position
+    task.observe(state, consumed=True, now=1)
+    assert task.steering_point(state) == (0, 0, -70)
+    assert task.target == (-70, 0, -70)
+
+
+def test_observed_corridor_progress_can_temporarily_increase_final_target_distance(state):
+    from zelda_ai.models import NavigationMeshSnapshot
+
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 64),
+               (-1, -1, 0., 1), (-1, 0, 0., 0)],
+    )
+    task = LocalTask.observed_cell(state, (-70, 0, 0), now=0)
+    task.observe(state, consumed=True, now=.1)
+    assert task.steering_point(state) == (0, 0, -70)
+    state.player.position = (0, 0, -42)
+    state.seq += 1
+    task.observe(state, consumed=True, now=2.6)
+    assert task.phase == "execute"
+    assert task.failure is None
+    assert task.target == (-70, 0, 0)
+
+
+def test_observed_corridor_checks_collision_toward_next_waypoint_not_final_target(state):
+    from zelda_ai.autonomy.features import PROBE_NAMES
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 64),
+               (-1, -1, 0., 1), (-1, 0, 0., 0)],
+    )
+    state.navigation_probes = [
+        NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0,
+                        delta_y=0, wall_hit=name == "right")
+        for name in PROBE_NAMES
+    ]
+    task = LocalTask.observed_cell(state, (-70, 0, 0), now=0)
+    task.observe(state, consumed=True, now=.1)
+    assert task.detour is None
+    assert task.steering_point(state) == (0, 0, -70)
+
+
+@pytest.mark.parametrize("fresh,consumed", ((False, True), (True, False)))
+def test_observed_corridor_requires_fresh_consumed_evidence_for_progress(state, fresh, consumed):
+    from zelda_ai.models import NavigationMeshSnapshot
+
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 64),
+               (-1, -1, 0., 1), (-1, 0, 0., 0)],
+    )
+    task = LocalTask.observed_cell(state, (-70, 0, 0), now=0)
+    task.observe(state, consumed=True, now=.1)
+    state.player.position = (0, 0, -42)
+    state.seq += int(fresh)
+    task.observe(state, consumed=consumed, now=2.6)
+    assert task.failure == "no_geometric_progress"
+
+
+def test_observed_corridor_revisits_do_not_renew_best_waypoint_progress(state):
+    from zelda_ai.models import NavigationMeshSnapshot
+
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 64),
+               (-1, -1, 0., 1), (-1, 0, 0., 0)],
+    )
+    task = LocalTask.observed_cell(state, (-70, 0, 0), now=0)
+    for seq, z, now in ((11, -30, .5), (12, -5, 1), (13, -30, 3.1)):
+        state.seq, state.player.position = seq, (0, 0, z)
+        task.observe(state, consumed=True, now=now)
+    assert task.failure == "no_geometric_progress"
+    assert task.progress_at == .5
+
+
+def test_observed_probe_detour_is_not_released_before_rounding_its_endpoint(state):
+    from zelda_ai.autonomy.features import PROBE_NAMES
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.player.yaw = -32768
+    state.player.wall_yaw = 0
+    state.player.bg_check_flags = 1 | 8
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 0)],
+    )
+    state.navigation_probes = [
+        NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)
+        for name in PROBE_NAMES
+    ]
+    task = LocalTask.observed_cell(state, (0, 0, -70), now=0)
+    task.observe(state, consumed=True, now=.1)
+    point = task.detour
+    state.player.position = (point[0] * 5 / 7, point[1], point[2] * 5 / 7)
+    state.seq += 1
+    state.player.bg_check_flags = 1
+    task.observe(state, consumed=True, now=.5)
+    assert task.detour == point  # Twenty units short of an intermediate corner.
+
+
+def test_observed_held_detour_reacts_to_new_body_contact_instead_of_pushing_into_wall(state):
+    from zelda_ai.autonomy.features import PROBE_NAMES
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.player.yaw = -32768
+    state.player.wall_yaw = 0
+    state.player.bg_check_flags = 1 | 8
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 16), (0, -1, 0., 0)],
+    )
+    state.navigation_probes = [
+        NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)
+        for name in PROBE_NAMES
+    ]
+    task = LocalTask.observed_cell(state, (0, 0, -70), now=0)
+    task.observe(state, consumed=True, now=.1)
+    previous = task.detour
+    state.player.position = (previous[0] / 3, 0, 0)
+    state.player.wall_yaw = -16384 if previous[0] > 0 else 16384
+    state.seq += 1
+    task.observe(state, consumed=True, now=.5)
+    assert task.detour != previous
+    assert task.steering_point(state) == task.target
+    assert task.progress_at == .5  # Prior physical gain, not the replacement.
+
+
+def test_observed_detour_handoff_respects_native_body_clearance_at_a_wall(state):
+    from zelda_ai.models import NavigationMeshSnapshot
+
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 1), (0, 1, 0., 0)],
+    )
+    task = LocalTask.observed_cell(state, (0, 0, 70), now=0)
+    task.detour = (70, 0, 0)
+    task._track_waypoint(state)
+    state.player.position = (53, 0, 0)
+    state.player.bg_check_flags = 1 | 8
+    state.player.wall_yaw = -16384
+    state.seq += 1
+    task.observe(state, consumed=True, now=.5)
+    assert task.detour is None

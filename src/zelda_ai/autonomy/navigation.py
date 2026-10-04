@@ -66,6 +66,7 @@ def observed_local_path(game: GameState, target, *, minimum_gain=None) -> dict |
     waypoint = point(keys[1])
     return {
         "waypoint": waypoint,
+        "waypoints": tuple(point(key) for key in keys[1:]),
         "waypoint_id": f"local:{game.scene_epoch}:{tuple(round(v, 1) for v in waypoint)}",
         "path_nodes": len(keys),
         "waypoint_index": 1,

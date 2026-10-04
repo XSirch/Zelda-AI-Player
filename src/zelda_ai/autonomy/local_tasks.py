@@ -47,7 +47,11 @@ class LocalTask:
     verification_frames: int = 0
     last_seq: int = -1
     detour: tuple | None = None
-    version: str = "observed-analog-task-v1"
+    corridor: tuple = ()
+    waypoint_index: int = 0
+    progress_point: tuple | None = None
+    best_waypoint_distance: float | None = None
+    version: str = "observed-analog-task-v2"
 
     @classmethod
     def traversal(cls, game, affordance, *, now=None, budget_s=8.0):
@@ -65,8 +69,13 @@ class LocalTask:
         path = observed_local_path(game, target, minimum_gain=0)
         if not path or path["partial"] or path["target_gap"] > 4:
             raise ValueError("Cell must be reachable through currently observed collision links")
-        return cls._create(game, "observed_cell", target, game.player.position,
+        task = cls._create(game, "observed_cell", target, game.player.position,
                            now=now, budget_s=budget_s)
+        # Keep only this task's observed directed collision proposal. It is
+        # neither a traversed route nor persistent room/route-map evidence.
+        task.corridor = path["waypoints"]
+        task._track_waypoint(game)
+        return task
 
     @classmethod
     def _create(cls, game, kind, target, approach, *, now, budget_s):
@@ -114,11 +123,31 @@ class LocalTask:
         if game.player.climbing_ladder or game.player.hanging_ledge or game.player.climbing_ledge:
             self.interrupt("unsupported_locomotor_mode")
             return
+        self.consumed = self.consumed or consumed
+        fresh = game.seq > self.last_seq and game.seq > self.origin_seq
+        self.last_seq = max(self.last_seq, game.seq)
         if self.kind == "observed_cell":
-            if self.detour and math.dist(game.player.position, self.detour) <= 25:
+            # Only fresh, consumed physical movement toward the SAME held
+            # point pays local progress. Replanning itself never resets time.
+            if (fresh and consumed and self.progress_point is not None
+                    and self.best_waypoint_distance is not None):
+                distance = math.dist(game.player.position, self.progress_point)
+                if distance < self.best_waypoint_distance - 4:
+                    self.best_waypoint_distance, self.progress_at = distance, now
+            # Intermediate corners need a tighter handoff than the final
+            # task's 35-unit success region. Do not cut the next corner early.
+            if self.detour and self._waypoint_reached(game.player.position, self.detour):
                 self.detour = None
+            if self.detour and self._body_blocks_point(game.player, self.detour):
+                # A clear thin probe at selection time is not permanent body
+                # clearance. Reconsider the corridor after new actual contact.
+                self.detour = None
+            while (self.waypoint_index + 1 < len(self.corridor)
+                   and self._waypoint_reached(game.player.position, self._corridor_point())):
+                self.waypoint_index += 1
             if self.detour is None:
-                dx, dz = self.target[0] - game.player.position[0], self.target[2] - game.player.position[2]
+                point = self._corridor_point()
+                dx, dz = point[0] - game.player.position[0], point[2] - game.player.position[2]
                 _, evidence = _collision_detour(
                     game, game.player, math.atan2(dx, dz), use_body_contact=True,
                 )
@@ -130,13 +159,13 @@ class LocalTask:
                     x, y, z = game.player.position
                     self.detour = (x + math.sin(yaw) * probe.distance,
                                    y + (probe.delta_y or 0), z + math.cos(yaw) * probe.distance)
-        self.consumed = self.consumed or consumed
-        fresh = game.seq > self.last_seq and game.seq > self.origin_seq
-        self.last_seq = max(self.last_seq, game.seq)
+            self._track_waypoint(game)
         position = game.player.position
         distance = math.dist(position, self.target)
         if distance < self.best_distance - 4:
-            self.best_distance, self.progress_at = distance, now
+            self.best_distance = distance
+            if self.kind != "observed_cell":
+                self.progress_at = now
         horizontal = math.hypot(position[0] - self.target[0], position[2] - self.target[2])
         reached = horizontal <= 35 and abs(position[1] - self.target[1]) <= 4
         # Actual gain is necessary: approaching the base of a raised surface
@@ -169,10 +198,30 @@ class LocalTask:
                 return path["waypoint"]
             return self.approach
         if self.kind == "observed_cell":
-            path = observed_local_path(game, self.target, minimum_gain=0)
-            if path and path["path_nodes"] > 2:
-                return path["waypoint"]
+            return self._corridor_point()
         return self.target
+
+    @staticmethod
+    def _waypoint_reached(position, point):
+        # Match the pinned native mesh's 18-unit BODY_CLEARANCE: a thin
+        # probe endpoint against a wall may be unreachable by Link's body.
+        return (math.hypot(position[0] - point[0], position[2] - point[2]) <= 18
+                and abs(position[1] - point[1]) <= 4)
+
+    @staticmethod
+    def _body_blocks_point(player, point):
+        yaw = math.atan2(point[0] - player.position[0], point[2] - player.position[2])
+        normal = player.wall_yaw * math.pi / 32768
+        return bool(player.bg_check_flags & (1 << 3)) and math.cos(yaw - normal) < -.25
+
+    def _corridor_point(self):
+        return self.corridor[self.waypoint_index] if self.corridor else self.target
+
+    def _track_waypoint(self, game):
+        point = self.steering_point(game)
+        if point != self.progress_point:
+            self.progress_point = point
+            self.best_waypoint_distance = math.dist(game.player.position, point)
 
     def reference_stick(self, game):
         if self.terminal or self.phase == "verify" or not game.player:

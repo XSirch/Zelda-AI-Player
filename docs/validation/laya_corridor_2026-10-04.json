@@ -1,0 +1,450 @@
+{
+  "date": "2026-10-04",
+  "source": "soh",
+  "provider_calls": 0,
+  "screenshots_to_models": 0,
+  "decision_response_budget_ms": 100,
+  "actuation_grace_ms": 50,
+  "promotion": "disabled",
+  "batches": [
+    {
+      "suite": "g1-6cd9570e6fb2",
+      "seed": 4102500,
+      "native_sessions": 3,
+      "tasks_per_session": 10,
+      "attempted": 30,
+      "successful": 26,
+      "consumed_actions": 1193,
+      "source": "soh",
+      "observation_profile": "instrumented_local_v1",
+      "save_slot": 2,
+      "task_versions": [
+        "observed-analog-task-v1"
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "reference_blend": 0,
+      "objectives_unchanged": true,
+      "promotion": "disabled",
+      "g2_complete": false,
+      "failure_reasons": {
+        "no_geometric_progress": 1,
+        "attempt_timeout": 3
+      },
+      "failures": [
+        {
+          "session": 1,
+          "index": 9,
+          "reason": "no_geometric_progress"
+        },
+        {
+          "session": 2,
+          "index": 2,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 2,
+          "index": 4,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 2,
+          "index": 6,
+          "reason": "attempt_timeout"
+        }
+      ],
+      "worker": {
+        "round_trip_ms": {
+          "samples": 1194,
+          "p50": 12.527300001238473,
+          "p95": 26.49869999731891,
+          "maximum": 40.08340000291355
+        },
+        "inference_ms": {
+          "samples": 1194,
+          "p50": 11.390300001949072,
+          "p95": 25.596100000257138,
+          "maximum": 39.08970000338741
+        },
+        "output_age_ms": {
+          "samples": 1596,
+          "p50": 63.03979999938747,
+          "p95": 65.93060000159312,
+          "maximum": 70.63939999352442
+        }
+      },
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "responses": 1194,
+      "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+      "client_command_to_native_consumption_ms": {
+        "samples": 1193,
+        "p50": 30.475,
+        "p95": 48.283,
+        "maximum": 50.127
+      },
+      "full_observation_to_physical_reaction_ms": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "report_sha256": "876c3cd5f7a686ee238dfbf80e7b4a3bd56a7263f2080c170efae1bd962176d0",
+      "manifest_sha256": "97f7f7ccd56f918766dccbdb53aa40af03df7ee47c0a3a78bf7eee8e5efb133c",
+      "frozen_artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "source_sha256": {
+        "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+        "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+        "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+        "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+        "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+        "src\\zelda_ai\\g1.py": "38de6121b128c0ce75940bcaaf2aa4c0386d8e5c7e2e5bd105189af691be0a99",
+        "src\\zelda_ai\\laya_curriculum.py": "b5aa1367edd4e1656f89e29bf229187c92a9c3d74c9b4022610d8ac7b5c63b34",
+        "src\\zelda_ai\\laya_data.py": "de16d7eeebc9bcb06c28d5fceae7a5939e93841caba9864bc33bfceb67ae4f0d",
+        "src\\zelda_ai\\laya_numeric.py": "a4c787f94a679c34ad0e1890bfae449b6fe8ce1d61e190952c5ea7e836fec75c",
+        "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+        "src\\zelda_ai\\laya_training.py": "1b8f828c282e2457169513a86422ff97095571d743ce663a44abb19a05f8f6b7",
+        "src\\zelda_ai\\laya_worker.py": "8b80c5aa02963ab71f72ee2dfc909f397f39b641d2c844487052787327dd68e3",
+        "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+        "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+        "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+        "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+        "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+        "src\\zelda_ai\\surface_curriculum.py": "41a9f6361791c191cc3056b59ed7d7222391b301261b64846bcfdb1ec64917f7",
+        "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+        "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+        "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+        "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+        "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+        "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+        "src\\zelda_ai\\autonomy\\laya_policy.py": "d7222e3fc57950136802a33f319f088ec68c536e7e547254b09e9cc03830359b",
+        "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+        "src\\zelda_ai\\autonomy\\local_tasks.py": "dd6e643f7936eea48de870a58a721707f25dd3c965ae88eef22d4649e8c0b464",
+        "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+        "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+        "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+        "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+        "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+        "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+        "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+        "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+        "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+        "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+        "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+        "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+        "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+        "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+        "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+        "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398"
+      },
+      "strict_utf8_and_finite_json_files_verified": 75
+    },
+    {
+      "suite": "g1-4907438dade7",
+      "seed": 4102500,
+      "native_sessions": 3,
+      "tasks_per_session": 10,
+      "attempted": 30,
+      "successful": 28,
+      "consumed_actions": 1012,
+      "source": "soh",
+      "observation_profile": "instrumented_local_v1",
+      "save_slot": 2,
+      "task_versions": [
+        "observed-analog-task-v2"
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "reference_blend": 0,
+      "objectives_unchanged": true,
+      "promotion": "disabled",
+      "g2_complete": false,
+      "failure_reasons": {
+        "attempt_timeout": 2
+      },
+      "failures": [
+        {
+          "session": 2,
+          "index": 2,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 3,
+          "index": 3,
+          "reason": "attempt_timeout"
+        }
+      ],
+      "worker": {
+        "round_trip_ms": {
+          "samples": 1012,
+          "p50": 12.718600002699532,
+          "p95": 28.009399997245055,
+          "maximum": 40.66929999680724
+        },
+        "inference_ms": {
+          "samples": 1012,
+          "p50": 11.58900000154972,
+          "p95": 27.028999997128267,
+          "maximum": 39.88030000618892
+        },
+        "output_age_ms": {
+          "samples": 1341,
+          "p50": 62.89399999513989,
+          "p95": 66.31139999808511,
+          "maximum": 141.8649999977788
+        }
+      },
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "responses": 1012,
+      "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+      "client_command_to_native_consumption_ms": {
+        "samples": 1012,
+        "p50": 30.481,
+        "p95": 48.409,
+        "maximum": 99.493
+      },
+      "full_observation_to_physical_reaction_ms": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "report_sha256": "50b7d99f23fb6103ff3a964e61cd5da773e92d0fae51b9a1405b4428d07b5b6a",
+      "manifest_sha256": "26e61db8c1a2630e64c68ebd12088852cf74c6726206ba19f58277afeb2da928",
+      "frozen_artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "source_sha256": {
+        "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+        "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+        "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+        "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+        "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+        "src\\zelda_ai\\g1.py": "38de6121b128c0ce75940bcaaf2aa4c0386d8e5c7e2e5bd105189af691be0a99",
+        "src\\zelda_ai\\laya_curriculum.py": "b5aa1367edd4e1656f89e29bf229187c92a9c3d74c9b4022610d8ac7b5c63b34",
+        "src\\zelda_ai\\laya_data.py": "de16d7eeebc9bcb06c28d5fceae7a5939e93841caba9864bc33bfceb67ae4f0d",
+        "src\\zelda_ai\\laya_numeric.py": "a4c787f94a679c34ad0e1890bfae449b6fe8ce1d61e190952c5ea7e836fec75c",
+        "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+        "src\\zelda_ai\\laya_training.py": "1b8f828c282e2457169513a86422ff97095571d743ce663a44abb19a05f8f6b7",
+        "src\\zelda_ai\\laya_worker.py": "8b80c5aa02963ab71f72ee2dfc909f397f39b641d2c844487052787327dd68e3",
+        "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+        "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+        "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+        "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+        "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+        "src\\zelda_ai\\surface_curriculum.py": "41a9f6361791c191cc3056b59ed7d7222391b301261b64846bcfdb1ec64917f7",
+        "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+        "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+        "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+        "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+        "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+        "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+        "src\\zelda_ai\\autonomy\\laya_policy.py": "d7222e3fc57950136802a33f319f088ec68c536e7e547254b09e9cc03830359b",
+        "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+        "src\\zelda_ai\\autonomy\\local_tasks.py": "db469d03f941758dca3cbbb85172c98e02e0283844c54d73e8c7dda2ce059390",
+        "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+        "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+        "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+        "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+        "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+        "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+        "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+        "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+        "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+        "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+        "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+        "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+        "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+        "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+        "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+        "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398"
+      },
+      "strict_utf8_and_finite_json_files_verified": 75
+    },
+    {
+      "suite": "g1-4328280d27f2",
+      "seed": 4102800,
+      "native_sessions": 5,
+      "tasks_per_session": 20,
+      "attempted": 100,
+      "successful": 94,
+      "consumed_actions": 3095,
+      "source": "soh",
+      "observation_profile": "instrumented_local_v1",
+      "save_slot": 2,
+      "task_versions": [
+        "observed-analog-task-v2"
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "reference_blend": 0,
+      "objectives_unchanged": true,
+      "promotion": "disabled",
+      "g2_complete": false,
+      "failure_reasons": {
+        "attempt_timeout": 6
+      },
+      "failures": [
+        {
+          "session": 3,
+          "index": 2,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 3,
+          "index": 7,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 3,
+          "index": 10,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 3,
+          "index": 14,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 3,
+          "index": 17,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 5,
+          "index": 3,
+          "reason": "attempt_timeout"
+        }
+      ],
+      "worker": {
+        "round_trip_ms": {
+          "samples": 3096,
+          "p50": 12.940299995534588,
+          "p95": 28.633099995204248,
+          "maximum": 39.184799999929965
+        },
+        "inference_ms": {
+          "samples": 3096,
+          "p50": 11.774500002502464,
+          "p95": 27.574299994739704,
+          "maximum": 38.40889999992214
+        },
+        "output_age_ms": {
+          "samples": 4092,
+          "p50": 62.713999999687076,
+          "p95": 65.78799999988405,
+          "maximum": 85.60650000435999
+        }
+      },
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "responses": 3096,
+      "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+      "client_command_to_native_consumption_ms": {
+        "samples": 3095,
+        "p50": 30.365,
+        "p95": 48.16,
+        "maximum": 50.103
+      },
+      "full_observation_to_physical_reaction_ms": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "report_sha256": "7778c510933b8618e7e97ccb61e94ae5e3fc76736298478378f997feb70d4738",
+      "manifest_sha256": "d8d359829b929f15b09eb64cd842034517301ee4794f471751d63c8f0d881b01",
+      "frozen_artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "source_sha256": {
+        "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+        "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+        "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+        "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+        "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+        "src\\zelda_ai\\g1.py": "38de6121b128c0ce75940bcaaf2aa4c0386d8e5c7e2e5bd105189af691be0a99",
+        "src\\zelda_ai\\laya_curriculum.py": "b5aa1367edd4e1656f89e29bf229187c92a9c3d74c9b4022610d8ac7b5c63b34",
+        "src\\zelda_ai\\laya_data.py": "de16d7eeebc9bcb06c28d5fceae7a5939e93841caba9864bc33bfceb67ae4f0d",
+        "src\\zelda_ai\\laya_numeric.py": "a4c787f94a679c34ad0e1890bfae449b6fe8ce1d61e190952c5ea7e836fec75c",
+        "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+        "src\\zelda_ai\\laya_training.py": "1b8f828c282e2457169513a86422ff97095571d743ce663a44abb19a05f8f6b7",
+        "src\\zelda_ai\\laya_worker.py": "8b80c5aa02963ab71f72ee2dfc909f397f39b641d2c844487052787327dd68e3",
+        "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+        "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+        "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+        "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+        "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+        "src\\zelda_ai\\surface_curriculum.py": "41a9f6361791c191cc3056b59ed7d7222391b301261b64846bcfdb1ec64917f7",
+        "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+        "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+        "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+        "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+        "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+        "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+        "src\\zelda_ai\\autonomy\\laya_policy.py": "d7222e3fc57950136802a33f319f088ec68c536e7e547254b09e9cc03830359b",
+        "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+        "src\\zelda_ai\\autonomy\\local_tasks.py": "db469d03f941758dca3cbbb85172c98e02e0283844c54d73e8c7dda2ce059390",
+        "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+        "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+        "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+        "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+        "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+        "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+        "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+        "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+        "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+        "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+        "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+        "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+        "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+        "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+        "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+        "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398"
+      },
+      "strict_utf8_and_finite_json_files_verified": 221
+    }
+  ],
+  "limitations": [
+    "short observed walking cells; not campaign or sword acquisition",
+    "same-seed targets and initial poses diverge with previous actual movement",
+    "previous inspected batches are development data",
+    "command-to-consumption excludes observation, inference and animation",
+    "full physical reaction remains unmeasured; response budget is not a guarantee"
+  ],
+  "validation": {
+    "status": "executed",
+    "pytest_passed": 337,
+    "pytest_skipped": 20,
+    "pytest_existing_warnings": 1,
+    "skips": "native compiler tests require unavailable g++ or clang++",
+    "web_production_build": "passed",
+    "focused_ruff": "passed",
+    "cpp_source_changed": false,
+    "new_native_build_claimed": false,
+    "owned_files_strict_utf8_verified": [
+      "README.md",
+      "docs/STATUS.md",
+      "src/zelda_ai/autonomy/local_tasks.py",
+      "src/zelda_ai/autonomy/navigation.py",
+      "tests/test_local_tasks.py",
+      "docs/validation/laya_corridor_2026-10-04.json"
+    ],
+    "local_debug_files_strict_utf8_verified": 3,
+    "native_json_files_strict_utf8_and_finite_json_verified": 371
+  },
+  "regressions": {
+    "call_site_scenarios_failed_before_fix": 5,
+    "new_test_cases": 9,
+    "fresh_consumed_same_waypoint_progress_required": true,
+    "revisits_and_point_replacement_do_not_renew_local_timer": true,
+    "corridor_is_ephemeral_not_a_learned_route": true,
+    "global_dwell_shaping_unchanged": true
+  }
+}
