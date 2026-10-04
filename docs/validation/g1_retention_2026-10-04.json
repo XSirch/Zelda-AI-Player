@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "suite_id": "g1-684c7a5df049",
+  "source": "soh",
+  "observation_profile": "instrumented_local_v1",
+  "scope": "native Arquivo 2; child, normal world; initial house and physical portal revisits",
+  "zero_shot": false,
+  "training_enabled": false,
+  "provider_calls": 0,
+  "g1_qualified": false,
+  "checks": {
+    "finished": true,
+    "exactly_100_attempts": false,
+    "at_least_99_valid_successes": false,
+    "unique_attempts": true,
+    "artifacts_unchanged": true,
+    "no_provider_calls": true,
+    "physical_device_mappings_disabled": true,
+    "one_native_build_and_revision": true,
+    "at_least_four_observed_poses": true,
+    "at_least_two_camera_bins": true,
+    "at_least_two_room_contexts": true,
+    "four_consumed_setup_heading_bins": true
+  },
+  "attempted_episodes": 10,
+  "successful_episodes": 10,
+  "coverage": {
+    "poses": 8,
+    "camera_bins": [
+      0,
+      1,
+      7
+    ],
+    "room_contexts": [
+      [
+        52,
+        0
+      ],
+      [
+        85,
+        0
+      ]
+    ],
+    "setup_heading_bins": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "failures": {},
+  "seed": 4102032,
+  "seconds_budget": 120.0,
+  "budget_scope": "reset_launch_startup_setup_motor_and_settle",
+  "timing_s": {
+    "total_scenarios": 132.144,
+    "min": 2.376,
+    "median": 11.718499999999999,
+    "p95_nearest_rank": 27.151,
+    "max": 27.151
+  },
+  "native_builds": [
+    "rt-input-v3.2"
+  ],
+  "native_instances_observed": 5,
+  "upstream_revisions": [
+    "d30fc192f2eb01ceea45bd1e12de61636cafbf86"
+  ],
+  "physical_device_mappings_disabled": true,
+  "frozen_sha256": {
+    "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+    "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+    "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+  },
+  "executable_sha256": "8d0595a1a77b85644de5cce065112b454571d15c371454d5d699b32688730029",
+  "local_evidence_sha256": {
+    "manifest.json": "9c19ef9ada13f8bcfb8226a89e644fec94a4fa7a38cab3fc8c4224ab1a5bc78d",
+    "report.json": "e926cdb89418212a5a1d92c76330f86a46fc64c289530912c52f315c362a17e4"
+  },
+  "motor_camera_bins_45_degrees": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "modal_trace_samples": 0,
+  "episodes": [
+    {
+      "episode_id": "g1-684c7a5df049:1",
+      "index": 1,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 93,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.773590087890625,
+        14.0,
+        114.23469543457031
+      ],
+      "initial_camera_yaw": -239,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.221,
+      "report_sha256": "ec8536741a93bb03ad222253b4242d78280e9a36254fc2d87381a99fba46466b",
+      "motor_sha256": "26f54cc9670edb83907d88ccf2f8c8f8aefb60377decd24ccc4e5266e54c5050",
+      "setup_sha256": "d563e05287a1690719e10e2b00163671efb7405f7c68699e98d753c90a52ffa8"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:2",
+      "index": 2,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.34794235229492,
+        100.0,
+        1072.2763671875
+      ],
+      "initial_camera_yaw": 6614,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.931,
+      "report_sha256": "78a77c46dadff2858f08781e45bd0c40ad772b4394b2f14dbef016c6cb162d6d",
+      "motor_sha256": "caa8fc56128b6fa936bbcb0ad3d1d31dd553440cd43cb96163ffa2e5d15688d0",
+      "setup_sha256": "c3163fdb14fcec6d0205ceaf347288b6b0abb4ab67c28c3baf04a57ea0724239"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:3",
+      "index": 3,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 70,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -67.53807067871094,
+        0.0,
+        92.65827941894531
+      ],
+      "initial_camera_yaw": -6565,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.141,
+      "report_sha256": "d5ef96ff714a04d00407ee99353c8001df900e92dcb8c081f0cedeedd853da66",
+      "motor_sha256": "bccbcd82ce66c9fe88dabe0d95c36b215d0e50ebe46ea8ab48f44054c0fabf4a",
+      "setup_sha256": "5b739b36fb69bf2539bbf212e992d94c3cbe392ca580e4e2ba95880395344701"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:4",
+      "index": 4,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 32,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        35.54924011230469,
+        100.0,
+        1071.136474609375
+      ],
+      "initial_camera_yaw": 6422,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.488,
+      "report_sha256": "a6677e0c95f8f8752b1062a652636d044787931df631d1f757701bfba58c6e64",
+      "motor_sha256": "1a9a768415cc740123029042a066d538aea85a002a285eb40d69a5bbc2e08c2c",
+      "setup_sha256": "6b46a65791fd69bd08bb4ed2e729ea2774e834f605f3e37424c877882c238275"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:5",
+      "index": 5,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 138,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        2.293846607208252,
+        14.0,
+        106.02755737304688
+      ],
+      "initial_camera_yaw": 224,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 27.151,
+      "report_sha256": "7670036a333f26f55ea1825146f5603b185ffc9a1fe3327582dbfedc2dfd83fb",
+      "motor_sha256": "e21a8dd9e6c6173e8f8b76140a05df4b49076502129d117c24d78ce565b52656",
+      "setup_sha256": "e99a41f8d4dc3d6ca4f045bce5314f86e724eedc227b74050758548b6a89d71b"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:6",
+      "index": 6,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.44259643554688,
+        100.0,
+        1074.60107421875
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.807,
+      "report_sha256": "1ac64883f3fee01f1ae52a216778665f1042371d97f12433ac337d1b3f744eac",
+      "motor_sha256": "580c2b9e2777af95c18309e7fb9b9bd06bda4826168f4cff1aeee1aacc36b38b",
+      "setup_sha256": "6b7678ba28e63ab5e78d5aec617d767ce3d4d616a32fe3dccccf2717a416b62d"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:7",
+      "index": 7,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 58,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.432,
+      "report_sha256": "28bdd8ccd3f95befcaec73e5ff1f0b42c41ada5494c4387f57879a342fb96906",
+      "motor_sha256": "7c1df4526812764368ec9e98020bcbdaf1b8554c939cd3e4243124c5257c015a",
+      "setup_sha256": "914b529d0fb280228d6d04c202f331a1bf0b94d89f609e41f43ea1840a1a0a61"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:8",
+      "index": 8,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.574745178222656,
+        100.0,
+        1072.09375
+      ],
+      "initial_camera_yaw": 6614,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 4.005,
+      "report_sha256": "980c49b826c36c98b56f7fdc6a8b1ac8bac15f7c47d6dc8d9d227999e11a3ebe",
+      "motor_sha256": "085307370787dacb903f03da708d57050831b3c898effccc70f9b6b665de9716",
+      "setup_sha256": "06548d8826aae20ee15aad8cbbee3084493c32f00589535c2dca97a5ac0e7429"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:9",
+      "index": 9,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 122,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.592,
+      "report_sha256": "c7af32174105c419a3c27993e484d669919dfd3fa3fc48e17bd19efe6737b55b",
+      "motor_sha256": "a37bc6f8bebf5edc1619f09c63c905a5550784684e7150f8d9ddeff66a2a0be9",
+      "setup_sha256": "4cf33238b3f8d4697b2b03726d81bd60589976e9141a1067e42a6956aed1e9e8"
+    },
+    {
+      "episode_id": "g1-684c7a5df049:10",
+      "index": 10,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.376,
+      "report_sha256": "2856bb4844ea87b6364b17162a603e420eaa550e20718a8d1c07e0e2f0fdf212",
+      "motor_sha256": "7aa23914461189c1e5db38babc7534bdc884a2fba772ceaf997a92fcc85f400b",
+      "setup_sha256": "d429e9814b8a2fd38339ba2cb496fa718482c391adfd8b52f060fc001e0ee40c"
+    }
+  ]
+}

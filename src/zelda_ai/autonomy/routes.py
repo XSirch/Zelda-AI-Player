@@ -10,6 +10,7 @@ from pathlib import Path
 
 from ..models import GameState
 from .lifetime import ObservationLifetime
+from .local_tasks import walking_surface_supported
 
 ROUTE_GRAPH_VERSION = 1
 ROUTE_CELL_XZ = 80.0
@@ -1152,6 +1153,8 @@ class LearnedRouteGraph:
         player_position = tuple(float(value) for value in game.player.position)
         candidates = []
         for row in game.traversal_affordances:
+            if row.kind.startswith("stairs_or_slope") and not walking_surface_supported(game, row):
+                continue
             target = tuple(float(value) for value in row.target_position)
             approach = tuple(float(value) for value in row.approach_position)
             target_id = _node_id(
@@ -1162,6 +1165,8 @@ class LearnedRouteGraph:
                 age=game.player.age,
             )
             visited = target_id in self.nodes
+            if self.frontier_retry_after.get(target_id, 0) > time.monotonic():
+                continue
             if visited and not include_visited:
                 continue
 
@@ -1174,7 +1179,7 @@ class LearnedRouteGraph:
                 else 0.0
             )
             visited_penalty = 400.0 if visited else 0.0
-            score = approach_distance + kind_penalty + visited_penalty
+            score = approach_distance + kind_penalty + visited_penalty + self.frontier_failures.get(target_id, 0) * 90
             candidates.append(
                 (
                     score,
@@ -1224,6 +1229,23 @@ class LearnedRouteGraph:
             "traversal_target_node": target_id,
             "traversal_target_visited": visited,
         }
+
+    def record_surface_outcome(self, game, target, *, success):
+        """Record an actual bounded traversal attempt, never an invented edge."""
+        node = _node_id(game.scene, game.room, target, mirrored=game.mirrored_world, age=game.player.age)
+        if success:
+            self.frontier_retry_after.pop(node, None)
+            failures = self.frontier_failures.get(node, 0)
+            if failures <= 1:
+                self.frontier_failures.pop(node, None)
+            else:
+                self.frontier_failures[node] = failures - 1
+        else:
+            self.frontier_retry_after[node] = time.monotonic() + 20
+            self.frontier_failures[node] = self.frontier_failures.get(node, 0) + 1
+        if self.writable:
+            self.persistence_revision += 1
+            self.dirty = True
 
     def exploration_waypoint(
         self,

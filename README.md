@@ -2,13 +2,13 @@
 
 Jogador autônomo para **The Legend of Zelda: Ocarina of Time** no **Ship of Harkinian (SoH)**.
 
-A fundação do motor V4 corrige a projeção horizontal invertida do controle nativo e separa os fragmentos PPO nas intervenções. A saída da casa foi reproduzida no SoH com o Arquivo 2, sem chamadas de IA. Isso ainda não qualifica a campanha completa nem o lote G1 de 100 cenários. Os resultados e as limitações estão em [docs/STATUS.md](docs/STATUS.md).
+A fundação do motor V4 corrige a projeção horizontal invertida do controle nativo e separa os fragmentos PPO nas intervenções. O lote G1 alcançou 99/100 saídas e retornos físicos com o Arquivo 2, sem chamadas de IA. O currículo de superfícies mede o aprendizado local separadamente. A campanha completa continua sem qualificação; os resultados e as limitações estão em [docs/STATUS.md](docs/STATUS.md).
 
 ## Autonomy V3
 
 Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
 
-- **ML actor goal-conditioned:** PPO local em PyTorch continua emitindo analógico N64 e bits físicos dos botões, mas um prior geométrico camera-relative transforma `target_position`/ator/direção observados em viés da própria distribuição do stick. O PPO aprende correções residuais e todos os botões. Não existe `navigate_to`, rota de Zelda ou mapping semântico de botão.
+- **ML actor goal-conditioned:** PPO local em PyTorch emite um residual do analógico N64 e bits físicos dos botões. O analógico executado combina esse residual com a orientação geométrica observada fora da distribuição da rede. As tarefas físicas locais podem assumir o controle temporariamente e seus passos ficam fora do PPO. Não existe rota de Zelda nem associação semântica fixa de botão.
 - **Online learner:** PPO aprende com experiência recém-coletada e **RND (Random Network Distillation)** fornece curiosidade. O learner usa uma cópia separada da rede; backprop não interrompe os inputs.
 - **Cognição LLM:** Codex/ChatGPT ou OpenRouter escolhe apenas o **próximo objetivo estratégico**. Quando a meta tem condição verificável, o runtime trava `objective + completion` até a telemetria provar conclusão. Troca de sala, stuck, waypoint local, progresso parcial e recuperação de rota não podem substituir a meta. A única exceção transitória é uma escolha semântica de diálogo, que não altera o objetivo. Não existe refresh periódico por `horizon_ms`.
 
@@ -210,6 +210,20 @@ O lote físico de 2026-10-04 aprovou esse perfil com **99/100**, incluindo uma f
 ```powershell
 uv run python scripts/export_g1.py .local/qualification/g1-3a53157b3632 --output docs/validation/g1_2026-10-04.json
 ```
+
+### Currículo local de superfícies
+
+O comando abaixo coleta demonstrações com inputs consumidos pelo SoH, treina uma rede separada por imitação e compara a mesma inicialização antes/depois em novas tentativas. O aluno controla o analógico diretamente, sem mistura com a referência. O treino não entra no PPO da campanha e o candidato fica em um checkpoint imutável, sem promoção automática.
+
+```powershell
+uv run zelda-ai train-local-surfaces C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home C:/Projetos/Shipwright-AI/x64/Release --save-slot 2 --demonstrations 24 --evaluation 30 --retention 10 --seed 4102031
+```
+
+São três famílias medidas separadamente: subida de superfície curta observada, descida e chegada a uma célula observada após uma tentativa que falhou por ausência de movimento. O preparo relocaliza Link pela geometria atual e usa apenas controles normais nas cópias de QA. Esse perfil não cobre ladders, lofts, mira, combate nem retomada após toda espécie de colisão. O objetivo estratégico permanece estável durante as tentativas locais. Os relatórios completos ficam locais; `scripts/export_surfaces.py` audita recibos, estados, objetivos e hashes antes de exportar o índice público.
+
+`--evaluation` deve ser divisível por três. O padrão serve para desenvolvimento; 300 tentativas antes e 300 depois fornecem 100 por família, sem agregar modos ruins com bons. Passar um piloto não aprova G2. Nenhum desses comandos instancia provedores de IA ou altera os pesos, memórias e saves originais.
+
+O lote medido de 2026-10-04 passou de **0/30 para 21/30** após o treino. Separadamente: subida **2/10**, descida **9/10**, retomada após ausência de movimento **10/10**. A seleção/preparação de superfícies de subida ainda falhou em sete tentativas reservadas. O candidato ficou sem promoção, e a saída da casa passou nas dez regressões. O índice auditado está em [docs/validation/surface_learning_2026-10-04.json](docs/validation/surface_learning_2026-10-04.json). Isso demonstra aprendizado limitado do controle local; não qualifica navegação geral, ladders ou campanha.
 
 No Windows com MSVC, os testes de transporte nativo também podem ser executados com `powershell -ExecutionPolicy Bypass -File scripts/verify_native.ps1`. Esse resultado complementa os testes pytest que exigem g++ ou clang++.
 

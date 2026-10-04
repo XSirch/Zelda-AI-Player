@@ -23,6 +23,7 @@ from .features import (
     target_point,
 )
 from .lifetime import ObservationLifetime
+from .local_tasks import LocalTask
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .navigation import observed_local_path
@@ -127,6 +128,9 @@ class ContinuousController:
         self.observed_full_seq = None
         self.full_observed_at = 0.0
         self.local_path_attempt = None
+        self.local_task: LocalTask | None = None
+        self.local_stick_policy = None
+        self.last_local_task = None
         self.feature_history = deque(maxlen=4)
         self.novelty_history = deque(maxlen=4)
         self.training_queue: asyncio.Queue = asyncio.Queue(maxsize=2)
@@ -202,6 +206,10 @@ class ContinuousController:
         self.last_motor_summary = "ML policy is ready to explore raw controller inputs."
 
     def reset_episode_state(self):
+        if self.local_task is not None:
+            self.local_task.interrupt("episode_reset")
+            self.last_local_task = self.local_task.snapshot()
+            self.local_task = self.local_stick_policy = None
         self.reward_tracker = RewardTracker()
         self.executor = ExecutionSupervisor()
         self.lifetime = ObservationLifetime()
@@ -279,6 +287,25 @@ class ContinuousController:
         self.intent = intent
         self.intent_updated_at = time.monotonic()
         self.last_sample_seq = None
+
+    def start_local_task(self, task: LocalTask, *, stick_policy=None):
+        """Local execution changes; the strategic intent remains immutable."""
+        game = self.bridge.state
+        if game is None or game.seq != task.origin_seq or task.terminal:
+            raise ValueError("A local task must start from the current observation")
+        if self.local_task is not None and not self.local_task.terminal:
+            raise ValueError("A physical task already owns the motor")
+        if self.pending is not None:
+            self.pending["trainable"] = False
+        self.local_task, self.local_stick_policy = task, stick_policy
+        self.last_sample_seq = None
+
+    def _observe_local_task(self, game):
+        task = self.local_task
+        consumed = any(self.bridge.command_consumed(seq)
+                       for seq in (self.pending or {}).get("command_seqs", ()))
+        task.observe(game, consumed=consumed)
+        return task.guidance(game)
 
     @staticmethod
     def _angle_delta(current: float, previous: float) -> float:
@@ -1482,74 +1509,109 @@ class ContinuousController:
         ):
             self._enqueue_rollout(observation, done=reward.done)
 
-        final_target = target_point(game, self.intent)
-        if game.dialogue.active or game.pause_menu.active:
-            # Modal UI owns physical control. Drop the ephemeral frontier
-            # commitment without treating the modal pause as a navigation fail.
+        local_owned = self.local_task is not None
+        if local_owned:
             self.route_graph.clear_frontier()
-            route_hint = None
-        elif (
-            final_target is not None
-            and self.intent.mode in {"navigate", "explore", "observe"}
-        ):
-            route_hint = self.route_graph.next_waypoint(
-                game,
-                final_target,
-            )
-            if route_hint is not None:
+            guidance = self._observe_local_task(game)
+        else:
+            final_target = target_point(game, self.intent)
+            if game.dialogue.active or game.pause_menu.active:
+                # Modal UI owns physical control. Drop the ephemeral frontier
+                # commitment without treating the modal pause as a navigation fail.
                 self.route_graph.clear_frontier()
+                route_hint = None
             elif (
-                self.route_graph.route_recovery_needed()
-                or self.route_graph.active_frontier is not None
+                final_target is not None
+                and self.intent.mode in {"navigate", "explore", "observe"}
             ):
-                # A learned directed edge just failed in real execution. Do not
-                # immediately fall back to the same straight-line cognition
-                # target; recover from current observed evidence instead.
-                route_hint = self._escape_waypoint(game)
+                route_hint = self.route_graph.next_waypoint(
+                    game,
+                    final_target,
+                )
+                if route_hint is not None:
+                    self.route_graph.clear_frontier()
+                elif (
+                    self.route_graph.route_recovery_needed()
+                    or self.route_graph.active_frontier is not None
+                ):
+                    # A learned directed edge just failed in real execution. Do not
+                    # immediately fall back to the same straight-line cognition
+                    # target; recover from current observed evidence instead.
+                    route_hint = self._escape_waypoint(game)
+                    if route_hint is not None:
+                        self.route_graph.clear_frontier()
+                    else:
+                        route_hint = self.route_graph.traversal_waypoint(game)
+                        if route_hint is None:
+                            route_hint = self.route_graph.exploration_waypoint(game)
+            elif self.intent.mode == "explore":
+                actor_is_door = bool(
+                    game.context_actor is not None
+                    and (
+                        game.context_actor.category_name or ""
+                    ).strip().lower() == "door"
+                )
+                prefer_exit = self._should_prefer_observed_exit(
+                    game,
+                    actor_is_door=actor_is_door,
+                )
+                route_hint = (
+                    self._escape_waypoint(game)
+                    if prefer_exit
+                    else None
+                )
                 if route_hint is not None:
                     self.route_graph.clear_frontier()
                 else:
                     route_hint = self.route_graph.traversal_waypoint(game)
                     if route_hint is None:
                         route_hint = self.route_graph.exploration_waypoint(game)
-        elif self.intent.mode == "explore":
-            actor_is_door = bool(
-                game.context_actor is not None
-                and (
-                    game.context_actor.category_name or ""
-                ).strip().lower() == "door"
-            )
-            prefer_exit = self._should_prefer_observed_exit(
-                game,
-                actor_is_door=actor_is_door,
-            )
-            route_hint = (
-                self._escape_waypoint(game)
-                if prefer_exit
-                else None
-            )
-            if route_hint is not None:
-                self.route_graph.clear_frontier()
             else:
-                route_hint = self.route_graph.traversal_waypoint(game)
-                if route_hint is None:
-                    route_hint = self.route_graph.exploration_waypoint(game)
-        else:
-            route_hint = None
-        local_target = (route_hint or {}).get("exit_position") or final_target
-        if self.intent.mode in {"navigate", "explore", "observe"} and not (game.dialogue.active or game.pause_menu.active):
-            route_hint = self._local_path_hint(game, route_hint, local_target)
-        guidance = goal_guidance(
-            game,
-            self.intent,
-            local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
-            route_hint=route_hint,
-        )
+                route_hint = None
+            local_target = (route_hint or {}).get("exit_position") or final_target
+            if self.intent.mode in {"navigate", "explore", "observe"} and not (game.dialogue.active or game.pause_menu.active):
+                route_hint = self._local_path_hint(game, route_hint, local_target)
+            guidance = goal_guidance(
+                game,
+                self.intent,
+                local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
+                route_hint=route_hint,
+            )
+            if route_hint and route_hint.get("traversal_kind", "").startswith("stairs_or_slope"):
+                point = route_hint.get("waypoint")
+                rows = [row for row in game.traversal_affordances
+                        if row.kind == route_hint["traversal_kind"] and point is not None
+                        and min(math.dist(row.approach_position, point),
+                                math.dist(row.target_position, point)) < 1]
+                if rows:
+                    try:
+                        self.start_local_task(LocalTask.traversal(game, rows[0]))
+                    except ValueError:
+                        pass  # An unsupported surface remains local evidence only.
+                    else:
+                        local_owned = True
+                        guidance = self._observe_local_task(game)
         durable_progress = any(reward.breakdown.get(key, 0.0) > 0 for key in (
             "durable_progress", "objective_milestone",
         ))
         self.executor.observe(game, guidance, macro_progress=macro_progress, durable_progress=durable_progress)
         setpoint, sample = self._sample_setpoint(observation, guidance)
+        if local_owned:
+            task = self.local_task
+            if task.terminal or task.phase == "verify":
+                stick = (0, 0)
+            elif self.local_stick_policy is None:
+                stick = task.reference_stick(game)
+            else:
+                stick = self.local_stick_policy(game, task)
+                if (len(stick) != 2 or not all(isinstance(v, (int, float))
+                                              and math.isfinite(v) for v in stick)):
+                    task.interrupt("invalid_local_policy_action")
+                    stick = (0, 0)
+            stick = tuple(max(-80, min(80, round(v))) for v in stick)
+            setpoint = Setpoint(stick_x=stick[0], stick_y=stick[1], reason="local_task")
+            sample = {**sample, "stick": [v / 80 for v in stick],
+                      "buttons": [0.0 for _ in BUTTON_NAMES], "guidance_strength": 0.0}
         if (
             guidance.get("forced_escape")
             or guidance.get("traversal_route_active")
@@ -1587,6 +1649,10 @@ class ContinuousController:
             )
             if dialogue_reentry_override:
                 interaction_override = True
+            elif local_owned:
+                # A walking surface task cannot probe unrelated contextual
+                # buttons. Modal dialogue still has higher authority above.
+                interaction_override = True
             else:
                 setpoint, sample, interaction_override = self._interaction_override(
                     game,
@@ -1603,7 +1669,7 @@ class ContinuousController:
             guidance=guidance,
             sample=sample,
         )
-        transition_trainable = transition_trainable and self.executor.state != "blocked"
+        transition_trainable = transition_trainable and self.executor.state != "blocked" and not local_owned
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -1632,6 +1698,13 @@ class ContinuousController:
             "actor_version": sample.get("actor_version", 0),
         }
         self.actions_sampled += 1
+        if local_owned and self.local_task.terminal:
+            task = self.local_task
+            if (task.kind.startswith("stairs_or_slope") and task.context == self.executor.context
+                    and task.phase in {"succeeded", "failed"}):
+                self.route_graph.record_surface_outcome(game, task.target, success=task.phase == "succeeded")
+            self.last_local_task = self.local_task.snapshot()
+            self.local_task = self.local_stick_policy = None
 
         active_names = [
             name for name, value in zip(BUTTON_NAMES, self.last_buttons)
@@ -1828,6 +1901,10 @@ class ContinuousController:
                 await asyncio.sleep(self.tick_s)
         finally:
             self.bridge.release()
+            if self.local_task is not None:
+                self.local_task.interrupt("motor_stopped")
+                self.last_local_task = self.local_task.snapshot()
+                self.local_task = self.local_stick_policy = None
             if route_saver is not None:
                 route_stop.set()
                 with contextlib.suppress(asyncio.CancelledError):

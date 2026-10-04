@@ -62,12 +62,27 @@ def main():
     g1.add_argument("--episodes", type=int, default=100, help="100 for qualification; smaller batches are pilots")
     g1.add_argument("--seed", type=int, default=1042026)
     g1.add_argument("--seconds", type=float, default=120.0, help="Complete scenario budget, including startup and setup")
+    surfaces = commands.add_parser("train-local-surfaces", help="Isolated local imitation and real before/after trials; zero AI calls")
+    surfaces.add_argument("executable", type=Path)
+    surfaces.add_argument("--source-home", type=Path, required=True)
+    surfaces.add_argument("--save-slot", type=int, choices=(1, 2, 3), required=True)
+    surfaces.add_argument("--demonstrations", type=int, default=24)
+    surfaces.add_argument("--evaluation", type=int, default=12, help="Divisible by 3; 300 tests 100 per family")
+    surfaces.add_argument("--retention", type=int, default=10)
+    surfaces.add_argument("--seed", type=int, default=4102026)
     launch = commands.add_parser("launch-soh")
     launch.add_argument("executable", type=Path)
     args = parser.parse_args()
     settings = Settings()
 
-    if args.command == "qualify-g1":
+    if args.command == "train-local-surfaces":
+        from .surface_curriculum import surface_curriculum
+        report = asyncio.run(surface_curriculum(settings, args.executable, args.source_home,
+            save_slot=args.save_slot, demonstration_trials=args.demonstrations,
+            evaluation_trials=args.evaluation, retention_trials=args.retention, seed=args.seed))
+        if not report["artifacts_unchanged"]:
+            raise SystemExit(2)
+    elif args.command == "qualify-g1":
         if not 1 <= args.episodes <= 100 or not 10 <= args.seconds <= 120:
             parser.error("G1 allows 1..100 episodes and a complete-scenario budget of 10..120 seconds")
         from .g1 import qualify_g1

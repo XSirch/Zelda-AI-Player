@@ -1,0 +1,850 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "suite_id": "g1-da24d7be4d70",
+  "source": "soh",
+  "observation_profile": "instrumented_local_v1",
+  "candidate_version": "surface-imitation-v1",
+  "scope": "short_observed_walking_surfaces_and_cell_after_input_withholding",
+  "provider_calls": 0,
+  "evaluation_training_updates": 0,
+  "promotion": "not_promoted",
+  "g2_complete": false,
+  "artifacts_unchanged": true,
+  "save_slot": 2,
+  "seed": 4102031,
+  "evaluation_seed": 4202034,
+  "training": {
+    "training_steps": 120,
+    "demonstrations": 228,
+    "initial_mse": 0.23636884987354279,
+    "final_mse": 0.007460350636392832
+  },
+  "families": {
+    "surface_up": {
+      "before": {
+        "attempted": 10,
+        "successful": 0,
+        "g2_qualified": false,
+        "failure_reasons": {
+          "no_geometric_progress": 4,
+          "ValueError:No currently observed short walking surface": 6
+        },
+        "initial_pose_bins": 2
+      },
+      "after": {
+        "attempted": 10,
+        "successful": 2,
+        "g2_qualified": false,
+        "failure_reasons": {
+          "ValueError:No currently observed short walking surface": 7,
+          "no_geometric_progress": 1
+        },
+        "initial_pose_bins": 2
+      }
+    },
+    "surface_down": {
+      "before": {
+        "attempted": 10,
+        "successful": 0,
+        "g2_qualified": false,
+        "failure_reasons": {
+          "no_geometric_progress": 9,
+          "ValueError:No currently observed short walking surface": 1
+        },
+        "initial_pose_bins": 2
+      },
+      "after": {
+        "attempted": 10,
+        "successful": 9,
+        "g2_qualified": false,
+        "failure_reasons": {
+          "ValueError:No currently observed short walking surface": 1
+        },
+        "initial_pose_bins": 2
+      }
+    },
+    "recovery_cell": {
+      "before": {
+        "attempted": 10,
+        "successful": 0,
+        "g2_qualified": false,
+        "failure_reasons": {
+          "no_geometric_progress": 10
+        },
+        "initial_pose_bins": 5
+      },
+      "after": {
+        "attempted": 10,
+        "successful": 10,
+        "g2_qualified": false,
+        "failure_reasons": {},
+        "initial_pose_bins": 7
+      }
+    }
+  },
+  "portal_retention": {
+    "attempted": 10,
+    "successful": 10,
+    "g2_qualified": false,
+    "failure_reasons": {},
+    "initial_pose_bins": 5
+  },
+  "candidate_sha256": "2fb6ae12316332b1de6f3c7fb9fe8899faa9fcf8dac50ec6cca2986d7035c8d9",
+  "before_sha256": "ad374b69deaa69228afca7085773442fa75dc19289544f2c74bb4fe0742d1430",
+  "dataset_sha256": "48951fa593f5971ec36af9f4990e765533db205f30cf372d61777b504245d2cc",
+  "records": [
+    {
+      "stage": "demonstrations",
+      "index": 1,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 24.598
+    },
+    {
+      "stage": "demonstrations",
+      "index": 2,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 19.164
+    },
+    {
+      "stage": "demonstrations",
+      "index": 3,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 21.287
+    },
+    {
+      "stage": "demonstrations",
+      "index": 4,
+      "family": "surface_up",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 24.981
+    },
+    {
+      "stage": "demonstrations",
+      "index": 5,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.496
+    },
+    {
+      "stage": "demonstrations",
+      "index": 6,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 20.471
+    },
+    {
+      "stage": "demonstrations",
+      "index": 7,
+      "family": "surface_up",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 23.537
+    },
+    {
+      "stage": "demonstrations",
+      "index": 8,
+      "family": "surface_down",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 29.496
+    },
+    {
+      "stage": "demonstrations",
+      "index": 9,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 20.717
+    },
+    {
+      "stage": "demonstrations",
+      "index": 10,
+      "family": "surface_up",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 21.551
+    },
+    {
+      "stage": "demonstrations",
+      "index": 11,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.735
+    },
+    {
+      "stage": "demonstrations",
+      "index": 12,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.644
+    },
+    {
+      "stage": "demonstrations",
+      "index": 13,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 29.08
+    },
+    {
+      "stage": "demonstrations",
+      "index": 14,
+      "family": "surface_down",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 22.379
+    },
+    {
+      "stage": "demonstrations",
+      "index": 15,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.5
+    },
+    {
+      "stage": "demonstrations",
+      "index": 16,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 29.329
+    },
+    {
+      "stage": "demonstrations",
+      "index": 17,
+      "family": "surface_down",
+      "success": false,
+      "reason": "RuntimeError:opposite_surface_setup_failed",
+      "elapsed_s": 22.786
+    },
+    {
+      "stage": "demonstrations",
+      "index": 18,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.327
+    },
+    {
+      "stage": "demonstrations",
+      "index": 19,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.041
+    },
+    {
+      "stage": "demonstrations",
+      "index": 20,
+      "family": "surface_down",
+      "success": false,
+      "reason": "RuntimeError:opposite_surface_setup_failed",
+      "elapsed_s": 22.805
+    },
+    {
+      "stage": "demonstrations",
+      "index": 21,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.149
+    },
+    {
+      "stage": "demonstrations",
+      "index": 22,
+      "family": "surface_up",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.023
+    },
+    {
+      "stage": "demonstrations",
+      "index": 23,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.959
+    },
+    {
+      "stage": "demonstrations",
+      "index": 24,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.334
+    },
+    {
+      "stage": "before",
+      "index": 1,
+      "family": "surface_up",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 18.476
+    },
+    {
+      "stage": "before",
+      "index": 2,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 20.645
+    },
+    {
+      "stage": "before",
+      "index": 3,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 22.146
+    },
+    {
+      "stage": "before",
+      "index": 4,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.324
+    },
+    {
+      "stage": "before",
+      "index": 5,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 19.531
+    },
+    {
+      "stage": "before",
+      "index": 6,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 23.968
+    },
+    {
+      "stage": "before",
+      "index": 7,
+      "family": "surface_up",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.648
+    },
+    {
+      "stage": "before",
+      "index": 8,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.068
+    },
+    {
+      "stage": "before",
+      "index": 9,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 22.646
+    },
+    {
+      "stage": "before",
+      "index": 10,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 28.806
+    },
+    {
+      "stage": "before",
+      "index": 11,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 19.676
+    },
+    {
+      "stage": "before",
+      "index": 12,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.336
+    },
+    {
+      "stage": "before",
+      "index": 13,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.247
+    },
+    {
+      "stage": "before",
+      "index": 14,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 19.699
+    },
+    {
+      "stage": "before",
+      "index": 15,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 23.973
+    },
+    {
+      "stage": "before",
+      "index": 16,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.082
+    },
+    {
+      "stage": "before",
+      "index": 17,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 19.945
+    },
+    {
+      "stage": "before",
+      "index": 18,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.918
+    },
+    {
+      "stage": "before",
+      "index": 19,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.182
+    },
+    {
+      "stage": "before",
+      "index": 20,
+      "family": "surface_down",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.26
+    },
+    {
+      "stage": "before",
+      "index": 21,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 23.733
+    },
+    {
+      "stage": "before",
+      "index": 22,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.261
+    },
+    {
+      "stage": "before",
+      "index": 23,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 20.736
+    },
+    {
+      "stage": "before",
+      "index": 24,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 22.693
+    },
+    {
+      "stage": "before",
+      "index": 25,
+      "family": "surface_up",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 21.643
+    },
+    {
+      "stage": "before",
+      "index": 26,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 20.97
+    },
+    {
+      "stage": "before",
+      "index": 27,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 24.06
+    },
+    {
+      "stage": "before",
+      "index": 28,
+      "family": "surface_up",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 18.604
+    },
+    {
+      "stage": "before",
+      "index": 29,
+      "family": "surface_down",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 19.655
+    },
+    {
+      "stage": "before",
+      "index": 30,
+      "family": "recovery_cell",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 23.812
+    },
+    {
+      "stage": "after",
+      "index": 1,
+      "family": "surface_up",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.307
+    },
+    {
+      "stage": "after",
+      "index": 2,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 19.403
+    },
+    {
+      "stage": "after",
+      "index": 3,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 21.934
+    },
+    {
+      "stage": "after",
+      "index": 4,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.253
+    },
+    {
+      "stage": "after",
+      "index": 5,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.463
+    },
+    {
+      "stage": "after",
+      "index": 6,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.576
+    },
+    {
+      "stage": "after",
+      "index": 7,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.318
+    },
+    {
+      "stage": "after",
+      "index": 8,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 19.609
+    },
+    {
+      "stage": "after",
+      "index": 9,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 21.869
+    },
+    {
+      "stage": "after",
+      "index": 10,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.012
+    },
+    {
+      "stage": "after",
+      "index": 11,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.842
+    },
+    {
+      "stage": "after",
+      "index": 12,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.987
+    },
+    {
+      "stage": "after",
+      "index": 13,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.177
+    },
+    {
+      "stage": "after",
+      "index": 14,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.457
+    },
+    {
+      "stage": "after",
+      "index": 15,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.757
+    },
+    {
+      "stage": "after",
+      "index": 16,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 29.054
+    },
+    {
+      "stage": "after",
+      "index": 17,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.345
+    },
+    {
+      "stage": "after",
+      "index": 18,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 20.949
+    },
+    {
+      "stage": "after",
+      "index": 19,
+      "family": "surface_up",
+      "success": false,
+      "reason": "no_geometric_progress",
+      "elapsed_s": 22.8
+    },
+    {
+      "stage": "after",
+      "index": 20,
+      "family": "surface_down",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.25
+    },
+    {
+      "stage": "after",
+      "index": 21,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.517
+    },
+    {
+      "stage": "after",
+      "index": 22,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.423
+    },
+    {
+      "stage": "after",
+      "index": 23,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 19.535
+    },
+    {
+      "stage": "after",
+      "index": 24,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 21.908
+    },
+    {
+      "stage": "after",
+      "index": 25,
+      "family": "surface_up",
+      "success": false,
+      "reason": "ValueError:No currently observed short walking surface",
+      "elapsed_s": 23.085
+    },
+    {
+      "stage": "after",
+      "index": 26,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 19.4
+    },
+    {
+      "stage": "after",
+      "index": 27,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.666
+    },
+    {
+      "stage": "after",
+      "index": 28,
+      "family": "surface_up",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.44
+    },
+    {
+      "stage": "after",
+      "index": 29,
+      "family": "surface_down",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 18.526
+    },
+    {
+      "stage": "after",
+      "index": 30,
+      "family": "recovery_cell",
+      "success": true,
+      "reason": "success",
+      "elapsed_s": 22.53
+    },
+    {
+      "stage": "retention",
+      "index": 1,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 19.357
+    },
+    {
+      "stage": "retention",
+      "index": 2,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 19.659
+    },
+    {
+      "stage": "retention",
+      "index": 3,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 25.36
+    },
+    {
+      "stage": "retention",
+      "index": 4,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 22.504
+    },
+    {
+      "stage": "retention",
+      "index": 5,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 25.1
+    },
+    {
+      "stage": "retention",
+      "index": 6,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 21.229
+    },
+    {
+      "stage": "retention",
+      "index": 7,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 21.526
+    },
+    {
+      "stage": "retention",
+      "index": 8,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 19.231
+    },
+    {
+      "stage": "retention",
+      "index": 9,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 25.29
+    },
+    {
+      "stage": "retention",
+      "index": 10,
+      "family": "portal_retention",
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "elapsed_s": 21.816
+    }
+  ]
+}

@@ -1,4 +1,33 @@
-# Implementation status — V3 and V4 motor foundation
+# Implementation status — V3, V4 motor foundation and local curriculum
+
+## Physical local-learning comparison on 2026-10-04
+
+The isolated batch `g1-da24d7be4d70` completed **94 physical SoH trials**: 24 reference demonstration attempts, 30 before-training evaluations, 30 after-training evaluations and 10 outbound portal retention tests. The audited index is [validation/surface_learning_2026-10-04.json](validation/surface_learning_2026-10-04.json). Full native observations, actual input receipts, copied working saves and immutable candidate checkpoints remain local under `.local/qualification/g1-da24d7be4d70/`.
+
+| Family | Before training | After training | G2 |
+| --- | --- | --- | --- |
+| Observed short surface ascent | 0/10 | 2/10 | Unqualified |
+| Observed short surface descent | 0/10 | 9/10 | Unqualified |
+| Observed cell after a withheld-movement stall | 0/10 | 10/10 | Unqualified |
+| Outbound house portal retention, existing V3 policy | — | 10/10 | Retention pilot only |
+
+The before/after comparison uses the same network initialization and the same family/setup schedule, with fresh native processes and ordinary Arquivo 2 loads. The evaluation seed differs from the demonstration schedule. Exact poses are not savestates and can vary with actual startup/movement timing. Both controllers use current observed targets and neutral verification guards; the candidate owns raw analog steering with **zero reference steering blending**. This measures a small local control domain rather than learned route discovery.
+
+- Twelve of the 24 demonstration attempts succeeded, four in each family. Only their **228 consumed reference actions** entered the separate imitation dataset. Failed attempts remain in the records. The candidate trained for 120 local gradient steps; MSE fell from 0.236369 to 0.007460. Physical evaluation improved from **0/30 to 21/30**; loss reduction alone was not treated as gameplay success.
+- All nine after-training failures are preserved. Seven ascent attempts could not expose/select a supported short upward surface during bounded preparation; one ascent controller attempt stalled; one descent preparation could not select its surface. Ascent is therefore **2/10 overall**, not a qualified capability. The three families have only ten reserved attempts each, below the 100-per-family gate; no candidate was promoted.
+- Scope: child Link, normal world, house interior, native `stairs_or_slope` observations with short height changes (observed successful ascent/descent here is approximately 14 units). These are not evidence of loft/ladder traversal, full staircases, aiming, combat, general collision recovery or campaign completion. The recovery perturbation is specifically consumed neutral input followed by another local task, not every kind of stuck condition.
+- `LocalTask` gives a currently observed walking surface/cell exclusive analog authority, a bounded attempt, fresh stopped verification frames, actual height checks and typed failure/interruption. Unrelated PPO buttons and contextual probes cannot run under a walking task. Dialogue/pause/context changes preempt it; ladder/ledge attachment rejects walking projection. Surface failure puts the observed target in cooldown and adds negative memory without inventing edges; actual success heals that memory.
+- Strategic intent/completion stays unchanged. All physical-task overrides remain excluded from PPO, whose latent residual/action probabilities retain their V3 semantics. Imitation labels are executed N64 analog actions in a separate network and never enter the PPO buffer as on-policy samples. The candidate freezes its action contract and fixed normalizer metadata together with weights; evaluation does not optimize or overwrite it.
+- There were **zero cognition/provider calls**, zero V3 PPO updates, and unchanged SHA-256 values for original native executable/assets/configuration/saves, original policy/maps, frozen snapshots and both before/after candidate files. Physical keyboard/gamepad mappings were disabled only in QA copies. No teleports, game-memory writes, walkthrough routes or operator game input were used.
+- Reported trial durations totalled 2071.596 s, with median 22.040 s and maximum 29.496 s. A 120 s async deadline bounds post-launch startup, preparation, motor execution and settlement; shutdown/checksum/reporting occur separately. Each physical analog task has an eight-second attempt budget and a 2.5-second geometric stall limit.
+
+The corrected development pilot `g1-9ae41d451c84` had 5/6 after-training successes versus 0/6 before, plus 2/2 outbound retention. An earlier pilot `g1-97717e656889` preceded the preparation/geometry corrections. Three development batches (`g1-e47c0b0191a7`, `g1-2b18e9bd4f27`, `g1-44666e720230`) were deliberately stopped by the source-hash fence during corrections. None of these attempts is substituted into the 94-trial measurement. Source-hash stops do not mean that original game saves/assets were rewritten.
+
+Reproduce with `train-local-surfaces` in README. `scripts/export_surfaces.py` audits the local records, native consumption, verification, unchanged objectives and artifact hashes before publishing a small whitelist index. The existing campaign PPO checkpoint and completion champions remain separate; this candidate is **not promoted**.
+
+A separate current-source portal regression, `g1-684c7a5df049` with seed `4102032`, passed **10/10**, including five house exits and five actual forest-to-house revisits. It covered eight observed pose cells, three initial camera bins and all four consumed setup heading bins. The audited index is [validation/g1_retention_2026-10-04.json](validation/g1_retention_2026-10-04.json). Its command correctly returned code 2 and `finished_unqualified`, because ten episodes cannot satisfy the 100-episode G1 gate. This supplements the ten outbound checks above and does not replace the historical 99/100 qualification with a smaller batch.
+
+Checks: `uv run pytest -q` **292 passed, 20 skipped**, with the existing Starlette/httpx deprecation warning; `web/npm run build` passed; the separate C++20 MSVC harness passed **19 cases**. The pytest C++ skips require unavailable g++/clang++ and are not counted as passes. Focused Ruff checks for the new task/imitation/curriculum/exporter/tests passed. No frontend or native adapter source changed in this step.
 
 ## Physical G1 batch qualified on 2026-10-04
 
