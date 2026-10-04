@@ -1039,6 +1039,102 @@ class ContinuousController:
             return False
         return True
 
+    @staticmethod
+    def _escape_traversal_hint(game, escape_hint: dict) -> dict:
+        """Insert one observed vertical traversal step before an unreachable exit."""
+        if (
+            game.player is None
+            or bool(escape_hint.get("direct_reachable"))
+            or int(escape_hint.get("path_nodes") or 0) > 1
+            or not game.traversal_affordances
+        ):
+            return escape_hint
+
+        final_target = escape_hint.get("exit_position") or escape_hint.get("waypoint")
+        if not (
+            isinstance(final_target, (list, tuple))
+            and len(final_target) == 3
+        ):
+            return escape_hint
+        final_target = tuple(float(value) for value in final_target)
+        player_position = tuple(float(value) for value in game.player.position)
+        current_distance = math.dist(player_position, final_target)
+        current_vertical_gap = abs(final_target[1] - player_position[1])
+        desired_vertical = final_target[1] - player_position[1]
+
+        candidates = []
+        for row in game.traversal_affordances:
+            target = tuple(float(value) for value in row.target_position)
+            approach = tuple(float(value) for value in row.approach_position)
+            target_distance = math.dist(target, final_target)
+            vertical_gap = abs(final_target[1] - target[1])
+            improves_target = target_distance <= current_distance - 12.0
+            improves_vertical = vertical_gap <= current_vertical_gap - 8.0
+            if not improves_target and not improves_vertical:
+                continue
+
+            direction_penalty = 0.0
+            if desired_vertical <= -25.0 and row.direction != "down":
+                direction_penalty = 180.0
+            elif desired_vertical >= 25.0 and row.direction != "up":
+                direction_penalty = 180.0
+
+            kind_penalty = (
+                80.0
+                if row.kind == "ledge_down"
+                else 20.0
+                if row.kind in {"stairs_or_slope_up", "stairs_or_slope_down"}
+                else 0.0
+            )
+            approach_distance = math.dist(player_position, approach)
+            score = (
+                approach_distance
+                + target_distance
+                + direction_penalty
+                + kind_penalty
+            )
+            candidates.append((score, approach_distance, row, approach, target))
+
+        if not candidates:
+            return escape_hint
+
+        _, approach_distance, row, approach, target = min(
+            candidates,
+            key=lambda item: item[0],
+        )
+        if approach_distance > 55.0:
+            phase = "approach"
+            waypoint = approach
+        else:
+            phase = "target"
+            waypoint = target
+
+        escape_key = str(
+            escape_hint.get("escape_key")
+            or escape_hint.get("waypoint_id")
+            or "escape"
+        )
+        return {
+            "waypoint": waypoint,
+            "waypoint_id": (
+                f"escape-traversal:{row.kind}:{phase}:"
+                f"{round(waypoint[0], 1)}:{round(waypoint[1], 1)}:"
+                f"{round(waypoint[2], 1)}"
+            )[:220],
+            "path_nodes": 1,
+            "waypoint_index": 0,
+            "target_gap": math.dist(waypoint, final_target),
+            "confidence": 1.0,
+            "partial": True,
+            "traversal": True,
+            "traversal_kind": row.kind,
+            "traversal_direction": row.direction,
+            "traversal_phase": phase,
+            "forced_escape": True,
+            "escape_key": escape_key,
+            "escape_final_target": final_target,
+        }
+
     def _escape_waypoint(self, game) -> dict | None:
         """Choose a healthy escape target, preferring proven departures."""
         now = time.monotonic()
@@ -1059,27 +1155,39 @@ class ContinuousController:
         if remembered_transition is not None:
             key = str(remembered_transition.get("escape_key") or "")
             if not self._escape_on_cooldown(key, now=now):
-                return remembered_transition
+                return self._escape_traversal_hint(
+                    game,
+                    remembered_transition,
+                )
 
-        observed_exit = self.route_graph.exit_waypoint(game)
+        observed_exit = self.route_graph.exit_waypoint(
+            game,
+            allow_unreachable=True,
+        )
         if observed_exit is not None:
             key = f"observed:{observed_exit.get('waypoint_id')}"
             if not self._escape_on_cooldown(key, now=now):
-                return {
-                    **observed_exit,
-                    "forced_escape": True,
-                    "escape_key": key,
-                }
+                return self._escape_traversal_hint(
+                    game,
+                    {
+                        **observed_exit,
+                        "forced_escape": True,
+                        "escape_key": key,
+                    },
+                )
 
         observed_door = self.route_graph.door_waypoint(game)
         if observed_door is not None:
             key = f"observed:{observed_door.get('waypoint_id')}"
             if not self._escape_on_cooldown(key, now=now):
-                return {
-                    **observed_door,
-                    "forced_escape": True,
-                    "escape_key": key,
-                }
+                return self._escape_traversal_hint(
+                    game,
+                    {
+                        **observed_door,
+                        "forced_escape": True,
+                        "escape_key": key,
+                    },
+                )
 
         remembered_other = self.room_map.remembered_escape_waypoint(
             game,
@@ -1090,7 +1198,10 @@ class ContinuousController:
         if remembered_other is not None:
             key = str(remembered_other.get("escape_key") or "")
             if not self._escape_on_cooldown(key, now=now):
-                return remembered_other
+                return self._escape_traversal_hint(
+                    game,
+                    remembered_other,
+                )
         return None
 
     def _sample_setpoint(
