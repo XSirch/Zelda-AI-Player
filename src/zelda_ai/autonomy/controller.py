@@ -724,14 +724,32 @@ class ContinuousController:
             (
                 probe.get("exit_active")
                 or probe.get("actor_is_door")
+                or probe.get("traversal_active")
             )
             and current_key != probe["key"]
+        )
+        traversal_started = bool(
+            probe.get("traversal_active")
+            and game.player is not None
+            and (
+                (game.player.climbing_ladder and not probe.get("climbing_ladder"))
+                or (game.player.climbing_ledge and not probe.get("climbing_ledge"))
+                or (game.player.hanging_ledge and not probe.get("hanging_ledge"))
+                or (
+                    probe.get("player_position") is not None
+                    and math.dist(
+                        game.player.position,
+                        probe["player_position"],
+                    ) >= 12.0
+                )
+            )
         )
         success = (
             scene_changed
             or dialogue_started
             or major_effect
             or exit_context_changed
+            or traversal_started
         )
 
         if success:
@@ -851,7 +869,22 @@ class ContinuousController:
             "room": game.room,
             "dialogue_active": bool(game.dialogue.active),
             "exit_active": bool(guidance.get("exit_active")),
+            "traversal_active": bool(guidance.get("traversal_route_active")),
             "actor_is_door": bool(actor_is_door),
+            "player_position": (
+                tuple(float(value) for value in game.player.position)
+                if game.player is not None
+                else None
+            ),
+            "climbing_ladder": bool(
+                game.player.climbing_ladder if game.player is not None else False
+            ),
+            "climbing_ledge": bool(
+                game.player.climbing_ledge if game.player is not None else False
+            ),
+            "hanging_ledge": bool(
+                game.player.hanging_ledge if game.player is not None else False
+            ),
             "known": bool(using_known),
         }
         self.last_interaction_source = f"{source}:{key}->{button}"
