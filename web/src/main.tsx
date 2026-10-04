@@ -413,41 +413,56 @@ function App() {
   const [socketOnline, setSocketOnline] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const token = useRef('');
   const reconnect = useRef<number | null>(null);
 
   useEffect(() => {
     let disposed = false;
     let socket: WebSocket | null = null;
 
-    const connect = () => {
-      if (disposed || !token.current) return;
-      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-      socket = new WebSocket(`${protocol}://${location.host}/api/events`);
-      socket.onopen = () => {
-        setSocketOnline(true);
-        socket?.send(JSON.stringify({ token: token.current }));
-      };
-      socket.onmessage = event => {
-        try { setSnapshot(JSON.parse(event.data) as Snapshot); } catch { /* ignore malformed local frame */ }
-      };
-      socket.onclose = () => {
-        setSocketOnline(false);
-        if (!disposed) reconnect.current = window.setTimeout(connect, 800);
-      };
-      socket.onerror = () => socket?.close();
+    const scheduleReconnect = () => {
+      if (disposed || reconnect.current != null) return;
+      reconnect.current = window.setTimeout(() => {
+        reconnect.current = null;
+        void connect();
+      }, 800);
     };
 
-    void (async () => {
+    const connect = async () => {
       try {
-        token.current = await bootstrap();
+        // Server restart rotates the local session token. Refresh it on every
+        // connection attempt rather than replaying an expired token forever.
+        const connectionToken = await bootstrap();
+        if (disposed) return;
         const initial = await api<Snapshot>('/status');
-        if (!disposed) setSnapshot(initial);
-        connect();
+        if (disposed) return;
+        setSnapshot(initial);
+        const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+        const currentSocket = new WebSocket(`${protocol}://${location.host}/api/events`);
+        socket = currentSocket;
+        currentSocket.onopen = () => {
+          if (disposed) { currentSocket.close(); return; }
+          setSocketOnline(true);
+          setError('');
+          currentSocket.send(JSON.stringify({ token: connectionToken }));
+        };
+        currentSocket.onmessage = event => {
+          if (disposed) return;
+          try { setSnapshot(JSON.parse(event.data) as Snapshot); } catch { /* ignore malformed local frame */ }
+        };
+        currentSocket.onclose = () => {
+          if (disposed) return;
+          setSocketOnline(false);
+          scheduleReconnect();
+        };
+        currentSocket.onerror = () => currentSocket.close();
       } catch (err) {
-        if (!disposed) setError(err instanceof Error ? err.message : String(err));
+        if (!disposed) {
+          setError(err instanceof Error ? err.message : String(err));
+          scheduleReconnect();
+        }
       }
-    })();
+    };
+    void connect();
 
     return () => {
       disposed = true;

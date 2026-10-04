@@ -24,7 +24,14 @@
     "browser": "agent-browser; isolated server; offline state; no errors; no cognition run",
     "pytest_warning": "Existing Starlette httpx TestClient deprecation (1 warning)",
     "pytest_native_skips": "19 scheduler cases and 1 legacy lease test: g++/clang++ unavailable; MSVC scheduler run is separate",
-    "soh_executable_sha256": "8d0595a1a77b85644de5cce065112b454571d15c371454d5d699b32688730029"
+    "soh_executable_sha256": "8d0595a1a77b85644de5cce065112b454571d15c371454d5d699b32688730029",
+    "browser_backend_restart": {
+      "authenticated_reconnections": 1,
+      "received_frames": 8,
+      "manual_page_reload": false,
+      "browser_errors": 0,
+      "provider_calls": 0
+    }
   },
   "episodes": [
     {
