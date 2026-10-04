@@ -262,6 +262,9 @@ def goal_guidance(
             "exit_active": False,
             "exit_index": None,
             "exit_direct_reachable": False,
+            "forced_escape": False,
+            "remembered_escape": False,
+            "escape_key": None,
         }
 
     point = target_point(game, intent)
@@ -289,6 +292,7 @@ def goal_guidance(
     exit_direct_reachable = False
     forced_escape = False
     is_remembered_escape = False
+    escape_key = None
     if point is None and intent.direction in {"up", "down"}:
         candidates = [
             row for row in game.traversal_affordances
@@ -328,6 +332,12 @@ def goal_guidance(
             is_door_escape = bool(route_hint.get("door"))
             is_remembered_escape = bool(route_hint.get("remembered"))
             forced_escape = bool(route_hint.get("forced_escape"))
+            raw_escape_key = route_hint.get("escape_key")
+            escape_key = (
+                str(raw_escape_key)[:240]
+                if raw_escape_key is not None
+                else None
+            )
             route_active = not is_frontier and not is_exit and int(
                 route_hint.get("path_nodes") or 0
             ) > 1
@@ -564,6 +574,7 @@ def goal_guidance(
             "exit_direct_reachable": exit_direct_reachable,
             "forced_escape": forced_escape if point is not None else False,
             "remembered_escape": is_remembered_escape if point is not None else False,
+            "escape_key": escape_key if point is not None else None,
         }
 
     direction_sticks = {
