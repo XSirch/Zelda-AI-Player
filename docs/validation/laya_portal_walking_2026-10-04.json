@@ -1,0 +1,202 @@
+{
+  "date": "2026-10-04",
+  "source": "soh",
+  "provider_calls": 0,
+  "screenshots_to_models": 0,
+  "promotion": "disabled",
+  "g2_complete": false,
+  "batch": {
+    "suite": "g1-5dd1039f9ceb",
+    "seed": 4103000,
+    "native_sessions": 3,
+    "tasks_per_session": 5,
+    "attempted": 15,
+    "successful": 15,
+    "consumed_actions": 176,
+    "source": "soh",
+    "observation_profile": "instrumented_local_v1",
+    "save_slot": 2,
+    "task_versions": [
+      "observed-analog-task-v2"
+    ],
+    "provider_calls": 0,
+    "training_updates": 0,
+    "reference_blend": 0,
+    "objectives_unchanged": true,
+    "promotion": "disabled",
+    "g2_complete": false,
+    "failure_reasons": {},
+    "failures": [],
+    "worker": {
+      "round_trip_ms": {
+        "samples": 176,
+        "p50": 13.69680000061635,
+        "p95": 30.019700003322214,
+        "maximum": 36.9254000033834
+      },
+      "inference_ms": {
+        "samples": 176,
+        "p50": 12.28129999799421,
+        "p95": 28.83069999370491,
+        "maximum": 35.81739999935962
+      },
+      "output_age_ms": {
+        "samples": 218,
+        "p50": 61.756299997796305,
+        "p95": 65.85739999718498,
+        "maximum": 66.64579999778653
+      }
+    },
+    "expired_responses": 0,
+    "context_rejections": 0,
+    "responses": 176,
+    "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+    "client_command_to_native_consumption_ms": {
+      "samples": 176,
+      "p50": 29.906,
+      "p95": 46.75,
+      "maximum": 54.688
+    },
+    "full_observation_to_physical_reaction_ms": null,
+    "candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "report_sha256": "c867fa31f02e419b486f42fa81b376b70650359812413e33760c5cdb4e64664a",
+    "manifest_sha256": "05e3e9f3bdd1527c43b4276409e10824ae784fffde282f01cc103f74f8d597af",
+    "frozen_artifact_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "source_sha256": {
+      "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+      "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+      "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+      "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+      "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+      "src\\zelda_ai\\g1.py": "38de6121b128c0ce75940bcaaf2aa4c0386d8e5c7e2e5bd105189af691be0a99",
+      "src\\zelda_ai\\laya_curriculum.py": "dd9d912f63751efeabb171c02370c3e2d229e7bb5e9ceab4c44ab73ac232e9a2",
+      "src\\zelda_ai\\laya_data.py": "de16d7eeebc9bcb06c28d5fceae7a5939e93841caba9864bc33bfceb67ae4f0d",
+      "src\\zelda_ai\\laya_numeric.py": "a4c787f94a679c34ad0e1890bfae449b6fe8ce1d61e190952c5ea7e836fec75c",
+      "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+      "src\\zelda_ai\\laya_training.py": "1b8f828c282e2457169513a86422ff97095571d743ce663a44abb19a05f8f6b7",
+      "src\\zelda_ai\\laya_worker.py": "8b80c5aa02963ab71f72ee2dfc909f397f39b641d2c844487052787327dd68e3",
+      "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+      "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+      "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+      "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+      "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+      "src\\zelda_ai\\surface_curriculum.py": "41a9f6361791c191cc3056b59ed7d7222391b301261b64846bcfdb1ec64917f7",
+      "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+      "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+      "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+      "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+      "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+      "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "2aee3e3ac9c3a2633cf150cec4a7e3189711ca435da8fb5521588fbf1dff3f6c",
+      "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "db469d03f941758dca3cbbb85172c98e02e0283844c54d73e8c7dda2ce059390",
+      "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+      "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+      "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+      "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+      "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+      "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+      "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+      "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+      "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+      "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+      "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+      "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+      "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+      "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398"
+    },
+    "strict_utf8_and_finite_json_files_verified": 52,
+    "candidate_scene_rooms": [
+      [
+        85,
+        0
+      ]
+    ],
+    "candidate_observed_heights": [
+      100.0
+    ],
+    "preparation_results": [
+      {
+        "session": 1,
+        "success": true,
+        "controller": "frozen_v3_motor_qa_preparation",
+        "consumed_commands": 119,
+        "run_updates": 0,
+        "provider_calls": 0,
+        "candidate_actions": 0,
+        "included_in_laya_training": false,
+        "initial_scene_room": [
+          52,
+          0
+        ],
+        "final_scene_room": [
+          85,
+          0
+        ]
+      },
+      {
+        "session": 2,
+        "success": true,
+        "controller": "frozen_v3_motor_qa_preparation",
+        "consumed_commands": 67,
+        "run_updates": 0,
+        "provider_calls": 0,
+        "candidate_actions": 0,
+        "included_in_laya_training": false,
+        "initial_scene_room": [
+          52,
+          0
+        ],
+        "final_scene_room": [
+          85,
+          0
+        ]
+      },
+      {
+        "session": 3,
+        "success": true,
+        "controller": "frozen_v3_motor_qa_preparation",
+        "consumed_commands": 164,
+        "run_updates": 0,
+        "provider_calls": 0,
+        "candidate_actions": 0,
+        "included_in_laya_training": false,
+        "initial_scene_room": [
+          52,
+          0
+        ],
+        "final_scene_room": [
+          85,
+          0
+        ]
+      }
+    ],
+    "camera_reprojected_outputs": 151,
+    "request_to_application_camera_delta_max_deg": 2.9003906249999996
+  },
+  "scope": "short current-observed walking cells after a verified native portal preparation",
+  "limitations": [
+    "preparation is frozen V3 control, not Laya sword/portal learning",
+    "all candidate positions stayed on the exterior platform at height 100",
+    "no descent, ladder, general forest navigation or campaign qualification",
+    "15/15 is a small exploratory sample, below the complete G2 gate",
+    "full observation-to-physical-reaction latency remains unmeasured"
+  ],
+  "validation": {
+    "pytest_passed": 351,
+    "native_tests_skipped": 20,
+    "native_skip_reason": "g++/clang++ unavailable",
+    "web_build": "passed",
+    "focused_ruff": "passed",
+    "strict_utf8": "passed"
+  }
+}

@@ -37,6 +37,8 @@ uv run python -m zelda_ai.laya_curriculum C:/Projetos/Shipwright-AI/x64/Release/
 
 O loader valida a base, a origem da biblioteca e os pesos do candidato. A avaliação usa cópias de trabalho isoladas, libera o controle ao encerrar e verifica os hashes dos artefatos congelados. Entrada inválida, dados sem recibos, mistura de sessões ou ausência de CUDA causam erro explícito. Modelos, telemetria e saves ficam em `.local/` e não são distribuídos no repositório.
 
+Para avaliar após uma saída real da sala inicial, acrescente `--cross-initial-portal` ao comando do currículo. O motor V3 congelado faz essa preparação pelos controles normais; suas ações não entram nos resultados nem no treino do Laya. O primeiro lote confirmou três saídas da casa e **15/15 caminhadas do Laya na plataforma externa**. Todas permaneceram na altura da plataforma: descida, exploração da floresta e coleta da espada continuam sem qualificação. Veja o [registro da avaliação externa](docs/validation/laya_portal_walking_2026-10-04.json).
+
 ## Autonomy V3
 
 Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
