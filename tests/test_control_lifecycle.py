@@ -797,6 +797,11 @@ def test_extreme_room_dwell_stops_redundant_ppo_training(
         guidance={"exit_active": True, "forced_escape": True},
         sample={"guidance_strength": 1.0},
     ) is False
+    assert controller._ppo_transition_trainable(
+        interaction_override=False,
+        guidance={"traversal_route_active": True, "forced_escape": False},
+        sample={"guidance_strength": 1.0},
+    ) is False
 
 
 def test_trackable_objective_prefers_exit_after_persistent_room_failures(
