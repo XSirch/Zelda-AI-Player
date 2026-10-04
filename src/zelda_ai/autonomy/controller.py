@@ -52,7 +52,7 @@ ROOM_FAILURE_EXIT_PRESSURE = 6
 NO_PROGRESS_TRAINING_CUTOFF_S = 180.0
 ESCAPE_PROGRESS_DELTA = 8.0
 ESCAPE_STALL_S = 3.5
-ESCAPE_MAX_AGE_S = 15.0
+ESCAPE_MAX_AGE_S = 45.0
 ESCAPE_RETRY_COOLDOWN_S = 20.0
 INTERACTION_PROBE_COOLDOWN_S = 0.35
 INTERACTION_OUTCOME_WINDOW_S = 1.5
@@ -1027,7 +1027,7 @@ class ContinuousController:
         if interaction_override:
             return False
         if (
-            guidance.get("exit_active")
+            guidance.get("forced_escape")
             and float(sample.get("guidance_strength") or 0.0) >= 0.999
         ):
             # Full-authority escape steering is a structured intervention. The
