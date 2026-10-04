@@ -358,6 +358,116 @@
       },
       "derived_from_candidate_sha256": "9a422c2fdbd6f353c8145f8f4b4c8d6d6858b2552d9431f264138f25d75b8510",
       "derivation_training_updates": 0
+    },
+    {
+      "candidate": "candidate-numeric-six-sessions",
+      "metadata_sha256": "9a2a6c3a6625fe0982cc6931dbc4fe0c384641a8278f59d7acd9ae1be2be1e83",
+      "metrics_scope": "training_evaluation",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": 16,
+      "encoder_layers": 0,
+      "encoder_frozen": true,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "stick_readout": null,
+      "heads_sha256": "eba73b581c590a9f7f8ad9038ae3c2b2e6f37ba560f37c0250b2b112bc4279e8",
+      "dataset_sha256": "95a996968c6bfc3afb3933413bd67cc0131235b8b49dc41af82c4efc50b97c5f",
+      "trainable_parameters": 26645763,
+      "after_validation": {
+        "records": 296,
+        "axis_accuracy": 0.5777027027027027,
+        "joint_accuracy": 0.28716216216216217,
+        "stick_mae_native_units": 14.016891891891891,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 8.395349996135337,
+        "p95_ms": 9.65110000106506,
+        "max_ms": 9.686900004453491,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "argmax",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "reserved_test": {
+        "records": 306,
+        "axis_accuracy": 0.5947712418300654,
+        "joint_accuracy": 0.3104575163398693,
+        "stick_mae_native_units": 16.983660130718953,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 7.068800001434283,
+        "p95_ms": 7.8141999983927235,
+        "max_ms": 8.496599999489263,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "argmax",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "majority_baseline_test": {
+        "stick": [
+          40,
+          -40
+        ],
+        "axis_accuracy": 0.23529411764705882,
+        "joint_accuracy": 0.10457516339869281,
+        "stick_mae_native_units": 38.63725490196079
+      },
+      "derived_from_candidate_sha256": null,
+      "derivation_training_updates": null
+    },
+    {
+      "candidate": "candidate-numeric-six-mean",
+      "metadata_sha256": "4281ec03a50f83ee03c95dddd87d2e6b8087deec700279def645d14c3d65a007",
+      "metrics_scope": "source_argmax_training_metrics",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": 16,
+      "encoder_layers": 0,
+      "encoder_frozen": true,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "stick_readout": "expectation",
+      "heads_sha256": "eba73b581c590a9f7f8ad9038ae3c2b2e6f37ba560f37c0250b2b112bc4279e8",
+      "dataset_sha256": "95a996968c6bfc3afb3933413bd67cc0131235b8b49dc41af82c4efc50b97c5f",
+      "trainable_parameters": 26645763,
+      "after_validation": {
+        "records": 296,
+        "axis_accuracy": 0.5777027027027027,
+        "joint_accuracy": 0.28716216216216217,
+        "stick_mae_native_units": 14.016891891891891,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 8.395349996135337,
+        "p95_ms": 9.65110000106506,
+        "max_ms": 9.686900004453491,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "argmax",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "reserved_test": {
+        "records": 306,
+        "axis_accuracy": 0.5947712418300654,
+        "joint_accuracy": 0.3104575163398693,
+        "stick_mae_native_units": 16.983660130718953,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 7.068800001434283,
+        "p95_ms": 7.8141999983927235,
+        "max_ms": 8.496599999489263,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "argmax",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "majority_baseline_test": {
+        "stick": [
+          40,
+          -40
+        ],
+        "axis_accuracy": 0.23529411764705882,
+        "joint_accuracy": 0.10457516339869281,
+        "stick_mae_native_units": 38.63725490196079
+      },
+      "derived_from_candidate_sha256": "9a2a6c3a6625fe0982cc6931dbc4fe0c384641a8278f59d7acd9ae1be2be1e83",
+      "derivation_training_updates": 0
     }
   ],
   "native_evaluations": [
@@ -472,6 +582,69 @@
       "g2_complete": false,
       "campaign_complete": false,
       "sword_acquisition_evaluated": false
+    },
+    {
+      "suite": "g1-516e3939b56f",
+      "runtime_commit": "562bb2c500bcfa402a4b41b9e7d506ecb90db9e1",
+      "report_sha256": "df8d4e9adc319348b3337fe6e2148b6f9f2372158367e97283dfe022f52b2405",
+      "manifest_sha256": "2cd7cdcc11b24eeae300f32cdbb66b771828ecc804fac0d71552ba8b51e70717",
+      "candidate_sha256": {
+        "candidate.json": "4281ec03a50f83ee03c95dddd87d2e6b8087deec700279def645d14c3d65a007",
+        "heads.safetensors": "eba73b581c590a9f7f8ad9038ae3c2b2e6f37ba560f37c0250b2b112bc4279e8"
+      },
+      "seed": 4102500,
+      "sessions": 3,
+      "tasks_per_session": 10,
+      "attempted": 30,
+      "successful": 18,
+      "consumed_actions": 1240,
+      "failure_reasons": [
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress"
+      ],
+      "objectives_unchanged": true,
+      "reference_blend": 0,
+      "training_updates": 0,
+      "provider_calls": 0,
+      "decision_budget_ms": 100,
+      "actuation_grace_ms": 50,
+      "responses": 1240,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "timings": {
+        "inference_ms": {
+          "samples": 1240,
+          "p50": 13.236399998277193,
+          "p95": 27.605700001004152,
+          "max": 42.33910000039032
+        },
+        "round_trip_ms": {
+          "samples": 1240,
+          "p50": 14.677699997264426,
+          "p95": 29.13849999458762,
+          "max": 43.55589999613585
+        },
+        "output_age_ms": {
+          "samples": 1769,
+          "p50": 63.781299999391194,
+          "p95": 67.9149999996298,
+          "max": 91.41269999963697
+        }
+      },
+      "timing_limit": "sampled policy-output age, not native consumption or physical reaction",
+      "g2_complete": false,
+      "campaign_complete": false,
+      "sword_acquisition_evaluated": false
     }
   ],
   "decoder_selection": {
@@ -504,7 +677,9 @@
     "new validation/test data have now been inspected and must not be reused as pristine future holdouts",
     "walking only; no learned buttons, ladders, combat, aiming or campaign ability",
     "decoder-only derivative retains original argmax training metrics; fresh benchmark is separate",
-    "no G2 or completion-champion promotion; primary UI still uses the existing motor"
+    "no G2 or completion-champion promotion; primary UI still uses the existing motor",
+    "expanded reference cohort has four training sessions but one validation and one test session; no broad gameplay generalization proof",
+    "different datasets and native schedules do not supply a paired causal comparison of the candidates"
   ],
   "validation": {
     "pytest_passed": 318,
@@ -515,5 +690,70 @@
     "native_cpp_changes": false,
     "new_native_build_claimed": false,
     "encoding": "strict_utf8_passed_all_15_owned_source_docs_and_test_files_no_replacement_or_crcrlf"
+  },
+  "expanded_collection": {
+    "suite": "g1-fb2d9b81b58b",
+    "runtime_commit": "562bb2c500bcfa402a4b41b9e7d506ecb90db9e1",
+    "report_sha256": "80871d5e5ae648edfa774e9afca659e45169cd4a9c1472cdd42dec79ad032c39",
+    "dataset_manifest_sha256": "95a996968c6bfc3afb3933413bd67cc0131235b8b49dc41af82c4efc50b97c5f",
+    "attempted": 120,
+    "successful": 114,
+    "positive_actions": 1788,
+    "dataset": {
+      "profile": "laya-observed-walking-v1",
+      "split_unit": "episode",
+      "source": "soh",
+      "episode_grouping": "native_instance",
+      "provider_calls": 0,
+      "families": {
+        "observed_cell": 1788
+      },
+      "records": {
+        "train": 1186,
+        "validation": 296,
+        "test": 306
+      },
+      "episodes": {
+        "train": 4,
+        "validation": 1,
+        "test": 1
+      },
+      "excluded": {
+        "failed_task": 6
+      },
+      "stick_bins": [
+        -80,
+        -60,
+        -40,
+        -20,
+        0,
+        20,
+        40,
+        60,
+        80
+      ],
+      "sha256": {
+        "train": "d7d35e0da5097494c81e694061081b03233ac072233da89d99099d3afd051668",
+        "validation": "110385e250100a91fc889b297eafef7c6f31b20c8e584adc3ea1e2ba760b1067",
+        "test": "543146044d8e68aea462e0ba45d9e38df806d3f0e536a8909f6eb321fc45440d"
+      },
+      "coverage": "short_observed_walking_only_no_buttons_ladders_combat_or_campaign"
+    },
+    "collection_utf8_json_files": 268,
+    "provider_calls": 0
+  },
+  "expanded_expectation_decoder_fresh_benchmark": {
+    "source": "actual local CUDA CLI stdout, fresh candidate reload",
+    "records": 306,
+    "stick_readout": "expectation",
+    "accuracy_scope": "choice_argmax_labels",
+    "axis_accuracy": 0.5947712418300654,
+    "joint_accuracy": 0.3104575163398693,
+    "stick_mae_native_units": 15.570261437908497,
+    "latency_samples": 50,
+    "p50_ms": 7.480650001525646,
+    "p95_ms": 9.353000001283363,
+    "max_ms": 11.004600004525855,
+    "physical_gameplay_evaluated": false
   }
 }
