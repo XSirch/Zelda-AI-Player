@@ -1047,8 +1047,18 @@ class LearnedRouteGraph:
             }
         return None
 
-    def exit_waypoint(self, game: GameState) -> dict | None:
-        """Choose an observed scene-exit surface, optionally via learned route."""
+    def exit_waypoint(
+        self,
+        game: GameState,
+        *,
+        allow_unreachable: bool = False,
+    ) -> dict | None:
+        """Choose an observed scene-exit surface, optionally via learned route.
+
+        Normal callers reject an unreachable raw exit without route/door evidence.
+        Forced room recovery may request that raw target so local traversal/collision
+        guidance can still try to discover a route instead of ignoring the exit.
+        """
         if not game.player or not game.scene_exits:
             return None
 
@@ -1087,7 +1097,7 @@ class LearnedRouteGraph:
                 and _distance(actor.position, exit_row.position) <= 220.0
                 for actor in game.room_actors
             )
-            if not context_door and not nearby_door:
+            if not context_door and not nearby_door and not allow_unreachable:
                 # An exit surface behind unrelated collision is evidence of a
                 # destination, not of a currently traversable straight line.
                 # Keep exploring local frontiers until a real route is observed.
