@@ -778,6 +778,7 @@ class ContinuousController:
         )
         should_interact = bool(
             guidance.get("exit_active")
+            or guidance.get("traversal_route_active")
             or actor_is_door
             or self.intent.mode == "interact"
         )
@@ -1387,6 +1388,21 @@ class ContinuousController:
             route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
+        if guidance.get("forced_escape"):
+            # Structured room recovery owns movement. Suppress PPO button noise
+            # completely; contextual interaction discovery below may still
+            # inject one empirically tested physical button when the game
+            # exposes an actionable door/ladder/ledge context.
+            sample = {
+                **sample,
+                "buttons": [0.0 for _ in BUTTON_NAMES],
+            }
+            setpoint = Setpoint(
+                buttons=0,
+                stick_x=setpoint.stick_x,
+                stick_y=setpoint.stick_y,
+                reason=setpoint.reason,
+            )
         setpoint, sample, dialogue_override = self._dialogue_override(
             game,
             setpoint,
