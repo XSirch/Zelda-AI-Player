@@ -331,6 +331,55 @@ def test_contextual_interaction_probes_one_button_and_learns_success(
     assert controller.route_graph.interaction_button(probe["key"]) == probe["button"]
 
 
+def test_traversal_context_probe_learns_when_ladder_state_starts(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.context_action.code = 12
+    game.context_action.label = "down"
+    game.context_actor = None
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    sample = {
+        "stick": [0.0, 1.0],
+        "policy_stick": [0.0, 0.0],
+        "buttons": [0.0 for _ in range(9)],
+        "log_prob": 0.0,
+        "value": 0.0,
+        "guidance_strength": 1.0,
+        "button_quiet_strength": 0.95,
+    }
+
+    setpoint, executed, overridden = controller._interaction_override(
+        game,
+        {"traversal_route_active": True},
+        Setpoint(stick_y=80, reason="ml_policy"),
+        sample,
+    )
+
+    assert overridden is True
+    assert setpoint.reason == "interaction_probe"
+    assert sum(1 for value in executed["buttons"] if value > 0.5) == 1
+    probe = dict(controller.pending_interaction_probe)
+    assert probe["traversal_active"] is True
+
+    climbing = game.model_copy(deep=True)
+    climbing.player.climbing_ladder = True
+
+    class Reward:
+        breakdown = {}
+
+    controller._observe_interaction_outcome(climbing, Reward())
+
+    assert controller.pending_interaction_probe is None
+    assert controller.route_graph.interaction_button(
+        probe["key"]
+    ) == probe["button"]
+
+
 def test_dialogue_close_releases_button_and_blocks_immediate_reentry(
     tmp_path, state
 ):
