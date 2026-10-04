@@ -1,7 +1,12 @@
 import asyncio
 import json
+import math
 import time
+from dataclasses import replace
 
+import pytest
+
+from zelda_ai.autonomy.controller import ContinuousController
 from zelda_ai.autonomy.laya_policy import DecisionLease, LayaWalkingPolicy
 from zelda_ai.autonomy.local_tasks import LocalTask
 from zelda_ai.models import TraversalAffordanceObservation
@@ -50,7 +55,99 @@ def task_for(state):
         height_delta=14,
     )
     state.traversal_affordances = [affordance]
+    state.camera_input_yaw = 0
     return LocalTask.traversal(state, affordance)
+
+
+@pytest.mark.parametrize("yaw", (1024, 16384, -32768))
+@pytest.mark.parametrize("mirrored", (False, True))
+def test_laya_inflight_heading_survives_indoor_camera_orbit_and_top_down(
+    state, tmp_path, yaw, mirrored,
+):
+    async def scenario():
+        class Bridge:
+            def command_consumed(self, seq):
+                return True
+
+        process = FakeWorker()
+        policy = LayaWalkingPolicy(process)
+        state.mirrored_world = mirrored
+        task = task_for(state)
+        bridge = Bridge()
+        bridge.state = state
+        controller = ContinuousController(bridge, tmp_path / "policy.pt")
+        controller.start_local_task(task, stick_policy=policy)
+        try:
+            controller._ml_step(state)
+            await asyncio.sleep(0)
+            request_id = process.sent[0]["id"]
+            # Camera changes while the model is still computing. The vertical
+            # view supplies no horizontal heading; native input yaw does.
+            state.camera_input_yaw = yaw
+            state.camera_eye, state.camera_at = (0, 200, 0), (0, 0, 0)
+            state.seq += 1
+            await process.replies.put({"id": request_id, "stick": [20, 60], "inference_ms": 5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            controller._refresh_camera_relative_setpoint(state)
+            actual = (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y)
+            sign = 1 if mirrored else -1
+            world_heading = math.atan2(sign * 20, 60)
+            relative = world_heading - yaw * math.pi / 32768
+            magnitude = math.hypot(20, 60)
+            expected = (round(sign * math.sin(relative) * magnitude),
+                        round(math.cos(relative) * magnitude))
+            assert actual == expected
+            assert controller.last_setpoint.buttons == 0
+            assert controller.pending["trainable"] is False
+            assert controller.pending["stick"] == [v / 80 for v in expected]
+            assert controller.rollout == []
+            # A second orbit after completion must also preserve the chosen
+            # world movement, even when the observation sequence is unchanged.
+            state.camera_input_yaw = 0
+            controller._refresh_camera_relative_setpoint(state)
+            assert (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y) == (20, 60)
+            task.target = (70, 14, 0)
+            controller._refresh_camera_relative_setpoint(state)
+            assert (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y) == (0, 0)
+        finally:
+            await policy.close()
+
+    asyncio.run(scenario())
+
+
+def test_rotated_diagonal_saturation_preserves_direction():
+    features = (0., 1., 0., .5, 0., 0., 0., 0., 1.)
+    lease = DecisionLease(("instance", 2, "task"), 10., features, (80, 80))
+    angle = math.pi / 4
+    current = (-math.sin(angle), math.cos(angle), *features[2:])
+    assert lease.resolve(lease.owner, current, now=10.05, budget_s=.1,
+                         camera_yaw=angle) == (80, 0)
+
+
+def test_top_down_without_native_input_yaw_cannot_reuse_a_lease(state):
+    async def scenario():
+        process = FakeWorker()
+        policy = LayaWalkingPolicy(process)
+        try:
+            task = task_for(state)
+            policy(state, task)
+            await asyncio.sleep(0)
+            await process.replies.put({"id": process.sent[0]["id"], "stick": [20, 60],
+                                       "inference_ms": 5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert policy(state, task) == (20, 60)
+            state.camera_input_yaw = None
+            state.camera_eye, state.camera_at = (0, 200, 0), (0, 0, 0)
+            state.player.yaw = 16384
+            assert policy(state, task) == (0, 0)
+            assert policy.lease.owner is None
+            assert policy.pending is None
+        finally:
+            await policy.close()
+
+    asyncio.run(scenario())
 
 
 def test_inflight_response_cannot_reenter_a_changed_context_or_stopped_policy(state):
@@ -83,8 +180,8 @@ def test_expired_or_mismatched_worker_reply_never_becomes_controller_input(state
         try:
             task = task_for(state)
             policy(state, task)
-            identity, owner, _, features, telemetry = policy.pending
-            policy.pending = (identity, owner, time.monotonic() - 1, features, telemetry)
+            identity = policy.pending.identity
+            policy.pending = replace(policy.pending, submitted_at=time.monotonic() - 1)
             await process.replies.put({"id": identity, "stick": [20, -40], "inference_ms": 5})
             for _ in range(5):
                 await asyncio.sleep(0)

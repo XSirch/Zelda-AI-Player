@@ -6,6 +6,8 @@ A fundação do motor V4 corrige a projeção horizontal invertida do controle n
 
 ## Laya base: treino e avaliação local
 
+O controle assíncrono do Laya agora preserva a direção escolhida em coordenadas do mundo e reprojeta o analógico pela orientação de input atual do SoH. Isso acompanha a câmera girando dentro de uma sala; a vista superior usa o ângulo nativo, sem depender da direção visual. Os testes automatizados cobrem esses casos. No jogo, o novo lote exercitou a rotação e concluiu **25/30 caminhadas**, abaixo das 28/30 anteriores; não demonstrou ganho de confiabilidade nem entrou em vista superior. As falhas e os limites estão no [registro de câmera](docs/validation/laya_camera_2026-10-04.json).
+
 O treino parte do [Laya base publicado](https://huggingface.co/convaiinnovations/laya), com revisão e SHA-256 fixados, em um ambiente CUDA separado do aplicativo. Nenhum peso ou dado de trading entra no treino. O novo candidato recebe telemetria numérica limitada em uma projeção treinável ligada às camadas de decisão do Laya. O encoder congelado reutiliza apenas a representação do esquema fixo; os valores observados passam pela rede a cada decisão.
 
 A coleta ampliada produziu 1.788 ações consumidas de 114 tarefas bem-sucedidas em 120 tentativas reais. A divisão mantém sessões nativas inteiras separadas, com quatro sessões para treino. O treino que minimiza o erro do analógico executado reduziu o erro médio offline de 15,57 para 5,63 unidades. Com o mesmo seed, os lotes reais passaram de **18/30** com classificação para **26/30** com esse treino e **28/30** após usar o contato físico com paredes na navegação local. As posições seguintes dependem do movimento de cada modelo; essa comparação não é perfeitamente pareada.
