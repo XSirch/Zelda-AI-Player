@@ -443,6 +443,11 @@ def test_unreachable_exit_requires_route_or_door_evidence(tmp_path, state):
     ]
 
     assert graph.exit_waypoint(game) is None
+    recovery_hint = graph.exit_waypoint(game, allow_unreachable=True)
+    assert recovery_hint is not None
+    assert recovery_hint["exit"] is True
+    assert recovery_hint["direct_reachable"] is False
+    assert recovery_hint["waypoint"] == (300.0, 0.0, 0.0)
 
     game.room_actors = [
         ActorObservation(
