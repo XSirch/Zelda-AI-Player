@@ -949,8 +949,7 @@ class ContinuousController:
         trackable_objective = self.intent.completion.kind != "manual"
         strong_escape_evidence = bool(
             self.room_map.has_remembered_transition(game)
-            or game.scene_exits
-            or self.route_graph._observed_doors(game)
+            or self.route_graph.has_observed_escape(game)
         )
         if (
             trackable_objective
