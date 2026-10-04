@@ -1038,7 +1038,10 @@ class ContinuousController:
         if interaction_override:
             return False
         if (
-            guidance.get("forced_escape")
+            (
+                guidance.get("forced_escape")
+                or guidance.get("traversal_route_active")
+            )
             and float(sample.get("guidance_strength") or 0.0) >= 0.999
         ):
             # Full-authority escape steering is a structured intervention. The
@@ -1358,7 +1361,9 @@ class ContinuousController:
                 if route_hint is not None:
                     self.route_graph.clear_frontier()
                 else:
-                    route_hint = self.route_graph.exploration_waypoint(game)
+                    route_hint = self.route_graph.traversal_waypoint(game)
+                    if route_hint is None:
+                        route_hint = self.route_graph.exploration_waypoint(game)
         elif self.intent.mode == "explore":
             actor_is_door = bool(
                 game.context_actor is not None
@@ -1378,7 +1383,9 @@ class ContinuousController:
             if route_hint is not None:
                 self.route_graph.clear_frontier()
             else:
-                route_hint = self.route_graph.exploration_waypoint(game)
+                route_hint = self.route_graph.traversal_waypoint(game)
+                if route_hint is None:
+                    route_hint = self.route_graph.exploration_waypoint(game)
         else:
             route_hint = None
         guidance = goal_guidance(
@@ -1388,11 +1395,14 @@ class ContinuousController:
             route_hint=route_hint,
         )
         setpoint, sample = self._sample_setpoint(observation, guidance)
-        if guidance.get("forced_escape"):
-            # Structured room recovery owns movement. Suppress PPO button noise
-            # completely; contextual interaction discovery below may still
-            # inject one empirically tested physical button when the game
-            # exposes an actionable door/ladder/ledge context.
+        if (
+            guidance.get("forced_escape")
+            or guidance.get("traversal_route_active")
+        ):
+            # Structured room recovery/traversal owns movement. Suppress PPO
+            # button noise completely; contextual interaction discovery below
+            # may still inject one empirically tested physical button when the
+            # game exposes an actionable door/ladder/ledge context.
             sample = {
                 **sample,
                 "buttons": [0.0 for _ in BUTTON_NAMES],
