@@ -1603,6 +1603,7 @@ class AutonomyRuntime:
                 },
                 "motor": controller.get("motor"),
                 "guidance": controller.get("guidance"),
+                "escape_control": controller.get("escape_control"),
                 "trigger": ", ".join(self.last_cognition_reasons) if self.last_cognition_reasons else None,
             },
             "input": controller.get("setpoint"),
