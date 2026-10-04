@@ -947,16 +947,20 @@ class ContinuousController:
             return False
         room_failure_pressure = self.route_graph.room_failure_pressure(game)
         trackable_objective = self.intent.completion.kind != "manual"
-        known_successful_exit = self.room_map.has_remembered_transition(game)
+        strong_escape_evidence = bool(
+            self.room_map.has_remembered_transition(game)
+            or game.scene_exits
+            or self.route_graph._observed_doors(game)
+        )
         if (
             trackable_objective
             and self.intent.mode == "explore"
-            and known_successful_exit
+            and strong_escape_evidence
             and not self._room_has_local_actionable_evidence(game)
         ):
-            # A previously traversed departure is stronger evidence than another
-            # blind frontier cycle. Revisited known rooms may leave immediately
-            # when the strategic objective has no local actor/interaction target.
+            # With a sticky strategic objective and no meaningful local actor,
+            # chest, switch or enemy to investigate, an observed/proven room
+            # boundary is more useful than another random frontier cycle.
             return True
         return bool(
             self.reward_tracker.local_dwell_seconds >= EXIT_PRIORITY_DWELL_S
