@@ -239,6 +239,19 @@ class LearnedRouteGraph:
         self.route_edge_retry_after.clear()
         self.last_route_failure_at = None
 
+    def clear_navigation_commitment(self):
+        """Drop the current target/route/frontier without forgetting trace history."""
+        self.active_target_signature = None
+        self.active_target_node_id = None
+        self.active_path = []
+        self.counted_route_target_signature = None
+        self.exhausted_partial_nodes.clear()
+        self.exhaustion_revision = self.revision
+        self.last_failed_search = None
+        self.active_frontier = None
+        self.active_route_edge = None
+        self.last_route_failure_at = None
+
     def _touch_node(
         self,
         scene: int,
