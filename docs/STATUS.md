@@ -1,5 +1,29 @@
 # Implementation status — V3, V4 motor foundation and local curriculum
 
+## Generic Laya base specialization pilot on 2026-10-04
+
+The operator clarified that the starting point is the generic Laya base, specialized exclusively for Zelda. The local generic weights were verified against the public `convaiinnovations/laya` repository at revision `7b928d828b7b0e022f929d9bd2e44165aa270148`: SHA-256 `891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c`. Only those matching weights were copied; the pinned revision supplied the configuration/tokenizer files. No trading checkpoint or trading dataset was loaded.
+
+The isolated Python 3.13 environment `.local/laya-env` successfully installed Laya source `573e5b62696ba441230cd6be71d593331b5d23af`, transformers 4.57.6 and torch 2.11.0+cu128. `requirements-laya.lock.txt` was generated from the successful installation, and `scripts/setup_laya.ps1` was executed successfully against that lock. The application environment and its existing PPO/maps remain separate.
+
+Dataset: 228 consumed physical reference actions from twelve successful tasks in the earlier 24-attempt surface demonstration batch. Six whole episodes/112 actions train, three/70 validate, and three/46 test. All source failures remain in the original batch; neither failed tasks nor failed preparations are positive training labels. Features are bounded to four causal walking frames and two quantized executed-stick axes. The profile contains no buttons, ladder/ledge locomotion, combat, aiming, dialogue, inventory operation or sword-acquisition demonstration.
+
+The real local pilot completed **120 supervised updates** to **26,512,131 trainable decision-layer parameters**, keeping the pretrained encoder frozen. GPU: NVIDIA GeForce RTX 4070 Laptop, 8 GB. Base files passed their pinned digest checks after training. Candidate heads are immutable and remain local under `.local/laya/candidate-20261004`; promotion is disabled. Audited summary: [validation/laya_base_2026-10-04.json](validation/laya_base_2026-10-04.json).
+
+| Offline reserved metric | Before, validation | After, validation | After, test |
+| --- | --- | --- | --- |
+| Individual analog-axis accuracy | 5.0% | 13.6% | 19.6% |
+| Both axes correct together | 0% | 0% | 0% |
+| Mean absolute executed-stick error, native units | 78.36 | 53.23 | 47.26 |
+
+A constant stick chosen only from training-label frequencies (`[-20, -20]`) had test-axis accuracy 21.7% and mean absolute error **32.83**, better than this candidate. Loss reduction or improvement over the untuned base therefore does **not** establish useful learning. The data volume, numeric input representation, head-only specialization and training settings require separate investigation; none is asserted as the sole cause.
+
+A fresh reload reproduced the candidate's test predictions and measured **50 end-to-end local inferences**: median **90.0 ms**, p95 **118.4 ms**, maximum **142.7 ms**. These times include tokenization, host/device transfer, the two-axis forward pass and output readback. The operator subsequently accepted **100 ms per decision as the initial target**, replacing the proposed 50 ms criterion for this pilot. The median fits that target; p95 exceeds it. These measurements do not include native input-consumption latency or establish full gameplay reaction time. Decision quality remains the main limitation of this candidate. There was no physical Laya gameplay evaluation and no new claim of navigation or campaign ability. Laya tactical planning with a separate fast motor remains an untested architectural option, not a delivered capability.
+
+No cognition/provider calls were made. The pilot commands cannot send native controller input and are not selected by the primary UI. During the preceding direct-play attempt, the Kokiri Sword was **not obtained**; its continuous helper was explicitly stopped and the game inputs released before this training work. That unsuccessful attempt was not used as a successful demonstration.
+
+Validation: **309 pytest cases passed, 20 skipped**, with the existing Starlette/httpx deprecation warning; the skips require unavailable g++/clang++. Web production build and focused Ruff checks passed. UTF-8 verification is recorded in the sanitized index. This patch has no native C++ changes; it does not claim a new native build.
+
 ## Physical local-learning comparison on 2026-10-04
 
 The isolated batch `g1-da24d7be4d70` completed **94 physical SoH trials**: 24 reference demonstration attempts, 30 before-training evaluations, 30 after-training evaluations and 10 outbound portal retention tests. The audited index is [validation/surface_learning_2026-10-04.json](validation/surface_learning_2026-10-04.json). Full native observations, actual input receipts, copied working saves and immutable candidate checkpoints remain local under `.local/qualification/g1-da24d7be4d70/`.

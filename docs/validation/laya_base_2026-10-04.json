@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "profile": "laya-observed-walking-v1",
+  "base": {
+    "repo": "convaiinnovations/laya",
+    "revision": "7b928d828b7b0e022f929d9bd2e44165aa270148",
+    "training_domain": "generic_base",
+    "sha256": {
+      "model.safetensors": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+      "rl_agent_config.json": "ae287b56bbcf5f8c4f4541ae9dfd00c914c4c48b940b8398c3058af37ba92bbd",
+      "encoder/config.json": "bf3ab80598fdccf414855a2ce80f22859e4492d06ca8a62ddd1cfb63972f8979",
+      "tokenizer/tokenizer.json": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30",
+      "tokenizer/tokenizer_config.json": "50044de60daaa73df97d262e15a40d4faf0160e7d742df64b377877a1320dd12"
+    }
+  },
+  "dataset": {
+    "profile": "laya-observed-walking-v1",
+    "split_unit": "episode",
+    "source": "soh",
+    "provider_calls": 0,
+    "families": {
+      "stairs_or_slope_down": 44,
+      "observed_cell": 46,
+      "stairs_or_slope_up": 138
+    },
+    "records": {
+      "train": 112,
+      "validation": 70,
+      "test": 46
+    },
+    "episodes": {
+      "train": 6,
+      "validation": 3,
+      "test": 3
+    },
+    "excluded": {
+      "failed_task": 4
+    },
+    "stick_bins": [
+      -80,
+      -60,
+      -40,
+      -20,
+      0,
+      20,
+      40,
+      60,
+      80
+    ],
+    "sha256": {
+      "train": "7ece96a32123843d596cdd06d4b79378c8b27b9562914c583dfa7401735a0c59",
+      "validation": "d74df5aeac1ba5598b7d8c175e42f7851dd0f6eba34f0220bafe712bfc01c81a",
+      "test": "433fad17600ae170d32bda780797d445ba60a24247cd56f940509c3f797abdc5"
+    },
+    "coverage": "short_observed_walking_only_no_buttons_ladders_combat_or_campaign"
+  },
+  "source_demonstration_attempts": 24,
+  "successful_source_episodes": 12,
+  "unsuccessful_source_episodes": 12,
+  "training": {
+    "steps": 120,
+    "seed": 4102050,
+    "trainable_parameters": 26512131,
+    "encoder_frozen": true,
+    "initial_loss": 2.731369972229004,
+    "final_loss": 2.0497705936431885,
+    "device": "NVIDIA GeForce RTX 4070 Laptop GPU",
+    "heads_sha256": "3377b5e9f144a6e3664bc5981d611755233de4b944f56c7fb3cd836f203d3ac2",
+    "dataset_sha256": "69c90b8a384be9028d12e96ec3483fb8950c17d76047516df184496f6e5044c4",
+    "source_revision": "573e5b62696ba441230cd6be71d593331b5d23af"
+  },
+  "before_validation": {
+    "records": 70,
+    "axis_accuracy": 0.05,
+    "joint_accuracy": 0.0,
+    "stick_mae_native_units": 78.35714285714286,
+    "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+    "latency_samples": 20,
+    "p50_ms": 76.66355000037584,
+    "p95_ms": 85.73600000090664,
+    "max_ms": 85.73600000090664,
+    "physical_gameplay_evaluated": false
+  },
+  "after_validation": {
+    "records": 70,
+    "axis_accuracy": 0.1357142857142857,
+    "joint_accuracy": 0.0,
+    "stick_mae_native_units": 53.22857142857143,
+    "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+    "latency_samples": 20,
+    "p50_ms": 78.84250000097381,
+    "p95_ms": 82.63150000129826,
+    "max_ms": 82.63150000129826,
+    "physical_gameplay_evaluated": false
+  },
+  "reserved_test": {
+    "records": 46,
+    "axis_accuracy": 0.1956521739130435,
+    "joint_accuracy": 0.0,
+    "stick_mae_native_units": 47.26086956521739,
+    "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+    "latency_samples": 20,
+    "p50_ms": 78.46985000105633,
+    "p95_ms": 82.81050000005052,
+    "max_ms": 82.81050000005052,
+    "physical_gameplay_evaluated": false
+  },
+  "fresh_reload_benchmark": {
+    "records": 46,
+    "axis_accuracy": 0.1956521739130435,
+    "joint_accuracy": 0.0,
+    "stick_mae_native_units": 47.26086956521739,
+    "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+    "latency_samples": 50,
+    "p50_ms": 90.02010000040173,
+    "p95_ms": 118.37740000191843,
+    "max_ms": 142.71460000236402,
+    "physical_gameplay_evaluated": false
+  },
+  "training_majority_baseline": {
+    "stick": [
+      -20,
+      -20
+    ],
+    "test_axis_accuracy": 0.21739130434782608,
+    "test_joint_accuracy": 0.0,
+    "test_stick_mae_native_units": 32.82608695652174
+  },
+  "original_ml_artifacts_unchanged": {
+    "raw-controller-ppo-rnd-v3.pt": true,
+    "route-graph-v1.json": true,
+    "room-map-v1.json": true
+  },
+  "provider_calls": 0,
+  "physical_laya_gameplay_evaluated": false,
+  "kokiri_sword_obtained": false,
+  "promotion": "disabled",
+  "latency_target": {
+    "ms_per_decision": 100,
+    "source": "operator",
+    "scope": "local_inference_only",
+    "median_within_target": true,
+    "p95_within_target": false,
+    "full_gameplay_reaction_time_measured": false
+  },
+  "validation": {
+    "pytest_passed": 309,
+    "pytest_skipped": 20,
+    "web_build": "passed",
+    "ruff": "passed",
+    "utf8": "passed"
+  }
+}

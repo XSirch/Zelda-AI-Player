@@ -4,6 +4,31 @@ Jogador autônomo para **The Legend of Zelda: Ocarina of Time** no **Ship of Har
 
 A fundação do motor V4 corrige a projeção horizontal invertida do controle nativo e separa os fragmentos PPO nas intervenções. O lote G1 alcançou 99/100 saídas e retornos físicos com o Arquivo 2, sem chamadas de IA. O currículo de superfícies mede o aprendizado local separadamente. A campanha completa continua sem qualificação; os resultados e as limitações estão em [docs/STATUS.md](docs/STATUS.md).
 
+## Laya base: piloto local de especialização
+
+O treinamento de Zelda parte do [Laya base publicado](https://huggingface.co/convaiinnovations/laya), com revisão e SHA-256 fixados. Os pesos coincidem com o checkpoint genérico; nenhum ajuste ou dado de trading entra no treino. O ambiente `.local/laya-env` é separado do aplicativo e usa o código Laya fixado em `573e5b62696ba441230cd6be71d593331b5d23af`.
+
+O primeiro piloto usa 228 ações realmente consumidas de 12 tarefas locais bem-sucedidas. A divisão reserva episódios inteiros: 112 ações de seis episódios para treino, 70 de três para validação e 46 de três para teste. Os exemplos contêm até quatro frames de telemetria limitada e rótulos dos dois eixos físicos do analógico. Falhas permanecem na evidência original e não recebem rótulo positivo.
+
+Foram executadas 120 atualizações em 26.512.131 parâmetros das camadas de decisão, com o encoder congelado. O piloto **não está aprovado para jogar**: no teste reservado acertou 19,6% dos eixos e nenhum par completo, com erro médio de 47,26 unidades; o controle constante de referência estatística teve erro de 32,83. A medição separada de 50 inferências teve mediana de 90,0 ms e percentil 95 de 118,4 ms, incluindo tokenização, transferência, duas decisões e leitura da saída. O operador definiu **100 ms por decisão como meta inicial**: a mediana fica dentro dessa meta, enquanto o percentil 95 a ultrapassa. O tempo de reação completo no jogo ainda não foi medido; a qualidade insuficiente das decisões continua sendo o principal limite deste candidato.
+
+Este conjunto cobre pequenos deslocamentos e superfícies baixas da casa. Não contém exemplos de escalada, combate, diálogos, botões ou aquisição da Kokiri Sword. O candidato permanece separado do PPO e não é conectado automaticamente ao botão **INICIAR**. Evidência e limites: [docs/STATUS.md](docs/STATUS.md) e [índice do piloto](docs/validation/laya_base_2026-10-04.json).
+
+Preparação e execução no Windows com NVIDIA/CUDA, sem chamadas a Codex/OpenRouter:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup_laya.ps1
+
+# Diretórios de saída devem ser novos. A preparação baixa os arquivos públicos;
+# --weights-source aceita uma cópia existente somente se seu SHA-256 for o da base.
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training prepare-base .local/laya/base
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training export-surfaces .local/qualification/g1-da24d7be4d70 .local/laya/dataset-novo
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training train .local/laya/base .local/laya/dataset-novo .local/laya/candidato-novo --steps 120
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training benchmark .local/laya/base .local/laya/dataset-novo --candidate .local/laya/candidato-novo
+```
+
+O loader valida os arquivos da base, a origem da biblioteca, o perfil e o checksum do candidato. O treino e a inferência usam arquivos locais; entrada truncada, dados sem recibos, mistura de episódios ou ausência de CUDA causam erro explícito. Checkpoints, exemplos e cópias de pesos ficam em `.local/` e não são distribuídos no repositório.
+
 ## Autonomy V3
 
 Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
