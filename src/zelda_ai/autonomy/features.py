@@ -399,8 +399,13 @@ def goal_guidance(
             if is_frontier:
                 source = "observed_frontier"
             elif is_traversal_route:
+                traversal_prefix = (
+                    "escape_traversal"
+                    if forced_escape
+                    else "observed_traversal"
+                )
                 source = (
-                    f"escape_traversal:{traversal_route_kind}:"
+                    f"{traversal_prefix}:{traversal_route_kind}:"
                     f"{traversal_route_phase}"
                 )
                 final_escape = route_hint.get("escape_final_target")
@@ -491,6 +496,7 @@ def goal_guidance(
                 intent.mode in {"navigate", "explore", "observe"}
                 and not source.startswith("traversal:")
                 and not source.startswith("escape_traversal:")
+                and not source.startswith("observed_traversal:")
                 and not (
                     source.startswith("scene_exit")
                     and exit_direct_reachable
@@ -520,9 +526,10 @@ def goal_guidance(
                         )
                     source = f"{source}:detour:{detour}"
 
-        if traversal_route_active and forced_escape:
-            # Local stairs/ladders/ledges selected as part of room recovery are
-            # physical navigation primitives, not PPO exploration suggestions.
+        if traversal_route_active:
+            # Observed stairs/ladders/ledges are physical navigation primitives,
+            # not PPO exploration suggestions. Give the low-level controller
+            # deterministic authority while traversing them.
             base_strength = 1.0
         elif route_active:
             # A route actually traversed by Link should be authoritative enough
@@ -595,7 +602,7 @@ def goal_guidance(
             else 1.0
         )
         strength = base_strength * proximity * stuck_scale * obstacle_scale
-        if traversal_route_active and forced_escape:
+        if traversal_route_active:
             quiet_multiplier = 0.95
         elif exit_active:
             # Explicit room recovery suppresses policy button noise; normal
