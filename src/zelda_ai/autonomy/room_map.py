@@ -680,6 +680,9 @@ class RoomMapMemory:
             "remembered": True,
             "memory_kind": candidate["kind"],
             "memory_key": candidate["memory_key"],
+            "escape_key": (
+                f"memory:{candidate['kind']}:{candidate['memory_key']}"
+            )[:240],
             "exit_position": tuple(position),
             "forced_escape": True,
         }
