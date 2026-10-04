@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 from ..models import GameState
-
+from .lifetime import ObservationLifetime
 
 ROOM_MAP_VERSION = 1
 ROOM_MAP_CELL_XZ = 80.0
@@ -85,6 +85,8 @@ class RoomMapMemory:
         self.rooms: dict[str, dict] = {}
         self.last_context: str | None = None
         self.last_position: tuple[float, float, float] | None = None
+        self.last_instance: str | None = None
+        self.lifetime = ObservationLifetime()
         self.last_full_seq: dict[str, int] = {}
         self.dirty = False
         self.persistence_revision = 0
@@ -234,6 +236,7 @@ class RoomMapMemory:
     def reset_trace(self):
         self.last_context = None
         self.last_position = None
+        self.last_instance = None
         self.last_full_seq.clear()
 
     def _ensure_room(
@@ -430,6 +433,13 @@ class RoomMapMemory:
         return changed
 
     def observe(self, game: GameState, *, now_s: float | None = None) -> bool:
+        if self.lifetime.observe(game):
+            self.reset_trace()
+        if game.game_over_state or (game.player is not None and game.player.health <= 0):
+            self.reset_trace()
+            return False
+        if self.last_instance is not None and self.last_instance != game.instance_id:
+            self.reset_trace()
         if (
             not self.writable
             or not game.in_game
@@ -439,6 +449,8 @@ class RoomMapMemory:
             return False
         now_s = time.time() if now_s is None else float(now_s)
         key, room, created = self._ensure_room(game, now_s)
+        if self.last_context and self.last_context.split(":")[:2] != key.split(":")[:2]:
+            self.reset_trace()
         changed = created
 
         if self.last_context != key:
@@ -478,6 +490,7 @@ class RoomMapMemory:
         changed = self._record_doors(game, room, now_s) or changed
 
         self.last_context = key
+        self.last_instance = game.instance_id
         self.last_position = tuple(float(v) for v in game.player.position)
         if changed:
             self.persistence_revision += 1
@@ -609,6 +622,8 @@ class RoomMapMemory:
             observations = max(1, int(row.get("observations") or 1))
             candidates.append({
                 "kind": "exit",
+                "exit_index": row.get("exit_index"),
+                "entrance_index": row.get("entrance_index"),
                 "memory_key": key,
                 "position": position,
                 "observations": observations,
@@ -618,8 +633,6 @@ class RoomMapMemory:
                     + (0.08 if row.get("direct_reachable") else 0.0)
                     + min(0.08, observations * 0.01),
                 ),
-                "exit_index": row.get("exit_index"),
-                "entrance_index": row.get("entrance_index"),
             })
 
         if "door" in kinds:
@@ -685,6 +698,10 @@ class RoomMapMemory:
             )[:240],
             "exit_position": tuple(position),
             "forced_escape": True,
+            "exit_index": candidate.get("exit_index"),
+            "entrance_index": candidate.get("entrance_index"),
+            "actor_id": candidate.get("actor_id"),
+            "params": candidate.get("params"),
         }
         if routed is not None:
             return {

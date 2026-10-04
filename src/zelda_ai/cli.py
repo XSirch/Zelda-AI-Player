@@ -50,12 +50,25 @@ def main():
     serve.add_argument("--demo", action="store_true", help="Explicit simulator; not real Zelda gameplay")
     commands.add_parser("init")
     commands.add_parser("auth-codex")
+    qualify = commands.add_parser("qualify-motor", help="Real SoH motor episode without any AI calls")
+    qualify.add_argument("--seconds", type=float, default=120.0)
+    qualify.add_argument("--wait-seconds", type=float, default=8.0)
+    qualify.add_argument("--probe-only", action="store_true")
+    qualify.add_argument("--save-slot", type=int, choices=(1, 2, 3), help="Explicit existing save to load through physical input")
     launch = commands.add_parser("launch-soh")
     launch.add_argument("executable", type=Path)
     args = parser.parse_args()
     settings = Settings()
 
-    if args.command == "init":
+    if args.command == "qualify-motor":
+        if not 1 <= args.seconds <= 600 or not 1 <= args.wait_seconds <= 60:
+            parser.error("Qualification budgets must be 1..600 seconds and wait 1..60 seconds")
+        from .qualification import qualify_motor
+        report = asyncio.run(qualify_motor(settings, seconds=args.seconds,
+            wait_s=args.wait_seconds, probe_only=args.probe_only, save_slot=args.save_slot))
+        if report["status"] == "blocked":
+            raise SystemExit(2)
+    elif args.command == "init":
         bridge_secret(settings)
         print("Local data directory and bridge credential initialized.")
     elif args.command == "auth-codex":

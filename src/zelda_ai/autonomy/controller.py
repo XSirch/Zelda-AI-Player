@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..bridge import Bridge
+from .execution import ExecutionSupervisor
 from .features import (
     BUTTON_NAMES,
     camera_relative_stick,
@@ -21,8 +22,10 @@ from .features import (
     stack_frames,
     target_point,
 )
+from .lifetime import ObservationLifetime
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
+from .navigation import observed_local_path
 from .reward import RewardTracker
 from .room_map import RoomMapMemory
 from .routes import LearnedRouteGraph
@@ -67,6 +70,8 @@ CAMERA_TRANSITION_DELTA_RAD = math.radians(12.0)
 CAMERA_CUT_DELTA_RAD = math.radians(35.0)
 CAMERA_TRANSITION_SETTLE_TICKS = 1
 CAMERA_CUT_SETTLE_TICKS = 2
+CAMERA_GUARD_MAX_TICKS = 3
+CAMERA_STABLE_REARM_TICKS = 6
 
 
 @dataclass(frozen=True)
@@ -116,6 +121,12 @@ class ContinuousController:
         self.intent = AgentIntent.bootstrap()
         self.intent_updated_at = time.monotonic()
         self.reward_tracker = RewardTracker()
+        self.executor = ExecutionSupervisor()
+        self.lifetime = ObservationLifetime()
+        self.last_sample_seq = None
+        self.observed_full_seq = None
+        self.full_observed_at = 0.0
+        self.local_path_attempt = None
         self.feature_history = deque(maxlen=4)
         self.novelty_history = deque(maxlen=4)
         self.training_queue: asyncio.Queue = asyncio.Queue(maxsize=2)
@@ -157,6 +168,8 @@ class ContinuousController:
         self.camera_guard_ticks = 0
         self.camera_cut_count = 0
         self.camera_transition_count = 0
+        self.camera_guard_spent = 0
+        self.camera_stable_ticks = 0
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -190,6 +203,10 @@ class ContinuousController:
 
     def reset_episode_state(self):
         self.reward_tracker = RewardTracker()
+        self.executor = ExecutionSupervisor()
+        self.lifetime = ObservationLifetime()
+        self.last_sample_seq = None
+        self.local_path_attempt = None
         self.route_graph.reset_trace()
         self.room_map.reset_trace()
         self.feature_history.clear()
@@ -215,6 +232,8 @@ class ContinuousController:
         self.camera_guard_ticks = 0
         self.camera_cut_count = 0
         self.camera_transition_count = 0
+        self.camera_guard_spent = 0
+        self.camera_stable_ticks = 0
         self.last_guidance = {
             "active": False,
             "stick": (0.0, 0.0),
@@ -255,8 +274,11 @@ class ContinuousController:
         self.achievements.clear()
 
     def set_intent(self, intent: AgentIntent):
+        if self.pending is not None:
+            self.pending["trainable"] = False
         self.intent = intent
         self.intent_updated_at = time.monotonic()
+        self.last_sample_seq = None
 
     @staticmethod
     def _angle_delta(current: float, previous: float) -> float:
@@ -266,6 +288,8 @@ class ContinuousController:
         self.last_camera_yaw = None
         self.camera_motion_state = "stable"
         self.camera_guard_ticks = 0
+        self.camera_guard_spent = 0
+        self.camera_stable_ticks = 0
 
     def _camera_state(self, game) -> str:
         current_yaw = camera_world_yaw(game, game.player)
@@ -280,6 +304,20 @@ class ContinuousController:
             return self.camera_motion_state
 
         delta = abs(self._angle_delta(current_yaw, previous_yaw))
+        if delta >= CAMERA_TRANSITION_DELTA_RAD:
+            self.camera_stable_ticks = 0
+        else:
+            self.camera_stable_ticks += 1
+            if self.camera_stable_ticks >= CAMERA_STABLE_REARM_TICKS:
+                self.camera_guard_spent = 0
+        # A fixed camera may chatter at a boundary. Cancel stale projection only
+        # for a bounded burst, then continually reproject the same world heading.
+        if self.camera_guard_spent >= CAMERA_GUARD_MAX_TICKS:
+            self.camera_guard_ticks = 0
+            self.camera_motion_state = "stable"
+            return self.camera_motion_state
+        if delta >= CAMERA_TRANSITION_DELTA_RAD or self.camera_guard_ticks > 0:
+            self.camera_guard_spent += 1
         if delta >= CAMERA_CUT_DELTA_RAD:
             self.camera_motion_state = "cut"
             self.camera_guard_ticks = CAMERA_CUT_SETTLE_TICKS
@@ -477,7 +515,12 @@ class ContinuousController:
             and self.pending_interaction_probe.get("kind") == "dialogue"
         ):
             closing_button = self.pending_interaction_probe.get("button")
-            if closing_button:
+            delivered = game.protocol != 3 or any(
+                self.bridge.command_consumed(seq)
+                for seq in self.pending_interaction_probe.get("command_seqs", ())
+            )
+            same_context = (old_game.instance_id, old_game.scene, old_game.room) == (game.instance_id, game.scene, game.room)
+            if closing_button and delivered and same_context:
                 self.route_graph.record_interaction_success(
                     "dialogue:advance",
                     str(closing_button),
@@ -641,6 +684,7 @@ class ContinuousController:
         self.interaction_last_probe_at = now
         self.pending_interaction_probe = {
             "kind": "dialogue",
+            "instance_id": game.instance_id,
             "key": key,
             "button": button,
             "at": now,
@@ -673,6 +717,14 @@ class ContinuousController:
             return
 
         now = time.monotonic()
+        commands = probe.get("command_seqs", ())
+        if game.protocol == 3 and not any(self.bridge.command_consumed(seq) for seq in commands):
+            if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
+                self.pending_interaction_probe = None
+            return
+        if probe.get("instance_id", game.instance_id) != game.instance_id or game.game_over_state:
+            self.pending_interaction_probe = None
+            return
         if probe.get("kind") == "dialogue":
             text_changed = bool(
                 not game.dialogue.active
@@ -701,32 +753,12 @@ class ContinuousController:
                 self.pending_interaction_probe = None
             return
 
-        current_key = self._interaction_key(game)
-        major_keys = {
-            "new_world_transition",
-            "new_dialogue",
-            "durable_progress",
-            "objective_milestone",
-            "native_event",
-        }
-        major_effect = any(
-            reward.breakdown.get(key, 0.0) > 0
-            for key in major_keys
-        )
         scene_changed = (
             (game.scene, game.room)
             != (probe["scene"], probe["room"])
         )
         dialogue_started = (
             game.dialogue.active and not probe["dialogue_active"]
-        )
-        exit_context_changed = bool(
-            (
-                probe.get("exit_active")
-                or probe.get("actor_is_door")
-                or probe.get("traversal_active")
-            )
-            and current_key != probe["key"]
         )
         traversal_started = bool(
             probe.get("traversal_active")
@@ -737,18 +769,14 @@ class ContinuousController:
                 or (game.player.hanging_ledge and not probe.get("hanging_ledge"))
                 or (
                     probe.get("player_position") is not None
-                    and math.dist(
-                        game.player.position,
-                        probe["player_position"],
-                    ) >= 12.0
+                    and abs(float(probe.get("speed_xz", 0.0))) <= 0.1
+                    and abs(game.player.position[1] - probe["player_position"][1]) >= 12.0
                 )
             )
         )
         success = (
             scene_changed
             or dialogue_started
-            or major_effect
-            or exit_context_changed
             or traversal_started
         )
 
@@ -862,6 +890,7 @@ class ContinuousController:
         self.interaction_last_probe_at = now
         self.pending_interaction_probe = {
             "kind": "context",
+            "instance_id": game.instance_id,
             "key": key,
             "button": button,
             "at": now,
@@ -876,6 +905,7 @@ class ContinuousController:
                 if game.player is not None
                 else None
             ),
+            "speed_xz": game.player.speed_xz if game.player else 0.0,
             "climbing_ladder": bool(
                 game.player.climbing_ladder if game.player is not None else False
             ),
@@ -999,8 +1029,13 @@ class ContinuousController:
         }
         attempt = self.active_escape_attempt
         context = self._escape_context(game)
+        if game.game_over_state or (game.player is not None and game.player.health <= 0):
+            self.active_escape_attempt = None
+            return
         if attempt is not None and attempt.get("context") != context:
-            self.escape_successes += 1
+            previous_context = attempt.get("context")
+            if previous_context[:2] != context[:2] and previous_context[2:] == context[2:]:
+                self.escape_successes += 1
             self.active_escape_attempt = None
             return
         if (
@@ -1078,10 +1113,10 @@ class ContinuousController:
                 guidance.get("forced_escape")
                 or guidance.get("traversal_route_active")
             )
-            and float(sample.get("guidance_strength") or 0.0) >= 0.999
         ):
-            # Full-authority escape steering is a structured intervention. The
-            # sampled residual did not cause the executed movement.
+            # Reference escape/traversal also replaces every sampled button.
+            # Exclude even a weakened stick mix: its executed joint action is
+            # no longer the action whose PPO log-probability was recorded.
             return False
         if self.reward_tracker.local_dwell_seconds >= NO_PROGRESS_TRAINING_CUTOFF_S:
             # A few minutes of negative anti-loop experience are enough. Hours
@@ -1185,6 +1220,18 @@ class ContinuousController:
             "escape_final_target": final_target,
         }
 
+    @staticmethod
+    def _canonical_escape_key(game, hint: dict) -> str:
+        if hint.get("exit_index") is not None:
+            return f"observed:exit:{game.scene}:{game.room}:{hint['exit_index']}:{hint.get('entrance_index')}"
+        if hint.get("door") or hint.get("kind") == "door":
+            position = hint.get("exit_position") or hint.get("position") or hint.get("waypoint")
+            cell = ":".join(str(round(float(v) / 40.0)) for v in position)
+            actor_id = hint.get("door_actor_id", hint.get("actor_id"))
+            params = hint.get("door_params", hint.get("params"))
+            return f"observed:door:{game.scene}:{game.room}:{actor_id}:{params}:{cell}"
+        return str(hint.get("escape_key") or f"memory:{hint.get('kind')}:{hint.get('memory_key')}")
+
     def _escape_waypoint(self, game) -> dict | None:
         """Choose a healthy escape target, preferring proven departures."""
         now = time.monotonic()
@@ -1193,6 +1240,9 @@ class ContinuousController:
             for key, until in self.escape_retry_after.items()
             if until > now and key.startswith("memory:") and key.count(":") >= 2
         }
+        for candidate in self.room_map.known_escape_candidates(game):
+            if self._escape_on_cooldown(self._canonical_escape_key(game, candidate), now=now):
+                excluded_memory.add(candidate["memory_key"])
 
         # A point where Link actually changed room/scene is stronger evidence
         # than a merely detected exit surface and should win on revisits.
@@ -1210,12 +1260,16 @@ class ContinuousController:
                     remembered_transition,
                 )
 
+        healthy_game = game.model_copy(update={"scene_exits": [
+            row for row in game.scene_exits
+            if not self._escape_on_cooldown(self._canonical_escape_key(game, row.model_dump()), now=now)
+        ]})
         observed_exit = self.route_graph.exit_waypoint(
-            game,
+            healthy_game,
             allow_unreachable=True,
         )
         if observed_exit is not None:
-            key = f"observed:{observed_exit.get('waypoint_id')}"
+            key = self._canonical_escape_key(game, observed_exit)
             if not self._escape_on_cooldown(key, now=now):
                 return self._escape_traversal_hint(
                     game,
@@ -1228,7 +1282,7 @@ class ContinuousController:
 
         observed_door = self.route_graph.door_waypoint(game)
         if observed_door is not None:
-            key = f"observed:{observed_door.get('waypoint_id')}"
+            key = self._canonical_escape_key(game, observed_door)
             if not self._escape_on_cooldown(key, now=now):
                 return self._escape_traversal_hint(
                     game,
@@ -1246,13 +1300,49 @@ class ContinuousController:
             excluded_keys=excluded_memory,
         )
         if remembered_other is not None:
-            key = str(remembered_other.get("escape_key") or "")
+            key = self._canonical_escape_key(game, remembered_other)
             if not self._escape_on_cooldown(key, now=now):
                 return self._escape_traversal_hint(
                     game,
-                    remembered_other,
+                    {**remembered_other, "escape_key": key},
                 )
         return None
+
+    def _local_path_hint(self, game, hint, target):
+        if hint is not None and (hint.get("traversal") or hint.get("direct_reachable") or hint.get("edge_key")):
+            self.local_path_attempt = None
+            return hint
+        if game.protocol == 3 and time.monotonic() - self.full_observed_at > 2.0:
+            self.local_path_attempt = None
+            return hint
+        local = observed_local_path(game, target) if target is not None else None
+        if local is None:
+            self.local_path_attempt = None
+            return hint
+        now = time.monotonic()
+        context = (game.instance_id, game.scene_epoch, *self._escape_context(game))
+        attempt = self.local_path_attempt
+        if (attempt and attempt["context"] == context and now - attempt["started"] < 2.5
+                and math.dist(target, attempt["target"]) < 35.0
+                and math.dist(game.player.position, attempt["hint"]["waypoint"]) > 35.0):
+            # A moving native mesh origin must not drag the waypoint ahead of
+            # Link every frame. Hold it only while a CURRENT observed direct
+            # edge still supports it; a new obstacle invalidates the commitment.
+            supported = observed_local_path(game, attempt["hint"]["waypoint"], minimum_gain=0.0)
+            if (supported and supported["path_nodes"] == 2
+                    and supported["target_gap"] <= game.navmesh.step * 0.45):
+                local = {**local, "waypoint": attempt["hint"]["waypoint"],
+                         "waypoint_id": attempt["hint"]["waypoint_id"]}
+            else:
+                attempt = None
+        else:
+            attempt = None
+        if attempt is None:
+            self.local_path_attempt = {"context": context, "started": now,
+                                       "target": tuple(target), "hint": local}
+        # Preserve the physical portal identity and final postcondition while
+        # changing only the approach corridor. Do not add this path to memory.
+        return {**(hint or {}), **local}
 
     def _sample_setpoint(
         self,
@@ -1279,7 +1369,9 @@ class ContinuousController:
     def _enqueue_rollout(self, observation: list[float], *, done: bool):
         if not self.rollout:
             return
-        bootstrap = 0.0 if done else self.policy.actor_value(observation)
+        bootstrap = 0.0 if done else self.rollout[-1].get("next_value")
+        if bootstrap is None:
+            bootstrap = self.policy.actor_value(observation)
         batch = {
             "rollout": self.rollout,
             "bootstrap_value": bootstrap,
@@ -1292,6 +1384,16 @@ class ContinuousController:
         self.training_queue.put_nowait(batch)
 
     def _ml_step(self, game) -> Setpoint:
+        if self.lifetime.observe(game):
+            if self.training_enabled and self.rollout:
+                self._enqueue_rollout([], done=False)
+            self.pending = self.pending_interaction_probe = None
+            self.feature_history.clear()
+            self.novelty_history.clear()
+            self.reward_tracker.break_causal_chain()
+            self.active_escape_attempt = None
+            self.local_path_attempt = None
+            self._reset_camera_guard()
         self.route_graph.observe(game)
         self.room_map.observe(game)
         self._update_escape_attempt(game)
@@ -1319,6 +1421,9 @@ class ContinuousController:
         self.total_reward += reward.reward
         self.reward_window.append(reward.reward)
         self.last_reward_breakdown = reward.breakdown
+        macro_progress = any(reward.breakdown.get(key, 0.0) > 0 for key in (
+            "new_macro_region", "durable_progress", "objective_milestone", "new_world_transition",
+        ))
         useful_keys = {
             "new_space",
             "new_macro_region",
@@ -1361,8 +1466,15 @@ class ContinuousController:
                 **self.pending,
                 "reward": reward.reward,
                 "done": reward.done,
+                "next_value": 0.0 if reward.done else self.policy.actor_value(observation),
             }
+            if self.rollout and self.rollout[-1].get("actor_version") != transition.get("actor_version"):
+                self._enqueue_rollout(observation, done=False)
             self.rollout.append(transition)
+        elif self.training_enabled and self.rollout:
+            # The endpoint belongs to the last PPO-controlled action, BEFORE
+            # the intervention. Never bootstrap from the post-intervention state.
+            self._enqueue_rollout(observation, done=False)
 
         if self.training_enabled and (
             len(self.rollout) >= self.rollout_size
@@ -1424,12 +1536,19 @@ class ContinuousController:
                     route_hint = self.route_graph.exploration_waypoint(game)
         else:
             route_hint = None
+        local_target = (route_hint or {}).get("exit_position") or final_target
+        if self.intent.mode in {"navigate", "explore", "observe"} and not (game.dialogue.active or game.pause_menu.active):
+            route_hint = self._local_path_hint(game, route_hint, local_target)
         guidance = goal_guidance(
             game,
             self.intent,
             local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
             route_hint=route_hint,
         )
+        durable_progress = any(reward.breakdown.get(key, 0.0) > 0 for key in (
+            "durable_progress", "objective_milestone",
+        ))
+        self.executor.observe(game, guidance, macro_progress=macro_progress, durable_progress=durable_progress)
         setpoint, sample = self._sample_setpoint(observation, guidance)
         if (
             guidance.get("forced_escape")
@@ -1475,11 +1594,16 @@ class ContinuousController:
                     setpoint,
                     sample,
                 )
+        # The supervisor owns the final arbitration, including modal probes.
+        if self.executor.state == "blocked":
+            sample = {**sample, "stick": [0.0, 0.0], "buttons": [0.0 for _ in BUTTON_NAMES]}
+            setpoint = Setpoint(reason="motor_blocked")
         transition_trainable = self._ppo_transition_trainable(
             interaction_override=interaction_override,
             guidance=guidance,
             sample=sample,
         )
+        transition_trainable = transition_trainable and self.executor.state != "blocked"
         self.last_guidance = guidance
         self.last_setpoint = setpoint
         self.last_stick = tuple(sample["stick"])
@@ -1505,6 +1629,7 @@ class ContinuousController:
             "guidance_strength": sample.get("guidance_strength", 0.0),
             "button_quiet_strength": sample.get("button_quiet_strength", 0.0),
             "trainable": transition_trainable,
+            "actor_version": sample.get("actor_version", 0),
         }
         self.actions_sampled += 1
 
@@ -1624,8 +1749,12 @@ class ContinuousController:
                 game = self.bridge.state
                 self.motor_ticks += 1
                 self.tick += 1
+                if game is not None and game.full_seq != self.observed_full_seq:
+                    self.observed_full_seq, self.full_observed_at = game.full_seq, time.monotonic()
 
                 if not self.bridge.connected or game is None or not game.in_game or game.player is None:
+                    if self.training_enabled and self.rollout:
+                        self._enqueue_rollout([], done=False)
                     self.pending = None
                     self.feature_history.clear()
                     self.novelty_history.clear()
@@ -1646,14 +1775,23 @@ class ContinuousController:
                 # During a non-interactive cutscene there is no useful control
                 # transition to learn; neutral input avoids polluting the rollout.
                 if game.cutscene_active and not game.dialogue.active:
+                    self.executor.observe(game, {})
+                    if self.pending is not None:
+                        self.pending["trainable"] = False
+                    if self.training_enabled and self.rollout:
+                        self._enqueue_rollout([], done=False)
                     self.route_graph.reset_trace()
                     # Keep room-map trace across door/transition cutscenes so the
                     # first playable frame in the next room can persist the real
                     # departure point from the previous room.
                     self.last_setpoint = Setpoint(reason="cutscene")
                     self.last_motor_summary = "Cutscene owns Link; ML actor remains live and resumes immediately."
-                elif self.tick % self.action_repeat_ticks == 1 or self.pending is None:
+                elif (self.tick % self.action_repeat_ticks == 1 or self.pending is None) and self.last_sample_seq != game.seq:
+                    if self.pending is not None and game.protocol == 3:
+                        delivered = any(self.bridge.command_consumed(seq) for seq in self.pending.get("command_seqs", ()))
+                        self.pending["trainable"] = self.pending.get("trainable", True) and delivered
                     self._ml_step(game)
+                    self.last_sample_seq = game.seq
 
                 if not (game.cutscene_active and not game.dialogue.active):
                     # Policy residuals are still sampled at 10 Hz.  Camera-space
@@ -1662,14 +1800,29 @@ class ContinuousController:
                     self._refresh_camera_relative_setpoint(game)
 
                 try:
-                    self.bridge.send(
+                    command_seq = self.bridge.send(
                         buttons=self.last_setpoint.buttons,
                         stick_x=self.last_setpoint.stick_x,
                         stick_y=self.last_setpoint.stick_y,
                         lease_ms=150,
                     )
+                    if self.pending is not None:
+                        self.pending.setdefault("command_seqs", []).append(command_seq)
+                        self.pending["command_seqs"] = self.pending["command_seqs"][-8:]
+                    if self.pending_interaction_probe is not None and self.last_setpoint.buttons:
+                        self.pending_interaction_probe.setdefault("command_seqs", []).append(command_seq)
                 except RuntimeError:
                     pass
+
+                self.executor.record(game, self.last_guidance, self.last_setpoint, self.bridge)
+                if self.executor.state == "blocked":
+                    self.bridge.release()
+                    try:
+                        await asyncio.to_thread(self.executor.save_incident, self.policy.checkpoint.parent / "incidents")
+                    except OSError as exc:
+                        self.executor.diagnostics_error = f"{type(exc).__name__}: {str(exc)[:180]}"
+                    publish()
+                    break
 
                 publish()
                 await asyncio.sleep(self.tick_s)
@@ -1713,7 +1866,7 @@ class ContinuousController:
                 game = self.bridge.state
                 if game is not None and self.feature_history:
                     observation = stack_frames(list(self.feature_history))
-                    bootstrap = self.policy.actor_value(observation)
+                    bootstrap = self.rollout[-1].get("next_value", self.policy.actor_value(observation))
                     try:
                         self.last_training_stats = await asyncio.to_thread(
                             self.policy.train_rollout,
@@ -1731,6 +1884,8 @@ class ContinuousController:
     def telemetry(self) -> dict:
         return {
             "intent": self.intent.model_dump(),
+            "observation_profile": "instrumented_local_v1",
+            "execution": self.executor.snapshot(),
             "intent_age_ms": round((time.monotonic() - self.intent_updated_at) * 1000),
             "motor": self.last_motor_summary,
             "guidance": {

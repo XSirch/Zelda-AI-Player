@@ -3,6 +3,7 @@
 #include "ZeldaAiBridge.h"
 #include "InputScheduler.hpp"
 #include "ActorRegistry.hpp"
+#include "StartupGuard.hpp"
 #include <SDL2/SDL_net.h>
 #include <nlohmann/json.hpp>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -40,7 +41,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.1";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.2";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -123,6 +124,14 @@ struct BridgeData {
     bool wasOwned = false;
     zelda_ai::ActorRegistry actors;
     bool playable = false;
+    zelda_ai::StartupObservation startup;
+    int64_t fileSelectSeenAt = 0;
+
+    bool StartupWindowReady() const {
+        return startup.phase == zelda_ai::StartupPhase::Title ||
+               startup.phase == zelda_ai::StartupPhase::SelectFile ||
+               startup.phase == zelda_ai::StartupPhase::ConfirmFile;
+    }
     int16_t lastScene = -1;
     int16_t lastRoom = -1;
     bool sceneAutosavePending = false;
@@ -208,7 +217,17 @@ struct BridgeData {
                     command.edgeButtons = static_cast<uint16_t>(edges);
                     for (const auto& row : steps) command.steps.push_back({pad(row), row.at("ticks").get<int>()});
                 }
-                if (!playable && command.kind != zelda_ai::InputKind::Release) continue;
+                if (!playable && command.kind != zelda_ai::InputKind::Release) {
+                    if (!StartupWindowReady() || !data.contains("startup_slot")) continue;
+                    const int slot = data.at("startup_slot").get<int>();
+                    auto allowed = [&](const zelda_ai::PadState& value) {
+                        return zelda_ai::StartupInputAllowed(startup, slot, value.buttons, value.stickX, value.stickY);
+                    };
+                    if (!allowed(command.pad)) continue;
+                    bool stepsAllowed = true;
+                    for (const auto& step : command.steps) if (!allowed(step.pad)) stepsAllowed = false;
+                    if (!stepsAllowed) continue;
+                }
                 const auto nowUs = NowUs();
                 scheduler.Accept(command, nowUs / 1000, nowUs);
             } catch (const std::exception&) {
@@ -1218,6 +1237,17 @@ void Snapshot() {
     if (!bridge.socket || !bridge.packet) return;
     const auto now = NowMs();
     bridge.playable = GameInteractor::IsSaveLoaded(true) && gPlayState != nullptr;
+    if (!bridge.playable) {
+        for (int slot = 0; slot < 3; ++slot)
+            bridge.startup.existing[slot] = SaveManager::Instance && SaveManager::Instance->SaveFile_Exist(slot);
+        if (now - bridge.fileSelectSeenAt > 250) {
+            bridge.startup.phase = gSaveContext.gameMode == GAMEMODE_TITLE_SCREEN
+                ? zelda_ai::StartupPhase::Title : zelda_ai::StartupPhase::Unknown;
+            bridge.startup.cursor = bridge.startup.selectedSlot = -1;
+        }
+    } else {
+        bridge.startup.phase = zelda_ai::StartupPhase::Unknown;
+    }
     int mode = 0;
     if (bridge.playable) {
         const int16_t scene = gPlayState->sceneNum;
@@ -1240,7 +1270,8 @@ void Snapshot() {
             | (gPlayState->gameOverCtx.state != 0 ? 16 : 0)
             | (gPlayState->msgCtx.ocarinaMode != 0 ? 32 : 0);
     } else {
-        bridge.scheduler.Release("game_not_ready");
+        if (!bridge.StartupWindowReady()) bridge.scheduler.Release("game_not_ready");
+        mode = 64 + static_cast<int>(bridge.startup.phase);
         bridge.lastScene = bridge.lastRoom = -1;
         bridge.sceneAutosavePending = false;
         bridge.sceneAutosaveTarget = -1;
@@ -1297,7 +1328,7 @@ void Snapshot() {
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "ml_combat_state",
                           "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces",
-                          "traversal_affordances_v1", "story_progress_v1", "scene_autosave_v1"}},
+                          "traversal_affordances_v1", "story_progress_v1", "scene_autosave_v1", "startup_controls_v1"}},
         {"token", bridge.token},
         {"source", "soh"},
         {"instance_id", bridge.instance},
@@ -1310,6 +1341,9 @@ void Snapshot() {
         {"day_time", 0},
         {"is_night", false},
         {"in_game", bridge.playable},
+        {"startup", {{"phase", static_cast<int>(bridge.startup.phase)},
+                     {"cursor", bridge.startup.cursor}, {"selected_slot", bridge.startup.selectedSlot},
+                     {"existing_slots", bridge.startup.existing}}},
         {"player", nullptr},
         {"inventory_named", json::array()},
         {"dialogue", json::object()},
@@ -1523,6 +1557,29 @@ void RegisterZeldaAiBridge() {
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameStateMainStart>(Snapshot);
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnGameFrameUpdate>(TrySceneAutosave);
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnFileChooseMain>([](void* raw) {
+        if (!raw) return;
+        const auto* menu = static_cast<FileChooseContext*>(raw);
+        auto& bridge = Data();
+        std::scoped_lock lock(bridge.mutex);
+        bridge.fileSelectSeenAt = NowMs();
+        bridge.startup.phase = zelda_ai::StartupPhase::Busy;
+        bridge.startup.cursor = -1;
+        bridge.startup.selectedSlot = menu->selectedFileIndex >= 0 && menu->selectedFileIndex < 3
+            ? menu->selectedFileIndex : -1;
+        if (menu->menuMode == 1 && menu->configMode == 2)
+        {
+            bridge.startup.phase = zelda_ai::StartupPhase::SelectFile;
+            bridge.startup.cursor = menu->buttonIndex;
+        }
+        else if (menu->menuMode == 2 && menu->selectMode == 3) {
+            bridge.startup.phase = zelda_ai::StartupPhase::ConfirmFile;
+            bridge.startup.cursor = menu->confirmButtonIndex;
+        }
+    });
+    GameInteractor::Instance->RegisterGameHook<GameInteractor::OnLoadGame>([](int32_t file) {
+        Event("save_loaded", std::to_string(file));
+    });
 
     GameInteractor::Instance->RegisterGameHook<GameInteractor::OnSceneInit>([](int16_t scene) {
         auto& bridge = Data();

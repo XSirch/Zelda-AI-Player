@@ -87,7 +87,7 @@ def test_camera_cut_neutralizes_then_reprojects_same_world_heading(
 
     assert controller.camera_motion_state == "stable"
     assert controller.last_setpoint.reason == "ml_policy"
-    assert controller.last_setpoint.stick_x < -75
+    assert controller.last_setpoint.stick_x > 75
     assert abs(controller.last_setpoint.stick_y) <= 1
     assert controller.last_guidance["target"] == original_target
     assert controller.route_graph.active_path == original_path

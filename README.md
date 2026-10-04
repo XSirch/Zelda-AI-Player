@@ -2,6 +2,8 @@
 
 Jogador autônomo para **The Legend of Zelda: Ocarina of Time** no **Ship of Harkinian (SoH)**.
 
+A fundação do motor V4 corrige a projeção horizontal invertida do controle nativo e separa os fragmentos PPO nas intervenções. A saída da casa foi reproduzida no SoH com o Arquivo 2, sem chamadas de IA. Isso ainda não qualifica a campanha completa nem o lote G1 de 100 cenários. Os resultados e as limitações estão em [docs/STATUS.md](docs/STATUS.md).
+
 ## Autonomy V3
 
 Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
@@ -182,7 +184,18 @@ npm run build
 cd ..
 ```
 
-## Native Bridge v3.1 (SoH)
+## Native Bridge v3.2 (SoH)
+
+Para testar apenas o motor local, sem cognição e sem atualizar pesos ou memórias:
+
+```powershell
+uv run zelda-ai qualify-motor --probe-only
+uv run zelda-ai qualify-motor --save-slot 2 --seconds 120
+```
+
+`--save-slot` autoriza a seleção daquele arquivo existente por inputs físicos. O adaptador permite confirmar apenas esse arquivo e bloqueia comandos nos modos de copiar, apagar e criar nomes. O harness usa o perfil instrumentado `instrumented_local_v1`, verifica mudança real de sala seguida de estado jogável e salva observações/recibos em `.local/qualification/`. Um episódio bem-sucedido não aprova G1. O código não cria provedores de cognição nem usa o simulador.
+
+No Windows com MSVC, os testes de transporte nativo também podem ser executados com `powershell -ExecutionPolicy Bypass -File scripts/verify_native.ps1`. Esse resultado complementa os testes pytest que exigem g++ ou clang++.
 
 Revisão Shipwright fixada:
 
@@ -191,7 +204,7 @@ HarbourMasters/Shipwright
 d30fc192f2eb01ceea45bd1e12de61636cafbf86
 ```
 
-A Autonomy V3 usa **Native Bridge v3.1 / Adapter v3.1** com wire protocol `3`.
+A Autonomy V3 e a fundação V4 usam **Native Bridge v3.2 / Adapter v3.2** com wire protocol `3`.
 
 Instale/atualize a bridge:
 

@@ -83,7 +83,7 @@ def test_goal_guidance_is_camera_relative(state):
 
     east = intent.model_copy(update={"target_position": (300.0, 0.0, 0.0)})
     east_guidance = goal_guidance(state, east)
-    assert east_guidance["stick"][0] > 0.95
+    assert east_guidance["stick"][0] < -0.95
     assert abs(east_guidance["stick"][1]) < 0.05
 
     # Rotate the camera 90 degrees: world +X becomes camera-forward.
@@ -253,7 +253,7 @@ def test_goal_guidance_replays_learned_route_waypoint(state):
     assert guidance["route_path_nodes"] == 7
     assert guidance["route_confidence"] == pytest.approx(0.75)
     assert guidance["route_target_gap"] == pytest.approx(20.0)
-    assert guidance["stick"][0] > 0.95
+    assert guidance["stick"][0] < -0.95
     assert abs(guidance["stick"][1]) < 0.05
     # UI distance remains the final objective distance, not just the next hop.
     assert guidance["distance"] == pytest.approx(500.0)
@@ -291,7 +291,7 @@ def test_observed_door_escape_gets_full_steering_authority(state):
     assert guidance["exit_active"] is True
     assert guidance["strength"] == pytest.approx(1.0)
     assert guidance["button_quiet"] == pytest.approx(0.95)
-    assert guidance["stick"][0] > 0.95
+    assert guidance["stick"][0] < -0.95
     assert abs(guidance["stick"][1]) < 0.05
 
 

@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 
 from ..models import GameState
-
+from .lifetime import ObservationLifetime
 
 ROUTE_GRAPH_VERSION = 1
 ROUTE_CELL_XZ = 80.0
@@ -83,6 +83,8 @@ class LearnedRouteGraph:
         self.last_node_id: str | None = None
         self.last_position: tuple[float, float, float] | None = None
         self.last_context: tuple[int, int, bool, str] | None = None
+        self.last_lifetime: tuple[str, int] | None = None
+        self.lifetime = ObservationLifetime()
         self.dirty = False
         self.persistence_revision = 0
         self.revision = 0
@@ -223,6 +225,7 @@ class LearnedRouteGraph:
             self.load_error = f"{type(exc).__name__}: {str(exc)[:160]}"
 
     def reset_trace(self):
+        self.last_lifetime = None
         self.last_node_id = None
         self.last_position = None
         self.last_context = None
@@ -304,6 +307,15 @@ class LearnedRouteGraph:
         return node_id
 
     def observe(self, game: GameState, *, now_s: float | None = None) -> bool:
+        if self.lifetime.observe(game):
+            self.reset_trace()
+        lifetime = (game.instance_id, game.scene_epoch)
+        if game.game_over_state or (game.player is not None and game.player.health <= 0):
+            self.reset_trace()
+            return False
+        if self.last_lifetime != lifetime:
+            self.reset_trace()
+            self.last_lifetime = lifetime
         if not self.writable or not game.player or not game.in_game or game.cutscene_active:
             return False
         now_s = time.time() if now_s is None else float(now_s)

@@ -306,6 +306,7 @@ class OnlinePPO:
                     for v in buttons.squeeze(0).detach().cpu().tolist()
                 ],
                 "log_prob": float(log_prob.item()),
+                "actor_version": self.updates,
                 "value": float(value.item()),
                 "guidance_stick": (
                     [float(v) for v in guidance_stick]
@@ -374,6 +375,10 @@ class OnlinePPO:
     ) -> dict:
         if not rollout:
             return {}
+        versions = {row["actor_version"] for row in rollout if "actor_version" in row}
+        if versions and (len(versions) != 1 or versions != {self.updates}
+                         or any("actor_version" not in row for row in rollout)):
+            return {"skipped": "stale_actor_version", "samples_discarded": len(rollout)}
 
         observations = torch.tensor(
             [row["observation"] for row in rollout], dtype=torch.float32, device=self.learner_device
@@ -502,12 +507,12 @@ class OnlinePPO:
         torch.nn.utils.clip_grad_norm_(self.learner_rnd.parameters(), 1.0)
         self.rnd_optimizer.step()
 
-        self.updates += 1
         self.samples_trained += count
 
         with self.actor_lock:
             self.actor.load_state_dict(self.learner.state_dict())
             self.actor_rnd.load_state_dict(self.learner_rnd.state_dict())
+            self.updates += 1
 
         self.last_stats = {
             "updates": self.updates,

@@ -340,6 +340,14 @@ export interface Snapshot {
       replans_suppressed: number;
     };
     motor: string;
+    execution?: {
+      state: 'idle' | 'executing' | 'modal' | 'blocked';
+      reason: string;
+      plan_revision: number;
+      completed: number;
+      failed: number;
+      task: { kind: string; phase: string; result: string | null } | null;
+    } | null;
     guidance: MotorGuidance | null;
     escape_control?: {
       active: boolean;

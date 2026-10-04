@@ -253,6 +253,13 @@ class GameEvent(StrictModel):
     detail: str = Field(default="", max_length=1000)
 
 
+class StartupState(StrictModel):
+    phase: int = Field(default=0, ge=0, le=4)  # Unknown/title/file-select/confirm/busy.
+    cursor: int = Field(default=-1, ge=-1, le=16)
+    selected_slot: int = Field(default=-1, ge=-1, le=2)
+    existing_slots: list[bool] = Field(default_factory=lambda: [False] * 3, min_length=3, max_length=3)
+
+
 class GameState(StrictModel):
     protocol: Literal[1, 3] = 1
     kind: Literal["full"] = "full"
@@ -279,6 +286,7 @@ class GameState(StrictModel):
     day_time: int = Field(default=0, ge=0, le=65535)
     is_night: bool = False
     in_game: bool
+    startup: StartupState = Field(default_factory=StartupState)
     player: PlayerState | None
     camera_eye: tuple[float, float, float] | None = None
     camera_at: tuple[float, float, float] | None = None
@@ -337,6 +345,7 @@ class RealtimeState(StrictModel):
     scene: int = Field(ge=-1, le=65535)
     room: int = Field(ge=-1, le=255)
     in_game: bool
+    startup: StartupState = Field(default_factory=StartupState)
     player: PlayerState | None
     camera_eye: tuple[float, float, float] | None
     camera_at: tuple[float, float, float] | None

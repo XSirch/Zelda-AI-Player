@@ -9,7 +9,6 @@ from .features import target_point
 from .models import AgentIntent
 from .routes import ROUTE_WAYPOINT_MIN_DISTANCE
 
-
 EQUIPMENT_OBJECTIVES: dict[tuple[str, int], tuple[str, int, float]] = {
     ("sword", 1): ("Kokiri Sword", 100, 3.0),
     ("sword", 2): ("Master Sword", 300, 4.0),
@@ -657,6 +656,7 @@ class RewardTracker:
                 and (
                     guidance.get("blocked")
                     or guidance.get("route_active")
+                    or guidance.get("local_path_active")
                 )
             )
             if (

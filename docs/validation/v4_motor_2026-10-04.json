@@ -1,0 +1,311 @@
+{
+  "schema_version": 1,
+  "recorded_utc": "2026-10-04T15:09:27.065932+00:00",
+  "implementation_base": "b187f0e8938f1f73aee09a45cd1610664f010922",
+  "observation_profile": "instrumented_local_v1",
+  "adapter": "rt-input-v3.2",
+  "wire_protocol": 3,
+  "upstream_revision": "d30fc192f2eb01ceea45bd1e12de61636cafbf86",
+  "provider_calls": 0,
+  "operator_save_slot": 2,
+  "g1_qualified": false,
+  "required_g1_episodes": 100,
+  "observed_post_fix_transitions": 7,
+  "settled_post_fix_destinations": 3,
+  "learning_improvement_proven": false,
+  "campaign_completion_proven": false,
+  "checks": {
+    "pytest_passed": 251,
+    "pytest_skipped": 20,
+    "native_msvc_cases_passed": 19,
+    "native_assertions_enabled": true,
+    "soh_release_build": "passed",
+    "web_build": "passed",
+    "browser": "agent-browser; isolated server; offline state; no errors; no cognition run",
+    "pytest_warning": "Existing Starlette httpx TestClient deprecation (1 warning)",
+    "pytest_native_skips": "19 scheduler cases and 1 legacy lease test: g++/clang++ unavailable; MSVC scheduler run is separate",
+    "soh_executable_sha256": "8d0595a1a77b85644de5cce065112b454571d15c371454d5d699b32688730029"
+  },
+  "episodes": [
+    {
+      "report": ".local/qualification/motor-a1e761062a5b/report.json",
+      "report_sha256": "be8c3af9ccd722bf12898a17eb5c1dc9575f314023928f8e81204bfaef5c477c",
+      "status": "blocked",
+      "reason": "episode_timeout_or_disconnect",
+      "elapsed_s": 120.032,
+      "initial_context": [
+        52,
+        0
+      ],
+      "initial_position": [
+        15.106693267822266,
+        -0.0,
+        35.5965690612793
+      ],
+      "final_context": [
+        52,
+        0
+      ],
+      "final_position": [
+        28.202756881713867,
+        0.0,
+        -78.7341079711914
+      ],
+      "destination_cutscene_finished": true,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": 26
+    },
+    {
+      "report": ".local/qualification/motor-944ca008c007/report.json",
+      "report_sha256": "0f47feebc542da896eecbd14c2d2b1c89fcd355ce9fc72bd6a57408502f13dc2",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 1.429,
+      "initial_context": [
+        52,
+        0
+      ],
+      "initial_position": [
+        33.14348602294922,
+        0.0,
+        -94.9443588256836
+      ],
+      "final_context": [
+        85,
+        0
+      ],
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "destination_cutscene_finished": false,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": null
+    },
+    {
+      "report": ".local/qualification/motor-408d48ba38c6/report.json",
+      "report_sha256": "fd5a6a1967282e5622761d45aa79ae589355e3d9776368a738ffdc7af969845d",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 1.17,
+      "initial_context": [
+        85,
+        0
+      ],
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "final_context": [
+        52,
+        0
+      ],
+      "final_position": [
+        -4.0,
+        0.0,
+        -111.0
+      ],
+      "destination_cutscene_finished": false,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": null
+    },
+    {
+      "report": ".local/qualification/motor-2dae940e0c7f/report.json",
+      "report_sha256": "a4183a7941819ff0d39a21062eaaac4dade3346d52cc2b7e347f78942a9eb416",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 3.942,
+      "initial_context": [
+        52,
+        0
+      ],
+      "initial_position": [
+        1.0,
+        0.0,
+        95.0
+      ],
+      "final_context": [
+        85,
+        0
+      ],
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "destination_cutscene_finished": false,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": 11
+    },
+    {
+      "report": ".local/qualification/motor-3e1ffe6e4430/report.json",
+      "report_sha256": "5c8e0f6c9228e89904de6622e37a84f93142c9f7cd05cdc8e56e01dc3870a5b7",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 6.533,
+      "initial_context": [
+        52,
+        0
+      ],
+      "initial_position": [
+        1.0,
+        0.0,
+        95.0
+      ],
+      "final_context": [
+        85,
+        0
+      ],
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "destination_cutscene_finished": false,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": 11
+    },
+    {
+      "report": ".local/qualification/motor-5c1e870dbbab/report.json",
+      "report_sha256": "cc6106def0412221ab443cd371720861c4249c71cac08d5f03259e4b06a5db01",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 1.843,
+      "initial_context": [
+        85,
+        0
+      ],
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "final_context": [
+        52,
+        0
+      ],
+      "final_position": [
+        -4.0,
+        0.0,
+        -66.0
+      ],
+      "destination_cutscene_finished": true,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": null
+    },
+    {
+      "report": ".local/qualification/motor-c84693ecd3f4/report.json",
+      "report_sha256": "fc033333c2defe6877c38bd3f1eb83d75fac58d803bb15cae687ba0f8285d1a5",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 7.427,
+      "initial_context": [
+        52,
+        0
+      ],
+      "initial_position": [
+        1.0,
+        0.0,
+        95.0
+      ],
+      "final_context": [
+        85,
+        0
+      ],
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "destination_cutscene_finished": true,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": 11
+    },
+    {
+      "report": ".local/qualification/motor-15fec1e89374/report.json",
+      "report_sha256": "7323f3bb51b74d65de6897227d72e1ea5a7dcabd95e33514192b6ba300a85f2f",
+      "status": "episode_success",
+      "reason": "observed_portal_crossing",
+      "elapsed_s": 1.862,
+      "initial_context": [
+        85,
+        0
+      ],
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "final_context": [
+        52,
+        0
+      ],
+      "final_position": [
+        -4.0,
+        0.0,
+        -69.0
+      ],
+      "destination_cutscene_finished": true,
+      "provider_calls": 0,
+      "training_enabled": false,
+      "artifacts_unchanged": true,
+      "artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "startup_probes": null
+    }
+  ]
+}

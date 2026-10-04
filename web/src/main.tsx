@@ -93,12 +93,39 @@ function Thought({ snapshot }: { snapshot: Snapshot | null }) {
   const intent = thought?.intent;
   const objectiveLock = thought?.objective_lock;
   const thinking = thought?.state === 'thinking';
+  const execution = thought?.execution;
+  const taskLabels: Record<string, string> = {
+    traverse_portal: 'Atravessar passagem',
+    traverse_surface: 'Percorrer superfície',
+    move_to_observed_region: 'Alcançar região observada',
+  };
+  const phaseLabels: Record<string, string> = {
+    prepare: 'preparando', execute: 'em andamento', verify: 'verificando efeito',
+    succeeded: 'concluída', failed: 'falhou',
+  };
+  const failureLabels: Record<string, string> = {
+    no_durable_or_macro_progress: 'sem avanço na região',
+    campaign_loop_without_progress: 'sem avanço de campanha',
+    input_not_consumed: 'o jogo não recebeu os controles',
+    modal_without_observed_effect: 'a interação não produziu efeito',
+    game_over_requires_recovery: 'a partida precisa ser recuperada',
+  };
   return <section className="thought-panel">
     <div className="section-label">
       OBJETIVO AUTÔNOMO
       <span className={thinking ? 'thinking live' : 'thinking'}>{thinking ? 'ESCOLHENDO PRÓXIMO' : (thought?.state ?? 'IDLE').toUpperCase()}</span>
     </div>
     <div className="thought-copy">
+      {execution && <div className="planner-line">
+        <span>EXECUÇÃO LOCAL</span>
+        <strong>{execution.state === 'blocked'
+          ? `Bloqueio identificado: ${failureLabels[execution.reason] ?? 'execução interrompida'}`
+          : execution.state === 'modal'
+            ? 'Interação em andamento'
+            : execution.task
+              ? `${taskLabels[execution.task.kind] ?? 'Executar tarefa'} · ${phaseLabels[execution.task.phase] ?? 'em andamento'}`
+              : 'Aguardando tarefa observável'}</strong>
+      </div>}
       {(objectiveLock?.objective ?? intent?.objective) && <div className="objective">
         <span>{objectiveLock?.trackable ? 'META TRAVADA' : 'OBJETIVO ATUAL'}</span>
         <strong>{objectiveLock?.objective ?? intent?.objective}</strong>
@@ -251,7 +278,16 @@ function LearningPanel({ snapshot }: { snapshot: Snapshot | null }) {
     .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
     .slice(0, 7);
   const evaluating = snapshot?.run_mode === 'evaluation';
-  const trainingState = evaluating
+  const executionState = snapshot?.thought.execution?.state;
+  const trainingState = executionState === 'blocked'
+    ? 'BLOQUEIO IDENTIFICADO'
+    : snapshot?.status !== 'running'
+      ? 'AGUARDANDO'
+      : executionState === 'modal'
+        ? 'INTERAÇÃO EM ANDAMENTO'
+        : snapshot?.thought.guidance?.forced_escape
+          ? 'RECUPERANDO'
+          : evaluating
     ? 'AVALIAÇÃO · PESOS CONGELADOS'
     : updates > 0
       ? 'TREINANDO'

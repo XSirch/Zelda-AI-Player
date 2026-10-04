@@ -1,4 +1,34 @@
-# Implementation status — Autonomy V3
+# Implementation status — V3 and V4 motor foundation
+
+## Validated locally on 2026-10-04
+
+This remains a game-agent laboratory. The master plan's complete P0–P7 system, G1 batch, skill coverage and campaign gates are not delivered by this foundation patch. No cognition calls were authorized or made. Learning improvement has not been measured in physical training; these gameplay episodes use a frozen existing V3 policy and read-only route/room memories.
+
+The principal reproduced movement defect was the horizontal sign of camera-relative guidance. Pinned SoH computes `Math_Atan2S(relY, -relX)` and adds `Camera_GetInputDirYaw`; the previous Python projection used the opposite horizontal sign in ordinary worlds. The correction inverts that native transform and accounts for native mirrored-world inversion. Original tests asserted the erroneous sign and were corrected alongside an independent native-transform contract test.
+
+Actual SoH validation used the existing Arquivo 2 with ordinary controller inputs, adapter `rt-input-v3.2`, wire protocol 3, upstream `d30fc192f2eb01ceea45bd1e12de61636cafbf86`. Startup selection was automated and consumed receipts were recorded. No teleports, save-state restores, HP writes, route scripts or human game input were used. Native autosave remains enabled; a local copy of the save directory was preserved before process restart.
+
+- Before the sign correction, one frozen episode remained in scene 52, room 0 for 120.032 seconds and failed.
+- After correction, portal crossings were observed between scene 52 (Link's house) and scene 85 (Kokiri Forest), including normal save reloads from `(1, 0, 95)`.
+- The stricter final harness requires the destination to be playable with the transition cutscene finished. A normal reload then left the house in 7.427 seconds; return to the house took 1.843 and 1.862 seconds in subsequent episodes. Earlier measurements ended during transition and are kept separately in the evidence.
+- Policy, route graph and room-map SHA-256 values stayed unchanged in every episode. G1 remains unqualified: the required 100 varied scenarios were not executed. Loft/ladder starts, varied camera/age conditions, combat, puzzles and campaign completion are unproven.
+
+The sanitized evidence index is [validation/v4_motor_2026-10-04.json](validation/v4_motor_2026-10-04.json). Complete reports and the bounded motor traces are local under `.local/qualification/`; they are not distributed with ROMs or saves.
+
+## Foundation added
+
+- A local task supervisor records preparation/execution/verification, verifies portals by physical scene/room change and keeps the strategic completion contract intact. Missing consumed inputs, room/campaign stagnation, death and a modal interaction without observed effects have separate bounded failure conditions. A fast watchdog pauses the run, releases controller authority and writes a whitelisted local incident ring. The modal timeout applies even while a non-interactive cutscene owns control. Automatic full save recovery and campaign replanning are still pending.
+- Current directed collision-mesh links can propose a Dijkstra approach path. Waypoints are held for a bounded attempt and revalidated against the current mesh; these proposed corridors do not become learned traversal evidence or earn learned-route rewards. Long-range geometric planning and traversal qualification remain pending.
+- PPO fragments close at interventions, cutscenes and actor-version boundaries; their bootstrap belongs to the last PPO-controlled endpoint. Overridden buttons, unconsumed native commands and stale actor-version batches are excluded. Latent residual and executed-stick semantics are preserved. These are correctness fixes, not proof of faster learning.
+- The runtime contract was versioned for the changed motor semantics. Previously captured champions fail the compatibility check without being rewritten, moved or silently evaluated under different guidance.
+- Camera-change neutralization is bounded, so repeated indoor cuts cannot suppress movement indefinitely. Observed and remembered exit aliases share cooldown identity. Death, process restart, native save loading and age/mirror changes cannot manufacture successful portal transitions.
+- Context-action label changes and horizontal inertia alone cannot learn a physical button association. Native interaction learning requires a consumed probe plus a specific observed effect. Dialogue closure releases the button and keeps the re-entry guard even when no causal mapping can be credited.
+- Startup observation and a native input fence allow bounded physical probing of the explicitly selected existing save. Unsafe and unknown menu modes fail closed; no semantic button mapping or direct save-loader API is exposed to the motor.
+- The minimal panel reports blocked/modal/local-task states. It no longer presents a blocked local executor as active training.
+
+Validation: `uv run pytest -q` and `web/npm run build`; the final counts are recorded in the evidence index. The pytest native cases skip without g++/clang++; separately, the real C++20 scheduler harness passed 19 cases under MSVC with assertions and `/W4 /WX`. The pinned SoH Release build completed and the resulting executable supplied actual adapter 3.2 telemetry. Browser QA used agent-browser against an isolated local server, verified loading and no browser errors, and did not activate a cognition run.
+
+The V3 inventory below documents the pre-existing architecture. Its remaining gameplay gates are still open.
 
 ## Implemented
 

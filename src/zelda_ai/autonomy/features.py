@@ -126,8 +126,12 @@ def camera_relative_stick(
     if camera_yaw is None:
         camera_yaw = player.yaw * math.pi / 32768.0
     relative = _wrap_angle(world_yaw - camera_yaw)
+    # Pinned SoH consumes Math_Atan2S(relY, -relX), and flips relX in
+    # mirrored worlds. Invert that native transform rather than reflecting
+    # the desired world-space heading across the current camera axis.
+    horizontal_sign = 1.0 if game.mirrored_world else -1.0
     return (
-        max(-1.0, min(1.0, math.sin(relative))),
+        max(-1.0, min(1.0, horizontal_sign * math.sin(relative))),
         max(-1.0, min(1.0, math.cos(relative))),
     )
 
@@ -344,7 +348,7 @@ def goal_guidance(
                 if raw_escape_key is not None
                 else None
             )
-            route_active = not is_frontier and not is_exit and int(
+            route_active = not route_hint.get("local_path") and not is_frontier and not is_exit and int(
                 route_hint.get("path_nodes") or 0
             ) > 1
             frontier_active = is_frontier
@@ -454,7 +458,7 @@ def goal_guidance(
                         float(value) for value in final_exit
                     )
             else:
-                source = "learned_route"
+                source = "observed_local_path" if route_hint.get("local_path") else "learned_route"
             route_path_nodes = max(0, int(route_hint.get("path_nodes") or 0))
             route_confidence = max(
                 0.0, min(1.0, float(route_hint.get("confidence") or 0.0))
@@ -627,6 +631,7 @@ def goal_guidance(
             "direct_probe": direct_probe,
             "stuck_scale": stuck_scale,
             "route_active": route_active,
+            "local_path_active": bool(route_hint and route_hint.get("local_path")),
             "route_path_nodes": route_path_nodes,
             "route_confidence": route_confidence,
             "route_target_gap": route_target_gap,

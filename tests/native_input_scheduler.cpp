@@ -1,4 +1,5 @@
 #include "InputScheduler.hpp"
+#include "StartupGuard.hpp"
 #include <cassert>
 #include <iostream>
 #include <string>
@@ -23,11 +24,13 @@ ScheduledInput tap(uint64_t seq = 1, uint64_t owner = 1) {
 }
 void button_width() {
     const auto pad = ToN64PadState(0x1A000u, -80, 80);
-    assert(pad.buttons == A);
+    // 0x10000 is outside the N64 mask; both low physical bits A and Z survive.
+    assert(pad.buttons == (A | Z));
     assert(pad.stickX == -80 && pad.stickY == 80);
 }
 void end_to_end_latency() {
     auto s = ready(); auto c = tap();
+    s.ObserveSample(1, 1000);
     c.clientSentUs = 1000000;
     assert(s.Accept(c, 1005, 1005000));
     assert(s.Consume(1012, {}, 1012750).pressed & A);
@@ -142,6 +145,27 @@ void renewed_sequence_deadline() {
     assert(!s.Consume(2000).owned);
     assert(std::string(s.Receipt(1)->reason) == "sequence_timeout");
 }
+void startup_fence() {
+    StartupObservation o;
+    o.existing = {true, true, false};
+    o.phase = StartupPhase::Title;
+    assert(StartupInputAllowed(o, 0, A, 0, 0));
+    assert(!StartupInputAllowed(o, 2, A, 0, 0));
+    assert(!StartupInputAllowed(o, 0, A | B, 0, 0));
+    o.phase = StartupPhase::SelectFile; o.cursor = 1;
+    assert(!StartupInputAllowed(o, 0, A, 0, 0));
+    assert(StartupInputAllowed(o, 0, 0, 0, 80));
+    o.cursor = 3; // Copy is visible, but no button can activate it.
+    assert(!StartupInputAllowed(o, 0, A, 0, 0));
+    o.cursor = 4; // Same fence for erase.
+    assert(!StartupInputAllowed(o, 0, A, 0, 0));
+    o.phase = StartupPhase::ConfirmFile; o.cursor = 0; o.selectedSlot = 1;
+    assert(!StartupInputAllowed(o, 0, A, 0, 0));
+    assert(StartupInputAllowed(o, 1, A, 0, 0));
+    o.phase = StartupPhase::Busy;
+    assert(!StartupInputAllowed(o, 1, A, 0, 0));
+    assert(!StartupInputAllowed(o, 1, 0, 0, 80));
+}
 int main(int argc, char** argv) {
     assert(argc == 2); std::string name = argv[1];
     #define CASE(n) if (name == #n) { n(); std::cout << #n << " OK\n"; return 0; }
@@ -149,5 +173,6 @@ int main(int argc, char** argv) {
     CASE(duplicate_once) CASE(duplicate_does_not_renew) CASE(stale_owner) CASE(scene_change)
     CASE(context_change) CASE(watchdog_not_frames) CASE(old_sample) CASE(emergency_stale_state)
     CASE(bad_values) CASE(busy_does_not_drop_action) CASE(bounded_receipts) CASE(renewed_sequence_deadline)
+    CASE(startup_fence)
     return 2;
 }

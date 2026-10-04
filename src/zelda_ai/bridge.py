@@ -296,17 +296,20 @@ class Bridge(asyncio.DatagramProtocol):
             stick_x=stick_x, stick_y=stick_y, lease_ms=lease_ms if active else (200 if self.realtime else 0))
 
     async def sequence_receipt(self, steps: list[dict], *, baseline_buttons=0, edge_buttons=0,
-                               timeout=1.5) -> InputReceipt | None:
+                               timeout=1.5, startup_slot: int | None = None) -> InputReceipt | None:
         """Execute a native input-consumer sequence and return its exact receipt."""
         self.authority.check()
         if not self.realtime:
             raise RuntimeError("native_sequence_not_supported")
         if not steps or len(steps) > 8:
             raise ValueError("sequence must contain between 1 and 8 steps")
+        if startup_slot is not None and not 0 <= startup_slot <= 2:
+            raise ValueError("startup_slot must be 0..2")
+        startup_options = {"startup_slot": startup_slot} if startup_slot is not None else {}
         state = self.state
         context = (state.instance_id, state.scene_epoch, state.context_epoch)
         seq = self._command("sequence", buttons=baseline_buttons, lease_ms=300,
-            edge_buttons=edge_buttons, steps=steps)
+            edge_buttons=edge_buttons, steps=steps, **startup_options)
         deadline = time.monotonic()+timeout
         last_seq = state.seq
         try:
@@ -318,7 +321,7 @@ class Bridge(asyncio.DatagramProtocol):
                     return row
                 if row and row.status in {"rejected", "cancelled", "superseded", "completed"}:
                     return row
-                self._command("renew", lease_ms=300)
+                self._command("renew", lease_ms=300, **startup_options)
             return self.receipts.get(seq)
         finally:
             current = self.state
