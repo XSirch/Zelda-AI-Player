@@ -155,3 +155,30 @@ def test_external_stick_candidate_has_full_authority_and_no_reference_blend(stat
     controller._refresh_camera_relative_setpoint(state)
     assert controller.last_setpoint == actual
     assert controller.pending["trainable"] is False
+
+
+def test_nonblocking_local_policy_response_is_applied_between_ml_samples(state, tmp_path):
+    class Bridge:
+        def command_consumed(self, seq):
+            return True
+    class Policy:
+        refresh_at_motor_cadence = True
+        response = (0, 0)
+        def __call__(self, game, task):
+            return self.response
+    bridge = Bridge()
+    bridge.state = state
+    controller = ContinuousController(bridge, tmp_path / "policy.pt")
+    policy = Policy()
+    controller.start_local_task(LocalTask.traversal(state, stair(state)), stick_policy=policy)
+    controller._ml_step(state)
+    assert controller.last_setpoint.stick_x == 0
+    policy.response = (-40, 20)  # Worker completes between residual-policy samples.
+    controller._refresh_camera_relative_setpoint(state)
+    assert (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y) == (-40, 20)
+    assert controller.last_setpoint.buttons == 0
+    assert controller.pending["trainable"] is False
+    assert controller.pending["stick"] == [-.5, .25]
+    controller.local_task.phase = "verify"
+    controller._refresh_camera_relative_setpoint(state)
+    assert (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y) == (0, 0)

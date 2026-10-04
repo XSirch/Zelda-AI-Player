@@ -1,0 +1,519 @@
+{
+  "date": "2026-10-04",
+  "source": "soh",
+  "provider_calls": 0,
+  "screenshots_to_models": 0,
+  "base_sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+  "collection": {
+    "suite": "g1-f4051bcdf0e6",
+    "report_sha256": "c26623821e40819f7c3358268a7c23975e2b5791752cc3aacc138349b5ed646b",
+    "attempted": 60,
+    "successful": 54,
+    "positive_actions": 931,
+    "dataset_manifest_sha256": "4df5249c93d94d8869d010301164e0a076689e33ace46f910df21c3a2c33d501",
+    "dataset": {
+      "profile": "laya-observed-walking-v1",
+      "split_unit": "episode",
+      "source": "soh",
+      "episode_grouping": "native_instance",
+      "provider_calls": 0,
+      "families": {
+        "observed_cell": 931
+      },
+      "records": {
+        "train": 306,
+        "validation": 304,
+        "test": 321
+      },
+      "episodes": {
+        "train": 1,
+        "validation": 1,
+        "test": 1
+      },
+      "excluded": {
+        "failed_task": 6
+      },
+      "stick_bins": [
+        -80,
+        -60,
+        -40,
+        -20,
+        0,
+        20,
+        40,
+        60,
+        80
+      ],
+      "sha256": {
+        "train": "17a73402c663b0953df115f27216ede01b399723854b046a91d931ec0ea0fcb2",
+        "validation": "6bf96a8f1333314b22fc064f836c6047b2b5383a9c29dada13d815af3734339b",
+        "test": "7b6e4eb9772bd93a34b514475ff764cfc60cf87e414095ae198cc6a3997107ad"
+      },
+      "coverage": "short_observed_walking_only_no_buttons_ladders_combat_or_campaign"
+    }
+  },
+  "experiments": [
+    {
+      "candidate": "candidate-steps1000",
+      "metadata_sha256": "2df81774451b02e6a4f061c52032f85928c32d43aba5143fdf2d9586d240dabb",
+      "metrics_scope": "training_evaluation",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": null,
+      "encoder_layers": null,
+      "encoder_frozen": true,
+      "representation": null,
+      "numeric_history_usage": null,
+      "stick_readout": null,
+      "heads_sha256": "d2c8970788896c1cb3acf030787f81242e0718bf6ef56e42431fb22e1497f09c",
+      "dataset_sha256": "69c90b8a384be9028d12e96ec3483fb8950c17d76047516df184496f6e5044c4",
+      "trainable_parameters": 26512131,
+      "after_validation": {
+        "records": 70,
+        "axis_accuracy": 0.2,
+        "joint_accuracy": 0.04285714285714286,
+        "stick_mae_native_units": 36.17142857142857,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 39.463949999117176,
+        "p95_ms": 45.49760000008973,
+        "max_ms": 47.454500003368594,
+        "physical_gameplay_evaluated": false
+      },
+      "reserved_test": {
+        "records": 46,
+        "axis_accuracy": 0.2391304347826087,
+        "joint_accuracy": 0.021739130434782608,
+        "stick_mae_native_units": 36.04347826086956,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 39.12195000157226,
+        "p95_ms": 45.291499998711515,
+        "max_ms": 54.43319999903906,
+        "physical_gameplay_evaluated": false
+      },
+      "majority_baseline_test": {
+        "stick": [
+          -20,
+          -20
+        ],
+        "axis_accuracy": 0.21739130434782608,
+        "joint_accuracy": 0.0,
+        "stick_mae_native_units": 32.82608695652174
+      },
+      "derived_from_candidate_sha256": null,
+      "derivation_training_updates": null
+    },
+    {
+      "candidate": "candidate-encoder2",
+      "metadata_sha256": "1e38a4d7eada4d1f8e9ce59fbc991a12c070308860f2793151ef5c91fcdea604",
+      "metrics_scope": "training_evaluation",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": null,
+      "encoder_layers": 2,
+      "encoder_frozen": false,
+      "representation": null,
+      "numeric_history_usage": null,
+      "stick_readout": null,
+      "heads_sha256": "ee975cdebf5935a9ff540b812be5b841f0942694771a14a21ce08f888d37e0f2",
+      "dataset_sha256": "69c90b8a384be9028d12e96ec3483fb8950c17d76047516df184496f6e5044c4",
+      "trainable_parameters": 51026691,
+      "after_validation": {
+        "records": 70,
+        "axis_accuracy": 0.3,
+        "joint_accuracy": 0.05714285714285714,
+        "stick_mae_native_units": 24.17142857142857,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 42.83815000053437,
+        "p95_ms": 46.1472999995749,
+        "max_ms": 47.12269999799901,
+        "physical_gameplay_evaluated": false
+      },
+      "reserved_test": {
+        "records": 46,
+        "axis_accuracy": 0.358695652173913,
+        "joint_accuracy": 0.08695652173913043,
+        "stick_mae_native_units": 28.608695652173914,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 36.50039999956789,
+        "p95_ms": 48.83669999981066,
+        "max_ms": 53.88749999838183,
+        "physical_gameplay_evaluated": false
+      },
+      "majority_baseline_test": {
+        "stick": [
+          -20,
+          -20
+        ],
+        "axis_accuracy": 0.21739130434782608,
+        "joint_accuracy": 0.0,
+        "stick_mae_native_units": 32.82608695652174
+      },
+      "derived_from_candidate_sha256": null,
+      "derivation_training_updates": null
+    },
+    {
+      "candidate": "candidate-numeric-ablation",
+      "metadata_sha256": "1a1313d4408a0312a669346491a3c58e4d573230d4dc46318ad34307c3ed3473",
+      "metrics_scope": "training_evaluation",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": null,
+      "encoder_layers": 0,
+      "encoder_frozen": true,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "stick_readout": null,
+      "heads_sha256": "f34ddee66aa90440152edfca2501772f588b9917de5e15d4c44d00a326ab0b3e",
+      "dataset_sha256": "69c90b8a384be9028d12e96ec3483fb8950c17d76047516df184496f6e5044c4",
+      "trainable_parameters": 26645763,
+      "after_validation": {
+        "records": 70,
+        "axis_accuracy": 0.42142857142857143,
+        "joint_accuracy": 0.14285714285714285,
+        "stick_mae_native_units": 15.0,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 7.473949997802265,
+        "p95_ms": 8.859100002155174,
+        "max_ms": 9.360399999422953,
+        "physical_gameplay_evaluated": false
+      },
+      "reserved_test": {
+        "records": 46,
+        "axis_accuracy": 0.4782608695652174,
+        "joint_accuracy": 0.21739130434782608,
+        "stick_mae_native_units": 12.108695652173912,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 7.594799997605151,
+        "p95_ms": 9.186399998725392,
+        "max_ms": 9.303600003477186,
+        "physical_gameplay_evaluated": false
+      },
+      "majority_baseline_test": {
+        "stick": [
+          -20,
+          -20
+        ],
+        "axis_accuracy": 0.21739130434782608,
+        "joint_accuracy": 0.0,
+        "stick_mae_native_units": 32.82608695652174
+      },
+      "derived_from_candidate_sha256": null,
+      "derivation_training_updates": null
+    },
+    {
+      "candidate": "candidate-numeric-sessions",
+      "metadata_sha256": "d6a360c11c28e775873a95e7a75a5cbb5bc8a1bf1a05439e655710e85ac85841",
+      "metrics_scope": "training_evaluation",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": null,
+      "encoder_layers": 0,
+      "encoder_frozen": true,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "stick_readout": null,
+      "heads_sha256": "ae6d40f358f516ec4830f597584ea343ae6d812deac05a02e81ba7b15578d2f7",
+      "dataset_sha256": "4df5249c93d94d8869d010301164e0a076689e33ace46f910df21c3a2c33d501",
+      "trainable_parameters": 26645763,
+      "after_validation": {
+        "records": 304,
+        "axis_accuracy": 0.5674342105263158,
+        "joint_accuracy": 0.3717105263157895,
+        "stick_mae_native_units": 17.401315789473685,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 7.452450001437683,
+        "p95_ms": 8.334400001331232,
+        "max_ms": 8.714299998246133,
+        "physical_gameplay_evaluated": false
+      },
+      "reserved_test": {
+        "records": 321,
+        "axis_accuracy": 0.5825545171339563,
+        "joint_accuracy": 0.38006230529595014,
+        "stick_mae_native_units": 13.649532710280374,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 8.645750000141561,
+        "p95_ms": 10.144300002139062,
+        "max_ms": 11.061400000471622,
+        "physical_gameplay_evaluated": false
+      },
+      "majority_baseline_test": {
+        "stick": [
+          40,
+          -60
+        ],
+        "axis_accuracy": 0.26635514018691586,
+        "joint_accuracy": 0.006230529595015576,
+        "stick_mae_native_units": 37.39408099688473
+      },
+      "derived_from_candidate_sha256": null,
+      "derivation_training_updates": null
+    },
+    {
+      "candidate": "candidate-numeric-batch16",
+      "metadata_sha256": "9a422c2fdbd6f353c8145f8f4b4c8d6d6858b2552d9431f264138f25d75b8510",
+      "metrics_scope": "training_evaluation",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": 16,
+      "encoder_layers": 0,
+      "encoder_frozen": true,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "stick_readout": null,
+      "heads_sha256": "324d0cea8ac0a50e283438beb1ea1d85473c813aaec5fdd8f013628a9ad9049d",
+      "dataset_sha256": "4df5249c93d94d8869d010301164e0a076689e33ace46f910df21c3a2c33d501",
+      "trainable_parameters": 26645763,
+      "after_validation": {
+        "records": 304,
+        "axis_accuracy": 0.6463815789473685,
+        "joint_accuracy": 0.4342105263157895,
+        "stick_mae_native_units": 16.174342105263158,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 6.418550001399126,
+        "p95_ms": 8.787099999608472,
+        "max_ms": 9.322600002633408,
+        "physical_gameplay_evaluated": false
+      },
+      "reserved_test": {
+        "records": 321,
+        "axis_accuracy": 0.6666666666666666,
+        "joint_accuracy": 0.4984423676012461,
+        "stick_mae_native_units": 12.630841121495328,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 5.873549998796079,
+        "p95_ms": 6.892899997183122,
+        "max_ms": 7.453199999872595,
+        "physical_gameplay_evaluated": false
+      },
+      "majority_baseline_test": {
+        "stick": [
+          40,
+          -60
+        ],
+        "axis_accuracy": 0.26635514018691586,
+        "joint_accuracy": 0.006230529595015576,
+        "stick_mae_native_units": 37.39408099688473
+      },
+      "derived_from_candidate_sha256": null,
+      "derivation_training_updates": null
+    },
+    {
+      "candidate": "candidate-numeric-mean",
+      "metadata_sha256": "623fab01dcb77e20be531d8850b150b185a8138b91fc1a125595aa763e1f91fe",
+      "metrics_scope": "source_argmax_training_metrics",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": 16,
+      "encoder_layers": 0,
+      "encoder_frozen": true,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "stick_readout": "expectation",
+      "heads_sha256": "324d0cea8ac0a50e283438beb1ea1d85473c813aaec5fdd8f013628a9ad9049d",
+      "dataset_sha256": "4df5249c93d94d8869d010301164e0a076689e33ace46f910df21c3a2c33d501",
+      "trainable_parameters": 26645763,
+      "after_validation": {
+        "records": 304,
+        "axis_accuracy": 0.6463815789473685,
+        "joint_accuracy": 0.4342105263157895,
+        "stick_mae_native_units": 16.174342105263158,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 6.418550001399126,
+        "p95_ms": 8.787099999608472,
+        "max_ms": 9.322600002633408,
+        "physical_gameplay_evaluated": false
+      },
+      "reserved_test": {
+        "records": 321,
+        "axis_accuracy": 0.6666666666666666,
+        "joint_accuracy": 0.4984423676012461,
+        "stick_mae_native_units": 12.630841121495328,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 5.873549998796079,
+        "p95_ms": 6.892899997183122,
+        "max_ms": 7.453199999872595,
+        "physical_gameplay_evaluated": false
+      },
+      "majority_baseline_test": {
+        "stick": [
+          40,
+          -60
+        ],
+        "axis_accuracy": 0.26635514018691586,
+        "joint_accuracy": 0.006230529595015576,
+        "stick_mae_native_units": 37.39408099688473
+      },
+      "derived_from_candidate_sha256": "9a422c2fdbd6f353c8145f8f4b4c8d6d6858b2552d9431f264138f25d75b8510",
+      "derivation_training_updates": 0
+    }
+  ],
+  "native_evaluations": [
+    {
+      "suite": "g1-69de0f082946",
+      "report_sha256": "14a7e7430782c706383812624e6b14e86f2f6fd7af539e002c1a2e4e6f34b067",
+      "manifest_sha256": "7204e6a645759fccb2812534fafa2972c21b0303346cac05a965b9c9b78e19a4",
+      "candidate_sha256": {
+        "candidate.json": "d6a360c11c28e775873a95e7a75a5cbb5bc8a1bf1a05439e655710e85ac85841",
+        "heads.safetensors": "ae6d40f358f516ec4830f597584ea343ae6d812deac05a02e81ba7b15578d2f7"
+      },
+      "sessions": 3,
+      "tasks_per_session": 5,
+      "attempted": 15,
+      "successful": 8,
+      "consumed_actions": 429,
+      "failure_reasons": [
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress"
+      ],
+      "objectives_unchanged": true,
+      "reference_blend": 0,
+      "training_updates": 0,
+      "provider_calls": 0,
+      "decision_budget_ms": 100,
+      "actuation_grace_ms": 50,
+      "responses": 430,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "timings": {
+        "inference_ms": {
+          "samples": 430,
+          "p50": 13.800299999275012,
+          "p95": 28.118700000050012,
+          "max": 33.83169999870006
+        },
+        "round_trip_ms": {
+          "samples": 430,
+          "p50": 15.062850001413608,
+          "p95": 29.264600001624785,
+          "max": 34.84100000059698
+        },
+        "output_age_ms": {
+          "samples": 584,
+          "p50": 63.3526499987056,
+          "p95": 66.55529999989085,
+          "max": 70.0488000002224
+        }
+      },
+      "timing_limit": "output_age ends at arbiter, not native consumption or physical reaction",
+      "g2_complete": false,
+      "campaign_complete": false,
+      "sword_acquisition_evaluated": false
+    },
+    {
+      "suite": "g1-d19fcdce6b4a",
+      "report_sha256": "5531d30ad29a9126a214c9049eea3d7b55eba9b0a567c29424bb3f7bb80e0c4e",
+      "manifest_sha256": "d74367d2e6b04ad49f6a458c72462bbb97f171a8f3fd1a988bccf09a754cedf0",
+      "candidate_sha256": {
+        "candidate.json": "623fab01dcb77e20be531d8850b150b185a8138b91fc1a125595aa763e1f91fe",
+        "heads.safetensors": "324d0cea8ac0a50e283438beb1ea1d85473c813aaec5fdd8f013628a9ad9049d"
+      },
+      "sessions": 3,
+      "tasks_per_session": 5,
+      "attempted": 15,
+      "successful": 8,
+      "consumed_actions": 504,
+      "failure_reasons": [
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress",
+        "no_geometric_progress"
+      ],
+      "objectives_unchanged": true,
+      "reference_blend": 0,
+      "training_updates": 0,
+      "provider_calls": 0,
+      "decision_budget_ms": 100,
+      "actuation_grace_ms": 50,
+      "responses": 504,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "timings": {
+        "inference_ms": {
+          "samples": 504,
+          "p50": 10.533550001127878,
+          "p95": 23.795199995220173,
+          "max": 37.413400001241826
+        },
+        "round_trip_ms": {
+          "samples": 504,
+          "p50": 11.66785000168602,
+          "p95": 24.933900000178255,
+          "max": 38.47759999916889
+        },
+        "output_age_ms": {
+          "samples": 719,
+          "p50": 63.02050000522286,
+          "p95": 65.93060000159312,
+          "max": 89.47739999712212
+        }
+      },
+      "timing_limit": "output_age ends at arbiter, not native consumption or physical reaction",
+      "g2_complete": false,
+      "campaign_complete": false,
+      "sword_acquisition_evaluated": false
+    }
+  ],
+  "decoder_selection": {
+    "source": "validation_only",
+    "artifact_sha256": "b50671a7b8f2b238be069a1dc328fac825ba9dc6ca5a2aa8029b56f3e1979b56",
+    "result": {
+      "split": "validation_only",
+      "axes": 608,
+      "argmax_mae": 16.14144736842105,
+      "distribution_mean_mae": 13.804276315789474
+    }
+  },
+  "expectation_decoder_fresh_benchmark": {
+    "source": "actual local CUDA CLI stdout, fresh candidate reload",
+    "records": 321,
+    "stick_readout": "expectation",
+    "accuracy_scope": "choice_argmax_labels",
+    "axis_accuracy": 0.6666666666666666,
+    "joint_accuracy": 0.4984423676012461,
+    "stick_mae_native_units": 10.766355140186915,
+    "latency_samples": 50,
+    "p50_ms": 7.507599995733472,
+    "p95_ms": 10.493800000404008,
+    "max_ms": 11.345800005074125,
+    "physical_gameplay_evaluated": false
+  },
+  "limits": [
+    "original 228-action data became development data after repeated diagnostics",
+    "only three native sessions in the new dataset, one per split; no broad independent generalization proof",
+    "new validation/test data have now been inspected and must not be reused as pristine future holdouts",
+    "walking only; no learned buttons, ladders, combat, aiming or campaign ability",
+    "decoder-only derivative retains original argmax training metrics; fresh benchmark is separate",
+    "no G2 or completion-champion promotion; primary UI still uses the existing motor"
+  ],
+  "validation": {
+    "pytest_passed": 318,
+    "pytest_skipped": 20,
+    "skip_reason": "native tests require unavailable g++/clang++",
+    "web_build": "passed",
+    "ruff_owned_files": "passed",
+    "native_cpp_changes": false,
+    "new_native_build_claimed": false,
+    "encoding": "strict_utf8_passed_all_15_owned_source_docs_and_test_files_no_replacement_or_crcrlf"
+  }
+}

@@ -4,30 +4,31 @@ Jogador autônomo para **The Legend of Zelda: Ocarina of Time** no **Ship of Har
 
 A fundação do motor V4 corrige a projeção horizontal invertida do controle nativo e separa os fragmentos PPO nas intervenções. O lote G1 alcançou 99/100 saídas e retornos físicos com o Arquivo 2, sem chamadas de IA. O currículo de superfícies mede o aprendizado local separadamente. A campanha completa continua sem qualificação; os resultados e as limitações estão em [docs/STATUS.md](docs/STATUS.md).
 
-## Laya base: piloto local de especialização
+## Laya base: treino e avaliação local
 
-O treinamento de Zelda parte do [Laya base publicado](https://huggingface.co/convaiinnovations/laya), com revisão e SHA-256 fixados. Os pesos coincidem com o checkpoint genérico; nenhum ajuste ou dado de trading entra no treino. O ambiente `.local/laya-env` é separado do aplicativo e usa o código Laya fixado em `573e5b62696ba441230cd6be71d593331b5d23af`.
+O treino parte do [Laya base publicado](https://huggingface.co/convaiinnovations/laya), com revisão e SHA-256 fixados, em um ambiente CUDA separado do aplicativo. Nenhum peso ou dado de trading entra no treino. O novo candidato recebe telemetria numérica limitada em uma projeção treinável ligada às camadas de decisão do Laya. O encoder congelado reutiliza apenas a representação do esquema fixo; os valores observados passam pela rede a cada decisão.
 
-O primeiro piloto usa 228 ações realmente consumidas de 12 tarefas locais bem-sucedidas. A divisão reserva episódios inteiros: 112 ações de seis episódios para treino, 70 de três para validação e 46 de três para teste. Os exemplos contêm até quatro frames de telemetria limitada e rótulos dos dois eixos físicos do analógico. Falhas permanecem na evidência original e não recebem rótulo positivo.
+A coleta produziu 931 ações consumidas de 54 tarefas bem-sucedidas em 60 tentativas reais. A divisão mantém sessões nativas inteiras separadas. Em dois lotes de jogo, o modelo completou **8 de 15 deslocamentos curtos** por lote, sem mistura com o controle de referência e sem atualização durante a avaliação. A resposta local teve percentil 95 de **29,3 ms e 24,9 ms**, dentro da meta inicial de **100 ms por decisão**. O tempo completo até a reação física ainda precisa de medição.
 
-Foram executadas 120 atualizações em 26.512.131 parâmetros das camadas de decisão, com o encoder congelado. O piloto **não está aprovado para jogar**: no teste reservado acertou 19,6% dos eixos e nenhum par completo, com erro médio de 47,26 unidades; o controle constante de referência estatística teve erro de 32,83. A medição separada de 50 inferências teve mediana de 90,0 ms e percentil 95 de 118,4 ms, incluindo tokenização, transferência, duas decisões e leitura da saída. O operador definiu **100 ms por decisão como meta inicial**: a mediana fica dentro dessa meta, enquanto o percentil 95 a ultrapassa. O tempo de reação completo no jogo ainda não foi medido; a qualidade insuficiente das decisões continua sendo o principal limite deste candidato.
-
-Este conjunto cobre pequenos deslocamentos e superfícies baixas da casa. Não contém exemplos de escalada, combate, diálogos, botões ou aquisição da Kokiri Sword. O candidato permanece separado do PPO e não é conectado automaticamente ao botão **INICIAR**. Evidência e limites: [docs/STATUS.md](docs/STATUS.md) e [índice do piloto](docs/validation/laya_base_2026-10-04.json).
+O candidato continua experimental e não foi conectado automaticamente ao botão **INICIAR**. A precisão ainda é insuficiente para navegação confiável. O perfil cobre somente caminhada: não aprende botões, escadas, combate, diálogos ou a coleta da Kokiri Sword. Resultados, falhas e limites estão em [docs/STATUS.md](docs/STATUS.md) e no [índice de avaliação](docs/validation/laya_runtime_2026-10-04.json). O [primeiro piloto](docs/validation/laya_base_2026-10-04.json) permanece como evidência histórica.
 
 Preparação e execução no Windows com NVIDIA/CUDA, sem chamadas a Codex/OpenRouter:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/setup_laya.ps1
-
-# Diretórios de saída devem ser novos. A preparação baixa os arquivos públicos;
-# --weights-source aceita uma cópia existente somente se seu SHA-256 for o da base.
 .local/laya-env/Scripts/python.exe -m zelda_ai.laya_training prepare-base .local/laya/base
-.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training export-surfaces .local/qualification/g1-da24d7be4d70 .local/laya/dataset-novo
-.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training train .local/laya/base .local/laya/dataset-novo .local/laya/candidato-novo --steps 120
-.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training benchmark .local/laya/base .local/laya/dataset-novo --candidate .local/laya/candidato-novo
+
+# Use diretórios de saída novos e uma cópia local existente de saves/configuração.
+# Carrega o Arquivo 2 pelos controles normais e coleta apenas telemetria/recibos.
+uv run python -m zelda_ai.laya_curriculum C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --sessions 3 --tasks 20
+
+# Substitua <lote> pelo diretório informado pela coleta, que já contém o dataset.
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training train .local/laya/base .local/qualification/<lote>/dataset .local/laya/candidato-novo --steps 1000 --batch-size 16 --numeric-telemetry
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training benchmark .local/laya/base .local/qualification/<lote>/dataset --candidate .local/laya/candidato-novo
+uv run python -m zelda_ai.laya_curriculum C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --sessions 3 --tasks 5 --candidate .local/laya/candidato-novo --base .local/laya/base --python .local/laya-env/Scripts/python.exe
 ```
 
-O loader valida os arquivos da base, a origem da biblioteca, o perfil e o checksum do candidato. O treino e a inferência usam arquivos locais; entrada truncada, dados sem recibos, mistura de episódios ou ausência de CUDA causam erro explícito. Checkpoints, exemplos e cópias de pesos ficam em `.local/` e não são distribuídos no repositório.
+O loader valida a base, a origem da biblioteca e os pesos do candidato. A avaliação usa cópias de trabalho isoladas, libera o controle ao encerrar e verifica os hashes dos artefatos congelados. Entrada inválida, dados sem recibos, mistura de sessões ou ausência de CUDA causam erro explícito. Modelos, telemetria e saves ficam em `.local/` e não são distribuídos no repositório.
 
 ## Autonomy V3
 

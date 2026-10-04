@@ -385,7 +385,29 @@ class ContinuousController:
         )
 
     def _refresh_camera_relative_setpoint(self, game):
-        """Refresh only camera projection; never choose/replan a waypoint here."""
+        """Refresh nonblocking local output or camera projection without replanning."""
+        if (
+            self.local_task is not None
+            and self.last_setpoint.reason == "local_task"
+            and getattr(self.local_stick_policy, "refresh_at_motor_cadence", False)
+        ):
+            task = self.local_task
+            if task.terminal or task.phase == "verify":
+                stick = (0, 0)
+            else:
+                stick = self.local_stick_policy(game, task)
+                if len(stick) != 2 or not all(
+                    isinstance(v, (int, float)) and math.isfinite(v) for v in stick
+                ):
+                    task.interrupt("invalid_local_policy_action")
+                    stick = (0, 0)
+            x, y = (max(-80, min(80, round(v))) for v in stick)
+            self.last_setpoint = Setpoint(stick_x=x, stick_y=y, reason="local_task")
+            self.last_stick = (x / 80, y / 80)
+            if self.pending is not None:
+                self.pending["stick"] = list(self.last_stick)
+                self.pending["trainable"] = False
+            return
         camera_state = self._camera_state(game)
 
         if camera_state != "stable":

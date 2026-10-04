@@ -12,7 +12,18 @@ from zelda_ai.laya_data import (
     quantize,
     validate_record,
 )
-from zelda_ai.laya_training import prepare_base
+from zelda_ai.laya_training import prepare_base, specialization_keys
+
+
+def test_specialization_keys_keep_frozen_encoder_out_of_candidate():
+    keys = {'head.weight', 'temperature', 'encoder.embeddings.weight'}
+    keys.update(f'encoder.layers.{i}.weight' for i in range(28))
+    assert specialization_keys(keys, 0) == {'head.weight', 'temperature'}
+    assert specialization_keys(keys, 2) == {
+        'head.weight', 'temperature', 'encoder.layers.26.weight', 'encoder.layers.27.weight'}
+    for bad in (-1, 5, True, 1.5):
+        with pytest.raises(ValueError):
+            specialization_keys(keys, bad)
 
 
 def record(episode="one"):
@@ -105,3 +116,29 @@ def test_export_reserves_whole_real_episodes_and_checks_receipts(tmp_path):
     path.write_text(json.dumps(task), encoding="utf-8")
     with pytest.raises(ValueError, match="receipt"):
         export_surfaces(suite, tmp_path / "invalid-dataset")
+
+
+def test_native_session_grouping_keeps_neighboring_tasks_together_across_families(tmp_path):
+    suite = tmp_path / 'suite'
+    for i in range(10):
+        session = i // 2
+        path = suite / 'demonstrations' / f'trial-{i:04}' / 'motor' / 'task.json'
+        path.parent.mkdir(parents=True)
+        action = {'source': 'soh', 'controller': 'reference', 'first_tick': i+1,
+                  'buttons': 0, 'successful_episode': True, 'reference_blend': 0,
+                  'command_seq': i+1, 'observation_seq': i+10,
+                  'features': [1, 0, 0, .5, 0, 0, 0, 0, 1], 'action': [-.5, .25]}
+        instance = {'source': 'soh', 'instance_id': f'native-{session}'}
+        task = {'success': True, 'source': 'soh', 'provider_calls': 0, 'run_updates': 0,
+                'objective_unchanged': True, 'reference_blend': 0,
+                'initial': instance, 'final': instance,
+                'task': {'kind': 'observed_cell' if i % 2 else 'stairs_or_slope_up'},
+                'receipts': [{'seq': i+1, 'first_tick': i+1}], 'demonstrations': [action]}
+        path.write_text(json.dumps(task), encoding='utf-8')
+    output = tmp_path / 'dataset'
+    manifest = export_surfaces(suite, output, group_native_sessions=True)
+    assert manifest['episode_grouping'] == 'native_instance'
+    assert manifest['episodes'] == {'train': 3, 'validation': 1, 'test': 1}
+    assert manifest['records'] == {'train': 6, 'validation': 2, 'test': 2}
+    _, splits = load_dataset(output)
+    assert len({r['episode_id'] for rows in splits.values() for r in rows}) == 5

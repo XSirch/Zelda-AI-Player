@@ -1,5 +1,34 @@
 # Implementation status — V3, V4 motor foundation and local curriculum
 
+## Continuous Laya walking evaluation on 2026-10-04
+
+The accepted target is **100 ms per local decision**. The frozen numeric-conditioned candidate now meets that response target in two small real SoH batches. It is still an experimental walking motor, with **8/15 successful short walking tasks in each batch**. Neither batch establishes reliable navigation, G2 qualification, sword acquisition or campaign completion. Sanitized evidence: [validation/laya_runtime_2026-10-04.json](validation/laya_runtime_2026-10-04.json).
+
+The earlier 120-update pilot was reproduced as worse than the training-only constant baseline. Increasing head-only training to 1,000 updates still lost to that baseline (development MAE 36.04 versus 32.83). Updating the last two encoder layers improved development MAE to 28.61, but response age under concurrent game rendering was unreliable. The original 228-action dataset has been repeatedly inspected during diagnosis and is now development data.
+
+Two changes address observed failures. First, the asynchronous local policy may refresh its nonblocking output at the existing 20 Hz motor cadence; otherwise replies arriving between 10 Hz policy samples expired before reaching the arbiter. The regression was reproduced before the fix. Ordinary PPO residual and camera-projection behavior is preserved. Second, a trainable numeric projection feeds current bounded telemetry into the actual pretrained Laya decision head. The frozen encoder caches only the constant schema and physical options, never live game values. This is a changed input representation, not a claim that textual numeric reasoning was learned. Numeric candidates currently use the last frame only; original text candidates remain compatible.
+
+Reference collection used three continuous native sessions, with ordinary Arquivo 2 startup in isolated copied homes: **60 attempted tasks, 54 successful, 931 positive consumed actions**. Failed tasks remain in the evidence without positive labels. Whole native instances, including neighboring tasks across families, stay in one split: 306 training actions, 304 validation actions and 321 test actions. Only one session supplies each split, which limits generalization evidence.
+
+| Candidate | Training updates / batch | Offline test stick MAE | Physical short walking |
+| --- | --- | --- | --- |
+| Numeric telemetry, argmax | 1,000 / 2 | 13.65 | 8/15 |
+| Numeric telemetry, argmax | 1,000 / 16 | 12.63 | Not separately evaluated |
+| Same batch-16 weights, expectation decoder | No additional updates | 10.77, fresh reload | 8/15 |
+| Constant stick chosen from training labels | No model updates | 37.39 | Not a physical candidate |
+
+The expectation decoder was chosen using validation predictions. Its immutable derivative keeps exactly the batch-16 weights and the parent's original argmax training metrics; the separately recorded fresh benchmark measures its actual decoder. Argmax classification accuracy and continuous-stick error have separate scopes. After these diagnostics the new validation/test splits have also been inspected; future promotion needs new independent holdouts.
+
+In `g1-69de0f082946`, IPC response p95 was **29.26 ms**, maximum 34.84 ms (430 replies). In `g1-d19fcdce6b4a`, p95 was **24.93 ms**, maximum 38.48 ms (504 replies). Neither batch had expired responses or context rejections. Observed request-submission-to-arbiter ages had p95 66.56/65.93 ms and maxima 70.05/89.48 ms. The policy accepts replies only within 100 ms and allows at most one 50 ms motor tick for actuation. These measurements end at the arbiter: native input-consumption and complete physical reaction latency are **not** measured by these counters.
+
+Evaluations chain five model-controlled tasks per native session, with zero reference steering blend, zero online updates and unchanged strategic objectives. Real consumed input receipts and actual positions establish physical movement; offline loss is not treated as gameplay success. The local worker never owns the bridge or invokes a provider. Outputs fail closed on stale/mismatched replies, changed game/task context, unsupported modal or ladder/ledge states, invalid values and stop. Evaluation checks candidate, original motor/map and pinned-source hashes. The stopped direct-play game was normally closed before these runs; all evaluation games use separate working copies. This does not assert that closing the original game could not save its state normally.
+
+The four earlier native pilots made 18 attempts: nine reached candidate control and nine failed preparation. No candidate task succeeded in those pilots. Preparation failures are recorded separately from control failures. The cadence regression and late responses explain observed failures in those batches, without attributing every later movement failure to latency.
+
+No screenshots or paid/provider requests were used. Original PPO and persistent maps remain separate. The primary INICIAR flow has not been switched to Laya. Learned buttons, climbing, combat, inventory, sword acquisition, broad navigation reliability and the campaign remain unqualified.
+
+Validation: **318 pytest cases passed, 20 skipped**, with the existing Starlette/httpx warning. Skips require unavailable g++/clang++; this patch makes no C++ changes and claims no new native build. Web production build and focused Ruff checks passed. Final encoding verification is recorded in the evidence index.
+
 ## Generic Laya base specialization pilot on 2026-10-04
 
 The operator clarified that the starting point is the generic Laya base, specialized exclusively for Zelda. The local generic weights were verified against the public `convaiinnovations/laya` repository at revision `7b928d828b7b0e022f929d9bd2e44165aa270148`: SHA-256 `891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c`. Only those matching weights were copied; the pinned revision supplied the configuration/tokenizer files. No trading checkpoint or trading dataset was loaded.

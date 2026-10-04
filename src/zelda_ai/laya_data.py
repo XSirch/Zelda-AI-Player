@@ -105,10 +105,10 @@ def majority_baseline(training: list[dict], reserved: list[dict]) -> dict:
                                           for r in reserved for i in (0, 1))/(2*len(reserved))}
 
 
-def export_surfaces(suite: Path, output: Path) -> dict:
+def export_surfaces(suite: Path, output: Path, *, group_native_sessions=False) -> dict:
     if output.exists():
         raise FileExistsError("Export into a new dataset directory")
-    by_family, skipped = defaultdict(list), Counter()
+    by_family, skipped = defaultdict(dict), Counter()
     for path in sorted((suite / "demonstrations").glob("trial-*/motor/task.json")):
         task = json.loads(path.read_text(encoding="utf-8"))
         if not task.get("success"):
@@ -123,6 +123,13 @@ def export_surfaces(suite: Path, output: Path) -> dict:
             raise ValueError("Unsupported task family")
         receipts = {r["seq"]: r for r in task["receipts"]}
         episode = digest(path)
+        if group_native_sessions:
+            initial, final = task.get('initial', {}), task.get('final', {})
+            instance = initial.get('instance_id')
+            if (not instance or initial.get('source') != 'soh' or final.get('source') != 'soh'
+                    or instance != final.get('instance_id')):
+                raise ValueError('Native-session grouping requires matching actual instance identities')
+            episode = hashlib.sha256(instance.encode('utf-8')).hexdigest()
         history, rows, last = [], [], -1
         for action in task["demonstrations"]:
             seq = action["observation_seq"]
@@ -141,16 +148,28 @@ def export_surfaces(suite: Path, output: Path) -> dict:
             validate_record(row)
             rows.append(row)
         if rows:
-            by_family[family].append((episode, rows))
+            by_family[family].setdefault(episode, []).extend(rows)
     splits = {name: [] for name in ("train", "validation", "test")}
+    native_owners = {}
+    if group_native_sessions:
+        native_ids = sorted({episode for family in by_family.values() for episode in family})
+        if len(native_ids) < 3:
+            raise ValueError('At least three real native sessions required')
+        native_owners = {episode: 'test' if i == len(native_ids)-1 else
+                         'validation' if i == len(native_ids)-2 else 'train'
+                         for i, episode in enumerate(native_ids)}
     for family, episodes in by_family.items():
         if len(episodes) < 3:
             raise ValueError(f"At least three real successful episodes required per family: {family}")
-        ordered = sorted(episodes)
+        ordered = sorted(episodes.items())
         # Last two whole episodes are reserved; no frame shuffle or family leakage.
-        for i, (_, rows) in enumerate(ordered):
-            name = "test" if i == len(ordered)-1 else "validation" if i == len(ordered)-2 else "train"
+        for i, (episode, rows) in enumerate(ordered):
+            name = native_owners[episode] if group_native_sessions else (
+                "test" if i == len(ordered)-1 else "validation" if i == len(ordered)-2 else "train")
             splits[name].extend(rows)
+    if group_native_sessions:
+        for rows in splits.values():
+            rows.sort(key=lambda r: (r['episode_id'], r['observation_seq'], r['command_seq']))
     if any(not rows for rows in splits.values()):
         raise ValueError("Insufficient real gameplay demonstrations")
     output.mkdir(parents=True)
@@ -159,6 +178,7 @@ def export_surfaces(suite: Path, output: Path) -> dict:
             "".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) + "\n" for r in rows),
             encoding="utf-8")
     manifest = {"profile": PROFILE, "split_unit": "episode", "source": "soh",
+                "episode_grouping": "native_instance" if group_native_sessions else "task",
                 "provider_calls": 0, "families": dict(Counter(r["family"] for r in sum(splits.values(), []))),
                 "records": {k: len(v) for k, v in splits.items()},
                 "episodes": {k: len({r["episode_id"] for r in v}) for k, v in splits.items()},
