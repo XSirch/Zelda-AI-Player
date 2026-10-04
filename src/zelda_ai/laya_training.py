@@ -40,6 +40,7 @@ BASE_FILES_SHA256 = {
 }
 LAYA_SOURCE_REVISION = "573e5b62696ba441230cd6be71d593331b5d23af"
 MAX_LEN, HEAD_MAX_LEN = 512, 96
+LOSS_MODES = ("choice", "stick_mse")
 
 
 def write_json(path, data):
@@ -159,6 +160,8 @@ def load_model(base: Path, candidate: Path | None = None, *, encoder_layers=0, n
         if metadata.get("encoder_frozen") is not (encoder_layers == 0):
             raise ValueError("Encoder specialization metadata contradicts the saved scope")
         representation = metadata.get("representation", TEXT_REPRESENTATION)
+        if metadata.get("loss_mode", "choice") not in LOSS_MODES:
+            raise ValueError("Unknown supervised walking loss")
         model.stick_readout = metadata.get("stick_readout", "argmax")
         if model.stick_readout not in {"argmax", "expectation"}:
             raise ValueError("Unknown physical stick decoder")
@@ -247,6 +250,40 @@ def decode_stick(logits, readout="argmax"):
     raise ValueError("Unknown physical stick decoder")
 
 
+def supervised_stick_loss(logits, labels, executed_stick, *, mode="choice"):
+    """Train choices or their continuous mean against consumed native actions.
+
+    Regression stays differentiable through probabilities. Rounded decoder
+    output must never be used for gradients, nor quantized labels as its target.
+    This supervised executed-action objective is separate from PPO residuals.
+    """
+    import torch
+
+    if mode not in LOSS_MODES:
+        raise ValueError("Unknown supervised walking loss")
+    if (
+        logits.ndim != 2
+        or logits.shape[1] != len(STICK_BINS)
+        or logits.shape[0] == 0
+        or logits.shape[0] % 2
+        or not torch.isfinite(logits).all()
+    ):
+        raise ValueError("Invalid two-axis physical stick logits")
+    if mode == "choice":
+        return torch.nn.functional.cross_entropy(logits, labels)
+    target = torch.as_tensor(executed_stick, dtype=torch.float32, device=logits.device)
+    if (
+        target.ndim != 2
+        or target.shape != (logits.shape[0] // 2, 2)
+        or not torch.isfinite(target).all()
+        or (target.abs() > 80).any()
+    ):
+        raise ValueError("Invalid or misaligned consumed native actions")
+    bins = torch.tensor(STICK_BINS, dtype=torch.float32, device=logits.device)
+    predicted = torch.softmax(logits.float(), -1) @ (bins / 80)
+    return torch.nn.functional.mse_loss(predicted, target.reshape(-1) / 80)
+
+
 def derive_readout(base: Path, source: Path, output: Path, readout: str):
     if output.exists() or readout not in {"argmax", "expectation"}:
         raise ValueError("Use a new immutable output and a supported decoder")
@@ -325,6 +362,7 @@ def train(
     encoder_layers=0,
     numeric=False,
     batch_size=2,
+    loss_mode="choice",
 ):
     import torch
     from safetensors.torch import save_file
@@ -333,10 +371,14 @@ def train(
         raise ValueError("Use a new immutable candidate directory and 1..1000 pilot updates")
     if not 1 <= batch_size <= 16:
         raise ValueError("Use a bounded training batch of one to sixteen real observations")
+    if loss_mode not in LOSS_MODES:
+        raise ValueError("Unknown supervised walking loss")
     manifest, splits = load_dataset(dataset)
     torch.manual_seed(seed)
     rng = random.Random(seed)
     model, tokenizer = load_model(base, encoder_layers=encoder_layers, numeric=numeric)
+    if loss_mode == "stick_mse":
+        model.stick_readout = "expectation"
     before = evaluate(model, tokenizer, splits["validation"])
     parameters = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(parameters, lr=1e-4, weight_decay=0.01)
@@ -348,7 +390,9 @@ def train(
         batch = batch_for(tokenizer, rows, numeric=numeric)
         optimizer.zero_grad(set_to_none=True)
         logits = forward(model, batch)
-        loss = torch.nn.functional.cross_entropy(logits, batch["label"])
+        loss = supervised_stick_loss(
+            logits, batch["label"], [r["executed_stick"] for r in rows], mode=loss_mode
+        )
         if not torch.isfinite(loss):
             raise RuntimeError("Nonfinite pilot training loss")
         loss.backward()
@@ -373,6 +417,8 @@ def train(
         "steps": steps,
         "seed": seed,
         "batch_size": batch_size,
+        "loss_mode": loss_mode,
+        "stick_readout": model.stick_readout,
         "trainable_parameters": sum(p.numel() for p in parameters),
         "encoder_frozen": encoder_layers == 0,
         "encoder_layers": encoder_layers,
@@ -421,6 +467,7 @@ def main():
     training.add_argument("--encoder-layers", type=int, default=0, choices=range(5))
     training.add_argument("--numeric-telemetry", action="store_true")
     training.add_argument("--batch-size", type=int, default=2, choices=range(1, 17))
+    training.add_argument("--loss-mode", choices=LOSS_MODES, default="choice")
     benchmark = commands.add_parser("benchmark")
     benchmark.add_argument("base", type=Path)
     benchmark.add_argument("dataset", type=Path)
@@ -445,6 +492,7 @@ def main():
             encoder_layers=args.encoder_layers,
             numeric=args.numeric_telemetry,
             batch_size=args.batch_size,
+            loss_mode=args.loss_mode,
         )
     elif args.command == "derive-readout":
         result = derive_readout(args.base, args.source, args.output, args.readout)

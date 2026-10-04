@@ -8,9 +8,11 @@ A fundação do motor V4 corrige a projeção horizontal invertida do controle n
 
 O treino parte do [Laya base publicado](https://huggingface.co/convaiinnovations/laya), com revisão e SHA-256 fixados, em um ambiente CUDA separado do aplicativo. Nenhum peso ou dado de trading entra no treino. O novo candidato recebe telemetria numérica limitada em uma projeção treinável ligada às camadas de decisão do Laya. O encoder congelado reutiliza apenas a representação do esquema fixo; os valores observados passam pela rede a cada decisão.
 
-A coleta ampliada produziu 1.788 ações consumidas de 114 tarefas bem-sucedidas em 120 tentativas reais. A divisão mantém sessões nativas inteiras separadas, com quatro sessões para treino. No lote mais recente, o modelo completou **18 de 30 deslocamentos curtos**, sem mistura com o controle de referência e sem atualização durante a avaliação. A resposta local teve percentil 95 de **29,1 ms** e máximo de **43,6 ms**, dentro da meta inicial de **100 ms por decisão**. O tempo completo até a reação física ainda precisa de medição.
+A coleta ampliada produziu 1.788 ações consumidas de 114 tarefas bem-sucedidas em 120 tentativas reais. A divisão mantém sessões nativas inteiras separadas, com quatro sessões para treino. O treino que minimiza o erro do analógico executado reduziu o erro médio offline de 15,57 para 5,63 unidades. Com o mesmo seed, os lotes reais passaram de **18/30** com classificação para **26/30** com esse treino e **28/30** após usar o contato físico com paredes na navegação local. As posições seguintes dependem do movimento de cada modelo; essa comparação não é perfeitamente pareada.
 
-O candidato continua experimental e não foi conectado automaticamente ao botão **INICIAR**. A precisão ainda é insuficiente para navegação confiável. O perfil cobre somente caminhada: não aprende botões, escadas, combate, diálogos ou a coleta da Kokiri Sword. Resultados, falhas e limites estão em [docs/STATUS.md](docs/STATUS.md) e no [índice de avaliação](docs/validation/laya_runtime_2026-10-04.json). O [primeiro piloto](docs/validation/laya_base_2026-10-04.json) permanece como evidência histórica.
+O último lote manteve zero mistura com o controle de referência e zero atualização durante a avaliação. A resposta local teve percentil 95 de **28,9 ms** e máximo de **46,5 ms**, dentro da meta inicial de **100 ms por decisão**. O tempo completo até a reação física ainda precisa de medição; a idade máxima da saída amostrada foi de 101,3 ms, incluindo a espera pelo motor.
+
+O candidato continua experimental e não foi conectado automaticamente ao botão **INICIAR**. A caminhada ainda não atingiu a qualificação exigida. O perfil cobre somente caminhada: não aprende botões, escadas, combate, diálogos ou a coleta da Kokiri Sword. Resultados, falhas e limites estão em [docs/STATUS.md](docs/STATUS.md), no [índice do treino com erro físico](docs/validation/laya_stick_loss_2026-10-04.json) e no [histórico de avaliação](docs/validation/laya_runtime_2026-10-04.json). O [primeiro piloto](docs/validation/laya_base_2026-10-04.json) permanece como evidência histórica.
 
 Preparação e execução no Windows com NVIDIA/CUDA, sem chamadas a Codex/OpenRouter:
 
@@ -22,9 +24,10 @@ powershell -ExecutionPolicy Bypass -File scripts/setup_laya.ps1
 # Carrega o Arquivo 2 pelos controles normais e coleta apenas telemetria/recibos.
 uv run python -m zelda_ai.laya_curriculum C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --sessions 3 --tasks 20
 
-# Substitua <lote> pelo diretório informado pela coleta, que já contém o dataset.
-.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training train .local/laya/base .local/qualification/<lote>/dataset .local/laya/candidato-novo --steps 1000 --batch-size 16 --numeric-telemetry
-.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training benchmark .local/laya/base .local/qualification/<lote>/dataset --candidate .local/laya/candidato-novo
+# Substitua o nome abaixo pelo lote informado pela coleta, que já contém o dataset.
+$lote = 'nome-do-lote'
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training train .local/laya/base ".local/qualification/$lote/dataset" .local/laya/candidato-novo --steps 1000 --batch-size 16 --numeric-telemetry --loss-mode stick_mse
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training benchmark .local/laya/base ".local/qualification/$lote/dataset" --candidate .local/laya/candidato-novo
 uv run python -m zelda_ai.laya_curriculum C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --sessions 3 --tasks 5 --candidate .local/laya/candidato-novo --base .local/laya/base --python .local/laya-env/Scripts/python.exe
 ```
 

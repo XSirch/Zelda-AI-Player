@@ -119,7 +119,9 @@ class LocalTask:
                 self.detour = None
             if self.detour is None:
                 dx, dz = self.target[0] - game.player.position[0], self.target[2] - game.player.position[2]
-                _, evidence = _collision_detour(game, game.player, math.atan2(dx, dz))
+                _, evidence = _collision_detour(
+                    game, game.player, math.atan2(dx, dz), use_body_contact=True,
+                )
                 direction = evidence.get("detour")
                 if direction:
                     probe = min((p for p in game.navigation_probes if p.direction == direction),

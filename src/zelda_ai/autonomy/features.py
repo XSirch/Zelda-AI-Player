@@ -147,12 +147,15 @@ def _probe_is_walkable(probe) -> bool:
     return True
 
 
-def _collision_detour(game: GameState, player, target_yaw: float) -> tuple[tuple[float, float] | None, dict]:
+def _collision_detour(
+    game: GameState, player, target_yaw: float, *, use_body_contact=False,
+) -> tuple[tuple[float, float] | None, dict]:
     """Pick a locally collision-safe heading when the direct heading is blocked.
 
     Navigation probes are scene collision observations relative to Link's yaw.
     This is deliberately local/reactive: it does not solve a route or encode any
-    Zelda-specific destination knowledge.
+    Zelda-specific destination knowledge. Flat-cell tasks may also reject a
+    heading into a currently touching wall; alternatives still require probes.
     """
     probes = {}
     for probe in game.navigation_probes:
@@ -167,13 +170,21 @@ def _collision_detour(game: GameState, player, target_yaw: float) -> tuple[tuple
         }
 
     player_yaw = player.yaw * math.pi / 32768.0
+    # Pinned SoH BGCHECKFLAG_WALL is current body contact; wallPoly surface
+    # flags alone can remain after separation. Normal comes from that contact.
+    wall_normal_yaw = player.wall_yaw * math.pi / 32768.0
+    body_blocked = (
+        use_body_contact
+        and bool(player.bg_check_flags & (1 << 3))
+        and math.cos(target_yaw - wall_normal_yaw) < -0.25
+    )
     relative_target = _wrap_angle(target_yaw - player_yaw)
     direct_name = min(
         _PROBE_YAW_OFFSETS,
         key=lambda name: abs(_wrap_angle(relative_target - _PROBE_YAW_OFFSETS[name])),
     )
     direct_probe = probes.get(direct_name)
-    if direct_probe is None or _probe_is_walkable(direct_probe):
+    if not body_blocked and (direct_probe is None or _probe_is_walkable(direct_probe)):
         return None, {
             "blocked": False,
             "detour": None,
@@ -184,6 +195,10 @@ def _collision_detour(game: GameState, player, target_yaw: float) -> tuple[tuple
     for name, offset in _PROBE_YAW_OFFSETS.items():
         probe = probes.get(name)
         if probe is None or not _probe_is_walkable(probe):
+            continue
+        # A thin ray can miss the obstacle touching Link's collision body.
+        # Select only a currently observed probe tangent to/out of that wall.
+        if body_blocked and math.cos(player_yaw + offset - wall_normal_yaw) < -0.05:
             continue
         angular_error = abs(_wrap_angle(relative_target - offset))
         alignment = math.cos(angular_error)

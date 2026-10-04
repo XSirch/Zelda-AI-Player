@@ -1,0 +1,374 @@
+{
+  "date": "2026-10-04",
+  "source": "soh",
+  "base_sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+  "provider_calls": 0,
+  "screenshots_to_models": 0,
+  "isolated_supervised_loss_ablation": {
+    "base_dataset_seed_batch_steps_and_adapter_unchanged": true,
+    "new_loss": "mean_probability_native_action_mse_normalized_by_80",
+    "new_readout": "expectation",
+    "baseline_candidate": "candidate-numeric-six-mean",
+    "baseline_heads_sha256": "eba73b581c590a9f7f8ad9038ae3c2b2e6f37ba560f37c0250b2b112bc4279e8",
+    "baseline_fresh_mean_decoder_test_mae": 15.570261437908497,
+    "candidate_sha256": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+    "candidate": {
+      "profile": "laya-observed-walking-v1",
+      "base_repo": "convaiinnovations/laya",
+      "base_revision": "7b928d828b7b0e022f929d9bd2e44165aa270148",
+      "base_sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+      "source_revision": "573e5b62696ba441230cd6be71d593331b5d23af",
+      "heads_sha256": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720",
+      "steps": 1000,
+      "seed": 4102050,
+      "batch_size": 16,
+      "loss_mode": "stick_mse",
+      "stick_readout": "expectation",
+      "trainable_parameters": 26645763,
+      "encoder_frozen": true,
+      "encoder_layers": 0,
+      "representation": "numeric_conditioned_choice_v2",
+      "numeric_history_usage": "current_frame_only",
+      "dataset_sha256": "95a996968c6bfc3afb3933413bd67cc0131235b8b49dc41af82c4efc50b97c5f",
+      "dataset": {
+        "profile": "laya-observed-walking-v1",
+        "split_unit": "episode",
+        "source": "soh",
+        "episode_grouping": "native_instance",
+        "provider_calls": 0,
+        "families": {
+          "observed_cell": 1788
+        },
+        "records": {
+          "train": 1186,
+          "validation": 296,
+          "test": 306
+        },
+        "episodes": {
+          "train": 4,
+          "validation": 1,
+          "test": 1
+        },
+        "excluded": {
+          "failed_task": 6
+        },
+        "stick_bins": [
+          -80,
+          -60,
+          -40,
+          -20,
+          0,
+          20,
+          40,
+          60,
+          80
+        ],
+        "sha256": {
+          "train": "d7d35e0da5097494c81e694061081b03233ac072233da89d99099d3afd051668",
+          "validation": "110385e250100a91fc889b297eafef7c6f31b20c8e584adc3ea1e2ba760b1067",
+          "test": "543146044d8e68aea462e0ba45d9e38df806d3f0e536a8909f6eb321fc45440d"
+        },
+        "coverage": "short_observed_walking_only_no_buttons_ladders_combat_or_campaign"
+      },
+      "scope": "short_observed_walking_only_no_buttons_ladders_combat_or_campaign",
+      "initial_loss": 0.24978163838386536,
+      "final_loss": 0.007741950917989016,
+      "before_validation": {
+        "records": 296,
+        "axis_accuracy": 0.0,
+        "joint_accuracy": 0.0,
+        "stick_mae_native_units": 35.4695945945946,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 9.291499998653308,
+        "p95_ms": 10.348499999963678,
+        "max_ms": 12.47700000385521,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "expectation",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "after_validation": {
+        "records": 296,
+        "axis_accuracy": 0.25506756756756754,
+        "joint_accuracy": 0.0472972972972973,
+        "stick_mae_native_units": 6.023648648648648,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 6.746500002918765,
+        "p95_ms": 9.389300001203083,
+        "max_ms": 9.403999996720813,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "expectation",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "reserved_test": {
+        "records": 306,
+        "axis_accuracy": 0.2565359477124183,
+        "joint_accuracy": 0.0,
+        "stick_mae_native_units": 5.629084967320262,
+        "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+        "latency_samples": 20,
+        "p50_ms": 7.733149999694433,
+        "p95_ms": 9.856399999989662,
+        "max_ms": 9.995500004151836,
+        "physical_gameplay_evaluated": false,
+        "stick_readout": "expectation",
+        "accuracy_scope": "choice_argmax_labels"
+      },
+      "majority_baseline_validation": {
+        "stick": [
+          40,
+          -40
+        ],
+        "axis_accuracy": 0.15878378378378377,
+        "joint_accuracy": 0.05405405405405406,
+        "stick_mae_native_units": 40.192567567567565
+      },
+      "majority_baseline_test": {
+        "stick": [
+          40,
+          -40
+        ],
+        "axis_accuracy": 0.23529411764705882,
+        "joint_accuracy": 0.10457516339869281,
+        "stick_mae_native_units": 38.63725490196079
+      },
+      "device": "NVIDIA GeForce RTX 4070 Laptop GPU",
+      "provider_calls": 0,
+      "promotion": "disabled_pending_physical_gameplay_and_latency_gates",
+      "max_len": 512,
+      "head_max_len": 96,
+      "stick_bins": [
+        -80,
+        -60,
+        -40,
+        -20,
+        0,
+        20,
+        40,
+        60,
+        80
+      ]
+    },
+    "classification_accuracy_scope": "argmax labels; not the trained continuous decoder"
+  },
+  "training_witness": {
+    "selected_from": "first 60 idle-speed rows of training split only, highest baseline MAE",
+    "artifact_sha256": "82f6bf8d99c6d72c1e0bb5ad7566f780b7a54afa7f3909a176fb4e9aed77101d",
+    "observation_seq": 334,
+    "first_tick": 860,
+    "reference_executed_stick": [
+      -52,
+      -30
+    ],
+    "before_prediction": [
+      5,
+      -34
+    ],
+    "before_mae": 30.5,
+    "before_repro_exit": 1,
+    "after_prediction": [
+      -51,
+      -21
+    ],
+    "after_mae": 5.0,
+    "after_repro_exit": 0,
+    "repro_threshold_mae_native_units": 10,
+    "broad_navigation_proof": false
+  },
+  "training_label_probe": {
+    "records": 1186,
+    "current_heading_vs_reference_direction_disagreement_over_20_degrees": 19,
+    "identical_current_feature_groups_with_native_labels_over_20_units_apart": 0,
+    "interpretation": "few directional inconsistencies; not a proof of perfect labels"
+  },
+  "body_contact_regression": {
+    "actual_trace_suites": [
+      "g1-4c926f38c019"
+    ],
+    "actual_trace_trials": [
+      7,
+      29
+    ],
+    "before_replay": "blocked_false_detour_null",
+    "after_replay": "blocked_true_detour_left",
+    "native_definition": "pinned SoH z64actor.h BGCHECKFLAG_WALL bit 3, current contact",
+    "scope": "observed_cell only; headings must come from current walkable probes and point tangent to/out of observed contact normal",
+    "stale_wall_poly_flags_do_not_activate_guard": true,
+    "away_from_wall_motion_is_preserved": true,
+    "traversal_and_interaction_guidance_unchanged": true,
+    "call_site_regression_failed_before_fix": true,
+    "call_site_regression_passed_after_fix": true,
+    "candidate_weights_unchanged_between_native_batches": true
+  },
+  "native_evaluations": [
+    {
+      "suite": "g1-4c926f38c019",
+      "manifest_sha256": "df2106b54b1657da0cb2bc4c56359f3d5fa5964509f2dcffabb23c4a90d5c33f",
+      "report_sha256": "54ef26208a7626c9cb98d0417783dfa09539ccce57ee08b074a7f96592eb59e2",
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "seed": 4102500,
+      "sessions": 3,
+      "tasks_per_session": 10,
+      "attempted": 30,
+      "successful": 26,
+      "failures": [
+        {
+          "session": 1,
+          "index": 7,
+          "reason": "no_geometric_progress"
+        },
+        {
+          "session": 2,
+          "index": 2,
+          "reason": "no_geometric_progress"
+        },
+        {
+          "session": 3,
+          "index": 3,
+          "reason": "no_geometric_progress"
+        },
+        {
+          "session": 3,
+          "index": 9,
+          "reason": "no_geometric_progress"
+        }
+      ],
+      "consumed_actions": 755,
+      "objectives_unchanged": true,
+      "reference_blend": 0,
+      "training_updates": 0,
+      "provider_calls": 0,
+      "responses": 756,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "timings": {
+        "inference_ms": {
+          "samples": 756,
+          "p50": 12.469799996324582,
+          "p95": 28.148899997177068,
+          "max": 42.97099999530474
+        },
+        "round_trip_ms": {
+          "samples": 756,
+          "p50": 13.632949998282129,
+          "p95": 29.393299999355804,
+          "max": 44.164599996292964
+        },
+        "output_age_ms": {
+          "samples": 998,
+          "p50": 62.799950002954574,
+          "p95": 66.1573999968823,
+          "max": 69.22199999826262
+        }
+      },
+      "decision_budget_ms": 100,
+      "actuation_grace_ms": 50,
+      "body_contact_enabled": false,
+      "native_execution_source_sha256": {
+        "laya_curriculum.py": "b5aa1367edd4e1656f89e29bf229187c92a9c3d74c9b4022610d8ac7b5c63b34",
+        "laya_numeric.py": "a4c787f94a679c34ad0e1890bfae449b6fe8ce1d61e190952c5ea7e836fec75c",
+        "laya_training.py": "1b8f828c282e2457169513a86422ff97095571d743ce663a44abb19a05f8f6b7",
+        "laya_worker.py": "8b80c5aa02963ab71f72ee2dfc909f397f39b641d2c844487052787327dd68e3",
+        "features.py": "8a42b9637ef55b2dc14ea24a3124528332a904f66dcd6e36df9323f494cf6fa4",
+        "laya_policy.py": "d7222e3fc57950136802a33f319f088ec68c536e7e547254b09e9cc03830359b",
+        "local_tasks.py": "16b4e828aa7c0084de9af12f5582acecd73607d7f1110413c19c299bf9fc90de"
+      },
+      "promotion": "disabled",
+      "g2_complete": false,
+      "sword_acquisition_evaluated": false,
+      "campaign_complete": false
+    },
+    {
+      "suite": "g1-f38e3d24b0e2",
+      "manifest_sha256": "0cda07df859ce33d29a9ef3cb355cb23d41ca87a7b1a09887f40e2bc9ddc41d1",
+      "report_sha256": "102a987f2facd878cc9f6566f62a2cbfdf6e70c5518492a4ad0ea7da18bf9a7a",
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "seed": 4102500,
+      "sessions": 3,
+      "tasks_per_session": 10,
+      "attempted": 30,
+      "successful": 28,
+      "failures": [
+        {
+          "session": 1,
+          "index": 9,
+          "reason": "no_geometric_progress"
+        },
+        {
+          "session": 2,
+          "index": 2,
+          "reason": "no_geometric_progress"
+        }
+      ],
+      "consumed_actions": 779,
+      "objectives_unchanged": true,
+      "reference_blend": 0,
+      "training_updates": 0,
+      "provider_calls": 0,
+      "responses": 780,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "timings": {
+        "inference_ms": {
+          "samples": 780,
+          "p50": 12.310800004343037,
+          "p95": 27.82580000348389,
+          "max": 45.39980000117794
+        },
+        "round_trip_ms": {
+          "samples": 780,
+          "p50": 13.567450001573889,
+          "p95": 28.940800002601463,
+          "max": 46.4709000007133
+        },
+        "output_age_ms": {
+          "samples": 1014,
+          "p50": 63.406750003196066,
+          "p95": 66.86959999933606,
+          "max": 101.2955000041984
+        }
+      },
+      "decision_budget_ms": 100,
+      "actuation_grace_ms": 50,
+      "body_contact_enabled": true,
+      "native_execution_source_sha256": {
+        "laya_curriculum.py": "b5aa1367edd4e1656f89e29bf229187c92a9c3d74c9b4022610d8ac7b5c63b34",
+        "laya_numeric.py": "a4c787f94a679c34ad0e1890bfae449b6fe8ce1d61e190952c5ea7e836fec75c",
+        "laya_training.py": "1b8f828c282e2457169513a86422ff97095571d743ce663a44abb19a05f8f6b7",
+        "laya_worker.py": "8b80c5aa02963ab71f72ee2dfc909f397f39b641d2c844487052787327dd68e3",
+        "features.py": "c95a0c1728b8667b57ed4e72e1f0704e20eff732078ce2df24d5dd3b85b3ff3c",
+        "laya_policy.py": "d7222e3fc57950136802a33f319f088ec68c536e7e547254b09e9cc03830359b",
+        "local_tasks.py": "3870157abf6bb03872cc2d8259122f0704ef5905ba80395effda5be46a1d1267"
+      },
+      "promotion": "disabled",
+      "g2_complete": false,
+      "sword_acquisition_evaluated": false,
+      "campaign_complete": false
+    }
+  ],
+  "limits": [
+    "same seed does not ensure identical targets/poses after trajectories diverge",
+    "dataset validation/test have been inspected during diagnostics; no new pristine broad holdout",
+    "sampled output age is not native consumption or full physical reaction; latest max exceeded 100 ms while all decision replies met 100 ms",
+    "only short observed walking cells in this room; no learned ladder, button, aiming, combat, sword or campaign evidence",
+    "28/30 is below a completed 95/100 skill gate; no G2/champion promotion",
+    "remaining no_geometric_progress cases require navigation/progress diagnosis"
+  ],
+  "validation": {
+    "pytest_passed": 328,
+    "pytest_skipped": 20,
+    "skip_reason": "unavailable g++/clang++ for native tests",
+    "web_build": "passed",
+    "focused_ruff": "passed",
+    "native_cpp_changes": false,
+    "new_native_build_claimed": false,
+    "utf8": "strict_utf8_passed_all_8_owned_source_docs_tests_files_no_replacement_or_crcrlf"
+  }
+}

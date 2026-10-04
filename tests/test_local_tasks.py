@@ -182,3 +182,47 @@ def test_nonblocking_local_policy_response_is_applied_between_ml_samples(state, 
     controller.local_task.phase = "verify"
     controller._refresh_camera_relative_setpoint(state)
     assert (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y) == (0, 0)
+
+
+def test_observed_cell_uses_current_body_contact_when_thin_probes_miss_the_wall(state):
+    from zelda_ai.autonomy.features import PROBE_NAMES
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.player.yaw = -32768
+    state.player.wall_yaw = 0
+    state.player.bg_check_flags = 1 | 8
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0.0, 16), (0, -1, 0.0, 0)],
+    )
+    state.navigation_probes = [
+        NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)
+        for name in PROBE_NAMES
+    ]
+    task = LocalTask.observed_cell(state, (0, 0, -70), now=0)
+    task.observe(state, consumed=True, now=.1)
+    assert task.detour is not None
+    assert abs(task.detour[0]) == pytest.approx(70)
+    assert abs(task.detour[2]) < 1e-4  # A currently probed tangent, not into the wall.
+
+
+@pytest.mark.parametrize("contact,target", ((1, (0, 0, -70)), (1 | 8, (0, 0, 70))))
+def test_body_contact_does_not_redirect_stale_wall_data_or_motion_away_from_wall(state, contact, target):
+    from zelda_ai.autonomy.features import PROBE_NAMES
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.player.yaw = -32768
+    state.player.wall_yaw = 0
+    state.player.wall_flags = 1  # A retained surface flag alone is not current contact.
+    state.player.bg_check_flags = contact
+    state.navmesh = NavigationMeshSnapshot(
+        origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0.0, 17), (0, -1, 0.0, 0), (0, 1, 0.0, 0)],
+    )
+    state.navigation_probes = [
+        NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)
+        for name in PROBE_NAMES
+    ]
+    task = LocalTask.observed_cell(state, target, now=0)
+    task.observe(state, consumed=True, now=.1)
+    assert task.detour is None
