@@ -548,6 +548,61 @@ def test_known_room_with_trackable_objective_leaves_immediately_without_local_ev
     ) is True
 
 
+def test_local_chest_delays_immediate_exit_but_not_stuck_recovery(
+    tmp_path, state
+):
+    game = state.model_copy(deep=True)
+    game.scene_exits = [
+        SceneExitObservation(
+            exit_index=5,
+            entrance_index=50,
+            position=(120.0, 0.0, 0.0),
+            samples=5,
+            direct_reachable=True,
+        )
+    ]
+    game.room_actors = [
+        ActorObservation(
+            actor_uid="chest-1",
+            actor_id=10,
+            name="Chest",
+            category=11,
+            category_name="chest",
+            params=0,
+            position=(60.0, 0.0, 0.0),
+            distance=60.0,
+        )
+    ]
+    controller = ContinuousController(
+        connected(game),
+        tmp_path / "policy.pt",
+        training_enabled=True,
+    )
+    controller.set_intent(
+        AgentIntent(
+            objective="Obtain a useful item",
+            completion=ObjectiveCompletion(
+                kind="inventory_item",
+                name="Useful Item",
+            ),
+            summary="Obtain a useful item",
+            mode="explore",
+            horizon_ms=60000,
+        )
+    )
+
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is False
+
+    controller.reward_tracker.local_dwell_seconds = 21.0
+    assert controller._should_prefer_observed_exit(
+        game,
+        actor_is_door=False,
+    ) is True
+
+
 def test_escape_prefers_proven_transition_over_current_unproven_exit(
     tmp_path, state
 ):
