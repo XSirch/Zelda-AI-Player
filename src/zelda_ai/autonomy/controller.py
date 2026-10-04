@@ -878,10 +878,20 @@ class ContinuousController:
             actor is not None
             and (actor.category_name or "").strip().lower() == "door"
         )
+        action_label = (action.label or "").strip().lower()
+        traversal_action = action_label in {
+            "climb",
+            "down",
+            "jump",
+            "drop",
+            "enter",
+            "open",
+        }
         if (
             action.code != 0
-            and (action.label or "").strip().lower() not in {"", "none"}
+            and action_label not in {"", "none"}
             and not actor_is_door
+            and not traversal_action
         ):
             return True
         for candidate in game.room_actors:
