@@ -1,6 +1,23 @@
 # Implementation status — V3 and V4 motor foundation
 
-## Validated locally on 2026-10-04
+## Physical G1 batch qualified on 2026-10-04
+
+The automatic batch `g1-3a53157b3632` completed 100 fresh physical SoH episodes with **99 verified successes**. It meets the proposed initial G1 threshold of at least 99/100 within 120 seconds per complete scenario. The sanitized, audited index is [validation/g1_2026-10-04.json](validation/g1_2026-10-04.json); full observations, preparation traces, native receipts and working save copies remain local under `.local/qualification/g1-3a53157b3632/`.
+
+Scope: existing Arquivo 2, child Link, normal world, initial house and physical portal revisits from Kokiri Forest. The batch used 50 separate native process instances and ordinary controller-based save loads, with a frozen existing V3 policy and read-only route/room memories. There were zero cognition/provider calls and zero training updates. This proves the measured local motor behavior; new ML learning, loft/ladder starts, other ages/worlds, general navigation, combat and campaign completion remain unproven.
+
+- All 100 attempts are retained, including episode 74, which timed out after 119.659 s on a forest revisit. Link started on the outside platform at height 100, later descended and finished at height -80 without crossing a portal. The trace contains a blocked scene-exit approach followed by other observed-door attempts; no exact root cause is claimed. No failed attempt was replaced or removed from the rate.
+- Successful episodes covered ten measured position cells, two initial room contexts and three initial camera bins. Physical setup movements covered all four world-heading bins; motor traces covered all eight 45-degree camera bins. These are observed values, not credit for a requested direction or camera setting.
+- The measured scenario durations totalled 1440.176 s; median 19.232 s, nearest-rank p95 26.633 s, maximum 119.659 s. The 120 s budget includes reset/process launch, native startup, legitimate collision-guided preparation, motor execution and destination verification. Reporting/checksum overhead is separate.
+- Success requires a fresh, living, playable destination in the same native process, with no new save-load event, an actual scene/room crossing and consumed input receipts. Three fresh stopped destination frames verify settlement. The strategic objective stays unchanged during each attempt.
+- Original executable, assets, configuration, saves, policy and memories passed SHA-256 checks. Each pair uses a new local native-home copy; physical keyboard/gamepad mappings are disabled only there. All owned SoH processes were closed after the batch. No teleports, game-memory position/camera writes, save-state API, hidden routes or human game input were used.
+- Three earlier development pilots (4, 10 and 10 episodes) are excluded from the qualification batch. The main batch used a separate seed, `1042027`. It is an instrumented, previously trained policy evaluation, not a zero-shot benchmark.
+
+Reproduce with the `qualify-g1` command documented in README. `scripts/export_g1.py` audits the full local observations/receipts and exports only whitelisted public evidence. Smaller pilot batches fail the G1 gate by design. The harness never constructs a cognition provider or silently substitutes simulation.
+
+Checks for this change: `uv run pytest -q` **271 passed, 20 skipped**, with the existing Starlette/httpx deprecation warning; `web/npm run build` passed; the separate C++20 MSVC harness passed **19 cases** with assertions and `/W4 /WX`. The 20 pytest skips require unavailable g++/clang++; they are not reported as passing. The stale frontend source assertion was updated to match the already implemented per-socket reconnect callback. Focused Ruff checks passed. Written task text and all batch JSON evidence were checked with strict UTF-8 decoding.
+
+## Foundation validated locally on 2026-10-04
 
 This remains a game-agent laboratory. The master plan's complete P0–P7 system, G1 batch, skill coverage and campaign gates are not delivered by this foundation patch. No cognition calls were authorized or made. Learning improvement has not been measured in physical training; these gameplay episodes use a frozen existing V3 policy and read-only route/room memories.
 
@@ -11,7 +28,7 @@ Actual SoH validation used the existing Arquivo 2 with ordinary controller input
 - Before the sign correction, one frozen episode remained in scene 52, room 0 for 120.032 seconds and failed.
 - After correction, portal crossings were observed between scene 52 (Link's house) and scene 85 (Kokiri Forest), including normal save reloads from `(1, 0, 95)`.
 - The stricter final harness requires the destination to be playable with the transition cutscene finished. A normal reload then left the house in 7.427 seconds; return to the house took 1.843 and 1.862 seconds in subsequent episodes. Earlier measurements ended during transition and are kept separately in the evidence.
-- Policy, route graph and room-map SHA-256 values stayed unchanged in every episode. G1 remains unqualified: the required 100 varied scenarios were not executed. Loft/ladder starts, varied camera/age conditions, combat, puzzles and campaign completion are unproven.
+- Policy, route graph and room-map SHA-256 values stayed unchanged in every episode. At this foundation snapshot, G1 was still unqualified because the required 100 varied scenarios had not been executed; the subsequent batch above qualifies only its stated initial profile. Loft/ladder starts, other age conditions, combat, puzzles and campaign completion remain unproven.
 
 The sanitized evidence index is [validation/v4_motor_2026-10-04.json](validation/v4_motor_2026-10-04.json). Complete reports and the bounded motor traces are local under `.local/qualification/`; they are not distributed with ROMs or saves.
 

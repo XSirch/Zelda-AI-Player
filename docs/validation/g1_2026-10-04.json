@@ -1,0 +1,3176 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "suite_id": "g1-3a53157b3632",
+  "source": "soh",
+  "observation_profile": "instrumented_local_v1",
+  "scope": "native Arquivo 2; child, normal world; initial house and physical portal revisits",
+  "zero_shot": false,
+  "training_enabled": false,
+  "provider_calls": 0,
+  "g1_qualified": true,
+  "checks": {
+    "finished": true,
+    "exactly_100_attempts": true,
+    "at_least_99_valid_successes": true,
+    "unique_attempts": true,
+    "artifacts_unchanged": true,
+    "no_provider_calls": true,
+    "physical_device_mappings_disabled": true,
+    "one_native_build_and_revision": true,
+    "at_least_four_observed_poses": true,
+    "at_least_two_camera_bins": true,
+    "at_least_two_room_contexts": true,
+    "four_consumed_setup_heading_bins": true
+  },
+  "attempted_episodes": 100,
+  "successful_episodes": 99,
+  "coverage": {
+    "poses": 10,
+    "camera_bins": [
+      0,
+      1,
+      7
+    ],
+    "room_contexts": [
+      [
+        52,
+        0
+      ],
+      [
+        85,
+        0
+      ]
+    ],
+    "setup_heading_bins": [
+      0,
+      1,
+      2,
+      3
+    ]
+  },
+  "failures": {
+    "motor_budget_or_disconnect": 1
+  },
+  "seed": 1042027,
+  "seconds_budget": 120.0,
+  "budget_scope": "reset_launch_startup_setup_motor_and_settle",
+  "timing_s": {
+    "total_scenarios": 1440.176,
+    "min": 2.285,
+    "median": 19.2315,
+    "p95_nearest_rank": 26.633,
+    "max": 119.659
+  },
+  "native_builds": [
+    "rt-input-v3.2"
+  ],
+  "native_instances_observed": 50,
+  "upstream_revisions": [
+    "d30fc192f2eb01ceea45bd1e12de61636cafbf86"
+  ],
+  "physical_device_mappings_disabled": true,
+  "frozen_sha256": {
+    "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+    "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+    "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+  },
+  "executable_sha256": "8d0595a1a77b85644de5cce065112b454571d15c371454d5d699b32688730029",
+  "local_evidence_sha256": {
+    "manifest.json": "737f3ec053f6f9c2a7fe26acff734dcb5468c39989fade55d9bafbaa3d82fc5f",
+    "report.json": "63eb5039daec63b96f21dcf9585b94a2f0e52c578e616f8673ac9f27ed7edb6e"
+  },
+  "motor_camera_bins_45_degrees": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "modal_trace_samples": 68,
+  "episodes": [
+    {
+      "episode_id": "g1-3a53157b3632:1",
+      "index": 1,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 72,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -68.59967041015625,
+        0.0,
+        94.946044921875
+      ],
+      "initial_camera_yaw": -6517,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.543,
+      "report_sha256": "7332c605cc8170ca472ed9b6465eb440200cbf3efa8bdec44b90a072174972af",
+      "motor_sha256": "68f3828d6c778c4733254f4760ab0cdf651a97c0b789b209e9a2cc2a11ea97f9",
+      "setup_sha256": "1ca4a340045f04bafc47c8ae33e5e0345c2de6691cd75f01a7add427b8be2266"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:2",
+      "index": 2,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 32,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.4763069152832,
+        100.0,
+        1071.14306640625
+      ],
+      "initial_camera_yaw": 6486,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.43,
+      "report_sha256": "7ed513c8916440e44bf4ec233bbcb84af87f4dbc1ba13f62bb9a17b18be3f13f",
+      "motor_sha256": "f5aca4bd380dc75ede28967518eda68fe9224b736c4fa168e157169b2866f339",
+      "setup_sha256": "6ceb14bbbc81f0a2f2f5b7e1b54690238715733349feefee04a9a60e1e4e54b3"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:3",
+      "index": 3,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 122,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.562,
+      "report_sha256": "5ed1f7ebf7caa86c6776dccfef09d2092d5dbfc0bd861fa77c244d8801ff01d8",
+      "motor_sha256": "55f110acb35984941902dcc2b3fdd043a448ae783313190f1893b1aea0a82746",
+      "setup_sha256": "695c551f984bcde0e150e7257b8d090b94f3edebb9a9199f8f20f67f0b12ac13"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:4",
+      "index": 4,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.336,
+      "report_sha256": "8d7492bfb91547b3baad2e17cbd6960a0f2a21919b68f8fc4746f1046edbf4ec",
+      "motor_sha256": "7484bd9eec82e3cef642626de02dd5ed7f69b436ec3c2bb84873b63dbe4c54a6",
+      "setup_sha256": "df6ab759d83458d21de4e0ec5b0af7cf3754afde4248e8cdf7e7f5b6c49fe8d4"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:5",
+      "index": 5,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 82,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 20.173,
+      "report_sha256": "d1ab1b41a76a62973c6d9bd8b6c6b75bec74e246318b1f2c685b590c807a7298",
+      "motor_sha256": "064b02233afdadeb45204cc7d59987862d5793484af5052d40a1a89f0d21588a",
+      "setup_sha256": "72e89841b212fcfa1f3627215d83c3f8415e262f3bb8fc34d1dd779c49f5b57f"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:6",
+      "index": 6,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.29,
+      "report_sha256": "89c53b9835c06643b39cd197c452f1c64e22ad35f7356f4ba43c8fdef2754055",
+      "motor_sha256": "a261e2a43eb543f6e14a7be21dc3a6bbc96d5682d7798be5a4a85a5d1707707d",
+      "setup_sha256": "0e078ddac5509d33147ec0c1bd4fa3a5fa2176e89a2df1062fcc4509bb4c4a38"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:7",
+      "index": 7,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 135,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        0.6532753705978394,
+        -0.0,
+        97.88261413574219
+      ],
+      "initial_camera_yaw": 64,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 26.63,
+      "report_sha256": "b4f5992dedbbc0b26eac5de87266e3abe529d86ad61ef3361d520cd01b96d5a6",
+      "motor_sha256": "47512ccb408645d312e8ed0e14fb73476ab9315dfe9f64efc1813b61574815ce",
+      "setup_sha256": "b8e39565e1019e727e0d234d233e2a3085d6546d1982344ac41d1ba55aeb0ccd"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:8",
+      "index": 8,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 37,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.52035522460938,
+        100.0,
+        1074.44921875
+      ],
+      "initial_camera_yaw": 656,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.766,
+      "report_sha256": "907a095101539daae131b56e9c30a07f998f96aaed282eda8a0504719ba86ac3",
+      "motor_sha256": "6131c5c153a48380490f426fc3d572f452ea14da6dad981d81c372d57572b9b4",
+      "setup_sha256": "c4954740c0c2bd30d3edfb9cc50936149974d226840e4f2e269ef35e03a9f4d5"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:9",
+      "index": 9,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 57,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.454,
+      "report_sha256": "4fe45c8107272ba61d92b6c7eca683a92616765b03420c7855a837482d1bbfb5",
+      "motor_sha256": "aaa8fb4c222e821b6f8a657fa04c689beb696512d34d658d929c78b39fe97e18",
+      "setup_sha256": "b157376a572a992f6a8cd720f26f308009ec6e1847ee9528fa5efd006dc8a675"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:10",
+      "index": 10,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        45.174468994140625,
+        100.0,
+        1073.020263671875
+      ],
+      "initial_camera_yaw": 6791,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.987,
+      "report_sha256": "e4aef7b5a930cbbdffbb1462ce0cdfcdd192b1bfb62a2be0430958fc63dfbc50",
+      "motor_sha256": "c1053a1e67992eec1f9eab3efdce7c6201284e63cd3be833412a6e08dae6aa8c",
+      "setup_sha256": "3954ba128cfa5e2219cf214ba8a17adec457bef4068c71e136e57809363d873b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:11",
+      "index": 11,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 135,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.528976321220398,
+        14.0,
+        107.33882904052734
+      ],
+      "initial_camera_yaw": 144,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 27.961,
+      "report_sha256": "2c24c086b96c3b2147de025827dea7dced95fa6283e3c5ba55ef224adb76662a",
+      "motor_sha256": "87eccce9b1a3061cdac3054f6eb9ccc79e2d4b7e89cd23eaa596449c4ef6d630",
+      "setup_sha256": "32914170719564b7b19833678b522d228bdd4a66c52e8ca8d87227e6319773e2"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:12",
+      "index": 12,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 43,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -106.1413803100586,
+        100.0,
+        1073.8310546875
+      ],
+      "initial_camera_yaw": 352,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 4.275,
+      "report_sha256": "9dcc2d4a67e47aec3ea04a99e814cde65f7ed87dd5e1311cc1b5d72a5253577b",
+      "motor_sha256": "ae3187782a3f73aade4ad766d0edde435cb823a7c92f245b7dda0dd10c4e0e54",
+      "setup_sha256": "29b00bfc24007d921813840d0e0ae50d528898e8c8b6b6ac768c6a12deff49c2"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:13",
+      "index": 13,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 123,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.44,
+      "report_sha256": "ef65301da5670487aceadd7524de3dcd1cfa281defa6183985bdc22109f72aac",
+      "motor_sha256": "cabf2f2ef77e60735b49cd6bd70cf6f40a2d7d8469d7de0c8d2ad246b08c0569",
+      "setup_sha256": "87662ed6c17b71ca1151fab6c6c5d1250fe362eb77ace9cb488f6121cbcedc7f"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:14",
+      "index": 14,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.396,
+      "report_sha256": "42e8f9ccabd32a801a907a0c563340148b26eabe0d8566bd907f31531bd25b97",
+      "motor_sha256": "60399527a23aec95a75c56fd2d093c49d5cf119e5598a7ae27027997ecc59aab",
+      "setup_sha256": "60e682bd10f2e3461d5df96a497db80fa108120cf86fca3fcbef9f9ed0cfab3b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:15",
+      "index": 15,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 131,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 23.231,
+      "report_sha256": "076adf9800f854cb9ac6550ce8855fd179a14206adf9014f8cbb1b4601fa4440",
+      "motor_sha256": "1ea3a1b79af76582c644cc57eb2e3589950893237a3a49a968cba69cd1b53c12",
+      "setup_sha256": "5af65b2938b5037ce7c9adea48de4a01264a0d7535d6e4b88dd835fc0a260c35"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:16",
+      "index": 16,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 30,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.342,
+      "report_sha256": "1689d096999481e4cbc07f3fcd7ce18658b6725ee613b4a17c4e30fee5612be0",
+      "motor_sha256": "97004169cd46e36921595f3939153a15fd7908c4a3032576c2cc7081f1058be8",
+      "setup_sha256": "0098e2df4c73d280499d02ae7160a60e56f5ecb25c1421db5387a9d11995b84d"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:17",
+      "index": 17,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 78,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -68.27261352539062,
+        0.0,
+        94.29363250732422
+      ],
+      "initial_camera_yaw": -6533,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.697,
+      "report_sha256": "b2e90212d2fba2bdd4b51d2804a2d8a3d11827be796634a39b7029f31900f39a",
+      "motor_sha256": "58eff19ceb89c25a9574eb1070b538f7d708ec2b71248c5adc4740d9da5e2c99",
+      "setup_sha256": "2ebf50c9a63c7daead9e2eaccd2574aff208c3e7dd2133e2e827923a5dd422d9"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:18",
+      "index": 18,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        45.174468994140625,
+        100.0,
+        1073.020263671875
+      ],
+      "initial_camera_yaw": 6791,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.911,
+      "report_sha256": "64e82eec738797e704b1e8e5abf59abea5c52441ad3ad96895e7f4d9e4f322c2",
+      "motor_sha256": "3c811cea8ff83fa793402c9449b88a960f309d936a815515d8b166341012cacb",
+      "setup_sha256": "855ec8f2526acaf8990d26d74faefc58b90d0625b25e29ab122cfb36bee152c2"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:19",
+      "index": 19,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 96,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -68.25882720947266,
+        0.0,
+        99.95928192138672
+      ],
+      "initial_camera_yaw": -6245,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.861,
+      "report_sha256": "fa787e93a3a914627808793f2aec690707211bef3ee5af05bbbb883b0548d865",
+      "motor_sha256": "71195432b2b342cf40d60eddeeccb423ee027c2853e46a8c0886ea595b708a95",
+      "setup_sha256": "c995be1fb2be3cc0f045ff4ef9b2e73d025f3ee4118c167609d5ba68f94739ac"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:20",
+      "index": 20,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        45.15796661376953,
+        100.0,
+        1072.9810791015625
+      ],
+      "initial_camera_yaw": 6791,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.947,
+      "report_sha256": "d67ea66626986d3129004de9f1bc5ff5a1731fe0016d18a4910794e8e6a84f1f",
+      "motor_sha256": "07da1638287cd379cabd39992b37e1d6aa1364a25c5089841d3bd1489b75dade",
+      "setup_sha256": "ad92ea522e791a1f349f9f2680693f8a245b97ef20e18e11479b79c73e6bd723"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:21",
+      "index": 21,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 128,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.150984287261963,
+        14.0,
+        112.8307113647461
+      ],
+      "initial_camera_yaw": -191,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 25.046,
+      "report_sha256": "8e362e16e99d6a2cf8b5584968bee23da2fe6d955a6ba919c043b0458c81cb7f",
+      "motor_sha256": "90b52de06401105151e940eb2dd9d128c6eab2f9b8aa2eaae71759632acfcf1b",
+      "setup_sha256": "693393a84bfb8aba427d1768d3e272bc0bd2acec7a98b4002fdfafcf0bf37c7d"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:22",
+      "index": 22,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 34,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        35.54924011230469,
+        100.0,
+        1071.136474609375
+      ],
+      "initial_camera_yaw": 6422,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.522,
+      "report_sha256": "2f8338231eb9ab93395bbe1bded6aa69c699da6f87b4a133aec390955ca32cd3",
+      "motor_sha256": "ce72e4df6c074339aba1058f5ef135f03e3896c9759a612ba7387c2a34146442",
+      "setup_sha256": "bd1444ff0500a7ce8966328e884dcb3df92684adf077b68cc9358b74c4f48390"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:23",
+      "index": 23,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 124,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        2.5536255836486816,
+        -0.0,
+        96.22472381591797
+      ],
+      "initial_camera_yaw": 272,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 26.074,
+      "report_sha256": "bd7708f4b38eaab34809b6b83c269c8704a03fcca34f52636aa3289cf81fe5f3",
+      "motor_sha256": "29ffa6adcfdcbd69688405984d57e20be4ea5ad9f777c4a5f07933d913f089ce",
+      "setup_sha256": "2f5e084e783782fb64686d34ef045df7545c93abfd655377761dfc74959b4707"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:24",
+      "index": 24,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.54468536376953,
+        100.0,
+        1074.477783203125
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.869,
+      "report_sha256": "d7bd8b082a490d3c0a29482bfc87664f7924a9b3f927a358dbc3fd8c5b59df5a",
+      "motor_sha256": "e745818d5732ddcdddd6838120d0d99cb9df39d5544e9832f3e69a939e684661",
+      "setup_sha256": "e8d4affbe2490cea906eff4d6bb7b99e2985444da3a5cd71cd4421cee1780b03"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:25",
+      "index": 25,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 78,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -67.1053466796875,
+        0.0,
+        98.54683685302734
+      ],
+      "initial_camera_yaw": -6229,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.356,
+      "report_sha256": "d54b4fd85becac3ce270a25097d1818cf170596d6ff4958d6767ee9ffe047a43",
+      "motor_sha256": "4166c87de412e56cfe121e478fecadf50d99cf444cdf53a8572e3ac8ada59043",
+      "setup_sha256": "ae56c071e579644d6e76c0db82335528d5a6b0f83514ace8af91721d174fe57c"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:26",
+      "index": 26,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        35.43273162841797,
+        100.0,
+        1070.5345458984375
+      ],
+      "initial_camera_yaw": 6422,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.549,
+      "report_sha256": "cb54624d80410a7dc0fbe9ea3e4590cb704a3e337a8c664fd951ffcd7170a918",
+      "motor_sha256": "372a7c6e8a5ae57716e8e3fb159c5a357ac87874d01571efa4034c4510c86f34",
+      "setup_sha256": "838327003213229adea953e94b1cbdcaa97715ba1899278f7ee45b051da3971c"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:27",
+      "index": 27,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 98,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0826843976974487,
+        14.0,
+        118.12767791748047
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 23.498,
+      "report_sha256": "f3b632ec79dfee04343f92e2dee1741e7c946b92029816d642c71686b2ab9006",
+      "motor_sha256": "419c1d458ff53177679e1946b90fdd0c5d1bd835dac6ed278dca17a85e630ee3",
+      "setup_sha256": "d7729a8872d9be7bb4fd1ed4f8fc117df9fb0a7fa60ad464fb9d7bb0daba7cfc"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:28",
+      "index": 28,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        41.005714416503906,
+        100.0,
+        1071.7354736328125
+      ],
+      "initial_camera_yaw": 6646,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.86,
+      "report_sha256": "10b2d93a42f31d6b30a1aa2411fa33ea73c351d15469dd1f0b2c8ecdcc53a892",
+      "motor_sha256": "2974ed802e46f140b0e2f35292bb4f03913e34bbf16882e9c5d629814b177696",
+      "setup_sha256": "567ce388a0028786456f93219e5a4596d901a968d233f2855e73c89d98a36f4b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:29",
+      "index": 29,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 76,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -1.7958564758300781,
+        14.0,
+        113.76061248779297
+      ],
+      "initial_camera_yaw": -159,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.302,
+      "report_sha256": "fc1ba9b911e6325ca866a6cdee8a1a5b1db84c99073f2398fed1db0eebf7b218",
+      "motor_sha256": "f781cdfedd5cb322045d8532ff0e474cd72e20664ed5681578cbffda09c21e19",
+      "setup_sha256": "8fcb2d80153baf883e1d873604290ad67f5b24c08923e3ba81c9268fc3c41124"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:30",
+      "index": 30,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.75020217895508,
+        100.0,
+        1071.10302734375
+      ],
+      "initial_camera_yaw": 6486,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.431,
+      "report_sha256": "0c6e8395633277da49f299e3b6e57dcad4a3a02891d8187e968e9e64c115ae4e",
+      "motor_sha256": "52cb64ba384d66bcdb4d4830e4515d88ef044f9b2b15613b7eb2f9d090c11df2",
+      "setup_sha256": "cab066820896c1640218483933b1f54844dc0fe4237eff88ed4001b2b7dd36b3"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:31",
+      "index": 31,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 125,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -67.54719543457031,
+        0.0,
+        92.99303436279297
+      ],
+      "initial_camera_yaw": -6549,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.476,
+      "report_sha256": "20a9faa8d951ea658c185120545d1f2f204a55fcfcaba3b14b4fef977b9ff3e4",
+      "motor_sha256": "c604c3b2e8702a392d58a7a5b30cd9f604fcf61dc3ddc12fcd65421fffe14b7b",
+      "setup_sha256": "9dd201514453db46cc1883980cdb250d2164b34abaeac011bc506d010d9edb15"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:32",
+      "index": 32,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        41.005714416503906,
+        100.0,
+        1071.7354736328125
+      ],
+      "initial_camera_yaw": 6646,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.809,
+      "report_sha256": "6c475c12d84130f6418d2b61d077ea329bdea11e335ec55fac35453cea3eea9d",
+      "motor_sha256": "e9c75f0d521cc36c8e25d8fc7b017310ffd126c8bbafe519500728d9fb7c3ccd",
+      "setup_sha256": "06dc39f074fb2edbe43052c472fea2736ee8f6bb72bfcb73eda3577c3f4a2df7"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:33",
+      "index": 33,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 124,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.773590087890625,
+        14.0,
+        114.23469543457031
+      ],
+      "initial_camera_yaw": -239,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.664,
+      "report_sha256": "4cb4cbeb61c2011666c1a385a5e08e5084360b2da2d3b6bd440f7c45c16d4184",
+      "motor_sha256": "c4bf0a341b9bd1bc06cd28499165ad6ca288d4407a3891f62373018e5bb5d9e0",
+      "setup_sha256": "547cc4b9fc33c6a82608b3e11e664ec7fe4305088213bee9bb6c0d7c79fe50e9"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:34",
+      "index": 34,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        39.83391571044922,
+        100.0,
+        1071.9051513671875
+      ],
+      "initial_camera_yaw": 6582,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.505,
+      "report_sha256": "c8756bc15742e7479145a2d79393c12ee5de659effe3a12234af31d7d8d04f35",
+      "motor_sha256": "ec1cc33bd9b25581967f7e73aa5795273873ffa6c57a513485cf7d34ca0b2af0",
+      "setup_sha256": "6ae7c2bb2e7203ba6704a6b2ff2171ec265f85ea0b81e3cf64a854d5a2035d37"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:35",
+      "index": 35,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 57,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.366,
+      "report_sha256": "0d197d57f34295903fd6dc799d4c436fddb20fccb63e162b0ed549f2c567f85a",
+      "motor_sha256": "7d4ab1a461439f3658c1319f3736b50d086f82a64ccda9ec32e6c1b939676057",
+      "setup_sha256": "90cf67d68d981c0b13c9a0b8b9e24d9db0b4cfedd1cee6e058af81dd9d4a2730"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:36",
+      "index": 36,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        45.15796661376953,
+        100.0,
+        1072.9810791015625
+      ],
+      "initial_camera_yaw": 6791,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.843,
+      "report_sha256": "04b1df19bdbcf17ed8b7f8d79e59a6eef2d0279e53fa238ce25a776f6d6aa6c8",
+      "motor_sha256": "cd55ade4becdd31cfcb6ba9f3e7703015fefdf8419b3fa1a4c5afe50dac9135f",
+      "setup_sha256": "70c9e019f9a938db32ba376b75bc0635d4488d252b09870180cc8ee9e8dac834"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:37",
+      "index": 37,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 135,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        2.2256622314453125,
+        -0.0,
+        98.65196228027344
+      ],
+      "initial_camera_yaw": 224,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 26.701,
+      "report_sha256": "3525e284cd9cfe868a98d2ef569587b1b2b3db0b85ffa2fc58b485e59199229e",
+      "motor_sha256": "71279f765b5bd87731eb5ed9c7c08507bd01c4f127db252c5346fe40732321dc",
+      "setup_sha256": "173349788c6bf2d108d110ff4b35f6ca227668fe85fcfdb50b857b19109dce44"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:38",
+      "index": 38,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 40,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.66893005371094,
+        100.0,
+        1074.382568359375
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.907,
+      "report_sha256": "139e59770105e16e2f711597e608f1dac3c48083b92ed97a0f712e24d469c7dc",
+      "motor_sha256": "f03791f7f4dddce947345604cbde38ebf196fb8fc6f11a39dd7990438c28cdea",
+      "setup_sha256": "a3b02d4d4f62398ad02314f0359b8babfa05cc17972e275192a07bcefbc3a74f"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:39",
+      "index": 39,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 121,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.373,
+      "report_sha256": "b694a570b2096b7edfa06bc30af718b1d3a54de675cbc0c5bbe216e4e94ada99",
+      "motor_sha256": "9a98d4d7bd98dab730d49a53807370a0eb173d6f6d8e9aa5f5c543bb6f640bf4",
+      "setup_sha256": "4211869313ee2973a511bd27d0c337f89e2684ec8c0979b0833c2a2e2c1cdb42"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:40",
+      "index": 40,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 30,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.285,
+      "report_sha256": "2df9820dc6acd10f30beb7decc17a998745bdb9d5508e31a50aff7ce4b95bf97",
+      "motor_sha256": "d213345a692fc1a326019378513c16579873bd37975cb0a75460ba5c0e8af301",
+      "setup_sha256": "bc436dc377db6d9d4e2530b71f2abeb4b92699925566dd4994c143de530b61b9"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:41",
+      "index": 41,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 115,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.972,
+      "report_sha256": "af15e00684828cfdf961b4a74ba0c6b47d526ec450739f2ad50dddb64f68cd1a",
+      "motor_sha256": "2f1713ec1c112b30a41d58320852415eb35e671ce0cf1661e8f2ca9fa38fb22b",
+      "setup_sha256": "54c4df8bc7f3b6525c645cc0ab6e49cb7a6b31ceead43e99c5365815fd43d9d6"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:42",
+      "index": 42,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.399,
+      "report_sha256": "860424f7e4390e393145e0ef60e3de9375c47ce16a487847476c00b7c9cbb0bc",
+      "motor_sha256": "fd1a128851cdb08af2fc20955f97a273d0b0db7927d6bfe7352d3876c84957fe",
+      "setup_sha256": "f603d2e88449260c711c98be7747e32bbf380662652b5dfdef85258d2406410b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:43",
+      "index": 43,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 60,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.39,
+      "report_sha256": "0dcac4a82073ad3b0bc4cf1dfcc14293e39755fb8f47f7e4e13db0aaa8c53fe1",
+      "motor_sha256": "151e1ecd26d65ac571a9e0d7fd66c3f6f96f2debca600702d7c66a8ad53d02fc",
+      "setup_sha256": "387a257e7fcfacfc651a6418cf1f8ca54c5c189ea5573201fb8778ab5aaaa9f9"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:44",
+      "index": 44,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        41.27195358276367,
+        100.0,
+        1071.714599609375
+      ],
+      "initial_camera_yaw": 6646,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.911,
+      "report_sha256": "691536749844e006798b8fb9f0e1de4285e25ba68cc1dc6afd276ab9f9156fee",
+      "motor_sha256": "973c872cc5662459e5ded95b965a1a709310bccc4640289d8a0bae1474a4ac4c",
+      "setup_sha256": "a7a03b1d4b3d2e04eba059194c51f2d25659f5185ad08ef5cf8056223a35f421"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:45",
+      "index": 45,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "setup_path_lost",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 62,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -10.660344123840332,
+        0.0,
+        48.3521614074707
+      ],
+      "initial_camera_yaw": -2257,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.067,
+      "report_sha256": "dc8d8d7e1285ad7943a6cba6de42d47bfa30e91f015763165ccd3a04be0a5c67",
+      "motor_sha256": "e0142b0d4671e27dae897f845b3bb7c289c02f17fbd2f4d6de7fa110b4e2e28b",
+      "setup_sha256": "5569cca523f463e0d777e9ad56012b2a38cc13c24919337ef578df597f1584df"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:46",
+      "index": 46,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 37,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.61161804199219,
+        100.0,
+        1074.4849853515625
+      ],
+      "initial_camera_yaw": 625,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.751,
+      "report_sha256": "8066f0418b5049d3be0bbdb8c021f1c78da4514f3ca5c1d64c358015a000226b",
+      "motor_sha256": "8d1d417911d39f9ce42a678387a6ed8338d226e30bdf929ec17986a1f20bc5a2",
+      "setup_sha256": "119f1df5478f1159077c8063dd67193f613c83fa341127d8baf5917e30d81f5e"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:47",
+      "index": 47,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 124,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -68.27261352539062,
+        0.0,
+        94.29363250732422
+      ],
+      "initial_camera_yaw": -6533,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.387,
+      "report_sha256": "618a21375ab751ff7e6a25856727bfd2a2d794a3d0b90ae89c0a79e56ef3c54b",
+      "motor_sha256": "beba155b33178a95006e672a33423c516a3ae2769f220780175acbd48a858588",
+      "setup_sha256": "416799b3c4ed57e357128f20ac18af1a38f7906bfc1b7b2adb415435ff358d26"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:48",
+      "index": 48,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 31,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.75020217895508,
+        100.0,
+        1071.10302734375
+      ],
+      "initial_camera_yaw": 6486,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.476,
+      "report_sha256": "86aa49444724fd2df68c80c2886278b43c942e7f7818b81481b3b3a31a1f6ee6",
+      "motor_sha256": "2bec487b2f0151ab72771acb03e965bf9f1667ed04434071a041547b63d46a58",
+      "setup_sha256": "c70a56f8d8a0c4215d573f0dfb08152d4a8a7bd4d8c6879a35b11f9311b0d775"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:49",
+      "index": 49,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "setup_path_lost",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 87,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -56.386173248291016,
+        0.0,
+        40.37099075317383
+      ],
+      "initial_camera_yaw": -9897,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.412,
+      "report_sha256": "788ee8778f68cf4293495fe7a557dfe7210b5528a17a5792c551b9b1de3ab1b1",
+      "motor_sha256": "cb87720cc4919a106d1934b220ac1d488932875327d19193addf43f8da2fed52",
+      "setup_sha256": "cc7b7019afbe35f372cedcc91eba96ea7be2a8434134812c3dac75306bffc2ca"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:50",
+      "index": 50,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.27516555786133,
+        100.0,
+        1071.9932861328125
+      ],
+      "initial_camera_yaw": 6614,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.909,
+      "report_sha256": "0c8cea40f63d379fd1d1f12181cabbead755b452728c8dd08ce72546c10e6421",
+      "motor_sha256": "31fc5e7bc42859172911e5f4f90fc0d49533d01ae9f59708af5d4063c7ca0d05",
+      "setup_sha256": "a6e1d57f5ad1d0f25be35d269b338e4ad3e2b111a480adf2105152839878b17f"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:51",
+      "index": 51,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 60,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.375,
+      "report_sha256": "dbcbfbda188ddbd4b52fb20b642d7a15450ab26b974920b477621aa3b9dbd218",
+      "motor_sha256": "b4c18cd4bdf8fac1008e41fd01f064ca47e779c522dba588283939021d5195f9",
+      "setup_sha256": "3f4509a515d697fec5ad061b73541977de1d216f71c403cf157d934830b4c236"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:52",
+      "index": 52,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 43,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.49502182006836,
+        100.0,
+        1071.316162109375
+      ],
+      "initial_camera_yaw": 6470,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 4.171,
+      "report_sha256": "533b1644b7632355c17cf82d8477b85267ef30dce686d3ba8dce0f1227c36ba5",
+      "motor_sha256": "b5c6084a4078d46a1cf983e6359771fd8ed4765e980d3f1d821b30cb9b38229a",
+      "setup_sha256": "1b552150b29239a6afebd253f822b022a5fcde0de35ebd5c251ccd031d9f13cd"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:53",
+      "index": 53,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 76,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.773590087890625,
+        14.0,
+        114.23469543457031
+      ],
+      "initial_camera_yaw": -239,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.733,
+      "report_sha256": "09e063416e40dcc2409c10155678dd87af0de9b053b0cd104598b404c52865a7",
+      "motor_sha256": "4eb7f78f92ea40991122292eccdaf209992cc70629222fd2bd2c7699fbd1e89d",
+      "setup_sha256": "d70221b0bc9e4addd24d70ddeec9e12b03277cfbbbd81d8d1f8e11c1f90d44ed"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:54",
+      "index": 54,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 42,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        45.57955551147461,
+        100.0,
+        1072.7227783203125
+      ],
+      "initial_camera_yaw": 6806,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 4.171,
+      "report_sha256": "4bccdaa2340a1a861fa468b383f3f2ba793b64eadeb34cd85dbe703252875679",
+      "motor_sha256": "00b884faafe964f511fcaf3482dc0569b75646ff9b2732aed081eb778da76a1f",
+      "setup_sha256": "668aa49e7446a425ea1611c04bf92557854daabaa7d1dbf96a2335d1fa37d129"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:55",
+      "index": 55,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 121,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.303,
+      "report_sha256": "68a391f048228ac8ec12d0f42e3dabf6c456e3c1a46f5da7cb1da91ffe0a9b13",
+      "motor_sha256": "8fce691740df1d9a93707aabc4f33928fc4a12b44d86496de9a631f6fdf36dd1",
+      "setup_sha256": "502bffdc14b169c18d7d7b297e0325d0443998784dd7d8287feefe27c9d3f3e2"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:56",
+      "index": 56,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 30,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.304,
+      "report_sha256": "904e7d6822e99112aa4f9b4515f56e0d98e725d198e589652a55024bbf37052c",
+      "motor_sha256": "4c0bfab4998b438997155d2d840ab8ca2e4c750ad551a1bbc9572f8119e1f400",
+      "setup_sha256": "656bcd3ac826b0911e6d19ee1115a87b20b9abbc3db5cf12ca4d40708ce44039"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:57",
+      "index": 57,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 59,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.75,
+      "report_sha256": "3b62466fc4057dcb3d0c72998e3fc86d18dddbf3a1640b1c8b51a1d1f66c9658",
+      "motor_sha256": "67616fa1c4d090db4c1b7655facc83f5388eb47c1a5ee3892bc10aa1d3a105a1",
+      "setup_sha256": "a37bc12a99f78c1bce50829cb4b48e862ca230f13102914fb4f9c5de3353142c"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:58",
+      "index": 58,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        45.15796661376953,
+        100.0,
+        1072.9810791015625
+      ],
+      "initial_camera_yaw": 6791,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.919,
+      "report_sha256": "2a40901afcdeaf51703feb80a4ca0c82e9f9bd2082968966e481c4aae9ea83b0",
+      "motor_sha256": "b152653d60d97c60e68d9e5bd700cb2b02e8fc00f52b5a9557344be6708174ee",
+      "setup_sha256": "f95f609db06826514363269d3d07597d197dd842c9f4b9348269dff366cc02ce"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:59",
+      "index": 59,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 85,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -67.1053466796875,
+        0.0,
+        98.54683685302734
+      ],
+      "initial_camera_yaw": -6229,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.959,
+      "report_sha256": "0e7a223898f9c175ad4048a32f8c28a0691e622a88fcc0c549fe6db51049fcf4",
+      "motor_sha256": "4fbd78dafabfdcf6bca2be9678776d8e46fb53116947d464f0d4f09671601351",
+      "setup_sha256": "3b1c1d1f3ad72c297bb655949c365832eb961d269007a82a9d8038522e95e129"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:60",
+      "index": 60,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.75020217895508,
+        100.0,
+        1071.10302734375
+      ],
+      "initial_camera_yaw": 6486,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.446,
+      "report_sha256": "b2ac460489f84319168ffeba45afd1dbec7afa1dd78b2c2562c5349d3f90bd57",
+      "motor_sha256": "ecac853a63267a9a377f3bc55793d249e85a3380915a152e7dbb0e2df2d7bbd8",
+      "setup_sha256": "a859c35b1739dbd8d90c1c4d87865626eca423de17bf9d8fb7b27f90efeab7bc"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:61",
+      "index": 61,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 134,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.7538392543792725,
+        -0.0,
+        99.49563598632812
+      ],
+      "initial_camera_yaw": 176,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 26.633,
+      "report_sha256": "6f6997b083f90dd95be4d7ba301a18ad03022089a35ec6172b924b94029a6137",
+      "motor_sha256": "06afb1ac4c5e9fec5ab9b74dfdeed9f064cedf7fc928b37e50ab3f30523d71cc",
+      "setup_sha256": "55af4d29eaf3395ad6d8d1ec3b572ac04758910ab894bdb5c83e18b4b9a23541"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:62",
+      "index": 62,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.66893005371094,
+        100.0,
+        1074.382568359375
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.839,
+      "report_sha256": "50613db1f5443c568aee442220abd0d1a511a974fd4a78838843851640285b99",
+      "motor_sha256": "6ef6d4b5f123354a67196ebeae9989c351796f97b45f214b183ccb2e6ac347d5",
+      "setup_sha256": "5180b35e2aa8e052245ea2cd50ac04d39a214b1ab23007a33180d1f29de8b51b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:63",
+      "index": 63,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 115,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.996,
+      "report_sha256": "842b9d5495e9c4199ff2e0d8be097875ca21063ef0f69d26664e52334d87dbf0",
+      "motor_sha256": "be48da681c889328cde024bf67e158e56641e65a2628949b2491215bfbc8138e",
+      "setup_sha256": "f23bc5aed211a33dfabed283f3eb0b22050b0d75d5702255befa39f34a02ca01"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:64",
+      "index": 64,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.359,
+      "report_sha256": "1e57e2c8bf8af5d9d87f89b75a6215696632c8a9e96b0bd0bdc08bb24b59962e",
+      "motor_sha256": "628ef0a309f64426677517b1f9aab6585fce48f33665847b42130f83ecd4871f",
+      "setup_sha256": "9729245576dd42f235270964229700d36958674188593d6403cebc2c0c635a33"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:65",
+      "index": 65,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 185,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -1.1051015853881836,
+        14.0,
+        113.19181060791016
+      ],
+      "initial_camera_yaw": -95,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 28.439,
+      "report_sha256": "8b205ff8106cd7efb2e7d49e52cdb533b6149520ead4eced0be144be7f1a46b3",
+      "motor_sha256": "b67feeb6c4872680a3d46b1eca344f9a0b3995aaf3327ba0252791898b1f9612",
+      "setup_sha256": "8f8e0a3b554d38df7e172ddbb80d685e05eff32f9ca554d4b3784af2b4bbe82a"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:66",
+      "index": 66,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.574745178222656,
+        100.0,
+        1072.09375
+      ],
+      "initial_camera_yaw": 6614,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.932,
+      "report_sha256": "75cac09a4e8b37bb00e314111462e15904b122248affb8b374e4ef72e33e00e7",
+      "motor_sha256": "68d8047419aa67c1dc2299d706d129f0ffebc6252486964ff942757eecc4ba24",
+      "setup_sha256": "57688fcd1a0c338ab07b553f879c0c7518504d27e6fdbc73d7567b64bd1c81d2"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:67",
+      "index": 67,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 130,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        3.2887208461761475,
+        -0.0,
+        95.4640884399414
+      ],
+      "initial_camera_yaw": 352,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 26.55,
+      "report_sha256": "138344f29fb51ee4442630c65a7fea5f55f9d42a4fdd20a84d33d004db3945a7",
+      "motor_sha256": "14dc80a4634c812bdf314627bc03280af287b2cbe1e6cbcdbe900db3827b9884",
+      "setup_sha256": "1b78f6b88ea522abe27c87a2e97cd13684e2800da8e7d7bf5c8866f230e34f76"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:68",
+      "index": 68,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 37,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.48039245605469,
+        100.0,
+        1074.5823974609375
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.795,
+      "report_sha256": "3f595effbf41609fa79d5d375e13e6cf244019b0a3d3095d3f872abae8c72fa3",
+      "motor_sha256": "5fa508a86f9e884c30d98114811c2e2d15d4c07d9adf555127f64247ddc0f4a1",
+      "setup_sha256": "5ae9a843570f8688e44b5e6d05cf3d7b4e657da1c056e99c17160dcaf103f997"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:69",
+      "index": 69,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 56,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -3.3792974948883057,
+        0.0,
+        33.36647033691406
+      ],
+      "initial_camera_yaw": -1040,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.477,
+      "report_sha256": "f0b8252c13ebe5b15e7da552ac2146e4b6907f85cbf71f5c2b968d0a8449ed2d",
+      "motor_sha256": "feed620ec32727d7dd7338686a39973415e7bb31338a21afd8b41f799215c9d4",
+      "setup_sha256": "2d2906868839f3b8935e48e6737327f24a4389492f47779009d04ddf75fb617b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:70",
+      "index": 70,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.34336853027344,
+        100.0,
+        1071.8922119140625
+      ],
+      "initial_camera_yaw": 6614,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.781,
+      "report_sha256": "1f205a805172ff32d1b90ca6465856be5ad8c3289ebe584721a3d9ac1f92f71e",
+      "motor_sha256": "84d96161fb00ed7f83106e1c984302cf0f499521f4eef6d2ddfb22d66c4cf25d",
+      "setup_sha256": "d9a55530c7dc9b8ba199445b5f61dae261e73d3622b052d96944bccf1ef03aa8"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:71",
+      "index": 71,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 105,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.773590087890625,
+        14.0,
+        114.23469543457031
+      ],
+      "initial_camera_yaw": -239,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 23.509,
+      "report_sha256": "147ed9ce2cf14830f08d12733dd528e34ca88d00f514054ac379750552b41507",
+      "motor_sha256": "128fe265464f772556fa5f4f0ec40582c2ff581158af3771291b9c43c933e441",
+      "setup_sha256": "c8e7d3c3bd15054e2f9f1895c3634bcf7d1fb5636e327582e038fc4399431d58"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:72",
+      "index": 72,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.66264724731445,
+        100.0,
+        1072.154296875
+      ],
+      "initial_camera_yaw": 6630,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.943,
+      "report_sha256": "09e98693a1221b3485a4222d659f001e5e57954fca267d8ce74f982df58cd17e",
+      "motor_sha256": "a7eb8f8b9f4fd0bbed002d6e19d2a9f62aff0acc151fdbb4a658e16c6a6d6d34",
+      "setup_sha256": "575ed27135bb373dcbd851b1522e9e20963ea6bdf39819af0e922b0ebd7f566a"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:73",
+      "index": 73,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 132,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -0.276798814535141,
+        14.0,
+        105.11415100097656
+      ],
+      "initial_camera_yaw": -15,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 26.639,
+      "report_sha256": "c8f27ba31fdd59939db139e25d80bf07dc893513e3d4d4e09020513dae97fffa",
+      "motor_sha256": "32f86be8f416eb83540e64b36ab17d17b3b13a499fb0989eb77087139249817e",
+      "setup_sha256": "b4445c0226e2b7c9a4838c2d8452b7c983744d00647c83777dfaf729b2b23dc2"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:74",
+      "index": 74,
+      "success": false,
+      "reason": "motor_budget_or_disconnect",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": false,
+      "consumed_commands": 512,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.65009307861328,
+        100.0,
+        1074.3707275390625
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -331.47039794921875,
+        -80.0,
+        1186.611572265625
+      ],
+      "total_elapsed_s": 119.659,
+      "report_sha256": "87909057037569a5783838ac63f72e66479ed8fb1fc1591f1544da3d70641887",
+      "motor_sha256": "cbecd67a8c4de2d19d8bbf3082b276bd1bb2cc8fefca0e62765c0f3720a2d5d0",
+      "setup_sha256": "dbdda22d1510a35f98ce5326fa21cb19368cf06118c8105e7a89e1e40728202b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:75",
+      "index": 75,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 139,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -1.4639278650283813,
+        14.0,
+        113.09857177734375
+      ],
+      "initial_camera_yaw": -127,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 25.744,
+      "report_sha256": "4705a3e74b472260046d04c2c97c98941c81ce21e0a34f24dd5d1cad024ec51b",
+      "motor_sha256": "c41f1a41f873b17ad0894be9162f8db8570ca8f54725a19385f52f3797c655c6",
+      "setup_sha256": "6fb8bb7ba3609eafa3f4b4e867ab73fdf644a19f1aaef4d8cf20e38c4b145906"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:76",
+      "index": 76,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        35.57666015625,
+        100.0,
+        1070.9205322265625
+      ],
+      "initial_camera_yaw": 6422,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.425,
+      "report_sha256": "7c55913dc36800bff85abceab689421b9ba302e7626e1d9cd326d92545379319",
+      "motor_sha256": "ffd2a57849388b78186efbfb4dd7a6b8bdf26e377fec624af80d3a3fb68b902b",
+      "setup_sha256": "31292a431f368bd1e49b9beba6cdae850152bf3ffb9ae883b6e6b83c490872f1"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:77",
+      "index": 77,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 125,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.027419090270996,
+        14.0,
+        113.20675659179688
+      ],
+      "initial_camera_yaw": -175,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.712,
+      "report_sha256": "f18b02f5d6b824c0cfd82d9082874882d9b2c262587064f695e8587ce525410d",
+      "motor_sha256": "862eabc03be0772f103814d90c82aa1bb7f96c879ebf9ad84209bff97ad02a33",
+      "setup_sha256": "ea7e35e6a4ce16acb6a40f6f8a8c0de2ac4660ccaa3298b4637224240db0f52c"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:78",
+      "index": 78,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 38,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        41.40404510498047,
+        100.0,
+        1071.85888671875
+      ],
+      "initial_camera_yaw": 6662,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.959,
+      "report_sha256": "36cd242bc374c452b5fec7675d214a4c11430c046a68ff3eb28c34392b96b311",
+      "motor_sha256": "5ad91bf18dc3312b07c27dca7eb4d54f14069cb2f41dcfac6e6c54c0c28b8c68",
+      "setup_sha256": "745d66f3cb9cd8bd5ae75bb19bccc82806b831cbb0bb34c6260929f72480fc67"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:79",
+      "index": 79,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 57,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.263,
+      "report_sha256": "f243f551dfa96b52471eab138a326d90fa8304de54ef3e700acc61208c3c5534",
+      "motor_sha256": "3c21bfa50ab6805b30f1b5224687091028d381c96cfbb358e1e55ee0d6712330",
+      "setup_sha256": "b92db3dcea1908067da6d2d47cbe0d84b0bfb4e5d559aa2e4af7e9acc09f03ad"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:80",
+      "index": 80,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 32,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        35.433692932128906,
+        100.0,
+        1070.8828125
+      ],
+      "initial_camera_yaw": 6422,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.506,
+      "report_sha256": "3e8667b446f0a5cca7c1698343a10e6d34b98b7f9cc4e7bea86162efad053372",
+      "motor_sha256": "49d1b209676226fe966a2e633299d07b3475980219d4d089132ade2d27d76244",
+      "setup_sha256": "43805a8308ec810e01431597257b36cd3be4256bc64ad0bbf143c59ab550c2e0"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:81",
+      "index": 81,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 95,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -0.19349507987499237,
+        0.0,
+        100.50572204589844
+      ],
+      "initial_camera_yaw": -15,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.252,
+      "report_sha256": "badc7fd8f85aaaaee8b4b1b0e7b1798a93fd6886a167399ccb3645ea9766d733",
+      "motor_sha256": "2a891d6211d17c76c0bf509667ff443a1abfe838e01ff47ed3de701c4313acd2",
+      "setup_sha256": "06ce402e78c3f64f9c622fbbbd53f133289a293b2a24d77305e981d0231b364d"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:82",
+      "index": 82,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.50726318359375,
+        100.0,
+        1074.623291015625
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.936,
+      "report_sha256": "e0ce6ed79a52ded77a274cb64862f6ccc8c1f88fa507bf1c4c8762b099078aa8",
+      "motor_sha256": "b5956a5f6c79e57c751580154460bbbe2f68c0d482e86de40ada48d4ec05de33",
+      "setup_sha256": "86be5186ba11179f98e09f4698dae4b32b66306d040f748db6aea582c94f5215"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:83",
+      "index": 83,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 71,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -68.03378295898438,
+        0.0,
+        100.66679382324219
+      ],
+      "initial_camera_yaw": -6197,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 21.269,
+      "report_sha256": "1dc441d52341c552f52be530648435d030db8cb3e44bba3489abb42a382790f2",
+      "motor_sha256": "34166549caa0dfde029a9d778dee9cf04b7eaeb43e005a6be3d74a61b180f604",
+      "setup_sha256": "e932157e3f4ad2bffbf9f95c8e2a26a47dbbd22df6e08d880cdf2502ecb5c2e9"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:84",
+      "index": 84,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        35.54924011230469,
+        100.0,
+        1071.136474609375
+      ],
+      "initial_camera_yaw": 6422,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.515,
+      "report_sha256": "430655ee10b40f6aa9cb47f69a2cedcc55d8ba9e6c9c938cde5420a31a877c72",
+      "motor_sha256": "bea631c45022e5e10ac34b133b4cd3c24833f65763faba9869b5ebc4cdc5e4e5",
+      "setup_sha256": "d204b16081b3cc86b1f9494ee837f23beefe306ffab69e20a5d9bef3b0c1914b"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:85",
+      "index": 85,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 56,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.2,
+      "report_sha256": "84a0dea07f75f23adb1135387c2335549253b1665504c8c611eb477310094e97",
+      "motor_sha256": "dc43332d76638db1e184f40150f13116c7294bb9b4ed625fdd10e2fecd243c95",
+      "setup_sha256": "7570ed2aac2fd0803bf3469232cf07cde98817746e413e845fd9d03e81089750"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:86",
+      "index": 86,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.8402099609375,
+        100.0,
+        1071.1173095703125
+      ],
+      "initial_camera_yaw": 6486,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.524,
+      "report_sha256": "49a8d106fd7f0a4dddcc734c440948e6be7f0f7bbfc6221e41a38f886b58de89",
+      "motor_sha256": "7c2cbac3189289a9d415ec397999b27543a6db77867ea3f5dc4670e7d95612db",
+      "setup_sha256": "7ea52a8ee7a769c7bd083c2d6d84782b883d0b4dcba629379826090b36ed434e"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:87",
+      "index": 87,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 132,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -67.72566223144531,
+        0.0,
+        99.65331268310547
+      ],
+      "initial_camera_yaw": -6229,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.692,
+      "report_sha256": "0617490534a5a8cc3bcef6d0e2acb1abb97a55e04a4335d80c8da5a6afa09c2e",
+      "motor_sha256": "bc75dae4c827604a39d446182130f5dc916b328d41e4a84a50c1f45fcf174f8d",
+      "setup_sha256": "f52b11ed04f6b94e3786987d31613ef366b48e0ac17c14d1b851e78e9df886c0"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:88",
+      "index": 88,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        41.27195358276367,
+        100.0,
+        1071.714599609375
+      ],
+      "initial_camera_yaw": 6646,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.852,
+      "report_sha256": "a53c8c33428aa7461f922defc642453ec39c86de36c5e3b6976e61f7e0a6c86b",
+      "motor_sha256": "b7bae92b265a67234dbfa8016ecc920b1f07da53470e2df3e1adb63ae268bbb9",
+      "setup_sha256": "d514fafadcc7423f5c509d7f807730640917d37b4071c8e41480327e8a80fa08"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:89",
+      "index": 89,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 60,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.521,
+      "report_sha256": "193fa4934f61b07cca032792f01ece9b451757a04a1a1b000f2f2169fab4ca48",
+      "motor_sha256": "3b6785b35691a1cc3ebea0120876e4101dcc7b494a264a54d491886800d0063a",
+      "setup_sha256": "1836c0c0b6873af92364735553d29c54deda69838f8a061d55d63addd9f86c3e"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:90",
+      "index": 90,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 33,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        36.75020217895508,
+        100.0,
+        1071.10302734375
+      ],
+      "initial_camera_yaw": 6486,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.416,
+      "report_sha256": "1f29b399ddc7ee4fff86549edc5ed9d6b18edfe6c662b1c6d8a12fe26db49b04",
+      "motor_sha256": "f4041e16c5f8bb05034387d40a528efc87ed9243c5f66802e22373553e71e1ab",
+      "setup_sha256": "20207df37d44133aa8244961acd2754bb11142a569e5a9dd5b17a03a20350803"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:91",
+      "index": 91,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1,
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 100,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        0.6813826560974121,
+        -0.0,
+        102.55571746826172
+      ],
+      "initial_camera_yaw": 64,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 24.928,
+      "report_sha256": "e32fb2667844ead65deefd273c32386f85dcfd1e14e7913cdb75a751fb636884",
+      "motor_sha256": "4a67f8425f125cc47deb7bfc0a640a0d20425ad0f5e78ad92a254751efbd6dad",
+      "setup_sha256": "9fd0df627ee054c0c54f8acb58c6ba93c5f463164abf66099425dd1014911038"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:92",
+      "index": 92,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        3
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 40,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -101.65009307861328,
+        100.0,
+        1074.3707275390625
+      ],
+      "initial_camera_yaw": 641,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.879,
+      "report_sha256": "0f9830d545d0d614ea46243324480af7af10ff1aaa1230ae750fab80d692b229",
+      "motor_sha256": "451ddf7d03eeed823c0fe35e880b93361f2c0f9ac0a3a8031588649f67dee787",
+      "setup_sha256": "e1a5b6199bb402f6105b2fa44090ab40bba8713f32fba462f14afbf2b156d906"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:93",
+      "index": 93,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 120,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.388,
+      "report_sha256": "5ef3f316c43d6d724801f2b5b13f0c4ce493e3010e05388740861998e19e86e5",
+      "motor_sha256": "c78d3c68bd5029bb6945f5790ae4827c146dd676d0188cdabe53b97750313cd8",
+      "setup_sha256": "db0e4174e98dc615fd9cde90ccd4fc2683a7f5965aa60898bc572dbac9ae0bab"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:94",
+      "index": 94,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.327,
+      "report_sha256": "2ea9468aea77afefa816f5cf9396e0a09256c529911f0cb5e65a6ab548a3fc65",
+      "motor_sha256": "03f612e48e318f55951270cb029f2cf5c3e41983ede6e0d562d6b50cbd5e51d3",
+      "setup_sha256": "d72443fac71caa538351e88103b47fba683220f59515853443c98d4b3bf476ca"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:95",
+      "index": 95,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 59,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -2.9588913917541504,
+        0.0,
+        33.54664611816406
+      ],
+      "initial_camera_yaw": -912,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 19.848,
+      "report_sha256": "869833f5c9c8277507b45004cb40c8a39fecc415844b7949ef7b706ae08935aa",
+      "motor_sha256": "30e49dd6253aac0b2c09f174b296302d5ac63c45ac6afc52904e53383aa5e37d",
+      "setup_sha256": "f35757e6220014bf57849b1408d1cafffce591dac1caa864700eb579c878a6bf"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:96",
+      "index": 96,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 39,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.77634048461914,
+        100.0,
+        1072.087890625
+      ],
+      "initial_camera_yaw": 6646,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 3.882,
+      "report_sha256": "548f62ca2412e5b59aa5531ceddb8506807ad682d676a8ddd404a6152209a562",
+      "motor_sha256": "4dcbc4ef9c9bbe5d8eac9bd65cd4e11d6c048534210ffb34d1fbd29cfcd057ce",
+      "setup_sha256": "201a1a9d2a49d3e62021f25f31cbfc7bacd6ee55dd717a1abd6bc1b72c447dcb"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:97",
+      "index": 97,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        0,
+        2
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 139,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -1.659482479095459,
+        14.0,
+        113.29393005371094
+      ],
+      "initial_camera_yaw": -143,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 25.488,
+      "report_sha256": "4f807f69535aa66d180d64f63ce8933595fdbdeef85b36d7868f420f18b53f8b",
+      "motor_sha256": "64d3b29a29b7de6dfe4103f92fe1145c5ec936b04bcdc479a4eefaf9d719a418",
+      "setup_sha256": "f5406a168fa1a8b79c98e730c9e1c936f749bd8ed2abe9b3788891f797c62934"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:98",
+      "index": 98,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "reached_observed_cell",
+      "setup_heading_bins": [
+        1
+      ],
+      "settled_crossing": true,
+      "consumed_commands": 53,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        40.34794235229492,
+        100.0,
+        1072.2763671875
+      ],
+      "initial_camera_yaw": 6614,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 4.795,
+      "report_sha256": "dbd5f93da5589f37cb7d992c057b46f2a1e5acac5b1c6a8037fc1840d448c5a1",
+      "motor_sha256": "6fc689300c5a620a02d825580eb3e4ae705d065cbf53d891ff05b5f680d47de9",
+      "setup_sha256": "1762dcecb843f7325de7c277fd8469fc301e49ba036b930d4d2b013e1a47bb06"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:99",
+      "index": 99,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "outbound",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 121,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        1.0,
+        -0.0,
+        95.0
+      ],
+      "initial_camera_yaw": 96,
+      "final_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "total_elapsed_s": 22.466,
+      "report_sha256": "83485df54ba3f6dc828aff89a73f689423f73f4db3a2dc004bff3cfe672d15a2",
+      "motor_sha256": "9218e5e499643cef9f7d0fc36d2b96b407e679e52c86514ae143ec6cac1751f7",
+      "setup_sha256": "9dff7f64eb48afb844550e4e646e5952c79425760b5b8d49228752c76048fef4"
+    },
+    {
+      "episode_id": "g1-3a53157b3632:100",
+      "index": 100,
+      "success": true,
+      "reason": "observed_settled_portal_crossing",
+      "artifacts_unchanged": true,
+      "pair_role": "revisit",
+      "setup_status": "baseline",
+      "setup_heading_bins": [],
+      "settled_crossing": true,
+      "consumed_commands": 29,
+      "objective_unchanged": true,
+      "run_updates": 0,
+      "initial_position": [
+        -31.0,
+        100.0,
+        1073.0
+      ],
+      "initial_camera_yaw": 3956,
+      "final_position": [
+        -4.0,
+        0.0,
+        -65.25
+      ],
+      "total_elapsed_s": 2.365,
+      "report_sha256": "6d82c8083ef2a23fa54b3a8b7d8b6e80d3dec349e22b6e8020de5a95aa4ad532",
+      "motor_sha256": "94d9d5b95dbe7b6806f8be808d94bf18f054dfe89cb12765071eaa5a0162636e",
+      "setup_sha256": "5a2942e9cd6162e8b0c96d22b035dbdc706ec70c79914e5410a26758ca5d9301"
+    }
+  ]
+}

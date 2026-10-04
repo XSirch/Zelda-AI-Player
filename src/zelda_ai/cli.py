@@ -55,12 +55,27 @@ def main():
     qualify.add_argument("--wait-seconds", type=float, default=8.0)
     qualify.add_argument("--probe-only", action="store_true")
     qualify.add_argument("--save-slot", type=int, choices=(1, 2, 3), help="Explicit existing save to load through physical input")
+    g1 = commands.add_parser("qualify-g1", help="Automatic real SoH G1 batch; no AI calls or training")
+    g1.add_argument("executable", type=Path)
+    g1.add_argument("--source-home", type=Path, required=True, help="Existing native config/Save directory, copied locally")
+    g1.add_argument("--save-slot", type=int, choices=(1, 2, 3), required=True)
+    g1.add_argument("--episodes", type=int, default=100, help="100 for qualification; smaller batches are pilots")
+    g1.add_argument("--seed", type=int, default=1042026)
+    g1.add_argument("--seconds", type=float, default=120.0, help="Complete scenario budget, including startup and setup")
     launch = commands.add_parser("launch-soh")
     launch.add_argument("executable", type=Path)
     args = parser.parse_args()
     settings = Settings()
 
-    if args.command == "qualify-motor":
+    if args.command == "qualify-g1":
+        if not 1 <= args.episodes <= 100 or not 10 <= args.seconds <= 120:
+            parser.error("G1 allows 1..100 episodes and a complete-scenario budget of 10..120 seconds")
+        from .g1 import qualify_g1
+        report = asyncio.run(qualify_g1(settings, args.executable, args.source_home,
+            episodes=args.episodes, seed=args.seed, save_slot=args.save_slot, seconds=args.seconds))
+        if not report["g1_qualified"]:
+            raise SystemExit(2)
+    elif args.command == "qualify-motor":
         if not 1 <= args.seconds <= 600 or not 1 <= args.wait_seconds <= 60:
             parser.error("Qualification budgets must be 1..600 seconds and wait 1..60 seconds")
         from .qualification import qualify_motor

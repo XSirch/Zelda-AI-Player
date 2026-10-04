@@ -195,6 +195,22 @@ uv run zelda-ai qualify-motor --save-slot 2 --seconds 120
 
 `--save-slot` autoriza a seleção daquele arquivo existente por inputs físicos. O adaptador permite confirmar apenas esse arquivo e bloqueia comandos nos modos de copiar, apagar e criar nomes. O harness usa o perfil instrumentado `instrumented_local_v1`, verifica mudança real de sala seguida de estado jogável e salva observações/recibos em `.local/qualification/`. Um episódio bem-sucedido não aprova G1. O código não cria provedores de cognição nem usa o simulador.
 
+Para executar o lote automático G1 no Windows, com os assets locais presentes junto do executável:
+
+```powershell
+uv run zelda-ai qualify-g1 C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home C:/Projetos/Shipwright-AI/x64/Release --save-slot 2 --episodes 100 --seed 1042027 --seconds 120
+```
+
+O supervisor cria uma cópia local dos saves e da configuração, congela política e memórias e inicia seus próprios processos SoH. A cada par de episódios, carrega o save pelos controles normais, testa a saída da sala e uma nova travessia a partir do destino. As posições de preparação vêm somente das conexões dirigidas da malha de colisão observada; nenhuma posição ou câmera é escrita na memória do jogo. Os mapeamentos de teclado e gamepad ficam desativados apenas nas cópias de QA, enquanto a bridge controla o jogo. O orçamento de 120 s inclui reinício, carga, preparação, motor e verificação. Os arquivos originais são verificados por SHA-256.
+
+Cada execução recebe um diretório novo em `.local/qualification/g1-*/`, com manifesto, relatório atualizado após cada tentativa, preparação, observações e recibos. Um lote menor, configurado por `--episodes`, serve como piloto e termina sem aprovação G1. O gate exige 100 tentativas, ao menos 99 travessias verificadas, variação efetivamente observada de posição/câmera, movimentos consumidos nas quatro direções e nenhuma atualização dos pesos. A qualificação vale para o perfil e os contextos medidos; ela não demonstra aprendizagem nova nem conclusão da campanha. O comando retorna código 2 quando o gate não é aprovado.
+
+O lote físico de 2026-10-04 aprovou esse perfil com **99/100**, incluindo uma falha de retorno. Os resultados e limites estão em [docs/STATUS.md](docs/STATUS.md). Para auditar um lote local e exportar somente o índice público:
+
+```powershell
+uv run python scripts/export_g1.py .local/qualification/g1-3a53157b3632 --output docs/validation/g1_2026-10-04.json
+```
+
 No Windows com MSVC, os testes de transporte nativo também podem ser executados com `powershell -ExecutionPolicy Bypass -File scripts/verify_native.ps1`. Esse resultado complementa os testes pytest que exigem g++ ou clang++.
 
 Revisão Shipwright fixada:

@@ -57,7 +57,7 @@ def test_panel_uses_realtime_websocket_and_simple_start_stop():
     text = Path("web/src/main.tsx").read_text(encoding="utf-8")
     assert "new WebSocket" in text
     assert "/api/events" in text
-    assert "socket.onmessage" in text
+    assert "currentSocket.onmessage" in text
     assert "api<Snapshot>(path, {})" in text
     assert "'/start' | '/stop' | '/evaluate'" in text
 
