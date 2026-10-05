@@ -26,11 +26,17 @@ def main():
     import torch
 
     with torch.inference_mode():
+        numeric = getattr(model, "numeric_telemetry", False)
+        if numeric:
+            from .laya_inference import NumericInference
+
+            inference = NumericInference(model, tokenizer, profile=args.profile)
+        else:
+            def inference(state):
+                return forward(model, batch_for(tokenizer, [{"state": state}]))
         warmup = {"state": bounded_state([[0.0] * len(profile_features(args.profile))], profile=args.profile)}
         for _ in range(3):
-            forward(
-                model, batch_for(tokenizer, [warmup], numeric=getattr(model, "numeric_telemetry", False))
-            ).argmax(-1).cpu().tolist()
+            decode_stick(inference(warmup["state"]), model.stick_readout).cpu().tolist()
         reply(
             {
                 "ready": True,
@@ -54,10 +60,7 @@ def main():
                 raise ValueError("Invalid bounded inference request")
             torch.cuda.synchronize()
             started = time.monotonic()
-            logits = forward(
-                model,
-                batch_for(tokenizer, [{"state": state}], numeric=getattr(model, "numeric_telemetry", False)),
-            )
+            logits = inference(state)
             stick = decode_stick(logits, model.stick_readout).cpu().tolist()
             reply(
                 {

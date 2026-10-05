@@ -66,6 +66,18 @@ def numeric_forward(model, batch):
         if not torch.equal(ids, cache[0]) or not torch.equal(mask, cache[1]):
             raise ValueError("Constant schema or physical options changed during inference")
     encoded = model.numeric_cache[2].repeat(n // 2, 1, 1)
+    return numeric_logits(model, batch, encoded)
+
+
+def numeric_logits(model, batch, encoded):
+    """The same head arithmetic for training and fixed-schema inference.
+
+    Callers own schema validation. This contains only tensor operations so a
+    read-only worker can capture it without a host synchronization per layer.
+    The telemetry projection still runs for every new observation.
+    """
+    import torch
+
     h = (
         encoded
         + model.type_emb(batch["qtype"])[:, None, :]

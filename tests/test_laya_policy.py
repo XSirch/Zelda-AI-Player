@@ -72,10 +72,12 @@ def test_laya_inflight_heading_survives_indoor_camera_orbit_and_top_down(
         process = FakeWorker()
         policy = LayaWalkingPolicy(process)
         state.mirrored_world = mirrored
-        task = task_for(state)
         bridge = Bridge()
         bridge.state = state
         controller = ContinuousController(bridge, tmp_path / "policy.pt")
+        # Model/optimizer cold initialization is outside the physical task's
+        # bounded attempt. Camera handling is what this test exercises.
+        task = task_for(state)
         controller.start_local_task(task, stick_policy=policy)
         try:
             controller._ml_step(state)

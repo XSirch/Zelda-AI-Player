@@ -1,0 +1,220 @@
+{
+  "date": "2026-10-05",
+  "observation_profile": "instrumented_local_v1",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "promotion": "disabled",
+  "decision_response_budget_ms": 100,
+  "actuation_grace_ms": 50,
+  "execution_optimization": {
+    "engine": "fixed_schema_cuda_graph_v1",
+    "current_numeric_values_copied_every_request": true,
+    "schema_and_profile_strictly_validated_before_scoring": true,
+    "training_numeric_forward_keeps_original_cache_checks_and_gradients": true,
+    "walking_world_reprojection_and_ladder_raw_input_leases_unchanged": true,
+    "cuda_capture_failure_aborts_worker_startup": true,
+    "worker_invalid_logits_fail_closed_before_a_reply": true,
+    "original_replay_stage_ms": {
+      "prepare_ms": {
+        "p50": 4.204600001685321,
+        "p95": 5.122800008393824,
+        "maximum": 6.180399999720976
+      },
+      "forward_ms": {
+        "p50": 8.050400007050484,
+        "p95": 10.883700000704266,
+        "maximum": 13.939600001322106
+      },
+      "decode_ms": {
+        "p50": 0.8758000039961189,
+        "p95": 1.4936000079615042,
+        "maximum": 1.9474000000627711
+      },
+      "total_ms": {
+        "p50": 13.330599991604686,
+        "p95": 16.860799994901754,
+        "maximum": 20.87290000054054
+      }
+    },
+    "same_recorded_inputs_sequential_execution_ms": {
+      "original": {
+        "p50": 12.427900001057424,
+        "p95": 14.919599998393096,
+        "maximum": 19.37490000273101,
+        "sample_count": 120
+      },
+      "cached_schema": {
+        "p50": 6.985599990002811,
+        "p95": 8.632899989606813,
+        "maximum": 10.294399995473213,
+        "sample_count": 120
+      },
+      "cuda_graph": {
+        "p50": 4.147300001932308,
+        "p95": 5.169600000954233,
+        "maximum": 5.860899997060187,
+        "sample_count": 120
+      }
+    },
+    "prototype_native_input_count": 75,
+    "prototype_audit_sha256": "ff4f4f291cdeaa23bb5db798c4d5ab67d8932628839b190a3b992de7a15f10ad",
+    "stage_audit_sha256": "bb28f8f17189ba0f6fe838f53744038882023f5b7b72a1b63e83114f7b12f842"
+  },
+  "actual_cuda_parity": {
+    "scope": "actual_cuda_recorded_native_input_replay_without_game",
+    "profiles": [
+      {
+        "profile": "laya-observed-walking-v1",
+        "candidate_sha256": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720",
+        "states": 75,
+        "p50_ms": 4.061799991177395,
+        "p95_ms": 5.169900003238581,
+        "maximum_ms": 5.548000000999309,
+        "all_logits_exact": true,
+        "all_executed_sticks_exact": true,
+        "distinct_executed_sticks": 23,
+        "sample_count": 120
+      },
+      {
+        "profile": "laya-observed-attached-descent-v1",
+        "candidate_sha256": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6",
+        "states": 46,
+        "p50_ms": 5.527799992705695,
+        "p95_ms": 6.976999997277744,
+        "maximum_ms": 9.714300002087839,
+        "all_logits_exact": true,
+        "all_executed_sticks_exact": true,
+        "distinct_executed_sticks": 1,
+        "sample_count": 120
+      }
+    ],
+    "audit_sha256": "2b07cca23886baef41ea299e7083be2b78bf6ea63be202aff3cd1371601eafca",
+    "provider_calls": 0,
+    "training_updates": 0,
+    "native_commands": 0
+  },
+  "native_walking": {
+    "suite": "g1-4c46f234407b",
+    "seed": 4102500,
+    "native_sessions": 3,
+    "tasks_per_session": 5,
+    "attempted": 15,
+    "successful": 14,
+    "consumed_actions": 508,
+    "source": "soh",
+    "observation_profile": "instrumented_local_v1",
+    "save_slot": 2,
+    "task_versions": [
+      "observed-analog-task-v2"
+    ],
+    "provider_calls": 0,
+    "training_updates": 0,
+    "reference_blend": 0,
+    "objectives_unchanged": true,
+    "promotion": "disabled",
+    "g2_complete": false,
+    "failure_reasons": {
+      "attempt_timeout": 1
+    },
+    "failures": [
+      {
+        "session": 2,
+        "index": 2,
+        "reason": "attempt_timeout"
+      }
+    ],
+    "worker": {
+      "round_trip_ms": {
+        "samples": 508,
+        "p50": 13.26990000961814,
+        "p95": 26.358799994341098,
+        "maximum": 76.00849999289494
+      },
+      "inference_ms": {
+        "samples": 508,
+        "p50": 9.801000007428229,
+        "p95": 22.934100008569658,
+        "maximum": 36.346900000353344
+      },
+      "output_age_ms": {
+        "samples": 686,
+        "p50": 67.10810000367928,
+        "p95": 75.97020000685006,
+        "maximum": 148.41460000025108
+      }
+    },
+    "expired_responses": 0,
+    "context_rejections": 0,
+    "responses": 508,
+    "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+    "client_command_to_native_consumption_ms": {
+      "samples": 508,
+      "p50": 27.246,
+      "p95": 47.225,
+      "maximum": 59.733
+    },
+    "full_observation_to_physical_reaction_ms": null,
+    "candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "report_sha256": "287ab8d610cd4e15564aa455f78e8e9d168c68b92405c0722aa0b589e6081b4a",
+    "manifest_sha256": "f19e46690c60ca1f69c5a445e062f65e1ed2fff945adc9f8b96980c81812bab2",
+    "frozen_artifact_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "strict_utf8_and_finite_json_files_verified": 45,
+    "source_files_count": 50,
+    "relevant_source_sha256": {
+      "src\\zelda_ai\\laya_curriculum.py": "49b6babf4b9aebb1230a4ae0dfe7fa46fa276b3c9157ef78e7e984b4e50b9518",
+      "src\\zelda_ai\\laya_inference.py": "e16eb517eda6a8360b27b31a653d899f8adbe9f758f14e405ccb40649bb31527",
+      "src\\zelda_ai\\laya_numeric.py": "e3271874ba7b04c2b1197151bc7f287dde22ee6cc227f81a6c449854824f49e4",
+      "src\\zelda_ai\\laya_training.py": "2a6979db78b84358d143897a611c623ab66226bb608ff170e064ae4338c74b80",
+      "src\\zelda_ai\\laya_worker.py": "06f9f22f4a100da085c31201fcecfd0abba64347dff3a39fce5fe9ec1e86e789",
+      "src\\zelda_ai\\surface_curriculum.py": "03689376d96f3bf5b46ee315518da3042b14bf757c7022b6fa8ab73e942ed7f6",
+      "src\\zelda_ai\\autonomy\\laya_ladder_policy.py": "85df4428e90ca4f5f6e0350db355947805e3c577a6dae7a46985cf1d3078c1cc",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6"
+    },
+    "camera": {
+      "native_input_yaw_observations": 633,
+      "changing_yaw_observations": 452,
+      "largest_observed_yaw_delta_deg": 19.97314453125,
+      "steep_top_down_observations": 0,
+      "camera_reprojected_outputs": 554,
+      "request_to_application_camera_delta_max_deg": 19.97314453125
+    },
+    "pinned_integrity_at_terminal_export": true,
+    "fixture_integrity_at_terminal_export": true,
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "reference_warmup_before_native_launch": {
+      "elapsed_ms": 2531.091999990167,
+      "native_commands": 0,
+      "run_updates": 0
+    }
+  },
+  "strict_utf8_and_finite_native_json_files_verified": 45,
+  "limitations": [
+    "Fourteen of fifteen short house walks; one attempt timeout retained.",
+    "No new ladder gameplay run; attached-profile equivalence was tested on recorded native inputs in CUDA.",
+    "No steep native top-down observation in this house batch; automated camera regressions remain separate.",
+    "Full observation-to-physical-reaction latency remains null; sampled output age uses the 50 ms actuation grace.",
+    "Replay excludes native rendering; historic native batches are not perfectly paired.",
+    "No diagnosis proving rendering contention as the sole prior latency cause.",
+    "G2 qualification, reliable navigation, INICIAR promotion, Kokiri Sword and full campaign remain pending."
+  ],
+  "validation": {
+    "pytest_passed": 421,
+    "pytest_skipped": 20,
+    "web_build": "passed",
+    "focused_ruff": "passed",
+    "strict_written_utf8": "passed",
+    "native_cpp_changed": false,
+    "new_native_cpp_build_claimed": false,
+    "native_skip_reason": "g++/clang++ unavailable",
+    "strict_written_text_files_verified": 77
+  }
+}
