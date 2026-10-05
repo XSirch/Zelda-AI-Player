@@ -107,6 +107,7 @@ class NavigationMeshSnapshot(StrictModel):
     # QA counter over this snapshot's bounded local rays; never a route or
     # solution flag. Old adapters retain the explicit zero default.
     backface_rejections: int = Field(default=0, ge=0, le=8192)
+    lower_band_rejections: int = Field(default=0, ge=0, le=8192)
 
     @property
     def available(self) -> bool:

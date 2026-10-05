@@ -4,6 +4,7 @@
 #include "InputScheduler.hpp"
 #include "ActorRegistry.hpp"
 #include "StartupGuard.hpp"
+#include "NavMeshQueries.hpp"
 #include <SDL2/SDL_net.h>
 #include <nlohmann/json.hpp>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -41,7 +42,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.7";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.8";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -751,6 +752,7 @@ json NavigationMesh(Player* player) {
         {"cells", json::array()},
         {"scene_exits", json::array()},
         {"backface_rejections", 0},
+        {"lower_band_rejections", 0},
     };
     if (!player) {
         result["step"] = 0.0f;
@@ -939,21 +941,18 @@ json NavigationMesh(Player* player) {
                 }
                 if (!floorContinuous) continue;
 
-                Vec3f start{x, cell.y + 26.0f, z};
-                Vec3f end{nxWorld, neighbor.y + 26.0f, nzWorld};
-                if (lineBlocked(start, end)) continue;
-
-                const float vx = nxWorld - x;
-                const float vz = nzWorld - z;
-                const float length = std::sqrt(vx * vx + vz * vz);
-                if (length <= 0.001f) continue;
-                const float px = -vz / length * BODY_CLEARANCE;
-                const float pz = vx / length * BODY_CLEARANCE;
-                Vec3f leftStart{start.x + px, start.y, start.z + pz};
-                Vec3f leftEnd{end.x + px, end.y, end.z + pz};
-                Vec3f rightStart{start.x - px, start.y, start.z - pz};
-                Vec3f rightEnd{end.x - px, end.y, end.z - pz};
-                if (lineBlocked(leftStart, leftEnd) || lineBlocked(rightStart, rightEnd)) continue;
+                // Pinned Player_ProcessSceneCollision centers Link's wall
+                // sphere 26 units above the floor, with age-specific radius.
+                // Its lower body cannot be represented by the center ray alone.
+                const float radius = player->ageProperties ? player->ageProperties->wallCheckRadius : BODY_CLEARANCE;
+                const float lowerHeight = std::max(1.0f, 26.0f - radius);
+                const auto clearance = zelda_ai::InspectWalkingEdge(
+                    Vec3f{x, cell.y, z}, Vec3f{nxWorld, neighbor.y, nzWorld},
+                    BODY_CLEARANCE, 26.0f, lowerHeight, lineBlocked);
+                if (clearance.lowerBandBlocked) {
+                    result["lower_band_rejections"] = result["lower_band_rejections"].get<int>() + 1;
+                }
+                if (clearance.blocked) continue;
 
                 cell.links |= static_cast<uint8_t>(1u << direction);
                 neighbor.links |= static_cast<uint8_t>(1u << (direction + 4));

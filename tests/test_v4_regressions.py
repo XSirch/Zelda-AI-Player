@@ -112,6 +112,18 @@ def test_backface_diagnostic_does_not_invent_collision_links(state):
             NavigationMeshSnapshot(backface_rejections=invalid)
 
 
+def test_lower_body_diagnostic_preserves_legacy_unknown_and_cannot_create_links(state):
+    from pydantic import ValidationError
+
+    legacy = NavigationMeshSnapshot(step=70, half_extent=1, cells=[(0, 0, 0., 0), (1, 0, 21., 0)])
+    assert legacy.lower_band_rejections == 0  # Schema default, not a measured legacy count.
+    state.navmesh = legacy.model_copy(update={"lower_band_rejections": 25})
+    assert observed_local_path(state, (70., 21., 0.)) is None
+    for invalid in (-1, 8193):
+        with pytest.raises(ValidationError):
+            NavigationMeshSnapshot(lower_band_rejections=invalid)
+
+
 def test_portal_requires_context_change_and_supervisor_bounds_failed_room(state):
     supervisor = ExecutionSupervisor(room_budget_s=4.0)
     hint = {"active": True, "exit_active": True, "target": (0.0, 0.0, 0.0), "escape_key": "portal"}
