@@ -70,6 +70,29 @@ def test_vertical_choice_prefers_current_upper_approach_before_a_farther_frontie
     assert task.target == near.target_position
 
 
+def test_contextual_mode_prioritizes_current_prompt_and_linear_text_without_ground_frontier(state):
+    ground(state)
+    state.context_action.code, state.context_action.label = 1, "check"
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    task = plan.choose(state, budget_s=20, now=0)
+    assert task.kind == "observed_context_interaction"
+    assert len(plan.visits) == 1
+    plan.outcome(task, success=True, now=1)
+    assert not plan.context_available(state, now=2)
+    assert plan.choose(state, budget_s=12, now=2).kind == "observed_cell"
+    state.seq += 1
+    state.dialogue.active = True
+    state.navmesh.cells = []
+    assert plan.choose(state, budget_s=20, now=3).kind == "observed_linear_dialogue"
+
+
+def test_dialogue_escape_guard_can_suppress_context_while_preserving_walking(state):
+    ground(state)
+    state.context_action.code, state.context_action.label = 15, "speak"
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    assert plan.choose(state, budget_s=12, now=0, suppress_context=True).kind == "observed_cell"
+
+
 def test_failed_target_is_cooled_and_success_heals_negative_working_memory(state):
     ground(state)
     plan = ObservedExplorationPlan()

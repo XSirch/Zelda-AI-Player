@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..bridge import Bridge
+from .context_tasks import LinearDialogueTask, ObservedContextTask
 from .execution import ExecutionSupervisor
 from .features import (
     BUTTON_NAMES,
@@ -22,6 +23,7 @@ from .features import (
     stack_frames,
     target_point,
 )
+from .interaction_memory import ObservedInteractionMemory, context_key
 from .ledge_task import ObservedLedgeAscentTask
 from .lifetime import ObservationLifetime
 from .local_tasks import LocalTask
@@ -116,6 +118,7 @@ class ContinuousController:
             route_graph_path or checkpoint.parent / "route-graph-v1.json",
             writable=training_enabled,
         )
+        self.interaction_memory = ObservedInteractionMemory(self.route_graph)
         self.room_map = RoomMapMemory(
             room_map_path or checkpoint.parent / "room-map-v1.json",
             writable=training_enabled,
@@ -305,6 +308,8 @@ class ContinuousController:
         task = self.local_task
         consumed = any(self.bridge.command_consumed(seq)
                        for seq in (self.pending or {}).get("command_seqs", ()))
+        if hasattr(task, "button_consumed"):
+            consumed = task.button_consumed(self.bridge)
         task.observe(game, consumed=consumed)
         return task.guidance(game)
 
@@ -524,18 +529,7 @@ class ContinuousController:
 
     @staticmethod
     def _interaction_key(game) -> str | None:
-        action = game.context_action
-        label = (action.label or "").strip()
-        if label == "none" or action.code == 0:
-            return None
-        actor = game.context_actor
-        category = (
-            (actor.category_name or "").strip().lower()
-            if actor is not None
-            else "none"
-        )
-        actor_id = actor.actor_id if actor is not None else -1
-        return f"{action.code}:{label.lower()}:{category}:{actor_id}"[:200]
+        return context_key(game)
 
     @staticmethod
     def _interaction_probe_order(key: str) -> list[str]:
@@ -571,13 +565,13 @@ class ContinuousController:
             )
             same_context = (old_game.instance_id, old_game.scene, old_game.room) == (game.instance_id, game.scene, game.room)
             if closing_button and delivered and same_context:
-                self.route_graph.record_interaction_success(
+                self.interaction_memory.record_interaction_success(
                     "dialogue:advance",
                     str(closing_button),
                 )
                 self.interaction_probe_successes += 1
         if closing_button is None:
-            closing_button = self.route_graph.interaction_button(
+            closing_button = self.interaction_memory.interaction_button(
                 "dialogue:advance"
             )
 
@@ -715,8 +709,8 @@ class ContinuousController:
             )
 
         key = self._dialogue_interaction_key(game)
-        known_button = self.route_graph.interaction_button(key)
-        using_known = known_button in BUTTON_MASKS
+        known_button = self.interaction_memory.interaction_button(key)
+        using_known = known_button in INTERACTION_PROBE_BUTTONS
         if using_known:
             button = known_button
             source = "dialogue_memory"
@@ -784,7 +778,7 @@ class ContinuousController:
                 != probe.get("dialogue_choice_count")
             )
             if text_changed:
-                self.route_graph.record_interaction_success(
+                self.interaction_memory.record_interaction_success(
                     probe["key"],
                     probe["button"],
                 )
@@ -796,7 +790,7 @@ class ContinuousController:
                 return
             if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
                 if probe.get("known"):
-                    self.route_graph.record_interaction_failure(
+                    self.interaction_memory.record_interaction_failure(
                         probe["key"],
                         probe["button"],
                     )
@@ -831,7 +825,7 @@ class ContinuousController:
         )
 
         if success:
-            self.route_graph.record_interaction_success(
+            self.interaction_memory.record_interaction_success(
                 probe["key"],
                 probe["button"],
             )
@@ -844,7 +838,7 @@ class ContinuousController:
 
         if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
             if probe.get("known"):
-                self.route_graph.record_interaction_failure(
+                self.interaction_memory.record_interaction_failure(
                     probe["key"],
                     probe["button"],
                 )
@@ -875,6 +869,7 @@ class ContinuousController:
         should_interact = bool(
             guidance.get("exit_active")
             or guidance.get("traversal_route_active")
+            or guidance.get("context_interaction_active")
             or actor_is_door
             or self.intent.mode == "interact"
         )
@@ -921,8 +916,8 @@ class ContinuousController:
                 True,
             )
 
-        known_button = self.route_graph.interaction_button(key)
-        using_known = known_button in BUTTON_MASKS
+        known_button = self.interaction_memory.interaction_button(key)
+        using_known = known_button in INTERACTION_PROBE_BUTTONS
         if using_known:
             button = known_button
             source = "interaction_memory"
@@ -1656,11 +1651,16 @@ class ContinuousController:
                 stick_y=setpoint.stick_y,
                 reason=setpoint.reason,
             )
-        setpoint, sample, dialogue_override = self._dialogue_override(
-            game,
-            setpoint,
-            sample,
-        )
+        if local_owned and isinstance(self.local_task, ObservedContextTask) and not isinstance(self.local_task, LinearDialogueTask):
+            # Starting an interaction and advancing its resulting text are
+            # distinct causal tasks. Verification must not press under modal UI.
+            dialogue_override = False
+        else:
+            setpoint, sample, dialogue_override = self._dialogue_override(
+                game,
+                setpoint,
+                sample,
+            )
         if dialogue_override:
             interaction_override = True
         else:
@@ -1676,9 +1676,13 @@ class ContinuousController:
             if dialogue_reentry_override:
                 interaction_override = True
             elif local_owned:
-                # A walking surface task cannot probe unrelated contextual
-                # buttons. Modal dialogue still has higher authority above.
-                interaction_override = True
+                if self.local_task.allows_context_buttons(game):
+                    setpoint, sample, interaction_override = self._interaction_override(
+                        game, guidance, setpoint, sample,
+                    )
+                else:
+                    # Walking and causal verification suppress unrelated probes.
+                    interaction_override = True
             else:
                 setpoint, sample, interaction_override = self._interaction_override(
                     game,

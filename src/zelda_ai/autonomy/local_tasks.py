@@ -111,6 +111,9 @@ class LocalTask:
     def accepts_attached_mode(self, game):
         return False
 
+    def allows_context_buttons(self, game):
+        return False
+
     def observe(self, game, *, consumed, now=None):
         if self.terminal:
             return

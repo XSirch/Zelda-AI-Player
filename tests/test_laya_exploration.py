@@ -169,3 +169,85 @@ def test_continuous_budget_is_bounded_before_controller_construction(state, monk
         asyncio.run(module.exploration_episode(bridge, tmp_path / "frozen", policy, policy,
             tmp_path / "motor", seconds=seconds))
     assert counts["controllers"] == 0
+
+
+def test_context_dialogue_walk_handoff_releases_close_and_restores_observer(state, monkeypatch, tmp_path):
+    # Software integration only: no artificial state is native gameplay evidence.
+    state.player.bg_check_flags = 1
+    state.player.floor_height = state.player.position[1]
+    state.camera_input_yaw = 0
+    state.context_action.code, state.context_action.label = 15, "speak"
+    state.navmesh = NavigationMeshSnapshot(step=70, half_extent=4,
+        cells=[(0, 0, 0., 4), (1, 0, 0., 68), (2, 0, 0., 68), (3, 0, 0., 64)])
+    calls, kinds = [], []
+    def previous_observer(game, old):
+        calls.append("previous_observer")
+
+    bridge = SimpleNamespace(state=state, on_state=previous_observer, release=lambda: calls.append("release"))
+    policy = SimpleNamespace(invalidate=lambda: None)
+    controller = SimpleNamespace(policy=SimpleNamespace(updates=0), starting_updates=0,
+        executor=SimpleNamespace(state="executing", room_budget_s=0, reason=""), local_task=None,
+        interaction_memory=SimpleNamespace(snapshot=lambda: {}))
+    assignments = []
+
+    def set_intent(intent):
+        controller.intent = intent
+        assignments.append(intent.model_copy(deep=True))
+
+    def closed(old, game):
+        calls.append("dialogue_closed")
+        controller.dialogue_reentry_guard = {"until": module.time.monotonic()+8,
+            "scene": game.scene, "room": game.room, "anchor": tuple(game.player.position)}
+
+    async def fresh(bridge):
+        if len(kinds) == 3:
+            raise ValueError("end_of_software_fixture")
+        return bridge.state
+
+    async def execute(owned, bridge, task, path, **kwargs):
+        assert owned is controller
+        controller.local_task = task
+        kinds.append(task.kind)
+        old = state.model_copy(deep=True)
+        state.seq += 1
+        if task.kind == "observed_context_interaction":
+            state.dialogue.active = True
+        elif task.kind == "observed_linear_dialogue":
+            state.dialogue.active = False
+        else:
+            assert kinds == ["observed_context_interaction", "observed_linear_dialogue", "observed_cell"]
+            assert "dialogue_closed" in calls
+        bridge.on_state(state, old)
+        if task.kind == "observed_linear_dialogue":
+            assert calls[-3:] == ["previous_observer", "dialogue_closed", "release"]
+        if task.kind == "observed_cell":
+            assert not task.terminal  # The re-entry guard preserves stick escape.
+            old = state.model_copy(deep=True)
+            state.player.position = task.target
+            state.context_action.code, state.context_action.label = 0, "none"
+            state.seq += 1
+            bridge.on_state(state, old)
+        task.phase, task.consumed = "succeeded", True
+        task.observed_effect = "dialogue_closed" if isinstance(task, module.LinearDialogueTask) else "dialogue_started"
+        controller.local_task = None
+        button_count = int(isinstance(task, module.ObservedContextTask))
+        return {"success": True, "task": task.snapshot(), "consumed_actions": 1,
+            "raw_button_actions": button_count, "causal_button_actions": button_count,
+            "unowned_button_actions": 0, "objective_unchanged": True,
+            "run_updates": 0, "motor_failure": None}
+
+    async def walking(owned, bridge, task, policy, path, **kwargs):
+        return await execute(owned, bridge, task, path, **kwargs)
+
+    controller.set_intent, controller.note_dialogue_closed = set_intent, closed
+    monkeypatch.setattr(module, "ContinuousController", lambda *args, **kwargs: controller)
+    monkeypatch.setattr(module, "fresh_collision_snapshot", fresh)
+    monkeypatch.setattr(module, "execute_context_task", execute)
+    monkeypatch.setattr(module, "execute_frozen_task", walking)
+    result = asyncio.run(module.exploration_episode(bridge, tmp_path / "frozen", policy, policy,
+        tmp_path / "motor", seconds=10, contextual_interactions=True))
+    assert bridge.on_state is previous_observer
+    assert len(assignments) == 1 and controller.intent == assignments[0]
+    assert result["objective_unchanged"] and result["run_updates"] == 0
+    assert result["causal_button_actions"] == 2 and result["unowned_button_actions"] == 0
+    assert not result["success"] and result["reason"] == "ValueError:end_of_software_fixture"

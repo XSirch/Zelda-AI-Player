@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import time
 
+from .autonomy.context_tasks import LinearDialogueTask, ObservedContextTask
 from .autonomy.controller import ContinuousController
 from .autonomy.exploration_plan import ObservedExplorationPlan
 from .autonomy.ground_descent_task import GroundDescentApproachTask
@@ -13,11 +15,13 @@ from .autonomy.laya_ladder_policy import encode_ladder
 from .autonomy.models import AgentIntent, ObjectiveCompletion
 from .autonomy.objectives import ObjectiveTracker
 from .g1 import ARTIFACTS, context, write_json
+from .laya_context import execute_context_task
 from .laya_motor import execute_frozen_task
 from .laya_traversal import fresh_collision_snapshot
 
 
-async def exploration_episode(bridge, frozen, walking, ladder, directory, *, seconds, on_started=None):
+async def exploration_episode(bridge, frozen, walking, ladder, directory, *, seconds, on_started=None,
+                              contextual_interactions=False):
     if not 10 <= seconds <= 300 or ladder is None:
         raise ValueError("Continuous exploration needs 10..300 seconds and both explicit frozen candidates")
     directory.mkdir(parents=True)
@@ -28,7 +32,7 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
     locked_objective = objective.model_copy(deep=True)
     controller.set_intent(objective)
     initial = bridge.state.model_copy(deep=True)
-    tracker, planner = ObjectiveTracker(), ObservedExplorationPlan()
+    tracker, planner = ObjectiveTracker(), ObservedExplorationPlan(contextual_interactions=contextual_interactions)
     tracker.assign(locked_objective, initial)
     baseline_completed = tracker.evaluate(initial).completed
     controller.executor.room_budget_s = 120  # Macro clock is never restarted by a new local task.
@@ -39,6 +43,13 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
     episode_valid = True
     initial_events = {event.id for event in initial.events}
 
+    def context_guard_active(game):
+        guard = getattr(controller, "dialogue_reentry_guard", None)
+        return bool(guard and time.monotonic() < guard["until"]
+            and (game.scene, game.room) == (guard["scene"], guard["room"])
+            and game.player and guard.get("anchor")
+            and math.dist(game.player.position, guard["anchor"]) < 120)
+
     def observe(game):
         nonlocal episode_valid
         # This flag is sticky: a later truncated event list cannot make a new
@@ -48,21 +59,49 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
             for event in game.events)
         if episode_valid:
             planner.observe(game)
+            task = getattr(controller, "local_task", None)
+            if (contextual_interactions and task and task.kind == "observed_cell" and not task.terminal
+                    and not context_guard_active(game) and planner.context_available(game)):
+                task.interrupt("observed_context_interaction")
+                bridge.release()
+
+    previous_observer = getattr(bridge, "on_state", None)
+
+    def on_state(game, old):
+        try:
+            if previous_observer:
+                previous_observer(game, old)
+        finally:
+            observe(game)
+            if old and old.dialogue.active and not game.dialogue.active:
+                controller.note_dialogue_closed(old, game)
+                bridge.release()  # Closing input is revoked before a repeated motor tick.
+
+    if contextual_interactions:
+        bridge.on_state = on_state
 
     async def execute(task, policy, *, encoder=None):
         path = directory / f"stage-{len(stages)+1:03d}"
         options = {"encoder": encoder} if encoder else {}
         was_cancelled = False
         try:
-            result = await execute_frozen_task(controller, bridge, task, policy, path,
-                on_started=on_started, observe=observe, **options)
+            if isinstance(task, ObservedContextTask):
+                walking.invalidate()
+                ladder.invalidate()
+                result = await execute_context_task(controller, bridge, task, path,
+                    on_started=on_started, observe=observe)
+            else:
+                result = await execute_frozen_task(controller, bridge, task, policy, path,
+                    on_started=on_started, observe=observe, **options)
         except asyncio.CancelledError:
             result = json.loads(await asyncio.to_thread((path / "motor.json").read_text, encoding="utf-8"))
             was_cancelled = True
         stages.append({"name": path.name, "after_verified_landing": landings > 0,
             **{key: result[key] for key in (
             "success", "task", "consumed_actions", "raw_button_actions", "objective_unchanged",
-            "run_updates", "motor_failure")}})
+            "run_updates", "motor_failure")},
+            "causal_button_actions": result.get("causal_button_actions", 0),
+            "unowned_button_actions": result.get("unowned_button_actions", result["raw_button_actions"])})
         if was_cancelled:
             raise asyncio.CancelledError
         return result
@@ -84,7 +123,8 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
                     reason = "objective_telemetry_completed"
                     break
                 selection_state = bridge.state.model_copy(deep=True)
-                task = planner.choose(selection_state, budget_s=min(300, deadline-time.monotonic()-.5))
+                task = planner.choose(selection_state, budget_s=min(300, deadline-time.monotonic()-.5),
+                    suppress_context=context_guard_active(selection_state))
                 first_task = first_task or task
                 result = await execute(task, walking)
                 observe(bridge.state)
@@ -108,6 +148,9 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
                 if result["motor_failure"]:
                     reason = result["motor_failure"]
                     break
+                if isinstance(task, LinearDialogueTask) and not result["success"]:
+                    reason = task.failure or "linear_dialogue_incomplete"
+                    break
             reason = reason or ("task_count_budget" if len(stages) >= 64 else "session_budget_exhausted")
     except (ValueError, RuntimeError, OSError, TimeoutError) as exc:
         reason = f"{type(exc).__name__}:{str(exc)[:180]}"
@@ -115,6 +158,8 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
         reason, cancelled = "exploration_cancelled", True
     finally:
         bridge.release()
+        if contextual_interactions:
+            bridge.on_state = previous_observer
         walking.invalidate()
         ladder.invalidate()
     observe(bridge.state)
@@ -123,9 +168,12 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
     updates = controller.policy.updates - controller.starting_updates
     consumed = sum(row["consumed_actions"] for row in stages)
     buttons = sum(row["raw_button_actions"] for row in stages)
+    causal_buttons = sum(row["causal_button_actions"] for row in stages)
+    unowned_buttons = sum(row["unowned_button_actions"] for row in stages)
     acquired = status.completed and not baseline_completed and episode_valid
     runtime_clean = not cancelled and not any(stage["motor_failure"] for stage in stages)
-    report = {"source": "soh", "success": bool(acquired and unchanged and updates == 0 and buttons == 0 and runtime_clean),
+    report = {"source": "soh", "success": bool(acquired and unchanged and updates == 0
+        and buttons == causal_buttons and unowned_buttons == 0 and runtime_clean),
         "runtime_clean": runtime_clean,
         "reason": reason, "objective_completed": status.completed, "objective_acquired_in_run": acquired,
         "completion_evidence": status.evidence, "stages": stages, "planning": planner.snapshot(),
@@ -136,6 +184,9 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
         "post_descent_walks_successful": sum(s["success"] for s in stages
             if s["task"]["kind"] == "observed_cell" and s["after_verified_landing"]),
         "consumed_actions": consumed, "raw_button_actions": buttons, "objective_unchanged": unchanged,
+        "causal_button_actions": causal_buttons, "unowned_button_actions": unowned_buttons,
+        "contextual_interactions": contextual_interactions,
+        "interaction_memory": controller.interaction_memory.snapshot() if contextual_interactions else None,
         "run_updates": updates, "provider_calls": 0, "reference_blend": 0, "demonstration_labels": 0,
         "objective": locked_objective.model_dump(), "final_objective": controller.intent.model_dump(),
         "episode_identity_unchanged": episode_valid,

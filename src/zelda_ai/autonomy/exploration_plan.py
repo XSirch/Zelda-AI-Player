@@ -9,6 +9,7 @@ import math
 import time
 from collections import Counter
 
+from .context_tasks import LinearDialogueTask, ObservedContextTask, eligible_context
 from .execution import physical_context
 from .ground_descent_task import GroundDescentApproachTask
 from .local_tasks import LocalTask
@@ -18,9 +19,10 @@ from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v3"
+    VERSION = "current-collision-exploration-plan-v4"
 
-    def __init__(self):
+    def __init__(self, *, contextual_interactions=False):
+        self.contextual_interactions = contextual_interactions
         self.visits, self.failures, self.retry_after = {}, {}, {}
         self.last_seq, self.last_context, self.last_region = -1, None, None
         self.entry_position, self.entry_at = None, 0
@@ -70,6 +72,8 @@ class ObservedExplorationPlan:
     def task_key(self, task):
         if isinstance(task, ObservedPortalTask):
             return (*task.context, task.kind, task.exit_index, task.entrance_index)
+        if isinstance(task, ObservedContextTask):
+            return (*self.region(task.context, task.origin), task.kind, task.context_action_key)
         return (*self.region(task.context, task.target), task.kind)
 
     def outcome(self, task, *, success, now=None):
@@ -79,25 +83,38 @@ class ObservedExplorationPlan:
         # Modal/context interrupts are not physical geometry failures.
         if (not success and task.phase == "interrupted" and task.failure in {
                 "context_changed", "modal_owns_control", "game_not_playable",
-                "portal_episode_changed", "portal_player_context_changed"}):
+                "portal_episode_changed", "portal_player_context_changed", "observed_context_interaction"}):
             failures = self.failures.get(key, 0)
         self.bounded_put(self.failures, key, failures, limit=512)
         self.bounded_put(self.retry_after, key, now + (30 if isinstance(task, ObservedPortalTask) else 20), limit=512)
 
-    def choose(self, game, *, budget_s, now=None):
+    def context_available(self, game, *, now=None):
+        if not self.contextual_interactions or not eligible_context(game):
+            return False
+        now = time.monotonic() if now is None else now
+        task = ObservedContextTask.create(game, now=now)
+        return self.retry_after.get(self.task_key(task), 0) <= now
+
+    def choose(self, game, *, budget_s, now=None, suppress_context=False):
         now = time.monotonic() if now is None else now
         self.observe(game, now=now)
         self.selection = {"observation_seq": game.seq, "full_seq": game.full_seq, "monotonic_s": now,
                           "mesh_cells": len(game.navmesh.cells), "reachable_floor_candidates": 0,
                           "cooled_floor_candidates": 0, "eligible_floor_candidates": 0}
+        if not 1 <= budget_s <= 300:
+            raise ValueError("planning_budget_exhausted")
+        if self.contextual_interactions and game.dialogue.active:
+            self.replans += 1
+            return LinearDialogueTask.create(game, now=now, budget_s=min(20, budget_s))
         if (game.dialogue.active or game.pause_menu.active or game.paused or game.cutscene_active):
             raise ValueError("modal_requires_separate_controller")
         if not grounded(game.player):
             raise ValueError(f"unsupported_planning_mode:{locomotor_mode(game)}")
         if not game.navmesh.available or game.camera_input_yaw is None:
             raise ValueError("current_ground_collision_unavailable")
-        if not 1 <= budget_s <= 300:
-            raise ValueError("planning_budget_exhausted")
+        if not suppress_context and self.context_available(game, now=now):
+            self.replans += 1
+            return ObservedContextTask.create(game, now=now, budget_s=min(20, budget_s))
         context, position = physical_context(game), game.player.position
         candidates = []
 

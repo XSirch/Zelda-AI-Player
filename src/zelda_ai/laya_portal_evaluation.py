@@ -69,13 +69,15 @@ async def motor_episode(bridge, frozen, policy, directory, *, seconds, on_starte
 
 async def evaluate(settings, executable, source_home, *, python, base, candidate,
                    episodes=3, seed=4105600, save_slot=2, seconds=30, ladder_candidate=None, post_descent_walks=0,
-                   explore_seconds=0):
+                   explore_seconds=0, contextual_interactions=False):
     if not 1 <= episodes <= 12 or not 5 <= seconds <= 30:
         raise ValueError("Use 1..12 episodes and 5..30 seconds per walking portal")
     if not 0 <= post_descent_walks <= 5 or post_descent_walks and not ladder_candidate:
         raise ValueError("Use 0..5 observed post-descent walks with an explicit attached candidate")
     if explore_seconds and (not 10 <= explore_seconds <= 300 or not ladder_candidate or post_descent_walks):
         raise ValueError("Use 10..300 continuous seconds, both candidates and no fixed post-descent walks")
+    if contextual_interactions and not explore_seconds:
+        raise ValueError("Contextual discovery requires continuous exploration")
     verify_base(base)
     episode_budget = (75 + explore_seconds if explore_seconds
         else 75 + seconds + (20 if ladder_candidate else 0) + 12 * post_descent_walks)
@@ -84,7 +86,7 @@ async def evaluate(settings, executable, source_home, *, python, base, candidate
     expected = {name: digest(candidate / name) for name in ("candidate.json", "heads.safetensors")}
     ladder_expected = ({name: digest(ladder_candidate / name) for name in ("candidate.json", "heads.safetensors")}
                        if ladder_candidate else None)
-    manifest.update(runner_version="laya-observed-portal-eval-v4", candidate_sha256=expected,
+    manifest.update(runner_version="laya-observed-portal-eval-v5", candidate_sha256=expected,
                     native_sessions=1, reset_episodes=episodes, promotion="disabled",
                     scope="current_observed_dry_floor_exit_with_partial_collision_approach",
                     episode_grouping="native_instance", decision_budget_ms=100,
@@ -98,6 +100,8 @@ async def evaluate(settings, executable, source_home, *, python, base, candidate
         manifest.update(scope="continuous_current_collision_goal_pursuit", explore_seconds=explore_seconds,
             planning_version=ObservedExplorationPlan.VERSION, memory="ephemeral_actual_positions_and_attempts_only",
             success_contract="objective_telemetry_completion", collision_handoff="fresh_full_same_context")
+    manifest["contextual_interactions"] = contextual_interactions
+    manifest["context_button_source"] = "causal_context_controller" if contextual_interactions else None
     manifest["warmup"] = await warm_reference(directory / "frozen")
     write_json(directory / "manifest.json", manifest)
     log = settings.data_dir / "laya" / f"portal-eval-{uuid.uuid4().hex[:12]}.log"
@@ -149,7 +153,8 @@ async def evaluate(settings, executable, source_home, *, python, base, candidate
                         options = {"seconds": seconds, "on_started": lambda: row.update(attempted=True)}
                         if explore_seconds:
                             result = await exploration_episode(bridge, directory / "frozen", policy, ladder_policy,
-                                home / "motor", seconds=explore_seconds, on_started=options["on_started"])
+                                home / "motor", seconds=explore_seconds, on_started=options["on_started"],
+                                contextual_interactions=contextual_interactions)
                         elif ladder_policy:
                             result = await traversal_episode(bridge, directory / "frozen", policy, ladder_policy,
                                 home / "motor", select_portal=select_task, post_descent_walks=post_descent_walks,
@@ -170,7 +175,9 @@ async def evaluate(settings, executable, source_home, *, python, base, candidate
                                         for s in result["stages"]])
                         if explore_seconds:
                             row.update(objective_completed=result["objective_completed"], planning=result["planning"],
-                                       elapsed_seconds=result["elapsed_seconds"])
+                                       elapsed_seconds=result["elapsed_seconds"],
+                                       causal_button_actions=result["causal_button_actions"],
+                                       unowned_button_actions=result["unowned_button_actions"])
                 except (RuntimeError, ValueError, OSError, TimeoutError) as exc:
                     row["reason"] = f"{type(exc).__name__}:{str(exc)[:180]}"
                     # Preserve the actual selection/bridge state, including
@@ -217,6 +224,8 @@ def main():
                         help="0..5 current-collision walks after released dry landing; requires --ladder-candidate")
     parser.add_argument("--explore-seconds", type=int, default=0,
                         help="10..300 seconds of continuous local planning; requires both candidates, no fixed walks")
+    parser.add_argument("--contextual-interactions", action="store_true",
+                        help="Allow stationary causal button discovery and linear text; no semantic choice or policy training")
     args = vars(parser.parse_args())
     print(asyncio.run(evaluate(Settings(), **args)), flush=True)
 
