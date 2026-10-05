@@ -199,3 +199,46 @@ def test_descent_preparation_requires_verified_ground_and_unmodified_evaluation(
                "reference_blend": "reference_blend", "provider": "provider_calls"}
     assert result["reason"] == reasons[failure]
     assert result["provider_calls"] == int(failure == "provider")
+
+
+@pytest.mark.parametrize("first_objective_unchanged", (True, False))
+def test_ladder_handoff_keeps_both_reference_stages_in_the_audit(
+    state, tmp_path, monkeypatch, first_objective_unchanged,
+):
+    state.traversal_affordances = descent_observation(state)[:1]
+    state.navmesh.cells.append((3, 0, 0., 0))
+    state.camera_input_yaw = 0
+    bridge = SimpleNamespace(state=state)
+    stages = []
+
+    async def execute(actual_bridge, frozen, task, directory):
+        stages.append(task)
+        initial = state.model_dump()
+        if len(stages) == 1:
+            state.player.climbing_ladder = True
+            state.seq += 1
+            task.observe(state, consumed=True, now=task.started + .1)
+            assert task.failure == "unsupported_locomotor_mode"
+        else:
+            state.player.climbing_ladder = False
+            state.player.position = task.target
+            state.player.floor_height = task.target[1]
+            for index in range(3):
+                state.seq += 1
+                task.observe(state, consumed=True, now=task.started + .1 * (index + 1))
+        return {"success": task.phase == "succeeded", "task": task.snapshot(),
+                "source": "soh", "reference_blend": 0, "provider_calls": 0,
+                "consumed_actions": 2 if len(stages) == 1 else 4,
+                "objective_unchanged": first_objective_unchanged if len(stages) == 1 else True,
+                "run_updates": 0, "initial": initial, "final": state.model_dump()}, []
+
+    monkeypatch.setattr(laya_curriculum, "run_task", execute)
+    result = asyncio.run(laya_curriculum.prepare_observed_descent(bridge, tmp_path, tmp_path / "descent"))
+    assert len(stages) == 2
+    assert result["success"] is first_objective_unchanged
+    assert result["consumed_actions"] == 6
+    attempt = result["attempts"][0]
+    assert attempt["initial_position"] == stages[0].origin
+    assert [row["consumed_actions"] for row in attempt["stages"]] == [2, 4]
+    assert result["candidate_actions"] == 0
+    assert not result["included_in_laya_training"]

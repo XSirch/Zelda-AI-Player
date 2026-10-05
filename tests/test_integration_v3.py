@@ -51,10 +51,10 @@ def test_input_is_hooked_at_consumer_not_raw_poll():
 
 
 def test_v3_release_identity():
-    assert module.ADAPTER_VERSION == "3.5"
+    assert module.ADAPTER_VERSION == "3.6"
     assert module.WIRE_PROTOCOL == 3
-    assert module.BRIDGE_BUILD == "rt-input-v3.5"
+    assert module.BRIDGE_BUILD == "rt-input-v3.6"
     native = (Path(__file__).parents[1] / "native" / "ZeldaAiBridge.cpp").read_text(encoding="utf-8")
-    assert 'BRIDGE_BUILD = "rt-input-v3.5"' in native
+    assert 'BRIDGE_BUILD = "rt-input-v3.6"' in native
     assert 'data.at("protocol") != 3' in native
     assert '{"protocol", 3}' in native

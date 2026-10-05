@@ -18,23 +18,31 @@ class ObservedDescentTask(LocalTask):
             raise ValueError("Descent needs a currently observed ledge_down affordance")
         if not game.player or not game.navmesh.available or not cls.grounded(game):
             raise ValueError("Descent needs current collision observations")
+        if game.player.climbing_ladder or game.player.hanging_ledge or game.player.climbing_ledge:
+            raise ValueError("An attached locomotor needs its own controller")
         drop = game.player.position[1] - affordance.target_position[1]
         observed_delta = affordance.target_position[1] - game.player.floor_height
-        if not 8 <= drop <= 120 or abs(observed_delta - affordance.height_delta) > 4:
-            raise ValueError("Descent landing must agree with the native observed floor delta")
+        local_extent = game.navmesh.step * game.navmesh.half_extent
+        if not 8 <= drop <= local_extent or abs(observed_delta - affordance.height_delta) > 4:
+            raise ValueError("Descent landing must stay local and agree with the native observed floor delta")
         # Native ledge_down targets are actual floor-ray hits. Do not demand an
         # identical height from a different, 70-unit mesh sample on a slope.
         # The radial affordance's approach can already lie below the edge.
-        # Approach only via directed cells observed on the current upper floor.
-        path = observed_local_path(game, affordance.target_position, minimum_gain=0)
-        if not path or not path["waypoints"]:
-            raise ValueError("No observed upper-floor approach to the landing direction")
-        approach = path["waypoints"][-1]
+        # A native zero-distance upper approach can be the floor Link already
+        # occupies. It needs no invented additional cell/path toward the drop.
+        if affordance.distance <= 4 and math.dist(affordance.approach_position, game.player.position) <= 4:
+            approach = game.player.position
+        else:
+            # Otherwise approach only via observed directed upper-floor cells.
+            path = observed_local_path(game, affordance.target_position, minimum_gain=0)
+            if not path or not path["waypoints"]:
+                raise ValueError("No observed upper-floor approach to the landing direction")
+            approach = path["waypoints"][-1]
         if abs(approach[1] - game.player.position[1]) > 24:
             raise ValueError("Descent approach must stay on the currently observed upper floor")
         task = cls._create(game, "ledge_down", affordance.target_position, approach,
                            now=now, budget_s=budget_s)
-        task.version = "observed-descent-reference-v1"
+        task.version = "observed-descent-reference-v2"
         return task
 
     @staticmethod

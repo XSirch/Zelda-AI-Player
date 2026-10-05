@@ -105,6 +105,9 @@ class LocalTask:
         if not self.terminal:
             self.phase, self.failure = "interrupted", failure
 
+    def accepts_attached_mode(self, game):
+        return False
+
     def observe(self, game, *, consumed, now=None):
         if self.terminal:
             return
@@ -120,7 +123,8 @@ class LocalTask:
         if game.dialogue.active or game.pause_menu.active or game.paused or game.cutscene_active:
             self.interrupt("modal_owns_control")
             return
-        if game.player.climbing_ladder or game.player.hanging_ledge or game.player.climbing_ledge:
+        if ((game.player.climbing_ladder or game.player.hanging_ledge or game.player.climbing_ledge)
+                and not self.accepts_attached_mode(game)):
             self.interrupt("unsupported_locomotor_mode")
             return
         self.consumed = self.consumed or consumed

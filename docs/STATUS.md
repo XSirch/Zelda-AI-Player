@@ -1,5 +1,29 @@
 # Implementation status — V3, V4 motor foundation and local curriculum
 
+## Observed deep landing, ladder handoff and ground walking on 2026-10-04
+
+A replay of actual adapter 3.5 telemetry reproduced a missing descent proposal: a clear current forward probe observed a floor 180 units below Link, but the traversal filter accepted downward floors only through 120 units. The replay failed with zero matching proposals. Adapter **3.6** expands only the downward floor-proposal height bound to the existing local ray radius (280 units); it changes neither physical collision nor upward step limits. The separately pinned SoH Release build completed with exit code 0. Replay of actual 3.6 telemetry passed with the same observed floor and one matching descent proposal. This is a measured local collision proposal, not a hidden path or guaranteed walkable step.
+
+Two additional regressions reproduced rejection of this deeper floor and rejection of an upper approach Link already occupied. Descent task v2 accepts only a height within the current local mesh extent, a matching native floor delta, and either the occupied native zero-distance approach or a current directed upper-floor collision path. Native ground contact during ladder animation cannot authorize another walking task.
+
+Three terminal experiments used Arquivo 2, seed `4103200`, three copied native homes, and unchanged frozen Laya weights:
+
+| Batch | Change under test | Reference descent preparation | Laya attempted / successful |
+| --- | --- | --- | --- |
+| `g1-ce2d767f6f08` | Adapter 3.6 with old descent eligibility | 0 eligible attempts; 0/3 preparations | 0 / 0 (9 planned) |
+| `g1-74002b57c6d5` | Task v2 deep floor and occupied approach | 3/3 real ladder attachments; 0/3 landings | 0 / 0 (15 planned) |
+| `g1-d18cabe9cbf8` | Separate bounded attached-mode controller | **3/3 verified ground landings** | **15 / 15** |
+
+All nine portal preparations succeeded. The intermediate batch preserves three `unsupported_locomotor_mode` walking interruptions on actual attachment and three redundant already-attached walking failures. The final implementation rejects already-attached walking starts. Its reference handoff requires the same physical context/epoch, no new save load, a currently supported lower floor and the original descent deadline. It waits for a stable observed pose, tests one numeric analog vector at a time, and retains a vector only after consumed input produces downward height change. Buttons stay zero. An empirical vector is invalidated by camera/body yaw drift relative to its calibration frame; a red regression showed that consecutive-frame comparison missed gradual orbit. Modal states, context changes, wrong attachment modes, deadline and geometric stall still release control. This controller is reference QA, not a trained Laya ladder policy or a semantic button mapping.
+
+In each final session, native ladder mode activated, the horizontal probe produced zero vertical change, and a separate consumed probe produced **−15.18** height change. Link subsequently left ladder mode and stopped on the observed floor at **−80**, with three fresh ground-contact verification frames and unchanged health. The preparation consumed **344 reference actions** across its walking/attached stages. Both stages, including the walking interruption, remain separately recorded; handoff cannot hide prior objective changes, updates or provider calls.
+
+The unchanged frozen candidate then completed **15/15 short ground walks**, consuming **304 candidate actions**, with zero reference blend, training updates or provider calls. Its **304 worker replies** had p95 **29.45 ms**, maximum **41.80 ms**; sampled output age reached **70.72 ms**, with zero expired/context-rejected replies. There were **324 reprojected nonzero outputs**, maximum request-to-application camera delta **16.72 degrees**. These are local inference/lease measurements, not full observation-to-physical-reaction latency. No steep top-down views occurred under the existing audit criterion; top-down handling remains automated-test-only. This small initial-profile batch does not qualify general terrain, G2, learned traversal, combat or sword acquisition. INICIAR still uses its existing policy.
+
+The sanitized [ladder evidence index](validation/laya_ladder_2026-10-04.json) preserves all three experiments and failures. Full local traces, ordinary copied saves and weights stay private. Historical/current pins, frozen motor/maps and candidate hashes passed the harness checks; the final source/executable/fixture pins were also rehashed after shutdown. All owned games/workers closed. There were no screenshots, teleports, HP writes or human game inputs. The three batches' **141 JSON files** passed strict UTF-8 and finite-JSON parsing.
+
+Validation: **395 pytest cases passed, 20 skipped**, with the existing Starlette/httpx warning. The skips require unavailable g++/clang++ and are not native passes. Web production build and focused Ruff passed. The separate MSVC C++20 scheduler harness passed **19 cases**; the actual SoH 3.6 build completed independently. Final changed-file UTF-8 verification passed.
+
 ## Bounded descent preparation and native ladder observations on 2026-10-04
 
 The separate QA profile `--descend-observed-ledge --cross-initial-portal` attempts a descent from a currently observed floor-ray landing. It approaches only through current directed upper-floor collision cells, keeps the landing proposal ephemeral, cools down failed regions and tries at most three distinct proposals. Actual success requires three fresh stopped ground-contact frames at the landing, native consumption, the same context and unchanged objective, zero updates/provider calls/reference blend, and SoH evidence. Airborne passage, simulated output and ladder/ledge attachment cannot credit a walking descent. Preparation remains outside Laya training and candidate results.

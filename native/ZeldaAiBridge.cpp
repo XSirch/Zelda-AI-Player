@@ -41,7 +41,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.5";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.6";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -688,7 +688,10 @@ json TraversalAffordances(Player* player) {
                 addCandidate(candidate);
                 foundUp = true;
             }
-            if (!foundDown && delta <= -8.0f && delta >= -120.0f) {
+            // A deep local landing is an observed descent proposal, not a
+            // walking step. Keep it within the same bounded local ray range;
+            // the mode-specific motor still owns whether traversal is valid.
+            if (!foundDown && delta <= -8.0f && delta >= -MAX_RADIUS) {
                 Candidate candidate;
                 candidate.kind = delta >= -70.0f ? "stairs_or_slope_down" : "ledge_down";
                 candidate.direction = "down";

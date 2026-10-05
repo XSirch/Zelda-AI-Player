@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from .app import bridge_secret
+from .autonomy.attached_descent import AttachedDescentTask
 from .autonomy.descent_task import ObservedDescentTask
 from .autonomy.laya_policy import LayaWalkingPolicy
 from .autonomy.local_tasks import LocalTask
@@ -71,7 +72,8 @@ async def prepare_observed_descent(bridge, frozen, directory):
     report = {"success": False, "source": "soh", "provider_calls": 0, "kind": "descent",
               "controller": "observed_descent_reference_qa_preparation",
               "candidate_actions": 0, "included_in_laya_training": False,
-              "reason": "no_supported_observed_landing", "consumed_actions": 0, "attempts": []}
+              "reason": "no_supported_observed_landing", "consumed_actions": 0, "attempts": [],
+              "initial": bridge.state.model_dump(), "rejected_proposals": []}
     attempted = []
     for index in range(3):
         # The prior attempt may reveal a different opening. Only reconsider
@@ -86,34 +88,56 @@ async def prepare_observed_descent(bridge, frozen, directory):
                 continue
             try:
                 task = ObservedDescentTask.create(bridge.state, row)
-            except ValueError:
+            except ValueError as exc:
+                report["rejected_proposals"].append({"attempt": index + 1, "observation_seq": bridge.state.seq,
+                    "target": row.target_position, "reason": str(exc)[:160]})
                 continue
             break
         if task is None or context(bridge.state) != initial_context:
             break
         attempted.append(task.target)
         result, _ = await run_task(bridge, frozen, task, directory / f"attempt-{index + 1}" / "motor")
+        walking_task = task
+        stages = [result]
+        if result["task"]["failure"] == "unsupported_locomotor_mode" and bridge.state.player.climbing_ladder:
+            try:
+                attached = AttachedDescentTask.continue_from(bridge.state, task)
+            except ValueError as exc:
+                report["rejected_proposals"].append({"attempt": index + 1, "observation_seq": bridge.state.seq,
+                    "target": task.target, "reason": str(exc)[:160]})
+            else:
+                result, _ = await run_task(bridge, frozen, attached,
+                    directory / f"attempt-{index + 1}" / "attached-motor")
+                task = attached
+                stages.append(result)
         checks = (
             (context(bridge.state) == initial_context, "context_changed"),
             (task.landing_verified(bridge.state), "landing_not_verified"),
-            (result.get("source") == "soh", "invalid_source"),
+            (all(stage.get("source") == "soh" for stage in stages), "invalid_source"),
             (result["consumed_actions"] > 0, "missing_consumed_input"),
-            (result["objective_unchanged"], "objective_changed"),
-            (result["run_updates"] == 0, "evaluation_trained"),
-            (result.get("reference_blend") == 0, "reference_blend"),
-            (result.get("provider_calls") == 0, "provider_calls"),
+            (all(stage["objective_unchanged"] for stage in stages), "objective_changed"),
+            (all(stage["run_updates"] == 0 for stage in stages), "evaluation_trained"),
+            (all(stage.get("reference_blend") == 0 for stage in stages), "reference_blend"),
+            (all(stage.get("provider_calls") == 0 for stage in stages), "provider_calls"),
         )
         success = bool(result["success"] and all(valid for valid, _ in checks))
         reason = ("observed_verified_landing" if success else result["task"]["failure"]
                   or next((reason for valid, reason in checks if not valid), "unverified_descent"))
         attempt = dict(
-            success=success, reason=reason, consumed_actions=result["consumed_actions"],
-            objective_unchanged=result["objective_unchanged"], run_updates=result["run_updates"],
-            provider_calls=result.get("provider_calls"), reference_blend=result.get("reference_blend"),
-            initial_position=result["initial"]["player"]["position"],
+            success=success, reason=reason, consumed_actions=sum(stage["consumed_actions"] for stage in stages),
+            objective_unchanged=all(stage["objective_unchanged"] for stage in stages),
+            run_updates=sum(stage["run_updates"] for stage in stages),
+            provider_calls=(sum(stage["provider_calls"] for stage in stages)
+                if all(type(stage.get("provider_calls")) is int and stage["provider_calls"] >= 0
+                       for stage in stages) else None),
+            reference_blend=(0 if all(stage.get("reference_blend") == 0 for stage in stages) else None),
+            initial_position=stages[0]["initial"]["player"]["position"],
             final_position=result["final"]["player"]["position"],
-            landing_target=task.target, upper_floor_approach=task.approach,
+            landing_target=task.target, upper_floor_approach=walking_task.approach,
             task_version=task.version,
+            stages=[{"task_version": stage["task"]["version"], "success": stage["success"],
+                     "failure": stage["task"]["failure"], "consumed_actions": stage["consumed_actions"]}
+                    for stage in stages],
         )
         report["attempts"].append(attempt)
         report["consumed_actions"] += attempt["consumed_actions"]
@@ -123,6 +147,7 @@ async def prepare_observed_descent(bridge, frozen, directory):
         write_json(directory / "report.json", report)
         if attempt["success"]:
             break
+    report["final"] = bridge.state.model_dump()
     write_json(directory / "report.json", report)
     return report
 
