@@ -1,0 +1,2237 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "source": "soh",
+  "scope": "continuous_frozen_current_collision_exploration_with_locked_equipment_goal",
+  "goal": "Obtain the Kokiri Sword",
+  "completion": "equipment:Kokiri Sword",
+  "observation_profile": "instrumented_local_v1",
+  "save_slot": 2,
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "reference_blend": 0,
+  "raw_candidate_button_actions": 0,
+  "demonstration_labels": 0,
+  "promotion": "disabled",
+  "campaign_qualified": false,
+  "current_planner_version": "current-collision-exploration-plan-v3",
+  "native_planner_versions": [
+    "current-collision-exploration-plan-v1",
+    "current-collision-exploration-plan-v2"
+  ],
+  "current_v3_guards_have_separate_native_qualification": false,
+  "goal_and_completion_locked": true,
+  "working_memory": "ephemeral_actual_positions_and_attempts_only",
+  "persistent_route_and_room_maps_read_only": true,
+  "input_owner": "one_ContinuousController_per_episode",
+  "reset_policy": "one_owned_native_process_per_batch_normal_emulator_reset_between_episodes",
+  "reset_episodes_are_independent_native_groups": false,
+  "fixture_restored_between_reset_episodes": false,
+  "reset_planned": 3,
+  "reset_verified": 3,
+  "planned_objectives": 7,
+  "attempted_objectives": 7,
+  "acquired_swords": 0,
+  "candidate_consumed_actions": 8842,
+  "corrected_native_sessions": 5,
+  "corrected_native_verified_landings": 5,
+  "corrected_post_descent_successful_walks": 55,
+  "walk_success_total_is_not_a_qualification_denominator": true,
+  "feedback": {
+    "failure_batch": "g1-3fc2ff0fa8af",
+    "episode": 1,
+    "stage": "stage-002",
+    "recorded_replay": ".local/replay_exploration_descent_ranking_20261005.py",
+    "red_replays": 2,
+    "green_replays": 2,
+    "red_selection_upper_approach_distance": 70,
+    "green_selection_upper_approach_distance": 0,
+    "unit_regression": "test_vertical_choice_prefers_current_upper_approach_before_a_farther_frontier",
+    "cause": "horizontal_frontier_distance_preference_also_ranked_vertical_landings",
+    "fix": "vertical_native_approach_distance_then_shorter_landing_horizontal_frontier_retains_expansion",
+    "physical_pilots_are_not_paired_counterfactual_replays": true,
+    "collision_or_traversal_postconditions_relaxed": false
+  },
+  "planning_diagnostics": {
+    "schema": "observed-exploration-planning-state-v1",
+    "contents": "last_selection_observation_with_sequence_tags_and_final_detailed_working_memory",
+    "v2_no_eligible_failure_has_exact_refusal_snapshot": false,
+    "later_instrumented_sessions": 3,
+    "later_instrumented_no_eligible_reproductions": 0,
+    "later_final_eligible_floor_candidates": [
+      16,
+      20,
+      2
+    ],
+    "no_eligible_failure_proven_fixed": false
+  },
+  "final_software_guards": {
+    "negative_regressions_before_fix": 4,
+    "cancelled_or_motor_failure_run_cannot_qualify_with_equipment_progress": true,
+    "reject_new_equipment_from_replaced_save_or_native_lifetime": true,
+    "lifetime_rejection_sticky_after_event_rolloff": true,
+    "failed_composed_descent_keeps_failure_cost": true,
+    "modal_interrupt_does_not_blame_geometry": true,
+    "diagnostic_sequence_tags_refresh_before_planning_refusal": true,
+    "same_episode_equipment_fixture_remains_positive": true,
+    "fixture_equipment_is_not_native_acquisition_evidence": true,
+    "native_source_before_guards": ".local/pre-exploration-evidence-guards-20261005"
+  },
+  "native_adapter": {
+    "version": "3.11",
+    "soh_revision": "d30fc192f2eb01ceea45bd1e12de61636cafbf86",
+    "executable_sha256": "4c5f5d48f8c46fda435b62f2db3ad68461e7c70f33259200c9c3a141eac33536",
+    "changed_this_turn": false,
+    "compiled_this_turn": false,
+    "build_evidence": "docs/validation/laya_navigation_resolution_2026-10-05.json"
+  },
+  "base": {
+    "origin": "generic_base_no_trading_weights_or_data",
+    "revision": "7b928d828b7b0e022f929d9bd2e44165aa270148",
+    "changed_this_turn": false
+  },
+  "source_archives": [
+    ".local/pre-laya-continuous-exploration-20261005",
+    ".local/pre-exploration-traversal-ranking-20261005",
+    ".local/pre-exploration-planning-diagnostics-20261005",
+    ".local/pre-exploration-evidence-guards-20261005"
+  ],
+  "batches": [
+    {
+      "suite_id": "g1-3fc2ff0fa8af",
+      "planning_version": "current-collision-exploration-plan-v1",
+      "continuous_seconds": 60,
+      "planned_episodes": 2,
+      "attempted_episodes": 2,
+      "successful_objectives": 0,
+      "native_processes": 1,
+      "native_groups": 1,
+      "same_process_between_episodes": true,
+      "reset_planned": 1,
+      "reset_verified": 1,
+      "consumed_actions": 1211,
+      "walking_worker": {
+        "responses": 1204,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 1204,
+        "retained_output_age_samples": 1665,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": 6.047100000614591,
+        "round_trip_max_ms": 8.284999999887077,
+        "sampled_output_age_max_ms": 127.14340000002267,
+        "camera_reprojected_outputs": 977,
+        "camera_delta_max_deg": 12.128906250000004,
+        "physical_reaction_ms": null
+      },
+      "attached_worker": {
+        "responses": 0,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 0,
+        "retained_output_age_samples": 0,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": null,
+        "round_trip_max_ms": null,
+        "sampled_output_age_max_ms": null,
+        "camera_reprojected_outputs": 0,
+        "camera_delta_max_deg": 0.0,
+        "physical_reaction_ms": null
+      },
+      "source_pins": {
+        "pins_verified": 80,
+        "matching_archives": [
+          {
+            "file": "laya_exploration.py",
+            "sha256": "e65c3fbf422550292fa02cf40e2625336c791091eb6bc784581b1b849194e095",
+            "matching_archive": ".local/pre-exploration-planning-diagnostics-20261005/laya_exploration.py"
+          },
+          {
+            "file": "laya_portal_evaluation.py",
+            "sha256": "1fd624bff05d43750094110aa434fc9059576c52b57e6533071e88e978f836f7",
+            "matching_archive": ".local/pre-exploration-traversal-ranking-20261005/laya_portal_evaluation.py"
+          },
+          {
+            "file": "exploration_plan.py",
+            "sha256": "c76098e8b3cd5998285b0d2e312f424da22c6df8019186ba9e70cfc838250799",
+            "matching_archive": ".local/pre-exploration-traversal-ranking-20261005/exploration_plan.py"
+          }
+        ]
+      },
+      "frozen_artifacts_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "walking_candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "attached_candidate_sha256": {
+        "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+        "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+      },
+      "native_executable_sha256": "4c5f5d48f8c46fda435b62f2db3ad68461e7c70f33259200c9c3a141eac33536",
+      "post_shutdown_integrity": true,
+      "strict_utf8_finite_native_json_files": 45,
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "ValueError:planning_budget_exhausted",
+          "native_instance": "2750517592-7844641",
+          "pid": 28096,
+          "reset": null,
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 58.95378629999959,
+          "consumed_actions": 771,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 0,
+          "post_descent_walks_successful": 0,
+          "planning": {
+            "version": "current-collision-exploration-plan-v1",
+            "replans": 20,
+            "actual_scene_room_transitions": 3,
+            "occupied_macro_regions": 9,
+            "failed_target_regions": 4,
+            "max_outward_radius": 268.76905247759987,
+            "observed_context_actions": {
+              "attack": 44,
+              "putaway": 65
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only"
+          },
+          "exact_planning_diagnostic": null,
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 100,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 71,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 7,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 7,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 69,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 35,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 37,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 31,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 19,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-012",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 43,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-013",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 59,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-014",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 23,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-015",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 75,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-016",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 67,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-017",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 81,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-018",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 9,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-019",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 9,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-020",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 7,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "ValueError:no_eligible_current_collision_task",
+          "native_instance": "2750517592-7844641",
+          "pid": 28096,
+          "reset": {
+            "source": "soh",
+            "success": true,
+            "reason": "observed_normal_title_reset",
+            "same_native_process": true,
+            "consumed": true,
+            "receipt": {
+              "seq": 988,
+              "owner_epoch": 1,
+              "status": "completed",
+              "first_tick": 1802,
+              "last_tick": 1803,
+              "pressed": 12304,
+              "released": 12304,
+              "apply_latency_ms": 0.005,
+              "client_to_consume_ms": 47.513,
+              "reason": ""
+            },
+            "initial_seq": 1275,
+            "initial_scene_epoch": 9,
+            "initial_context_epoch": 21,
+            "provider_calls": 0,
+            "command_base_seq": 1276,
+            "final_seq": 1297,
+            "final_scene_epoch": 9,
+            "final_context_epoch": 23
+          },
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 35.1710350000003,
+          "consumed_actions": 440,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 0,
+          "post_descent_walks_successful": 0,
+          "planning": {
+            "version": "current-collision-exploration-plan-v1",
+            "replans": 13,
+            "actual_scene_room_transitions": 2,
+            "occupied_macro_regions": 8,
+            "failed_target_regions": 2,
+            "max_outward_radius": 261.95634110469217,
+            "observed_context_actions": {
+              "attack": 45,
+              "putaway": 37
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only"
+          },
+          "exact_planning_diagnostic": null,
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 101,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 71,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 7,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 7,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 67,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "current_landing_support_lost",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 35,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 36,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 29,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 27,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-012",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 25,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-013",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 13,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "suite_id": "g1-37fac9b12e04",
+      "planning_version": "current-collision-exploration-plan-v2",
+      "continuous_seconds": 60,
+      "planned_episodes": 2,
+      "attempted_episodes": 2,
+      "successful_objectives": 0,
+      "native_processes": 1,
+      "native_groups": 1,
+      "same_process_between_episodes": true,
+      "reset_planned": 1,
+      "reset_verified": 1,
+      "consumed_actions": 1614,
+      "walking_worker": {
+        "responses": 1466,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 1466,
+        "retained_output_age_samples": 2094,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": 5.982100001347135,
+        "round_trip_max_ms": 29.027299999142997,
+        "sampled_output_age_max_ms": 96.55860000020766,
+        "camera_reprojected_outputs": 1482,
+        "camera_delta_max_deg": 12.128906250000004,
+        "physical_reaction_ms": null
+      },
+      "attached_worker": {
+        "responses": 142,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 142,
+        "retained_output_age_samples": 210,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": 6.7828000010194955,
+        "round_trip_max_ms": 8.335900000020047,
+        "sampled_output_age_max_ms": 66.97859999985667,
+        "camera_reprojected_outputs": 0,
+        "camera_delta_max_deg": 0.0,
+        "physical_reaction_ms": null
+      },
+      "source_pins": {
+        "pins_verified": 80,
+        "matching_archives": [
+          {
+            "file": "laya_exploration.py",
+            "sha256": "e65c3fbf422550292fa02cf40e2625336c791091eb6bc784581b1b849194e095",
+            "matching_archive": ".local/pre-exploration-planning-diagnostics-20261005/laya_exploration.py"
+          },
+          {
+            "file": "exploration_plan.py",
+            "sha256": "f2beadb48b121d991eed91b2616cc0ec6c0d3839d5826a235e3fef586d88ec86",
+            "matching_archive": ".local/pre-exploration-planning-diagnostics-20261005/exploration_plan.py"
+          }
+        ]
+      },
+      "frozen_artifacts_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "walking_candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "attached_candidate_sha256": {
+        "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+        "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+      },
+      "native_executable_sha256": "4c5f5d48f8c46fda435b62f2db3ad68461e7c70f33259200c9c3a141eac33536",
+      "post_shutdown_integrity": true,
+      "strict_utf8_finite_native_json_files": 35,
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "ValueError:no_eligible_current_collision_task",
+          "native_instance": "2390446854-8248495",
+          "pid": 248,
+          "reset": null,
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 52.21922840000116,
+          "consumed_actions": 747,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 1,
+          "post_descent_walks_successful": 3,
+          "planning": {
+            "version": "current-collision-exploration-plan-v2",
+            "replans": 11,
+            "actual_scene_room_transitions": 1,
+            "occupied_macro_regions": 15,
+            "failed_target_regions": 6,
+            "max_outward_radius": 353.65959562107435,
+            "observed_context_actions": {
+              "attack": 16,
+              "down": 73
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only"
+          },
+          "exact_planning_diagnostic": null,
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 100,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "ladder_down",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 73,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 57,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 105,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 83,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 67,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 85,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-012",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 43,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "session_budget_exhausted",
+          "native_instance": "2390446854-8248495",
+          "pid": 248,
+          "reset": {
+            "source": "soh",
+            "success": true,
+            "reason": "observed_normal_title_reset",
+            "same_native_process": true,
+            "consumed": true,
+            "receipt": {
+              "seq": 866,
+              "owner_epoch": 1,
+              "status": "completed",
+              "first_tick": 1667,
+              "last_tick": 1668,
+              "pressed": 12304,
+              "released": 12304,
+              "apply_latency_ms": 0.006,
+              "client_to_consume_ms": 46.81,
+              "reason": ""
+            },
+            "initial_seq": 1140,
+            "initial_scene_epoch": 5,
+            "initial_context_epoch": 15,
+            "provider_calls": 0,
+            "command_base_seq": 1141,
+            "final_seq": 1162,
+            "final_scene_epoch": 5,
+            "final_context_epoch": 17
+          },
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 59.65753089999998,
+          "consumed_actions": 867,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 1,
+          "post_descent_walks_successful": 4,
+          "planning": {
+            "version": "current-collision-exploration-plan-v2",
+            "replans": 10,
+            "actual_scene_room_transitions": 1,
+            "occupied_macro_regions": 18,
+            "failed_target_regions": 4,
+            "max_outward_radius": 350.66072164171004,
+            "observed_context_actions": {
+              "attack": 24,
+              "down": 73,
+              "speak": 31,
+              "check": 22,
+              "putaway": 35
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only"
+          },
+          "exact_planning_diagnostic": null,
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 101,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "ladder_down",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 73,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 57,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 105,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 85,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 133,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 85,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 129,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "attempt_timeout",
+              "consumed_actions": 47,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "suite_id": "g1-5af6ad56daa2",
+      "planning_version": "current-collision-exploration-plan-v2",
+      "continuous_seconds": 60,
+      "planned_episodes": 1,
+      "attempted_episodes": 1,
+      "successful_objectives": 0,
+      "native_processes": 1,
+      "native_groups": 1,
+      "same_process_between_episodes": true,
+      "reset_planned": 0,
+      "reset_verified": 0,
+      "consumed_actions": 840,
+      "walking_worker": {
+        "responses": 766,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 766,
+        "retained_output_age_samples": 1090,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": 5.976600001304178,
+        "round_trip_max_ms": 8.04470000002766,
+        "sampled_output_age_max_ms": 81.831699999384,
+        "camera_reprojected_outputs": 655,
+        "camera_delta_max_deg": 10.645751953125007,
+        "physical_reaction_ms": null
+      },
+      "attached_worker": {
+        "responses": 72,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 72,
+        "retained_output_age_samples": 107,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": 6.815400000050431,
+        "round_trip_max_ms": 7.742099998722551,
+        "sampled_output_age_max_ms": 67.34669999968901,
+        "camera_reprojected_outputs": 0,
+        "camera_delta_max_deg": 0.0,
+        "physical_reaction_ms": null
+      },
+      "source_pins": {
+        "pins_verified": 80,
+        "matching_archives": [
+          {
+            "file": "laya_exploration.py",
+            "sha256": "c1732b1b41f95d7c9307807821fd3e75d3fda913b7e2217840e77e4c4d523e27",
+            "matching_archive": ".local/pre-exploration-evidence-guards-20261005/laya_exploration.py"
+          },
+          {
+            "file": "exploration_plan.py",
+            "sha256": "10c220ed44785ac66554ee3cf41fba3f709fadc859d93bdd9c54badbec33c1bf",
+            "matching_archive": ".local/pre-exploration-evidence-guards-20261005/exploration_plan.py"
+          }
+        ]
+      },
+      "frozen_artifacts_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "walking_candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "attached_candidate_sha256": {
+        "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+        "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+      },
+      "native_executable_sha256": "4c5f5d48f8c46fda435b62f2db3ad68461e7c70f33259200c9c3a141eac33536",
+      "post_shutdown_integrity": true,
+      "strict_utf8_finite_native_json_files": 21,
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "session_budget_exhausted",
+          "native_instance": "2587495572-8819904",
+          "pid": 27248,
+          "reset": null,
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 59.30445320000035,
+          "consumed_actions": 840,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 1,
+          "post_descent_walks_successful": 6,
+          "planning": {
+            "version": "current-collision-exploration-plan-v2",
+            "replans": 10,
+            "actual_scene_room_transitions": 1,
+            "occupied_macro_regions": 17,
+            "failed_target_regions": 2,
+            "max_outward_radius": 353.48716870125855,
+            "observed_context_actions": {
+              "attack": 39,
+              "down": 74,
+              "speak": 31
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only",
+            "last_selection": {
+              "observation_seq": 1130,
+              "full_seq": 1130,
+              "monotonic_s": 8885.5383812,
+              "mesh_cells": 56,
+              "reachable_floor_candidates": 37,
+              "cooled_floor_candidates": 10,
+              "eligible_floor_candidates": 16
+            }
+          },
+          "exact_planning_diagnostic": {
+            "path": ".local/qualification/g1-5af6ad56daa2/episode-1/motor/planning-state.json",
+            "observation_seq": 1130,
+            "full_seq": 1130,
+            "snapshot_is_selection_observation": true,
+            "memory_last_seq": 1270,
+            "selection": {
+              "observation_seq": 1130,
+              "full_seq": 1130,
+              "monotonic_s": 8885.5383812,
+              "mesh_cells": 56,
+              "reachable_floor_candidates": 37,
+              "cooled_floor_candidates": 10,
+              "eligible_floor_candidates": 16
+            }
+          },
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 98,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "ladder_down",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 73,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 57,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 105,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 81,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 13,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 93,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 91,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 111,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 107,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "suite_id": "g1-9010b1dfcbd3",
+      "planning_version": "current-collision-exploration-plan-v2",
+      "continuous_seconds": 180,
+      "planned_episodes": 2,
+      "attempted_episodes": 2,
+      "successful_objectives": 0,
+      "native_processes": 1,
+      "native_groups": 1,
+      "same_process_between_episodes": true,
+      "reset_planned": 1,
+      "reset_verified": 1,
+      "consumed_actions": 5177,
+      "walking_worker": {
+        "responses": 5028,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 4096,
+        "retained_output_age_samples": 4096,
+        "round_trip_window_covers_all_responses": false,
+        "round_trip_p95_ms": 6.211700001585996,
+        "round_trip_max_ms": 37.76860000107263,
+        "sampled_output_age_max_ms": 115.11909999899217,
+        "camera_reprojected_outputs": 4778,
+        "camera_delta_max_deg": 12.518920898437504,
+        "physical_reaction_ms": null
+      },
+      "attached_worker": {
+        "responses": 145,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "retained_round_trip_samples": 145,
+        "retained_output_age_samples": 215,
+        "round_trip_window_covers_all_responses": true,
+        "round_trip_p95_ms": 6.697599999824888,
+        "round_trip_max_ms": 28.31520000108867,
+        "sampled_output_age_max_ms": 67.65889999951469,
+        "camera_reprojected_outputs": 0,
+        "camera_delta_max_deg": 0.0,
+        "physical_reaction_ms": null
+      },
+      "source_pins": {
+        "pins_verified": 80,
+        "matching_archives": [
+          {
+            "file": "laya_exploration.py",
+            "sha256": "c1732b1b41f95d7c9307807821fd3e75d3fda913b7e2217840e77e4c4d523e27",
+            "matching_archive": ".local/pre-exploration-evidence-guards-20261005/laya_exploration.py"
+          },
+          {
+            "file": "exploration_plan.py",
+            "sha256": "10c220ed44785ac66554ee3cf41fba3f709fadc859d93bdd9c54badbec33c1bf",
+            "matching_archive": ".local/pre-exploration-evidence-guards-20261005/exploration_plan.py"
+          }
+        ]
+      },
+      "frozen_artifacts_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "walking_candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "attached_candidate_sha256": {
+        "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+        "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+      },
+      "native_executable_sha256": "4c5f5d48f8c46fda435b62f2db3ad68461e7c70f33259200c9c3a141eac33536",
+      "post_shutdown_integrity": true,
+      "strict_utf8_finite_native_json_files": 86,
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "session_budget_exhausted",
+          "native_instance": "3321264555-9417729",
+          "pid": 31740,
+          "reset": null,
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 179.6466851999994,
+          "consumed_actions": 2617,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 1,
+          "post_descent_walks_successful": 19,
+          "planning": {
+            "version": "current-collision-exploration-plan-v2",
+            "replans": 33,
+            "actual_scene_room_transitions": 1,
+            "occupied_macro_regions": 35,
+            "failed_target_regions": 10,
+            "max_outward_radius": 1511.715679325991,
+            "observed_context_actions": {
+              "attack": 44,
+              "down": 73,
+              "check": 9,
+              "speak": 47,
+              "putaway": 24
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only",
+            "last_selection": {
+              "observation_seq": 3644,
+              "full_seq": 3644,
+              "monotonic_s": 9609.0245466,
+              "mesh_cells": 75,
+              "reachable_floor_candidates": 45,
+              "cooled_floor_candidates": 8,
+              "eligible_floor_candidates": 20
+            }
+          },
+          "exact_planning_diagnostic": {
+            "path": ".local/qualification/g1-9010b1dfcbd3/episode-1/motor/planning-state.json",
+            "observation_seq": 3644,
+            "full_seq": 3644,
+            "snapshot_is_selection_observation": true,
+            "memory_last_seq": 3678,
+            "selection": {
+              "observation_seq": 3644,
+              "full_seq": 3644,
+              "monotonic_s": 9609.0245466,
+              "mesh_cells": 75,
+              "reachable_floor_candidates": 45,
+              "cooled_floor_candidates": 8,
+              "eligible_floor_candidates": 20
+            }
+          },
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 100,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "ladder_down",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 73,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 57,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 105,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 123,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 135,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 31,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 123,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 123,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 93,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-012",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 67,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-013",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 61,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-014",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-015",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 43,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-016",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-017",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-018",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-019",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 77,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-020",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 69,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-021",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 107,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-022",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 21,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-023",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 59,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-024",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 109,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-025",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 109,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-026",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 27,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-027",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 85,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-028",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 27,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-029",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 119,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-030",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 123,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-031",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 133,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-032",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 103,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-033",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 113,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-034",
+              "kind": "observed_portal",
+              "success": false,
+              "phase": "failed",
+              "failure": "attempt_timeout",
+              "consumed_actions": 27,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "objective_success": false,
+          "reason": "session_budget_exhausted",
+          "native_instance": "3321264555-9417729",
+          "pid": 31740,
+          "reset": {
+            "source": "soh",
+            "success": true,
+            "reason": "observed_normal_title_reset",
+            "same_native_process": true,
+            "consumed": true,
+            "receipt": {
+              "seq": 2924,
+              "owner_epoch": 1,
+              "status": "completed",
+              "first_tick": 4217,
+              "last_tick": 4218,
+              "pressed": 12304,
+              "released": 12304,
+              "apply_latency_ms": 0.009,
+              "client_to_consume_ms": 47.826,
+              "reason": ""
+            },
+            "initial_seq": 3689,
+            "initial_scene_epoch": 5,
+            "initial_context_epoch": 15,
+            "provider_calls": 0,
+            "command_base_seq": 3690,
+            "final_seq": 3712,
+            "final_scene_epoch": 5,
+            "final_context_epoch": 17
+          },
+          "fresh_normal_loads": 1,
+          "elapsed_seconds": 179.69145919999937,
+          "consumed_actions": 2560,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "objective_acquired_in_run": false,
+          "verified_landings": 1,
+          "post_descent_walks_successful": 23,
+          "planning": {
+            "version": "current-collision-exploration-plan-v2",
+            "replans": 37,
+            "actual_scene_room_transitions": 1,
+            "occupied_macro_regions": 27,
+            "failed_target_regions": 10,
+            "max_outward_radius": 523.365595693904,
+            "observed_context_actions": {
+              "attack": 46,
+              "down": 74,
+              "speak": 131,
+              "check": 49,
+              "putaway": 203
+            },
+            "memory": "ephemeral_actual_positions_and_attempts_only",
+            "last_selection": {
+              "observation_seq": 7340,
+              "full_seq": 7340,
+              "monotonic_s": 9802.3947892,
+              "mesh_cells": 72,
+              "reachable_floor_candidates": 11,
+              "cooled_floor_candidates": 1,
+              "eligible_floor_candidates": 2
+            }
+          },
+          "exact_planning_diagnostic": {
+            "path": ".local/qualification/g1-9010b1dfcbd3/episode-2/motor/planning-state.json",
+            "observation_seq": 7340,
+            "full_seq": 7340,
+            "snapshot_is_selection_observation": true,
+            "memory_last_seq": 7371,
+            "selection": {
+              "observation_seq": 7340,
+              "full_seq": 7340,
+              "monotonic_s": 9802.3947892,
+              "mesh_cells": 72,
+              "reachable_floor_candidates": 11,
+              "cooled_floor_candidates": 1,
+              "eligible_floor_candidates": 2
+            }
+          },
+          "stages": [
+            {
+              "name": "stage-001",
+              "kind": "observed_portal",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 99,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-002",
+              "kind": "observed_descent_approach",
+              "success": false,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "consumed_actions": 11,
+              "verification_frames": 0,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-003",
+              "kind": "ladder_down",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 73,
+              "verification_frames": 3,
+              "after_verified_landing": false
+            },
+            {
+              "name": "stage-004",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 57,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-005",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 105,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-006",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 167,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-007",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 115,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-008",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 71,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-009",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 23,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-010",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 9,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-011",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 95,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-012",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 123,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-013",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 107,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-014",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 43,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-015",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-016",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 39,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-017",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 83,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-018",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 27,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-019",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 15,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-020",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 131,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-021",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 31,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-022",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 83,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-023",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 89,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-024",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 39,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-025",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 19,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-026",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 113,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-027",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 23,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-028",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 125,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-029",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 97,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-030",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-031",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-032",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 43,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-033",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "no_geometric_progress",
+              "consumed_actions": 41,
+              "verification_frames": 0,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-034",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 39,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-035",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 97,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-036",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 77,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-037",
+              "kind": "observed_cell",
+              "success": true,
+              "phase": "succeeded",
+              "failure": null,
+              "consumed_actions": 107,
+              "verification_frames": 3,
+              "after_verified_landing": true
+            },
+            {
+              "name": "stage-038",
+              "kind": "observed_cell",
+              "success": false,
+              "phase": "failed",
+              "failure": "attempt_timeout",
+              "consumed_actions": 21,
+              "verification_frames": 1,
+              "after_verified_landing": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "pytest_passed": 505,
+    "pytest_skipped": 22,
+    "pytest_warnings": 1,
+    "skip_reason": "g++/clang++ unavailable; skipped native harnesses are not passes",
+    "web_production_build": "passed",
+    "focused_ruff": "passed",
+    "native_batch_strict_utf8_finite_json_files": 187,
+    "written_text_utf8": "passed",
+    "diff_and_index_check": "passed",
+    "written_text_files": 40,
+    "written_text_audit": ".local/continuous-exploration-text-audit-20261005.json",
+    "staged_utf8_files": 10
+  },
+  "shutdown": {
+    "owned_native_and_workers_running": false,
+    "exact_child_exit_status": null
+  },
+  "decision_budget_ms": 100,
+  "actuation_grace_ms": 50,
+  "complete_observation_to_physical_reaction_ms": null,
+  "timing_is_isolated_benchmark": false,
+  "limits": [
+    "zero_new_sword_acquisitions_in_all_seven_native_attempts",
+    "v3_final_guard_changes_have_software_regressions_only",
+    "no_new_training_or_measured_learning_improvement",
+    "upward_traversal_interactions_water_ledge_fence_and_combat_not_qualified",
+    "native_top_down_camera_not_qualified",
+    "native_reset_episodes_share_one_group_and_current_working_save",
+    "no_eligible_task_failure_not_reproduced_with_exact_diagnostics_and_not_proven_fixed",
+    "complete_reaction_time_unknown_and_sampled_output_age_can_exceed_100ms",
+    "general_navigation_G2_to_G5_and_full_campaign_unqualified",
+    "full_master_plan_goal_remains_active"
+  ],
+  "previous_composition_source_pins": {
+    "pins_verified": 78,
+    "matching_archives": [
+      {
+        "file": "laya_motor.py",
+        "sha256": "83299abb7e880e4210ce9038c1a2093bd840073cbad2fd6a2c36d1882055c5c3",
+        "matching_archive": ".local/pre-laya-continuous-exploration-20261005/laya_motor.py"
+      },
+      {
+        "file": "laya_portal_evaluation.py",
+        "sha256": "e6e9c20639d3a8278c1a4fe1c32e5cbb3430c18818f84b7962a4696419701052",
+        "matching_archive": ".local/pre-laya-continuous-exploration-20261005/laya_portal_evaluation.py"
+      }
+    ]
+  }
+}

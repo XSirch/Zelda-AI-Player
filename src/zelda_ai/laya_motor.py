@@ -9,7 +9,7 @@ from .g1 import write_json
 
 
 async def execute_frozen_task(controller, bridge, task, policy, directory, *, encoder=encode_surface,
-                              on_started=None):
+                              on_started=None, observe=None):
     if controller.training_enabled or policy is None:
         raise ValueError("Frozen execution requires an explicit candidate and disabled training")
     directory.mkdir(parents=True, exist_ok=True)
@@ -34,6 +34,8 @@ async def execute_frozen_task(controller, bridge, task, policy, directory, *, en
 
     def publish():
         game, owned = bridge.state, controller.local_task
+        if observe and game:
+            observe(game)
         if (owned and game.player and owned.phase in {"prepare", "execute"}
                 and controller.last_setpoint.reason == "local_task"):
             requested[bridge.command_seq] = {"observation_seq": game.seq, "features": encoder(game, owned),

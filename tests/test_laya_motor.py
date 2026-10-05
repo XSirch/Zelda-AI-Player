@@ -70,3 +70,14 @@ def test_cancelled_stage_preserves_partial_receipts_then_propagates_cancel(state
         assert result["consumed_actions"] == 1 and result["objective_unchanged"]
         assert bridge.releases == 1 and policy.invalidations == 2
     asyncio.run(scenario())
+
+
+def test_actual_motor_observations_can_feed_ephemeral_planner_without_another_sender(state, tmp_path):
+    async def scenario():
+        controller, bridge, task, policy, _ = harness(state)
+        observations = []
+        result = await execute_frozen_task(controller, bridge, task, policy, tmp_path,
+            encoder=lambda g,t:[1]*9, observe=lambda game: observations.append(game.seq))
+        assert result["success"] and observations == [state.seq]
+        assert result["consumed_actions"] == 1 and bridge.releases == 1
+    asyncio.run(scenario())

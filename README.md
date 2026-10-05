@@ -26,6 +26,18 @@ Para verificar também o retorno à caminhada, acrescente os dois argumentos aba
 
 O adapter **3.11** também refina componentes pequenos, com até quatro células acessíveis. A grade de 35 unidades mantém o alcance de 280 unidades e todas as verificações de colisão. O novo lote concluiu **6/6 sequências**, incluindo **18/18 caminhadas externas** e **5/5 resets no mesmo SoH**, com os pesos congelados. As consultas de navegação levaram até **10,7 ms**; isso não mede o tempo completo de reação física. A amostra ainda não qualifica navegação geral ou coleta da espada. Veja o [registro da resolução local](docs/validation/laya_navigation_resolution_2026-10-05.json).
 
+O piloto também oferece exploração contínua durante **10 a 300 segundos**. Um único controlador conserva o objetivo da espada e escolhe novas tarefas pela colisão atual, pelos locais que Link realmente ocupou e pelas tentativas já realizadas. Uma proposta de caminho não entra na memória como travessia. Na descida, o planejador prefere a aproximação superior observada mais próxima; a busca de distância maior fica restrita às fronteiras horizontais.
+
+Nos testes corrigidos, **5/5 sessões saíram da casa e desceram**, sem ações de referência. As duas sessões de três minutos concluíram **19 e 23 caminhadas externas**, registrando 35 e 27 regiões ocupadas. Ambas terminaram pelo prazo, sem obter a espada. Subidas, interações e os demais modos de locomoção ainda precisam de controladores qualificados. A avaliação mantém um SoH por lote, usa reset normal entre sessões e preserva os pesos e mapas congelados. O [registro da exploração contínua](docs/validation/laya_continuous_exploration_2026-10-05.json) inclui o lote anterior malsucedido e todas as falhas.
+
+Para executar duas sessões de três minutos com os candidatos locais:
+
+```powershell
+uv run python -m zelda_ai.laya_portal_evaluation C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --episodes 2 --candidate .local/laya/candidate-numeric-stick-mse --base .local/laya/base --python .local/laya-env/Scripts/python.exe --ladder-candidate .local/laya/candidate-attached-descent-20261005 --explore-seconds 180
+```
+
+Nesse modo, sucesso exige nova aquisição comprovada pela telemetria de equipamento no mesmo episódio. Contar caminhadas ou encontrar a espada já presente em outro save não satisfaz a meta. A caixa-preta guarda a observação usada na seleção e a memória de tentativas, inclusive quando o planejador recusa continuar. A versão atual também conserva o custo de uma descida malsucedida após a troca de controlador; essas proteções finais têm regressões automatizadas, sem nova qualificação física dessa versão. O piloto continua fora do botão INICIAR.
+
 Cada troca libera o input e as respostas pendentes. Antes de caminhar novamente, o harness exige uma nova observação completa de colisão no mesmo contexto. O relógio de progresso do supervisor continua por toda a sequência. As amostras ainda são pequenas, e os perfis continuam experimentais.
 
 O adapter **3.9** separa o contato com uma borda escalável das ligações de caminhada. A verificação de chegada exige contato real com o chão: estar no alto durante um salto ou uma animação de subida não basta. O motor identifica os estados de natação, mergulho e movimento submerso pelas flags nativas e interrompe a política de caminhada ao entrar na água. Os controladores e o aprendizado desses movimentos ainda precisam de validação no jogo.
