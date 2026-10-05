@@ -7,9 +7,11 @@ from dataclasses import replace
 import pytest
 
 from zelda_ai.autonomy.controller import ContinuousController
+from zelda_ai.autonomy.ground_descent_task import GroundDescentApproachTask
+from zelda_ai.autonomy.imitation import encode_surface
 from zelda_ai.autonomy.laya_policy import DecisionLease, LayaWalkingPolicy
 from zelda_ai.autonomy.local_tasks import LocalTask
-from zelda_ai.models import TraversalAffordanceObservation
+from zelda_ai.models import NavigationMeshSnapshot, TraversalAffordanceObservation
 
 
 def test_decision_lease_expires_and_rejects_old_context_or_direction():
@@ -251,4 +253,28 @@ def test_expired_or_mismatched_worker_reply_never_becomes_controller_input(state
         finally:
             await policy.close()
 
+    asyncio.run(scenario())
+
+
+def test_walking_candidate_owns_only_dry_phase_of_observed_descent(state):
+    async def scenario():
+        state.player.position, state.player.floor_height, state.player.bg_check_flags = (0,100,0),100,1
+        state.camera_input_yaw = 0
+        state.navmesh = NavigationMeshSnapshot(origin=(0,100,0),step=70,half_extent=3,
+            cells=[(0,0,100.,0),(1,0,0.,0)])
+        row = TraversalAffordanceObservation(kind="ledge_down",direction="down",
+            approach_position=state.player.position,target_position=(70,0,0),distance=0,height_delta=-100)
+        state.traversal_affordances = [row]
+        task = GroundDescentApproachTask.create(state,row)
+        policy = LayaWalkingPolicy(FakeWorker())
+        owner = policy.key(state,task)
+        policy.owner = owner
+        policy.lease = DecisionLease(owner,time.monotonic(),tuple(encode_surface(state,task)),(0,60))
+        try:
+            assert policy(state,task) != (0,0)
+            state.player.climbing_ladder = True
+            state.seq += 1
+            assert policy(state,task) == (0,0) and policy.owner is None
+        finally:
+            await policy.close()
     asyncio.run(scenario())

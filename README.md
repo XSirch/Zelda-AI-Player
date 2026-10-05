@@ -10,11 +10,21 @@ O Laya agora tem um piloto para atravessar saídas nativas observadas. O planeja
 
 Os dois primeiros lotes saíram da casa em **2/3 tentativas cada**, usando somente o analógico do candidato congelado, sem mistura com o controle de referência, treino ou chamadas a provedores. Um desvio que primeiro se afastou da saída funcionou no jogo; a falha restante deixou a posição de Link sem ligações na malha observada. O adapter **3.10** testa uma malha menor somente nesse caso, preservando as verificações de corpo e piso. O lote seguinte concluiu **6/6 saídas**, com **5/5 resets** no mesmo processo; o modelo respondeu em até **37,5 ms** nesse lote. A amostra ainda é pequena e o tempo completo de reação física permanece sem medição. Resultados completos ficam no [registro do controle de portais](docs/validation/laya_portal_control_2026-10-05.json).
 
-Este piloto continua fora do botão INICIAR. Ele avalia saídas de piso alcançáveis pela telemetria atual; ainda não comprova acesso à escada, coleta da espada ou conclusão da campanha. Para executá-lo com a base e o candidato locais existentes:
+Este piloto continua fora do botão INICIAR. Ele avalia saídas de piso alcançáveis pela telemetria atual. Os primeiros lotes isolados não avaliaram escadas; o teste composto abaixo verifica essa passagem. A coleta da espada e a conclusão da campanha permanecem sem qualificação. Para executá-lo com a base e o candidato locais existentes:
 
 ```powershell
 uv run python -m zelda_ai.laya_portal_evaluation C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --episodes 3 --candidate .local/laya/candidate-numeric-stick-mse --base .local/laya/base --python .local/laya-env/Scripts/python.exe
 ```
+
+A avaliação composta mantém um único controlador e o objetivo da Kokiri Sword. O candidato de caminhada aproxima Link da borda observada; uma ligação real à escada libera esse perfil e ativa o candidato de descida. O piso de aterrissagem e o prazo original são preservados. O primeiro lote concluiu **3/3 saídas e descidas**, sem ações de referência. O seguinte concluiu **2/3 sequências** e **6/6 caminhadas externas iniciadas** após a descida. A outra tentativa parou ainda na casa por falta de continuação na malha observada, deixando três caminhadas planejadas sem execução. Os pesos permaneceram congelados; esse teste demonstra composição física, sem medir aprendizado novo. Veja o [registro da sequência](docs/validation/laya_traversal_control_2026-10-05.json).
+
+Para verificar também o retorno à caminhada, acrescente os dois argumentos abaixo ao comando anterior:
+
+```powershell
+--ladder-candidate .local/laya/candidate-attached-descent-20261005 --post-descent-walks 3
+```
+
+Cada troca libera o input e as respostas pendentes. Antes de caminhar novamente, o harness exige uma nova observação completa de colisão no mesmo contexto. O relógio de progresso do supervisor continua por toda a sequência. As amostras ainda são pequenas, e os perfis continuam experimentais.
 
 O adapter **3.9** separa o contato com uma borda escalável das ligações de caminhada. A verificação de chegada exige contato real com o chão: estar no alto durante um salto ou uma animação de subida não basta. O motor identifica os estados de natação, mergulho e movimento submerso pelas flags nativas e interrompe a política de caminhada ao entrar na água. Os controladores e o aprendizado desses movimentos ainda precisam de validação no jogo.
 

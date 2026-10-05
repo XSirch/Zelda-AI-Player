@@ -1,0 +1,703 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "source": "soh",
+  "scope": "current_observed_portal_ground_approach_attached_descent_and_return_to_walking",
+  "goal": "Obtain the Kokiri Sword",
+  "completion": "equipment:Kokiri Sword",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "reference_blend": 0,
+  "demonstration_labels": 0,
+  "promotion": "disabled",
+  "g2_qualified": false,
+  "campaign_qualified": false,
+  "batches": [
+    {
+      "suite_id": "g1-9fce8747836b",
+      "seed": 4105900,
+      "runner": "laya-observed-portal-eval-v2",
+      "scenario_budget_seconds": 125,
+      "planned": 3,
+      "attempted": 3,
+      "successful": 3,
+      "native_processes": 1,
+      "native_groups": 1,
+      "normal_resets_verified": 2,
+      "consumed_candidate_actions": 778,
+      "post_descent_walks_planned": 0,
+      "post_descent_walks_attempted": 0,
+      "post_descent_walks_successful": 0,
+      "pins_verified": 77,
+      "historical_matching_archives": [
+        {
+          "file": "laya_motor.py",
+          "sha256": "e6f7149c1d09e912bc36ef3258170fdd91e68d91fef5de174dddfcffb7a22002",
+          "matching_archive": ".local/pre-laya-return-walking-20261005/laya_motor.py"
+        },
+        {
+          "file": "laya_portal_evaluation.py",
+          "sha256": "90c76f406c6162ac8c16b84063a0e79a766c455ba5162b5f4082fba17c232502",
+          "matching_archive": ".local/pre-laya-return-walking-20261005/laya_portal_evaluation.py"
+        },
+        {
+          "file": "laya_traversal.py",
+          "sha256": "baf4142c949b3eb35b6b1ef4c40628db706e778d096909708a3ba94cefa56d4c",
+          "matching_archive": ".local/pre-laya-return-walking-20261005/laya_traversal.py"
+        }
+      ],
+      "integrity_after_shutdown": true,
+      "native_executable_sha256": "21780c11c8b967d2b4e2c49023907e80161299bf8e7a55d8c4d200169fbe0ca0",
+      "frozen_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "walking_candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "ladder_candidate_sha256": {
+        "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+        "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+      },
+      "walking_worker": {
+        "responses": 556,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 695,
+        "camera_delta_max_deg": 15.66101074218749,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_p95_ms": 5.93010000011418,
+        "response_max_ms": 27.556999999433174,
+        "sampled_output_age_max_ms": 67.946999999549,
+        "full_physical_reaction_ms": null
+      },
+      "ladder_worker": {
+        "responses": 216,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 0,
+        "camera_delta_max_deg": 0.0,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_p95_ms": 6.780499999877065,
+        "response_max_ms": 20.951799999238574,
+        "sampled_output_age_max_ms": 68.54869999915536,
+        "full_physical_reaction_ms": null
+      },
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 246,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "initial_context": [
+            "2293600366-4704961",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "2293600366-4704961",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "attached_ladder": true,
+          "landing_verified": true,
+          "normal_reset_verified": false,
+          "fresh_normal_save_loads": 1,
+          "handoff_deadline_preserved": true,
+          "handoff_target_preserved": true,
+          "post_descent_walks_planned": 0,
+          "post_descent_walks_successful": 0,
+          "stages": [
+            {
+              "name": "portal",
+              "success": true,
+              "consumed_actions": 162,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-walking-portal-v2",
+              "verification_frames": 3
+            },
+            {
+              "name": "ground-approach",
+              "success": false,
+              "consumed_actions": 11,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "task_version": "observed-ground-descent-approach-v1",
+              "verification_frames": 0
+            },
+            {
+              "name": "attached-ladder",
+              "success": true,
+              "consumed_actions": 73,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-ladder-descent-task-v1",
+              "verification_frames": 3
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 287,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "initial_context": [
+            "2293600366-4704961",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "2293600366-4704961",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "attached_ladder": true,
+          "landing_verified": true,
+          "normal_reset_verified": true,
+          "fresh_normal_save_loads": 1,
+          "handoff_deadline_preserved": true,
+          "handoff_target_preserved": true,
+          "post_descent_walks_planned": 0,
+          "post_descent_walks_successful": 0,
+          "stages": [
+            {
+              "name": "portal",
+              "success": true,
+              "consumed_actions": 203,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-walking-portal-v2",
+              "verification_frames": 3
+            },
+            {
+              "name": "ground-approach",
+              "success": false,
+              "consumed_actions": 11,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "task_version": "observed-ground-descent-approach-v1",
+              "verification_frames": 0
+            },
+            {
+              "name": "attached-ladder",
+              "success": true,
+              "consumed_actions": 73,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-ladder-descent-task-v1",
+              "verification_frames": 3
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 245,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "initial_context": [
+            "2293600366-4704961",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "2293600366-4704961",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "attached_ladder": true,
+          "landing_verified": true,
+          "normal_reset_verified": true,
+          "fresh_normal_save_loads": 1,
+          "handoff_deadline_preserved": true,
+          "handoff_target_preserved": true,
+          "post_descent_walks_planned": 0,
+          "post_descent_walks_successful": 0,
+          "stages": [
+            {
+              "name": "portal",
+              "success": true,
+              "consumed_actions": 161,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-walking-portal-v2",
+              "verification_frames": 3
+            },
+            {
+              "name": "ground-approach",
+              "success": false,
+              "consumed_actions": 11,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "task_version": "observed-ground-descent-approach-v1",
+              "verification_frames": 0
+            },
+            {
+              "name": "attached-ladder",
+              "success": true,
+              "consumed_actions": 73,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-ladder-descent-task-v1",
+              "verification_frames": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "suite_id": "g1-afe6d38234db",
+      "seed": 4106000,
+      "runner": "laya-observed-portal-eval-v3",
+      "scenario_budget_seconds": 161,
+      "planned": 3,
+      "attempted": 3,
+      "successful": 2,
+      "native_processes": 1,
+      "native_groups": 1,
+      "normal_resets_verified": 2,
+      "consumed_candidate_actions": 710,
+      "post_descent_walks_planned": 9,
+      "post_descent_walks_attempted": 6,
+      "post_descent_walks_successful": 6,
+      "pins_verified": 77,
+      "historical_matching_archives": [],
+      "integrity_after_shutdown": true,
+      "native_executable_sha256": "21780c11c8b967d2b4e2c49023907e80161299bf8e7a55d8c4d200169fbe0ca0",
+      "frozen_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "walking_candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "ladder_candidate_sha256": {
+        "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+        "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+      },
+      "walking_worker": {
+        "responses": 562,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 670,
+        "camera_delta_max_deg": 15.221557617187495,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_p95_ms": 6.347699999423639,
+        "response_max_ms": 10.818200000358047,
+        "sampled_output_age_max_ms": 107.93360000025132,
+        "full_physical_reaction_ms": null
+      },
+      "ladder_worker": {
+        "responses": 144,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 0,
+        "camera_delta_max_deg": 0.0,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_p95_ms": 7.635199999640463,
+        "response_max_ms": 10.01189999988128,
+        "sampled_output_age_max_ms": 76.37940000040544,
+        "full_physical_reaction_ms": null
+      },
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "success": false,
+          "reason": "RuntimeError:observed_approach_exhausted",
+          "consumed_actions": 124,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "initial_context": [
+            "2503571249-5045764",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "2503571249-5045764",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "attached_ladder": false,
+          "landing_verified": false,
+          "normal_reset_verified": false,
+          "fresh_normal_save_loads": 1,
+          "handoff_deadline_preserved": null,
+          "handoff_target_preserved": null,
+          "post_descent_walks_planned": 3,
+          "post_descent_walks_successful": 0,
+          "stages": [
+            {
+              "name": "portal",
+              "success": false,
+              "consumed_actions": 124,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "failed",
+              "failure": "observed_approach_exhausted",
+              "task_version": "observed-walking-portal-v2",
+              "verification_frames": 0
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 283,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "initial_context": [
+            "2503571249-5045764",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "2503571249-5045764",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "attached_ladder": true,
+          "landing_verified": true,
+          "normal_reset_verified": true,
+          "fresh_normal_save_loads": 1,
+          "handoff_deadline_preserved": true,
+          "handoff_target_preserved": true,
+          "post_descent_walks_planned": 3,
+          "post_descent_walks_successful": 3,
+          "stages": [
+            {
+              "name": "portal",
+              "success": true,
+              "consumed_actions": 154,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-walking-portal-v2",
+              "verification_frames": 3
+            },
+            {
+              "name": "ground-approach",
+              "success": false,
+              "consumed_actions": 11,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "task_version": "observed-ground-descent-approach-v1",
+              "verification_frames": 0
+            },
+            {
+              "name": "attached-ladder",
+              "success": true,
+              "consumed_actions": 73,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-ladder-descent-task-v1",
+              "verification_frames": 3
+            },
+            {
+              "name": "post-descent-walk-1",
+              "success": true,
+              "consumed_actions": 9,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-analog-task-v3",
+              "verification_frames": 3
+            },
+            {
+              "name": "post-descent-walk-2",
+              "success": true,
+              "consumed_actions": 21,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-analog-task-v3",
+              "verification_frames": 3
+            },
+            {
+              "name": "post-descent-walk-3",
+              "success": true,
+              "consumed_actions": 15,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-analog-task-v3",
+              "verification_frames": 3
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 303,
+          "raw_button_actions": 0,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "initial_context": [
+            "2503571249-5045764",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "2503571249-5045764",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "attached_ladder": true,
+          "landing_verified": true,
+          "normal_reset_verified": true,
+          "fresh_normal_save_loads": 1,
+          "handoff_deadline_preserved": true,
+          "handoff_target_preserved": true,
+          "post_descent_walks_planned": 3,
+          "post_descent_walks_successful": 3,
+          "stages": [
+            {
+              "name": "portal",
+              "success": true,
+              "consumed_actions": 164,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-walking-portal-v2",
+              "verification_frames": 3
+            },
+            {
+              "name": "ground-approach",
+              "success": false,
+              "consumed_actions": 11,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "interrupted",
+              "failure": "unsupported_locomotor_mode",
+              "task_version": "observed-ground-descent-approach-v1",
+              "verification_frames": 0
+            },
+            {
+              "name": "attached-ladder",
+              "success": true,
+              "consumed_actions": 73,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-ladder-descent-task-v1",
+              "verification_frames": 3
+            },
+            {
+              "name": "post-descent-walk-1",
+              "success": true,
+              "consumed_actions": 17,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-analog-task-v3",
+              "verification_frames": 3
+            },
+            {
+              "name": "post-descent-walk-2",
+              "success": true,
+              "consumed_actions": 27,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-analog-task-v3",
+              "verification_frames": 3
+            },
+            {
+              "name": "post-descent-walk-3",
+              "success": true,
+              "consumed_actions": 11,
+              "raw_button_actions": 0,
+              "objective_unchanged": true,
+              "run_updates": 0,
+              "motor_failure": null,
+              "phase": "succeeded",
+              "failure": null,
+              "task_version": "observed-analog-task-v3",
+              "verification_frames": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "feedback": {
+    "old_descent_contract_replay": {
+      "replays": 2,
+      "projected_height_feature": -1,
+      "point_flag": 0,
+      "script": ".local/replay_descent_contract_20261005.py",
+      "assertion_exit_code": 1
+    },
+    "new_ground_contract_replay": {
+      "replays": 2,
+      "projected_height_feature": 0,
+      "point_flag": 1,
+      "actual_landing_preserved": true,
+      "script": ".local/replay_descent_contract_after_20261005.py",
+      "assertion_exit_code": 0
+    },
+    "remaining_portal_failure": {
+      "suite": "g1-afe6d38234db",
+      "episode": 1,
+      "replays": 2,
+      "coarse_step": 70,
+      "root_links": 1,
+      "reachable_cells": 3,
+      "used_local_detours": 3,
+      "continuing_approach": false,
+      "script": ".local/replay_coarse_component_20261005.py",
+      "assertion_exit_code": 1
+    }
+  },
+  "checks": {
+    "pytest_passed": 476,
+    "pytest_skipped": 21,
+    "pytest_warning": "existing Starlette/httpx deprecation",
+    "web_production_build": true,
+    "focused_ruff": true,
+    "native_cpp_changed": false,
+    "native_build_this_turn": null,
+    "written_text_utf8": {
+      "passed": true,
+      "files": 24,
+      "replacement_characters": 0
+    },
+    "native_batch_json": {
+      "strict_utf8": true,
+      "finite": true,
+      "files": 52
+    }
+  },
+  "limitations": [
+    "Small pilots, one native group per batch; normal resets reuse working saves.",
+    "No new weights or learning improvement measured.",
+    "Remaining portal failure prevents general navigation qualification.",
+    "Three planned post-descent walks were unattempted after the portal failure.",
+    "Native top-down, water/ledge/fence controllers, combat, sword acquisition, G2-G5 and INICIAR promotion remain unqualified.",
+    "Complete physical reaction latency and exact child shutdown exit status were not collected."
+  ],
+  "candidate_input_scope": "Normal QA startup/reset controls are excluded from candidate motor stages."
+}
