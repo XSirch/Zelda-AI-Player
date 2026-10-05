@@ -65,7 +65,7 @@ class NavigationProbe(StrictModel):
 
 class TraversalAffordanceObservation(StrictModel):
     """Local collision-derived vertical route candidate; not hidden map knowledge."""
-    kind: Literal["stairs_or_slope_up", "stairs_or_slope_down", "ledge_down",
+    kind: Literal["stairs_or_slope_up", "stairs_or_slope_down", "ledge_down", "ledge_up",
                   "ladder_up", "ladder_down", "climbable_wall_up"]
     direction: Literal["up", "down"]
     approach_position: tuple[float, float, float]

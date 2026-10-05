@@ -64,6 +64,9 @@ def test_failed_preparation_never_runs_candidate_and_survives_dataset_rejection(
         def close(self):
             pass
 
+        def release(self):
+            pass
+
     class Process:
         def __init__(self, *args):
             self.child = SimpleNamespace(poll=lambda: None)

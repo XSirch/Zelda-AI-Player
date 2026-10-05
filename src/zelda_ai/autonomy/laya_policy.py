@@ -14,6 +14,7 @@ from pathlib import Path
 from ..laya_data import PROFILE, bounded_state, digest
 from .features import camera_world_yaw
 from .imitation import encode_surface
+from .locomotion import FREEFALL, JUMPING, water_active
 
 
 @dataclass(frozen=True)
@@ -153,6 +154,8 @@ class LayaWalkingPolicy:
             or game.player.climbing_ladder
             or game.player.hanging_ledge
             or game.player.climbing_ledge
+            or water_active(game.player)
+            or game.player.state_flags_1 & (JUMPING | FREEFALL)
             or game.camera_input_yaw is None
         ):
             self.invalidate()

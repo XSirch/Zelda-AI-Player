@@ -68,6 +68,8 @@ def test_success_requires_height_and_consumed_input_and_fresh_verification(state
     task.observe(state, consumed=True, now=1)
     assert task.phase == "execute"
     state.player.position = (0, 14, 70)
+    state.player.floor_height = 14
+    state.player.bg_check_flags = 1
     task.observe(state, consumed=False, now=1.1)
     assert task.phase != "succeeded"
     for index in range(3):

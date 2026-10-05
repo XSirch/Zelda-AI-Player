@@ -8,6 +8,7 @@ from __future__ import annotations
 import math
 
 from .local_tasks import LocalTask
+from .locomotion import grounded
 from .navigation import observed_local_path
 
 
@@ -16,10 +17,12 @@ class ObservedDescentTask(LocalTask):
     def create(cls, game, affordance, *, now=None, budget_s=20):
         if affordance not in game.traversal_affordances or affordance.kind != "ledge_down":
             raise ValueError("Descent needs a currently observed ledge_down affordance")
-        if not game.player or not game.navmesh.available or not cls.grounded(game):
+        if not game.player or not game.navmesh.available:
             raise ValueError("Descent needs current collision observations")
         if game.player.climbing_ladder or game.player.hanging_ledge or game.player.climbing_ledge:
             raise ValueError("An attached locomotor needs its own controller")
+        if not cls.grounded(game):
+            raise ValueError("Descent needs current collision observations")
         drop = game.player.position[1] - affordance.target_position[1]
         observed_delta = affordance.target_position[1] - game.player.floor_height
         local_extent = game.navmesh.step * game.navmesh.half_extent
@@ -47,10 +50,7 @@ class ObservedDescentTask(LocalTask):
 
     @staticmethod
     def grounded(game):
-        player = game.player
-        # Pinned SoH BGCHECKFLAG_GROUND, plus actual floor contact height.
-        return bool(player and player.bg_check_flags & 1
-                    and abs(player.position[1] - player.floor_height) <= 4)
+        return grounded(game.player)
 
     def observe(self, game, *, consumed, now=None):
         grounded = self.grounded(game)

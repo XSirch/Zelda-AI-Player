@@ -127,6 +127,34 @@ def test_rotated_diagonal_saturation_preserves_direction():
                          camera_yaw=angle) == (80, 0)
 
 
+@pytest.mark.parametrize("state_1,state_2", ((1 << 27, 0), (1 << 27, 1 << 10),
+                                             (1 << 27, 1 << 11), (1 << 18, 0), (1 << 19, 0)))
+def test_ground_reply_cannot_control_water_or_airborne_mode(state, state_1, state_2):
+    async def scenario():
+        process = FakeWorker()
+        policy = LayaWalkingPolicy(process)
+        try:
+            task = task_for(state)
+            policy(state, task)
+            await asyncio.sleep(0)
+            identity = process.sent[0]["id"]
+            state.player.state_flags_1 = state_1
+            state.player.state_flags_2 = state_2
+            assert policy(state, task) == (0, 0)
+            assert policy.pending is None
+            await process.replies.put({"id": identity, "stick": [20, 60], "inference_ms": 5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert policy.lease.owner is None
+            assert policy.metrics["context_rejections"] == 1
+            assert policy(state, task) == (0, 0)
+            assert len(process.sent) == 1
+        finally:
+            await policy.close()
+
+    asyncio.run(scenario())
+
+
 def test_top_down_without_native_input_yaw_cannot_reuse_a_lease(state):
     async def scenario():
         process = FakeWorker()

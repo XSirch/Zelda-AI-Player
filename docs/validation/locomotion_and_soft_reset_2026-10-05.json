@@ -1,0 +1,777 @@
+{
+  "date": "2026-10-05",
+  "source": "soh",
+  "bridge_build": "rt-input-v3.9",
+  "wire_protocol": 3,
+  "upstream_revision": "d30fc192f2eb01ceea45bd1e12de61636cafbf86",
+  "observation_profile": "instrumented_local_v1",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "promotion": "disabled",
+  "g2_complete": false,
+  "campaign_complete": false,
+  "learned_ledge_ascent_qualified": false,
+  "swimming_diving_sinking_qualified": false,
+  "native_top_down_qualified": false,
+  "full_physical_reaction_latency_ms": null,
+  "executable_sha256": "fadb26138d51da10bcec94645ba1dfc6977389df6520b45d1d6d21c11eddb047",
+  "installed_native_files_sha256": {
+    "ZeldaAiBridge.cpp": "e298f6c0a62c819e07c0fa431c39909bd22a0d569829b5e92ee617e9c43173cd",
+    "ZeldaAiBridge.h": "b75ca38d14d77eb9db87f2f732714abf5995dd786d4fac5a209c57794b7a280c",
+    "InputScheduler.hpp": "149e769c11d09e357d1f43158b9fecb1a042719760989a9a694e5b68e1edcb57",
+    "ActorRegistry.hpp": "056d9475fedde4021e950284e3793a2a31b105351e810b1c836215cfc27520d3",
+    "StartupGuard.hpp": "e90ff60054ab21a8e0fe4d28898a05c31071293d427648bbc39fa0f297687ed1",
+    "NavMeshQueries.hpp": "227e4e0d348eadb2ee5440671586fcd874730f0f0cd48c46d4999f9f73bfdaa2"
+  },
+  "exact_prechange_archive_sha256": {
+    "native/ZeldaAiBridge.cpp": "b55214f7a06990653383d1af21e6b21e8d01920b55e6cc2529dad289c6d98704",
+    "src/zelda_ai/models.py": "222667102ec0ab392e63a5d0e9db97c1574eeb4e49d6a9f3a8157a18ed0af8c9",
+    "src/zelda_ai/autonomy/local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+    "src/zelda_ai/autonomy/laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+    "src/zelda_ai/autonomy/controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+    "src/zelda_ai/autonomy/descent_task.py": "0968d69fd1b0f2fc1d6b3a6aa149f599666ead4850794e1fcbddbc1edddf128a",
+    "src/zelda_ai/autonomy/execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+    "scripts/integrate_soh.py": "ca0f0697c8f1e7a11bc17b649f7354ffc970d82fab85f33411767e3814bcba7e",
+    "soh-3.8.exe": "d86870069218fabbe568b343a840bf43d11265954ec1c9527c199727180c3925"
+  },
+  "build_log_sha256": "7a17d1e01cbef00056b893680bbe0dd581a453e55f6fd194d8bcfde3b25e31cb",
+  "build_exit_code": 0,
+  "build_has_upstream_warnings": true,
+  "unit_regression_before_fix": {
+    "cases": 5,
+    "failed": 4,
+    "passed": 1,
+    "scope": "false airborne arrival and unsupported native water entry; unit evidence"
+  },
+  "validation": {
+    "pytest_passed": 453,
+    "pytest_skipped": 21,
+    "pytest_elapsed_s": 42.38,
+    "skip_reason": "g++/clang++ unavailable",
+    "msvc_scheduler_passed": 19,
+    "msvc_walking_queries_passed": 8,
+    "web_build_passed": true,
+    "ruff_passed": true,
+    "native_json_utf8_finite_files": 121,
+    "written_text_utf8_verified": true,
+    "written_text_files": 49,
+    "replacement_character_found": false,
+    "scheduler_binary_sha256": "2a7299d3d3199a0fa08cd2bdef38be610fc906b48b87355861e20f77d38c3615"
+  },
+  "limitations": [
+    "No native contact ledge task was initiated in six planned probes",
+    "The 14-unit QA relocation rise is not learned ledge ascent or external ladder access",
+    "Reset episodes belong to a single native group and reuse the normally saved working file",
+    "Nine short walks do not qualify general navigation, combat, Kokiri Sword or campaign completion",
+    "No camera top-down, water locomotion or gap/fence curriculum qualified"
+  ],
+  "batches": [
+    {
+      "suite": "g1-6eb5ca9427da",
+      "seed": 4105100,
+      "runner": "contact-ledge-probe-qa-v1",
+      "scope": "current native contact ledge; geometric approach preparation excluded",
+      "manifest_sha256": "19708aad17fd4da09a4d0fd9cd7f7aca117b21f5df63fb04ebd875182169e6ac",
+      "report_sha256": "83d9f3ac20b93999d751a446d6860ab97e0fc804e7556b6111df8cf789ab33f8",
+      "progress_sha256": null,
+      "planned_tasks": 3,
+      "attempted_tasks": 0,
+      "successful_tasks": 0,
+      "recorded_task_outcomes": [
+        {
+          "session": 1,
+          "index": null,
+          "attempted": false,
+          "success": false,
+          "reason": "ValueError:no_current_local_raised_floor_for_qa_approach",
+          "consumed_actions": null,
+          "run_updates": null,
+          "objective_unchanged": null
+        },
+        {
+          "session": 2,
+          "index": null,
+          "attempted": false,
+          "success": false,
+          "reason": "ValueError:no_current_local_raised_floor_for_qa_approach",
+          "consumed_actions": null,
+          "run_updates": null,
+          "objective_unchanged": null
+        },
+        {
+          "session": 3,
+          "index": null,
+          "attempted": false,
+          "success": false,
+          "reason": "ValueError:no_current_local_raised_floor_for_qa_approach",
+          "consumed_actions": null,
+          "run_updates": null,
+          "objective_unchanged": null
+        }
+      ],
+      "native_processes": 3,
+      "native_groups": 0,
+      "successful_resets": 0,
+      "resets": [],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [],
+      "same_pid_per_cycle": [],
+      "same_native_instance_per_cycle": [],
+      "child_exit_code": null,
+      "failure_reasons": [],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "laya_curriculum.py",
+          "sha256": "d1d4c30ae7a10e1ba91b7183e05b1111d327ecdeb0eda9706341a371fe6e2735",
+          "private_archive": "pre-soft-reset-harness-20261005\\laya_curriculum.py"
+        },
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": true,
+      "candidate_sha256": null,
+      "verified_json_files": 20
+    },
+    {
+      "suite": "g1-56133d48ec36",
+      "seed": 4105100,
+      "runner": "contact-ledge-probe-qa-v2",
+      "scope": "current native contact ledge; geometric approach preparation excluded",
+      "manifest_sha256": "4197aebffb304081a33ad9d7de64b8e106ed8b4755736658bcfef844525c3eef",
+      "report_sha256": "83d9f3ac20b93999d751a446d6860ab97e0fc804e7556b6111df8cf789ab33f8",
+      "progress_sha256": null,
+      "planned_tasks": 3,
+      "attempted_tasks": 0,
+      "successful_tasks": 0,
+      "recorded_task_outcomes": [
+        {
+          "session": 1,
+          "index": null,
+          "attempted": false,
+          "success": false,
+          "reason": "ValueError:no_current_local_raised_floor_for_qa_approach",
+          "consumed_actions": null,
+          "run_updates": null,
+          "objective_unchanged": null
+        },
+        {
+          "session": 2,
+          "index": null,
+          "attempted": false,
+          "success": false,
+          "reason": "ValueError:no_current_local_raised_floor_for_qa_approach",
+          "consumed_actions": null,
+          "run_updates": null,
+          "objective_unchanged": null
+        },
+        {
+          "session": 3,
+          "index": null,
+          "attempted": false,
+          "success": false,
+          "reason": "ValueError:no_current_local_raised_floor_for_qa_approach",
+          "consumed_actions": null,
+          "run_updates": null,
+          "objective_unchanged": null
+        }
+      ],
+      "native_processes": 3,
+      "native_groups": 0,
+      "successful_resets": 0,
+      "resets": [],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [],
+      "same_pid_per_cycle": [],
+      "same_native_instance_per_cycle": [],
+      "child_exit_code": null,
+      "failure_reasons": [],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "laya_curriculum.py",
+          "sha256": "d1d4c30ae7a10e1ba91b7183e05b1111d327ecdeb0eda9706341a371fe6e2735",
+          "private_archive": "pre-soft-reset-harness-20261005\\laya_curriculum.py"
+        },
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": true,
+      "candidate_sha256": null,
+      "verified_json_files": 23
+    },
+    {
+      "suite": "g1-ac1858646e68",
+      "seed": 4105200,
+      "runner": "normal-soft-reset-qa-v1",
+      "scope": "normal_reset_reload_cycles",
+      "manifest_sha256": "d57423ed8d6fa89d88d98945f4296e3c2414487be6d2dcbdb0283180ccbb1108",
+      "report_sha256": "c0dc5b5682c14cd35eba7fae82881cedbc87fb39a0c7be912ff6ad3e5f8c0259",
+      "progress_sha256": null,
+      "planned_tasks": null,
+      "attempted_tasks": 0,
+      "successful_tasks": 0,
+      "recorded_task_outcomes": [],
+      "native_processes": 1,
+      "native_groups": 0,
+      "successful_resets": 0,
+      "resets": [],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [],
+      "same_pid_per_cycle": [],
+      "same_native_instance_per_cycle": [],
+      "child_exit_code": 3221225786,
+      "failure_reasons": [],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "laya_curriculum.py",
+          "sha256": "d1d4c30ae7a10e1ba91b7183e05b1111d327ecdeb0eda9706341a371fe6e2735",
+          "private_archive": "pre-soft-reset-harness-20261005\\laya_curriculum.py"
+        },
+        {
+          "file": "qa_reset.py",
+          "sha256": "a6af727c1a4583f7a967957c864f241bde7a15dee2b66af7e72fbbf62e891607",
+          "private_archive": "pre-soft-reset-freshness-20261005\\qa_reset.py"
+        },
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": null,
+      "candidate_sha256": null,
+      "verified_json_files": 8,
+      "collector_failure": "AttributeError: GameState has no input field; no verified cycle counted",
+      "private_script_archive": "validate_soft_reset_v1_20261005.py",
+      "planned_reset_cycles": 3
+    },
+    {
+      "suite": "g1-a8f156f5baa6",
+      "seed": 4105200,
+      "runner": "normal-soft-reset-qa-v2",
+      "scope": "normal_reset_reload_cycles",
+      "manifest_sha256": "ab151da7159951b56a02fdfb68aa4340328dc42bb9b95d3a71142b3da6b17cae",
+      "report_sha256": "c8d32f35c96b666662fb2f7181af09adca9e91aaab92aea289fa5d0bd69f0078",
+      "progress_sha256": null,
+      "planned_tasks": null,
+      "attempted_tasks": 0,
+      "successful_tasks": 0,
+      "recorded_task_outcomes": [],
+      "native_processes": 1,
+      "native_groups": 0,
+      "successful_resets": 3,
+      "resets": [
+        {
+          "source": "soh",
+          "success": true,
+          "reason": "observed_normal_title_reset",
+          "same_native_process": true,
+          "consumed": true,
+          "receipt": {
+            "seq": 25,
+            "owner_epoch": 1,
+            "status": "completed",
+            "first_tick": 612,
+            "last_tick": 613,
+            "pressed": 12304,
+            "released": 12304,
+            "apply_latency_ms": 0.008,
+            "client_to_consume_ms": 22.576,
+            "reason": ""
+          },
+          "initial_seq": 87,
+          "initial_scene_epoch": 3,
+          "initial_context_epoch": 12,
+          "provider_calls": 0,
+          "final_seq": 109,
+          "final_scene_epoch": 3,
+          "final_context_epoch": 14
+        },
+        {
+          "source": "soh",
+          "success": true,
+          "reason": "observed_normal_title_reset",
+          "same_native_process": true,
+          "consumed": true,
+          "receipt": {
+            "seq": 53,
+            "owner_epoch": 1,
+            "status": "completed",
+            "first_tick": 1226,
+            "last_tick": 1227,
+            "pressed": 12304,
+            "released": 12304,
+            "apply_latency_ms": 0.015,
+            "client_to_consume_ms": 44.903,
+            "reason": ""
+          },
+          "initial_seq": 175,
+          "initial_scene_epoch": 6,
+          "initial_context_epoch": 24,
+          "provider_calls": 0,
+          "final_seq": 196,
+          "final_scene_epoch": 6,
+          "final_context_epoch": 26
+        },
+        {
+          "source": "soh",
+          "success": true,
+          "reason": "observed_normal_title_reset",
+          "same_native_process": true,
+          "consumed": true,
+          "receipt": {
+            "seq": 81,
+            "owner_epoch": 1,
+            "status": "completed",
+            "first_tick": 1848,
+            "last_tick": 1849,
+            "pressed": 12304,
+            "released": 12304,
+            "apply_latency_ms": 0.006,
+            "client_to_consume_ms": 30.081,
+            "reason": ""
+          },
+          "initial_seq": 262,
+          "initial_scene_epoch": 9,
+          "initial_context_epoch": 36,
+          "provider_calls": 0,
+          "final_seq": 284,
+          "final_scene_epoch": 9,
+          "final_context_epoch": 38
+        }
+      ],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [
+        1,
+        1,
+        1
+      ],
+      "same_pid_per_cycle": [
+        true,
+        true,
+        true
+      ],
+      "same_native_instance_per_cycle": [
+        true,
+        true,
+        true
+      ],
+      "child_exit_code": 3221225786,
+      "failure_reasons": [],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "laya_curriculum.py",
+          "sha256": "d1d4c30ae7a10e1ba91b7183e05b1111d327ecdeb0eda9706341a371fe6e2735",
+          "private_archive": "pre-soft-reset-harness-20261005\\laya_curriculum.py"
+        },
+        {
+          "file": "qa_reset.py",
+          "sha256": "a6af727c1a4583f7a967957c864f241bde7a15dee2b66af7e72fbbf62e891607",
+          "private_archive": "pre-soft-reset-freshness-20261005\\qa_reset.py"
+        },
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": null,
+      "candidate_sha256": null,
+      "verified_json_files": 16,
+      "planned_reset_cycles": 3
+    },
+    {
+      "suite": "g1-c06fa907d903",
+      "seed": 4105300,
+      "runner": "laya-continuous-walking-eval-v4",
+      "scope": "current_observed_walking_cells_only",
+      "manifest_sha256": "38782cb94a595be17b4130ac64bd9e0ebcd7acea869c2c5889c13a69c245a158",
+      "report_sha256": null,
+      "progress_sha256": null,
+      "planned_tasks": 9,
+      "attempted_tasks": 0,
+      "successful_tasks": 0,
+      "recorded_task_outcomes": [],
+      "native_processes": 1,
+      "native_groups": 0,
+      "successful_resets": 0,
+      "resets": [],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [],
+      "same_pid_per_cycle": [],
+      "same_native_instance_per_cycle": [],
+      "child_exit_code": null,
+      "failure_reasons": [
+        {
+          "phase": "await_native_bridge",
+          "reason": "Real native input-receipt bridge unavailable",
+          "commands_at_failure": 0,
+          "last_seen_age_s": null
+        }
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "laya_curriculum.py",
+          "sha256": "564b512104fb2842ee79d307d3690c65f32acc43763d493b0e7f509ef4b3250b",
+          "private_archive": "pre-soft-reset-freshness-20261005\\laya_curriculum.py"
+        },
+        {
+          "file": "qa_reset.py",
+          "sha256": "a6af727c1a4583f7a967957c864f241bde7a15dee2b66af7e72fbbf62e891607",
+          "private_archive": "pre-soft-reset-freshness-20261005\\qa_reset.py"
+        },
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "verified_json_files": 6
+    },
+    {
+      "suite": "g1-1d2236eb10b9",
+      "seed": 4105400,
+      "runner": "laya-continuous-walking-eval-v4",
+      "scope": "current_observed_walking_cells_only",
+      "manifest_sha256": "f0acfe659a8d95e94e0d95446b9c9279c9c0d1a8cd52ee74a2405bd627d312ba",
+      "report_sha256": null,
+      "progress_sha256": "b78be28c9f93dbd7a2e5624c08b2c0cde3140fd00c9713091543a7fc368afad4",
+      "planned_tasks": 9,
+      "attempted_tasks": 3,
+      "successful_tasks": 2,
+      "recorded_task_outcomes": [
+        {
+          "session": 1,
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 8,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 1,
+          "index": 2,
+          "attempted": true,
+          "success": false,
+          "reason": "attempt_timeout",
+          "consumed_actions": 67,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 1,
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 11,
+          "run_updates": 0,
+          "objective_unchanged": true
+        }
+      ],
+      "native_processes": 1,
+      "native_groups": 1,
+      "successful_resets": 0,
+      "resets": [],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [],
+      "same_pid_per_cycle": [],
+      "same_native_instance_per_cycle": [],
+      "child_exit_code": null,
+      "failure_reasons": [
+        {
+          "phase": "normal_reset_or_launch",
+          "reason": "state_feedback_stale",
+          "commands_at_failure": 139,
+          "last_seen_age_s": 1.972
+        }
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "laya_curriculum.py",
+          "sha256": "564b512104fb2842ee79d307d3690c65f32acc43763d493b0e7f509ef4b3250b",
+          "private_archive": "pre-soft-reset-freshness-20261005\\laya_curriculum.py"
+        },
+        {
+          "file": "qa_reset.py",
+          "sha256": "a6af727c1a4583f7a967957c864f241bde7a15dee2b66af7e72fbbf62e891607",
+          "private_archive": "pre-soft-reset-freshness-20261005\\qa_reset.py"
+        },
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "verified_json_files": 15,
+      "worker": {
+        "responses": 92,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 81,
+        "camera_delta_max_deg": 11.964111328124993,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_p95_ms": 34.1444,
+        "response_max_ms": 38.7904,
+        "output_age_p95_ms": 110.4265,
+        "output_age_max_ms": 126.0951
+      }
+    },
+    {
+      "suite": "g1-5b7a5b2cab54",
+      "seed": 4105500,
+      "runner": "laya-continuous-walking-eval-v4",
+      "scope": "current_observed_walking_cells_only",
+      "manifest_sha256": "af8710c6cf0e0b7b94ad006dd3d2d3dda8d7396fd86d15f7535e892d40b07e25",
+      "report_sha256": "ee88167c96783916cc5e519b57f4a21e4fd9e529e30a4e39a78788fd987cf161",
+      "progress_sha256": "a8c04ef13d1a574edeb8c4a14318d5e0807089edb0d4fea9258e495c70f88a3c",
+      "planned_tasks": 9,
+      "attempted_tasks": 9,
+      "successful_tasks": 9,
+      "recorded_task_outcomes": [
+        {
+          "session": 1,
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 8,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 1,
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 32,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 1,
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 12,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 2,
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 8,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 2,
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 28,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 2,
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 12,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 3,
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 10,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 3,
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 20,
+          "run_updates": 0,
+          "objective_unchanged": true
+        },
+        {
+          "session": 3,
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 8,
+          "run_updates": 0,
+          "objective_unchanged": true
+        }
+      ],
+      "native_processes": 1,
+      "native_groups": 1,
+      "successful_resets": 2,
+      "resets": [
+        {
+          "source": "soh",
+          "success": true,
+          "reason": "observed_normal_title_reset",
+          "same_native_process": true,
+          "consumed": true,
+          "receipt": {
+            "seq": 106,
+            "owner_epoch": 1,
+            "status": "completed",
+            "first_tick": 758,
+            "last_tick": 759,
+            "pressed": 12304,
+            "released": 12304,
+            "apply_latency_ms": 0.018,
+            "client_to_consume_ms": 47.215,
+            "reason": ""
+          },
+          "initial_seq": 234,
+          "initial_scene_epoch": 3,
+          "initial_context_epoch": 12,
+          "provider_calls": 0,
+          "command_base_seq": 235,
+          "final_seq": 256,
+          "final_scene_epoch": 3,
+          "final_context_epoch": 14
+        },
+        {
+          "source": "soh",
+          "success": true,
+          "reason": "observed_normal_title_reset",
+          "same_native_process": true,
+          "consumed": true,
+          "receipt": {
+            "seq": 224,
+            "owner_epoch": 1,
+            "status": "completed",
+            "first_tick": 1606,
+            "last_tick": 1607,
+            "pressed": 12304,
+            "released": 12304,
+            "apply_latency_ms": 0.019,
+            "client_to_consume_ms": 44.87,
+            "reason": ""
+          },
+          "initial_seq": 491,
+          "initial_scene_epoch": 6,
+          "initial_context_epoch": 24,
+          "provider_calls": 0,
+          "command_base_seq": 492,
+          "final_seq": 513,
+          "final_scene_epoch": 6,
+          "final_context_epoch": 26
+        }
+      ],
+      "normal_save_slot": 2,
+      "save_load_events_per_cycle": [],
+      "same_pid_per_cycle": [],
+      "same_native_instance_per_cycle": [],
+      "child_exit_code": null,
+      "failure_reasons": [],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled",
+      "historical_source_bytes_preserved": [
+        {
+          "file": "controller.py",
+          "sha256": "71bd136c58506a00c4cd845ea21a0704104a03f09065e593db1fb2d771f490d4",
+          "private_archive": "pre-final-import-order-20261005\\controller.py"
+        }
+      ],
+      "frozen_unchanged": true,
+      "seed_unchanged": true,
+      "reported_integrity_after_shutdown": true,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "verified_json_files": 33,
+      "worker": {
+        "responses": 138,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 128,
+        "camera_delta_max_deg": 11.601562499999998,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_p95_ms": 29.5891,
+        "response_max_ms": 37.264,
+        "output_age_p95_ms": 81.887,
+        "output_age_max_ms": 135.5408
+      },
+      "new_normal_load_events_after_reset": [
+        1,
+        1
+      ],
+      "unique_task_observations": 221,
+      "steep_top_down_observations": 0,
+      "full_physical_reaction_latency_ms": null
+    }
+  ]
+}

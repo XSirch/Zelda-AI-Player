@@ -22,6 +22,7 @@ from .features import (
     stack_frames,
     target_point,
 )
+from .ledge_task import ObservedLedgeAscentTask
 from .lifetime import ObservationLifetime
 from .local_tasks import LocalTask
 from .ml_policy import OnlinePPO
@@ -1599,7 +1600,8 @@ class ContinuousController:
                 local_dwell_seconds=self.reward_tracker.local_dwell_seconds,
                 route_hint=route_hint,
             )
-            if route_hint and route_hint.get("traversal_kind", "").startswith("stairs_or_slope"):
+            if route_hint and (route_hint.get("traversal_kind", "").startswith("stairs_or_slope")
+                               or route_hint.get("traversal_kind") == "ledge_up"):
                 point = route_hint.get("waypoint")
                 rows = [row for row in game.traversal_affordances
                         if row.kind == route_hint["traversal_kind"] and point is not None
@@ -1607,7 +1609,9 @@ class ContinuousController:
                                 math.dist(row.target_position, point)) < 1]
                 if rows:
                     try:
-                        self.start_local_task(LocalTask.traversal(game, rows[0]))
+                        task = (ObservedLedgeAscentTask.create(game, rows[0]) if rows[0].kind == "ledge_up"
+                                else LocalTask.traversal(game, rows[0]))
+                        self.start_local_task(task)
                     except ValueError:
                         pass  # An unsupported surface remains local evidence only.
                     else:

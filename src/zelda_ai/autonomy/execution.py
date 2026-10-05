@@ -15,6 +15,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .lifetime import ObservationLifetime
+from .locomotion import locomotor_mode
 
 
 @dataclass
@@ -165,6 +166,7 @@ class ExecutionSupervisor:
             "scene_epoch": game.scene_epoch, "context_epoch": game.context_epoch,
             "instance_id": game.instance_id, "scene": game.scene, "room": game.room,
             "position": game.player.position if game.player else None,
+            "locomotor_mode": locomotor_mode(game),
             "camera_input_yaw": game.camera_input_yaw,
             "dialogue_active": game.dialogue.active, "pause_active": game.pause_menu.active,
             "target": guidance.get("target"), "source": guidance.get("source"),

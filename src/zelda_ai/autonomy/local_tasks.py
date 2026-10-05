@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 
 from .execution import physical_context
 from .features import _PROBE_YAW_OFFSETS, _collision_detour, camera_relative_stick
+from .locomotion import grounded, water_active
 from .navigation import observed_local_path
 
 
@@ -51,7 +52,7 @@ class LocalTask:
     waypoint_index: int = 0
     progress_point: tuple | None = None
     best_waypoint_distance: float | None = None
-    version: str = "observed-analog-task-v2"
+    version: str = "observed-analog-task-v3"
 
     @classmethod
     def traversal(cls, game, affordance, *, now=None, budget_s=8.0):
@@ -86,6 +87,8 @@ class LocalTask:
             raise ValueError("A physical task requires a playable observed state")
         if not 0 < budget_s <= 30:
             raise ValueError("Task budget must be in (0, 30] seconds")
+        if water_active(game.player):
+            raise ValueError("A water locomotor needs its own task and controller")
         now = time.monotonic() if now is None else now
         origin, target, approach = tuple(game.player.position), tuple(target), tuple(approach)
         return cls(f"{kind}:{game.seq}:{target}", kind, physical_context(game),
@@ -122,6 +125,9 @@ class LocalTask:
             return
         if game.dialogue.active or game.pause_menu.active or game.paused or game.cutscene_active:
             self.interrupt("modal_owns_control")
+            return
+        if water_active(game.player):
+            self.interrupt("unsupported_locomotor_mode")
             return
         if ((game.player.climbing_ladder or game.player.hanging_ledge or game.player.climbing_ledge)
                 and not self.accepts_attached_mode(game)):
@@ -176,7 +182,7 @@ class LocalTask:
         # must not count as a climb. Verify stopped, fresh frames, not a jump apex.
         delta = self.target[1] - self.origin[1]
         reached = reached and (abs(delta) <= 4 or (position[1] - self.origin[1]) * delta > 0)
-        reached = reached and game.player.speed_xz < .1
+        reached = reached and game.player.speed_xz < .1 and grounded(game.player)
         if fresh:
             self.verification_frames = self.verification_frames + 1 if reached and self.consumed else 0
         if self.verification_frames >= 3:
@@ -185,7 +191,7 @@ class LocalTask:
             self.phase, self.failure = "failed", "attempt_timeout"
         elif now - self.progress_at >= 2.5:
             self.phase, self.failure = "failed", "no_geometric_progress"
-        elif (horizontal <= 35 and abs(position[1] - self.target[1]) <= 4
+        elif (horizontal <= 35 and abs(position[1] - self.target[1]) <= 4 and grounded(game.player)
               or self.phase == "verify" and game.player.speed_xz >= .1):
             self.phase = "verify"
         elif math.dist(position, self.approach) > 35 and self.phase == "prepare":

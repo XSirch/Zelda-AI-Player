@@ -42,7 +42,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.8";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.9";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -573,6 +573,38 @@ json TraversalAffordances(Player* player) {
         }
         candidates.push_back(candidate);
     };
+
+    // The player's normal collision pass already classified the wall/ledge
+    // Link is actually touching. It is a traversal proposal, not a walking
+    // link through the solid lower band. Recheck only that local landing;
+    // never infer an unseen platform behind a distant wall or a gap crossing.
+    if (player->actor.wallPoly && (player->actor.bgCheckFlags & BGCHECKFLAG_PLAYER_WALL_INTERACT) &&
+        (player->actor.bgCheckFlags & BGCHECKFLAG_GROUND) &&
+        !(player->stateFlags1 & (PLAYER_STATE1_IN_WATER | PLAYER_STATE1_JUMPING | PLAYER_STATE1_FREEFALL |
+                               PLAYER_STATE1_CLIMBING_LADDER | PLAYER_STATE1_CLIMBING_LEDGE |
+                               PLAYER_STATE1_HANGING_OFF_LEDGE)) &&
+        player->ledgeClimbType >= 1 && player->ledgeClimbType <= 3 &&
+        player->distToInteractWall >= 0.0f && player->distToInteractWall <= 60.0f &&
+        player->yDistToLedge >= 18.0f && player->yDistToLedge <= 120.0f) {
+        const float normalX = COLPOLY_GET_NORMAL(player->actor.wallPoly->normal.x);
+        const float normalZ = COLPOLY_GET_NORMAL(player->actor.wallPoly->normal.z);
+        const float offset = player->distToInteractWall + 10.0f;
+        const float targetX = origin.x - offset * normalX;
+        const float targetZ = origin.z - offset * normalZ;
+        float landingY = 0.0f;
+        if (floorAt(targetX, targetZ, origin.y + player->yDistToLedge + 6.0f, landingY) &&
+            std::abs(landingY - origin.y - player->yDistToLedge) <= 4.0f) {
+            Candidate candidate;
+            candidate.kind = "ledge_up";
+            candidate.direction = "up";
+            candidate.approach = origin;
+            candidate.target = {targetX, landingY, targetZ};
+            candidate.heightDelta = landingY - baseFloor;
+            candidate.wallFlags = SurfaceType_GetWallFlags(&gPlayState->colCtx, player->actor.wallPoly,
+                                                           player->actor.wallBgId);
+            addCandidate(candidate);
+        }
+    }
 
     for (int directionIndex = 0; directionIndex < DIRECTION_COUNT; ++directionIndex) {
         const float angle = static_cast<float>(directionIndex) *
