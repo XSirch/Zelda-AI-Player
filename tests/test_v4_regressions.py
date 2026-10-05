@@ -100,6 +100,18 @@ def test_local_path_rejects_another_floor_and_unlinked_cells(state):
     assert observed_local_path(state, (160.0, 120.0, 0.0)) is None
 
 
+def test_backface_diagnostic_does_not_invent_collision_links(state):
+    from pydantic import ValidationError
+
+    legacy = NavigationMeshSnapshot(step=80.0, half_extent=1, cells=[(0, 0, 0.0, 0), (1, 0, 0.0, 0)])
+    assert legacy.backface_rejections == 0
+    state.navmesh = legacy.model_copy(update={"backface_rejections": 24})
+    assert observed_local_path(state, (80.0, 0.0, 0.0)) is None
+    for invalid in (-1, 8193):
+        with pytest.raises(ValidationError):
+            NavigationMeshSnapshot(backface_rejections=invalid)
+
+
 def test_portal_requires_context_change_and_supervisor_bounds_failed_room(state):
     supervisor = ExecutionSupervisor(room_budget_s=4.0)
     hint = {"active": True, "exit_active": True, "target": (0.0, 0.0, 0.0), "escape_key": "portal"}

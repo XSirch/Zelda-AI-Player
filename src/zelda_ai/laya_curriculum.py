@@ -235,6 +235,7 @@ async def collect(
         rng = random.Random(seed + session)
         if policy is not None:
             policy.invalidate()
+        stage = "await_native_bridge"
         try:
             async with asyncio.timeout(session_budget):
                 deadline = time.monotonic() + 15
@@ -244,14 +245,17 @@ async def collect(
                     await asyncio.sleep(0.05)
                 if not bridge.connected or not bridge.realtime or bridge.state.protocol != 3:
                     raise RuntimeError("Real native input-receipt bridge unavailable")
+                stage = "normal_save_startup"
                 startup = await enter_playable_save(bridge, save_slot - 1, budget_s=60,
                     failure_report=lambda report: write_json(home / "startup.json", report))
                 write_json(home / "startup.json", startup)
                 if startup["status"] != "loaded":
                     raise RuntimeError(startup.get("reason", "Native save not loaded"))
+                stage = "settle_after_startup"
                 await settle(bridge, deadline=time.monotonic() + 8)
                 preparation = None
                 if cross_initial_portal:
+                    stage = "initial_physical_preparation"
                     preparation = await prepare_portal_start(
                         bridge, directory / "frozen", home / "portal-preparation",
                     )
@@ -264,6 +268,7 @@ async def collect(
                     write_json(directory / "preparations.json", preparations)
                     if policy is not None:
                         policy.invalidate()
+                stage = "walking_tasks"
                 for index in range(tasks):
                     trial = (
                         directory
@@ -322,6 +327,23 @@ async def collect(
                     print({"directory": str(directory), **record}, flush=True)
                     if policy is not None and policy.failure:
                         raise RuntimeError(f"Inference worker failed: {policy.failure}")
+        except (OSError, ValueError, RuntimeError, TimeoutError) as exc:
+            game = bridge.state
+            # Persist the pre-input phase too, before release/owned shutdown.
+            # Missing state/receipts stay unknown; never retain raw tokens or
+            # infer an unconsumed command from absent feedback.
+            write_json(home / "session-failure.json", {
+                "status": "failed", "phase": stage, "error_kind": type(exc).__name__,
+                "reason": str(exc)[:160], "bridge": bridge.telemetry(),
+                "last_observation": ({
+                    "seq": game.seq, "protocol": game.protocol, "capabilities": game.capabilities,
+                    "scene_epoch": game.scene_epoch, "context_epoch": game.context_epoch,
+                    "scene": game.scene, "room": game.room, "in_game": game.in_game,
+                } if game else None),
+                "native_process_exit_code": process.child.poll(),
+                "command_seq_at_failure": bridge.command_seq,
+            })
+            raise
         finally:
             bridge.close()
             await process.close()

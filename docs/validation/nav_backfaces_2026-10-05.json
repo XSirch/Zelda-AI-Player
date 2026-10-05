@@ -1,0 +1,400 @@
+{
+  "date": "2026-10-05",
+  "source": "soh",
+  "observation_profile": "instrumented_local_v1",
+  "engine": "rt-input-v3.7",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "promotion": "disabled",
+  "change_scope": "conservative_two_face_queries_only_in_current_local_navmesh",
+  "game_physics_and_native_input_queries_unchanged": true,
+  "legacy_native_failure_analysis": {
+    "suite": "g1-4c46f234407b",
+    "record": "candidate/trial-0007/motor/task.json",
+    "failure": "attempt_timeout",
+    "summary": {
+      "frames": 125,
+      "held_target_changes": 8,
+      "wall_contact_frames": 8,
+      "blocked_target_frames": 0,
+      "minimum_final_target_distance": 60.3070436974838,
+      "world_error_p50_deg": 5.3120574441742745,
+      "world_error_p95_deg": 8.842890910889881,
+      "candidate_nonzero_frames": 116
+    },
+    "analysis_sha256": "8e80bea9dcada899c335b5e34002d43e3cbc443c160b8ab46b25113494aeb06c",
+    "exact_archived_source_sha256": {
+      "ZeldaAiBridge.cpp": "b7d8be160fc2423522fe8daa9b7b023027540516f33b423674b8d52be3a0b75a",
+      "models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded"
+    },
+    "exact_archived_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5"
+  },
+  "paired_actual_native_query_audit": {
+    "suite": "g1-8ca545cfe7ff",
+    "source": "soh",
+    "engine": "rt-input-v3.7",
+    "unique_full_snapshots": 170,
+    "snapshots_with_backface_rejections": 134,
+    "minimum_rejections": 0,
+    "median_rejections": 2,
+    "maximum_rejections": 5,
+    "query_pairs_rejected_only_by_two_faces": 280,
+    "provider_calls": 0,
+    "training_updates": 0,
+    "scope": "same_segment_one_face_clear_then_two_face_blocked_in_actual_local_navmesh_queries"
+  },
+  "walking_batch": {
+    "suite": "g1-8ca545cfe7ff",
+    "seed": 4102500,
+    "native_sessions": 3,
+    "tasks_per_session": 5,
+    "attempted": 15,
+    "successful": 15,
+    "consumed_actions": 318,
+    "source": "soh",
+    "observation_profile": "instrumented_local_v1",
+    "save_slot": 2,
+    "task_versions": [
+      "observed-analog-task-v2"
+    ],
+    "provider_calls": 0,
+    "training_updates": 0,
+    "reference_blend": 0,
+    "objectives_unchanged": true,
+    "promotion": "disabled",
+    "g2_complete": false,
+    "failure_reasons": {},
+    "failures": [],
+    "worker": {
+      "round_trip_ms": {
+        "samples": 323,
+        "p50": 16.23630001267884,
+        "p95": 30.046599989873357,
+        "maximum": 51.15010000008624
+      },
+      "inference_ms": {
+        "samples": 323,
+        "p50": 11.692700005369261,
+        "p95": 25.137200005701743,
+        "maximum": 35.50549999636132
+      },
+      "output_age_ms": {
+        "samples": 423,
+        "p50": 68.42009999672882,
+        "p95": 89.92179999768268,
+        "maximum": 142.94859999790788
+      }
+    },
+    "expired_responses": 0,
+    "context_rejections": 0,
+    "responses": 323,
+    "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+    "client_command_to_native_consumption_ms": {
+      "samples": 318,
+      "p50": 27.256,
+      "p95": 48.48,
+      "maximum": 61.392
+    },
+    "full_observation_to_physical_reaction_ms": null,
+    "candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "report_sha256": "450407aaca629e692562a25158a7c9a0e0a786bf43a15f7f2bb18239eb567f8a",
+    "manifest_sha256": "36eb72d60d640f266fab4c9feeb54382407ce37a5a16e04d821e131e37f193dd",
+    "frozen_artifact_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "strict_utf8_and_finite_json_files_verified": 46,
+    "source_files_count": 50,
+    "relevant_source_sha256": {
+      "src\\zelda_ai\\laya_inference.py": "e16eb517eda6a8360b27b31a653d899f8adbe9f758f14e405ccb40649bb31527",
+      "src\\zelda_ai\\laya_worker.py": "06f9f22f4a100da085c31201fcecfd0abba64347dff3a39fce5fe9ec1e86e789",
+      "src\\zelda_ai\\models.py": "b7c4f08c414b27d7f35f98a803f6cabccdb18d39c7fac71122bc1e8c8d369b27",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66"
+    },
+    "native_executable_sha256": "7351c536bdf4c261e899975b4bd3e4621ade83bad4913eaa51b41013b192a141",
+    "native_adapter_sha256": "82e9de098bf68d6b8af588879ef75edabfa5147d6befc33fb0c66ed3079fe4f8",
+    "engine": "rt-input-v3.7",
+    "source_executable_original_frozen_candidate_fixture_integrity_at_terminal": true,
+    "camera": {
+      "native_input_yaw_observations": 455,
+      "changing_yaw_observations": 287,
+      "largest_observed_yaw_delta_deg": 21.20361328125,
+      "steep_top_down_observations": 0,
+      "camera_reprojected_outputs": 316,
+      "request_to_application_camera_delta_max_deg": 21.203613281250004
+    }
+  },
+  "strict_utf8_and_finite_native_json_files_verified": 283,
+  "limitations": [
+    "The paired query audit proves rejected ray segments, not the sole cause of the previous timeout.",
+    "Native trajectories/selected targets differ; the same seed does not produce perfectly paired gameplay.",
+    "Full reaction latency, native top-down, general terrain, sword acquisition and campaign are still unqualified.",
+    "No training, demonstration export or INICIAR promotion in this evaluation.",
+    "The larger batch stopped at 80 attempted tasks; the remaining 20 have no gameplay result.",
+    "Three observation-only startups did not reproduce the missing bridge; its cause remains unknown.",
+    "Pre-input failure logging has unit evidence; a post-change native failure has not occurred.",
+    "Worker and bridge startup reliability are not qualified by successful small followups."
+  ],
+  "validation": {
+    "pytest_passed": 424,
+    "pytest_skipped": 20,
+    "native_skip_reason": "g++/clang++ unavailable",
+    "msvc_native_input_cases_passed": 19,
+    "native_soh_release_build": "passed",
+    "native_soh_build_exit_code": 0,
+    "native_build_log_sha256": "898d701287a315b3e1460eea453f4464c6ae2cd260eaf461e87408858b1096c4",
+    "web_build": "passed",
+    "focused_ruff": "passed",
+    "strict_written_utf8": "passed",
+    "written_files_checked": 23,
+    "preserved_original_build_logs": [
+      {
+        "file": "soh-build-3.7-20261005.raw",
+        "encoding": "UTF-16-LE with BOM, preserved original",
+        "sha256": "44838f43cc04529d89bd6977d3aaa4e7571ca341787b9f48c54e17bb867deaaf"
+      },
+      {
+        "file": "soh-build-3.7-20261005.complete.raw",
+        "encoding": "UTF-16-LE with BOM, preserved original",
+        "sha256": "44838f43cc04529d89bd6977d3aaa4e7571ca341787b9f48c54e17bb867deaaf"
+      }
+    ]
+  },
+  "post_logging_walking_batch": {
+    "suite": "g1-7c0eba0d2a8d",
+    "seed": 4104200,
+    "native_sessions": 3,
+    "tasks_per_session": 5,
+    "attempted": 15,
+    "successful": 15,
+    "consumed_actions": 271,
+    "source": "soh",
+    "observation_profile": "instrumented_local_v1",
+    "save_slot": 2,
+    "task_versions": [
+      "observed-analog-task-v2"
+    ],
+    "provider_calls": 0,
+    "training_updates": 0,
+    "reference_blend": 0,
+    "objectives_unchanged": true,
+    "promotion": "disabled",
+    "g2_complete": false,
+    "failure_reasons": {},
+    "failures": [],
+    "worker": {
+      "round_trip_ms": {
+        "samples": 274,
+        "p50": 14.936499996110797,
+        "p95": 29.76180000405293,
+        "maximum": 44.28159999952186
+      },
+      "inference_ms": {
+        "samples": 274,
+        "p50": 10.331700003007427,
+        "p95": 24.94509999814909,
+        "maximum": 40.73179999249987
+      },
+      "output_age_ms": {
+        "samples": 361,
+        "p50": 70.2919000032125,
+        "p95": 89.1669999982696,
+        "maximum": 145.96989999699872
+      }
+    },
+    "expired_responses": 0,
+    "context_rejections": 0,
+    "responses": 274,
+    "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+    "client_command_to_native_consumption_ms": {
+      "samples": 271,
+      "p50": 25.963,
+      "p95": 46.936,
+      "maximum": 51.759
+    },
+    "full_observation_to_physical_reaction_ms": null,
+    "candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "report_sha256": "04f8e4e86d1767e8527bde31c4f566a4b3e68b8220687c5f178f9d7412ddd0a3",
+    "manifest_sha256": "15f04175543915df0f88b18b4c7a85496de57e7bf2e3440d24314ab51dfcac32",
+    "frozen_artifact_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "strict_utf8_and_finite_json_files_verified": 45,
+    "camera": {
+      "native_input_yaw_observations": 407,
+      "changing_yaw_observations": 257,
+      "largest_observed_yaw_delta_deg": 21.55517578125,
+      "steep_top_down_observations": 0,
+      "camera_reprojected_outputs": 285,
+      "request_to_application_camera_delta_max_deg": 21.55517578124999
+    },
+    "source_files_count": 50,
+    "relevant_source_sha256": {
+      "src\\zelda_ai\\laya_curriculum.py": "d1d4c30ae7a10e1ba91b7183e05b1111d327ecdeb0eda9706341a371fe6e2735",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb"
+    },
+    "engine": "rt-input-v3.7",
+    "post_failure_logging_source_pins_checked": true
+  },
+  "incomplete_larger_attempt": {
+    "suite": "g1-8d8c10c0237f",
+    "planned_tasks": 100,
+    "attempted_tasks": 80,
+    "successful_tasks": 79,
+    "unattempted_tasks": 20,
+    "failed_tasks": [
+      {
+        "session": 2,
+        "index": 20,
+        "reason": "attempt_timeout"
+      }
+    ],
+    "terminal_failure": "Real native input-receipt bridge unavailable before session 5 save selection",
+    "failure_source": "observed_executor_exception",
+    "initial_bridge_diagnostic_present": false,
+    "normal_save_startup_diagnostic_present": false,
+    "final_report_present": false,
+    "g2_complete": false,
+    "seed": 4104100,
+    "native_engine": "rt-input-v3.7",
+    "provider_calls": 0,
+    "training_updates": 0,
+    "candidate_actions_become_training_labels": false,
+    "promotion": "disabled",
+    "worker": {
+      "round_trip_ms": {
+        "sample_count": 1520,
+        "p95": 34.9562000046717,
+        "maximum": 442.3529000050621
+      },
+      "inference_ms": {
+        "sample_count": 1520,
+        "p95": 27.786599996034056,
+        "maximum": 54.50120000750758
+      },
+      "output_age_ms": {
+        "sample_count": 1967,
+        "p95": 101.03289999824483,
+        "maximum": 143.05030000105035
+      }
+    },
+    "expired_responses": 3,
+    "context_rejections": 0,
+    "manifest_sha256": "f84191b4c65b28f480756c1c2460f8a9b12469650d1c561b1df723cdcd548a6a",
+    "progress_sha256": "f4265e07f6e8a23bf87a0bf0912ca0f7d25d14586103445af757ba0e34ccd872",
+    "terminal_source_native_frozen_candidate_integrity": true,
+    "sanitized_partial_index_sha256": "a2fb3a0b9fcabaaf08aba58c0a68db25ed288e35fd271f99ca1c1a50d5b21c75",
+    "full_observation_to_physical_reaction_ms": null
+  },
+  "first_native_telemetry_diagnostic": {
+    "suite": "g1-8e8264118b22",
+    "sessions": [
+      {
+        "session": 1,
+        "first_state_s": 3.933119799999986,
+        "realtime_ready_s": 3.9331892000045627,
+        "commands_before_close": 0
+      },
+      {
+        "session": 2,
+        "first_state_s": 3.759894999995595,
+        "realtime_ready_s": 3.7599206999875605,
+        "commands_before_close": 0
+      },
+      {
+        "session": 3,
+        "first_state_s": 4.60137429999304,
+        "realtime_ready_s": 4.601420199993299,
+        "commands_before_close": 0
+      }
+    ],
+    "report_sha256": "d10e826ec73ad7226c63e253e39dd92fc281ca9054d690c5e24b943088b3c6af",
+    "provider_calls": 0,
+    "training_updates": 0,
+    "normal_save_selection_attempted": false,
+    "production_15_second_guard_unchanged": true,
+    "diagnostic_observation_limit_s": 60,
+    "prior_failure_reproduced": false,
+    "root_cause": null
+  },
+  "worker_cold_start": {
+    "initial_launch_failed_at_readiness_timeout_s": 45,
+    "initial_failure_source": "observed_executor_TimeoutError_before_native_suite_creation",
+    "initial_launch_native_processes": 0,
+    "initial_log_sha256": "e87836921077504ffded725a059ce4520f50b33f3bdb4808650d747d55f9f255",
+    "standalone_followup_ready_and_eof_exit_s": 21.640340199999628,
+    "profile_sha256": "b1ae0e5616d244b51c4c17425368cb5608c6116ed37ace4168b1ddec1f670733",
+    "profile_stack_log_sha256": "f7862f94d7d0fa59e8a71b7c31c8c320f484c4b8319599d1ff5c896c739ce752",
+    "followup_requests": 0,
+    "native_commands": 0,
+    "provider_calls": 0,
+    "training_updates": 0,
+    "initial_failure_root_cause": null,
+    "startup_reliability_qualified": false
+  },
+  "failure_logging": {
+    "change": "persist bounded session failure before release and owned shutdown",
+    "phases": [
+      "await_native_bridge",
+      "normal_save_startup",
+      "settle_after_startup",
+      "initial_physical_preparation",
+      "walking_tasks"
+    ],
+    "unknown_state_and_receipts_remain_null": true,
+    "raw_tokens_retained": false,
+    "deadlines_and_input_authority_unchanged": true,
+    "pre_input_failure_and_failed_report_write_cleanup_test_cases": 2,
+    "actual_pre_input_failure_after_logging_change_observed": false
+  },
+  "terminal_integrity_checks": [
+    {
+      "suite": "g1-8ca545cfe7ff",
+      "source_native_frozen_fixture_pins_rechecked": true,
+      "historical_source_checked_from_exact_archive": {
+        "src/zelda_ai/laya_curriculum.py": "49b6babf4b9aebb1230a4ae0dfe7fa46fa276b3c9157ef78e7e984b4e50b9518"
+      },
+      "strict_utf8_and_finite_json_files_verified": 46,
+      "manifest_sha256": "36eb72d60d640f266fab4c9feeb54382407ce37a5a16e04d821e131e37f193dd"
+    },
+    {
+      "suite": "g1-8d8c10c0237f",
+      "source_native_frozen_fixture_pins_rechecked": true,
+      "historical_source_checked_from_exact_archive": {
+        "src/zelda_ai/laya_curriculum.py": "49b6babf4b9aebb1230a4ae0dfe7fa46fa276b3c9157ef78e7e984b4e50b9518"
+      },
+      "strict_utf8_and_finite_json_files_verified": 178,
+      "manifest_sha256": "f84191b4c65b28f480756c1c2460f8a9b12469650d1c561b1df723cdcd548a6a"
+    },
+    {
+      "suite": "g1-8e8264118b22",
+      "source_native_frozen_fixture_pins_rechecked": true,
+      "historical_source_checked_from_exact_archive": {
+        "src/zelda_ai/laya_curriculum.py": "49b6babf4b9aebb1230a4ae0dfe7fa46fa276b3c9157ef78e7e984b4e50b9518"
+      },
+      "strict_utf8_and_finite_json_files_verified": 14,
+      "manifest_sha256": "daedc0f37870f87738d8c3cc95ba41a8e22e25c641082295229ecddd6ac4a4a4"
+    },
+    {
+      "suite": "g1-7c0eba0d2a8d",
+      "source_native_frozen_fixture_pins_rechecked": true,
+      "historical_source_checked_from_exact_archive": {},
+      "strict_utf8_and_finite_json_files_verified": 45,
+      "manifest_sha256": "15f04175543915df0f88b18b4c7a85496de57e7bf2e3440d24314ab51dfcac32"
+    }
+  ],
+  "initial_provisional_index_sha256": "28c3ff695d5da42598244eed8e655c7f3415d9eab16393fe8e8d8b306c8190e5"
+}

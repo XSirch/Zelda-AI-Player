@@ -41,7 +41,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.6";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.7";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -750,6 +750,7 @@ json NavigationMesh(Player* player) {
         {"half_extent", HALF_EXTENT},
         {"cells", json::array()},
         {"scene_exits", json::array()},
+        {"backface_rejections", 0},
     };
     if (!player) {
         result["step"] = 0.0f;
@@ -819,9 +820,21 @@ json NavigationMesh(Player* player) {
         Vec3f hit{};
         CollisionPoly* poly = nullptr;
         s32 bgId = BGCHECK_SCENE;
-        return BgCheck_EntityLineTest1(
+        const bool oneFaceHit = BgCheck_EntityLineTest1(
             &gPlayState->colCtx, &start, &end, &hit, &poly,
             true, false, false, true, &bgId) != 0;
+        if (oneFaceHit) return true;
+        // Observation must reject solid crossings from either side. The game
+        // intentionally ignores some back-face crossings in physical queries;
+        // copying that filter here can approve links from inside tall solids.
+        // Count the exact same segment rejected only by the conservative query.
+        const bool twoFaceHit = BgCheck_EntityLineTest1(
+            &gPlayState->colCtx, &start, &end, &hit, &poly,
+            true, false, false, false, &bgId) != 0;
+        if (twoFaceHit) {
+            result["backface_rejections"] = result["backface_rejections"].get<int>() + 1;
+        }
+        return twoFaceHit;
     };
     auto floorAt = [&](float x, float z, float startY, float& floorY) -> bool {
         Vec3f pos{x, startY, z};

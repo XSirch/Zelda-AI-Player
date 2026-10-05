@@ -104,6 +104,9 @@ class NavigationMeshSnapshot(StrictModel):
     step: float = Field(default=0.0, ge=0.0, le=500.0)
     half_extent: int = Field(default=0, ge=0, le=8)
     cells: list[tuple[int, int, float, int]] = Field(default_factory=list, max_length=289)
+    # QA counter over this snapshot's bounded local rays; never a route or
+    # solution flag. Old adapters retain the explicit zero default.
+    backface_rejections: int = Field(default=0, ge=0, le=8192)
 
     @property
     def available(self) -> bool:
