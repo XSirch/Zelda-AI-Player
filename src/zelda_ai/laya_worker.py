@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from .laya_data import bounded_state, digest
+from .laya_data import PROFILE, PROFILE_FEATURES, bounded_state, digest, profile_features
 from .laya_training import batch_for, decode_stick, forward, load_model
 
 
@@ -20,12 +20,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("base", type=Path)
     parser.add_argument("candidate", type=Path)
+    parser.add_argument("--profile", choices=tuple(PROFILE_FEATURES), default=PROFILE)
     args = parser.parse_args()
-    model, tokenizer = load_model(args.base, args.candidate)
+    model, tokenizer = load_model(args.base, args.candidate, profile=args.profile)
     import torch
 
     with torch.inference_mode():
-        warmup = {"state": bounded_state([[0.0] * 9])}
+        warmup = {"state": bounded_state([[0.0] * len(profile_features(args.profile))], profile=args.profile)}
         for _ in range(3):
             forward(
                 model, batch_for(tokenizer, [warmup], numeric=getattr(model, "numeric_telemetry", False))
@@ -33,6 +34,7 @@ def main():
         reply(
             {
                 "ready": True,
+                "profile": args.profile,
                 "candidate_sha256": digest(args.candidate / "heads.safetensors"),
                 "provider_calls": 0,
                 "training_updates": 0,
@@ -47,7 +49,7 @@ def main():
                 set(request) != {"id", "state"}
                 or type(request["id"]) is not int
                 or request["id"] <= 0
-                or state != bounded_state(state["history_oldest_first"])
+                or state != bounded_state(state["history_oldest_first"], profile=args.profile)
             ):
                 raise ValueError("Invalid bounded inference request")
             torch.cuda.synchronize()

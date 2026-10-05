@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..laya_data import bounded_state, digest
+from ..laya_data import PROFILE, bounded_state, digest
 from .features import camera_world_yaw
 from .imitation import encode_surface
 
@@ -61,6 +61,8 @@ class LayaWalkingPolicy:
     """Raw analog candidate for LocalTask only; never a native input sender."""
 
     refresh_at_motor_cadence = True
+    profile = PROFILE
+    lease_type = DecisionLease
 
     def __init__(self, process, *, budget_s=0.1):
         if not 0 < budget_s <= 0.5:
@@ -70,7 +72,7 @@ class LayaWalkingPolicy:
         self.last_seq, self.request_id = -1, 0
         self.closed = False
         self.failure = None
-        self.lease = DecisionLease()
+        self.lease = self.lease_type()
         self.metrics = {
             "responses": 0,
             "expired_responses": 0,
@@ -96,6 +98,7 @@ class LayaWalkingPolicy:
                 "zelda_ai.laya_worker",
                 str(base.resolve()),
                 str(candidate.resolve()),
+                "--profile", cls.profile,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=stderr,
@@ -105,6 +108,7 @@ class LayaWalkingPolicy:
             ready = json.loads(await asyncio.wait_for(process.stdout.readline(), timeout=45))
             if (
                 ready.get("ready") is not True
+                or ready.get("profile") != cls.profile
                 or ready.get("provider_calls") != 0
                 or ready.get("training_updates") != 0
                 or ready.get("candidate_sha256") != digest(candidate / "heads.safetensors")
@@ -183,7 +187,7 @@ class LayaWalkingPolicy:
 
     def invalidate(self):
         self.owner, self.pending, self.history, self.last_seq = None, None, [], -1
-        self.lease = DecisionLease()
+        self.lease = self.lease_type()
 
     async def _run(self):
         try:
@@ -218,7 +222,7 @@ class LayaWalkingPolicy:
                 elif elapsed > self.budget_s:
                     self.metrics["expired_responses"] += 1
                 else:
-                    self.lease = DecisionLease(request.owner, request.submitted_at, request.features,
+                    self.lease = self.lease_type(request.owner, request.submitted_at, request.features,
                                                tuple(stick), request.camera_yaw)
         except asyncio.CancelledError:
             raise

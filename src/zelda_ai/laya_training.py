@@ -19,12 +19,13 @@ from pathlib import Path
 
 from .laya_data import (
     PROFILE,
-    QUESTIONS,
     STICK_BINS,
     digest,
     export_surfaces,
     load_dataset,
     majority_baseline,
+    profile_features,
+    profile_questions,
 )
 from .laya_numeric import NUMERIC_REPRESENTATION, TEXT_REPRESENTATION
 
@@ -118,7 +119,8 @@ def prepare_base(output: Path, weights_source: Path | None = None) -> dict:
     return verify_base(output)
 
 
-def load_model(base: Path, candidate: Path | None = None, *, encoder_layers=0, numeric=False):
+def load_model(base: Path, candidate: Path | None = None, *, encoder_layers=0, numeric=False, profile=PROFILE):
+    profile_features(profile)
     verify_base(base)
     os.environ["HF_HUB_OFFLINE"] = "1"
     os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -147,10 +149,11 @@ def load_model(base: Path, candidate: Path | None = None, *, encoder_layers=0, n
     model.to("cuda")
     model.encoder.to(dtype=torch.bfloat16)
     model.stick_readout = "argmax"
+    model.observation_profile = profile
     if candidate:
         metadata = json.loads((candidate / "candidate.json").read_text(encoding="utf-8"))
         if (
-            metadata.get("profile") != PROFILE
+            metadata.get("profile") != profile
             or metadata.get("base_sha256") != BASE_WEIGHTS_SHA256
             or metadata.get("source_revision") != LAYA_SOURCE_REVISION
             or digest(candidate / "heads.safetensors") != metadata.get("heads_sha256")
@@ -197,12 +200,12 @@ def batch_for(tokenizer, rows, *, numeric=False):
     groups = []
     for row in rows:
         group = []
-        for axis, definition in QUESTIONS.items():
+        for axis, definition in profile_questions(row["state"]["profile"]).items():
             q = {"t": definition["type"], "ins": definition["instructions"], "crit": definition["criteria"]}
             if numeric:
-                from .laya_numeric import ENCODER_SCHEMA
+                from .laya_numeric import encoder_schema
 
-                state = ENCODER_SCHEMA
+                state = encoder_schema(row["state"]["profile"])
             else:
                 state = row["state"]
             ids, markers = build_sequence(tokenizer, state, q, 16384, HEAD_MAX_LEN)
@@ -287,8 +290,8 @@ def supervised_stick_loss(logits, labels, executed_stick, *, mode="choice"):
 def derive_readout(base: Path, source: Path, output: Path, readout: str):
     if output.exists() or readout not in {"argmax", "expectation"}:
         raise ValueError("Use a new immutable output and a supported decoder")
-    load_model(base, source)  # Validate actual keys, base, provenance and finite weights.
     metadata = json.loads((source / "candidate.json").read_text(encoding="utf-8"))
+    load_model(base, source, profile=metadata.get("profile"))  # Actual keys, provenance and finite weights.
     metadata.update(
         stick_readout=readout,
         derived_from_candidate_sha256=digest(source / "candidate.json"),
@@ -363,6 +366,7 @@ def train(
     numeric=False,
     batch_size=2,
     loss_mode="choice",
+    baseline_output: Path | None = None,
 ):
     import torch
     from safetensors.torch import save_file
@@ -376,11 +380,27 @@ def train(
     manifest, splits = load_dataset(dataset)
     torch.manual_seed(seed)
     rng = random.Random(seed)
-    model, tokenizer = load_model(base, encoder_layers=encoder_layers, numeric=numeric)
+    model, tokenizer = load_model(base, encoder_layers=encoder_layers, numeric=numeric, profile=manifest["profile"])
     if loss_mode == "stick_mse":
         model.stick_readout = "expectation"
     before = evaluate(model, tokenizer, splits["validation"])
     parameters = [p for p in model.parameters() if p.requires_grad]
+    if baseline_output is not None:
+        if baseline_output.exists() or baseline_output.resolve() == output.resolve():
+            raise ValueError("The untouched baseline needs a separate new immutable directory")
+        baseline_output.mkdir(parents=True)
+        selected = specialization_keys(model.state_dict(), encoder_layers)
+        save_file({k: v.detach().cpu().contiguous() for k, v in model.state_dict().items() if k in selected},
+                  str(baseline_output / "heads.safetensors"))
+        write_json(baseline_output / "candidate.json", {
+            "profile": manifest["profile"], "base_repo": BASE_REPO, "base_revision": BASE_REVISION,
+            "base_sha256": BASE_WEIGHTS_SHA256, "source_revision": LAYA_SOURCE_REVISION,
+            "heads_sha256": digest(baseline_output / "heads.safetensors"), "steps": 0, "seed": seed,
+            "loss_mode": loss_mode, "stick_readout": model.stick_readout,
+            "encoder_layers": encoder_layers, "encoder_frozen": encoder_layers == 0,
+            "representation": NUMERIC_REPRESENTATION if numeric else TEXT_REPRESENTATION,
+            "dataset_sha256": digest(dataset / "manifest.json"), "provider_calls": 0,
+            "promotion": "disabled", "scope": "exact_pre_training_baseline_for_separate_physical_evaluation"})
     optimizer = torch.optim.AdamW(parameters, lr=1e-4, weight_decay=0.01)
     model.train()
     model.encoder.eval()
@@ -408,7 +428,7 @@ def train(
     heads = {k: v.detach().cpu().contiguous() for k, v in model.state_dict().items() if k in selected}
     save_file(heads, str(output / "heads.safetensors"))
     metadata = {
-        "profile": PROFILE,
+        "profile": manifest["profile"],
         "base_repo": BASE_REPO,
         "base_revision": BASE_REVISION,
         "base_sha256": BASE_WEIGHTS_SHA256,
@@ -430,6 +450,7 @@ def train(
         "initial_loss": losses[0],
         "final_loss": losses[-1],
         "before_validation": before,
+        "before_candidate_sha256": digest(baseline_output / "candidate.json") if baseline_output else None,
         "after_validation": validation,
         "reserved_test": test,
         "majority_baseline_validation": majority_baseline(splits["train"], splits["validation"]),
@@ -468,6 +489,7 @@ def main():
     training.add_argument("--numeric-telemetry", action="store_true")
     training.add_argument("--batch-size", type=int, default=2, choices=range(1, 17))
     training.add_argument("--loss-mode", choices=LOSS_MODES, default="choice")
+    training.add_argument("--baseline-output", type=Path)
     benchmark = commands.add_parser("benchmark")
     benchmark.add_argument("base", type=Path)
     benchmark.add_argument("dataset", type=Path)
@@ -493,12 +515,13 @@ def main():
             numeric=args.numeric_telemetry,
             batch_size=args.batch_size,
             loss_mode=args.loss_mode,
+            baseline_output=args.baseline_output,
         )
     elif args.command == "derive-readout":
         result = derive_readout(args.base, args.source, args.output, args.readout)
     else:
-        _, splits = load_dataset(args.dataset)
-        model, tokenizer = load_model(args.base, args.candidate)
+        manifest, splits = load_dataset(args.dataset)
+        model, tokenizer = load_model(args.base, args.candidate, profile=manifest["profile"])
         result = evaluate(model, tokenizer, splits["test"], latency_samples=50)
     print(json.dumps(result, ensure_ascii=False, indent=2), flush=True)
 

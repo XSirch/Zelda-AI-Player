@@ -15,13 +15,15 @@ from pathlib import Path
 from .app import bridge_secret
 from .autonomy.attached_descent import AttachedDescentTask
 from .autonomy.descent_task import ObservedDescentTask
+from .autonomy.ladder_task import LadderDescentTask
+from .autonomy.laya_ladder_policy import encode_ladder
 from .autonomy.laya_policy import LayaWalkingPolicy
 from .autonomy.local_tasks import LocalTask
 from .autonomy.navigation import observed_local_path
 from .bridge import Bridge, bind_bridge
 from .config import Settings
 from .g1 import OwnedProcess, _motor_episode, context, portal_crossed, prepare_suite, settle, write_json
-from .laya_data import digest, export_surfaces
+from .laya_data import LADDER_PROFILE, digest, export_surfaces
 from .startup import enter_playable_save
 from .surface_curriculum import run_task
 
@@ -65,15 +67,19 @@ async def prepare_portal_start(bridge, frozen, directory):
     return report
 
 
-async def prepare_observed_descent(bridge, frozen, directory):
+async def prepare_observed_descent(bridge, frozen, directory, *, attached_policy=None, collect_attached_labels=False):
     """Try a current landing proposal; never infer a hidden route or button."""
     directory.mkdir(parents=True, exist_ok=True)
+    if attached_policy is not None and collect_attached_labels:
+        raise ValueError("Candidate evaluation cannot collect reference labels")
     initial_context = context(bridge.state)
     report = {"success": False, "source": "soh", "provider_calls": 0, "kind": "descent",
               "controller": "observed_descent_reference_qa_preparation",
               "candidate_actions": 0, "included_in_laya_training": False,
               "reason": "no_supported_observed_landing", "consumed_actions": 0, "attempts": [],
               "initial": bridge.state.model_dump(), "rejected_proposals": []}
+    if attached_policy is not None:
+        report["controller"] = "walking_reference_preparation_then_attached_candidate"
     attempted = []
     for index in range(3):
         # The prior attempt may reveal a different opening. Only reconsider
@@ -101,13 +107,19 @@ async def prepare_observed_descent(bridge, frozen, directory):
         stages = [result]
         if result["task"]["failure"] == "unsupported_locomotor_mode" and bridge.state.player.climbing_ladder:
             try:
-                attached = AttachedDescentTask.continue_from(bridge.state, task)
+                task_type = LadderDescentTask if attached_policy is not None else AttachedDescentTask
+                attached = task_type.continue_from(bridge.state, task)
             except ValueError as exc:
                 report["rejected_proposals"].append({"attempt": index + 1, "observation_seq": bridge.state.seq,
                     "target": task.target, "reason": str(exc)[:160]})
             else:
+                options = ({"policy": attached_policy, "demonstrations": collect_attached_labels,
+                            "feature_encoder": encode_ladder, "feature_profile": LADDER_PROFILE}
+                           if attached_policy is not None or collect_attached_labels else {})
                 result, _ = await run_task(bridge, frozen, attached,
-                    directory / f"attempt-{index + 1}" / "attached-motor")
+                    directory / f"attempt-{index + 1}" / "attached-motor", **options)
+                if attached_policy is not None:
+                    report["candidate_actions"] += result["consumed_actions"]
                 task = attached
                 stages.append(result)
         checks = (

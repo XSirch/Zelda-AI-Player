@@ -6,6 +6,20 @@ A fundação do motor V4 corrige a projeção horizontal invertida do controle n
 
 ## Laya base: treino e avaliação local
 
+O laboratório agora tem um perfil separado para **descida já presa à escada**. Ele recebe telemetria numérica do alvo, da ligação à escada e das orientações de Link e do input. A saída é analógico físico; uma mudança de câmera invalida uma resposta antiga, em vez de aplicar a transformação da caminhada. A aproximação ainda pertence ao controle de referência, e esse perfil continua fora do botão INICIAR.
+
+O piloto de 05/10 treinou a base com 228 ações válidas, separadas por processo do jogo. O erro reservado caiu de 32 para 0,5 unidade. Na avaliação física, houve **0/2 descidas concluídas antes do treino** e **2/2 depois**; cada lote planejava três sessões, mas a primeira falhou durante a carga normal do save. Os exemplos contêm uma única direção, e um analógico constante foi melhor offline. A latência do candidato teve p95 de **90,8 ms**, máximo de **224,5 ms** e três respostas expiradas; o tempo completo de reação física ainda não foi medido. Esse resultado é limitado à descida avaliada. Veja [o registro de aprendizado da escada](docs/validation/laya_ladder_learning_2026-10-05.json).
+
+Coleta e treino desse perfil usam diretórios novos e preservam o candidato de caminhada:
+
+```powershell
+uv run python -m zelda_ai.laya_ladder_curriculum C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --sessions 6
+# Substitua o caminho abaixo pelo dataset informado pela coleta.
+$dadosEscada = '.local/qualification/nome-do-lote/dataset'
+.local/laya-env/Scripts/python.exe -m zelda_ai.laya_training train .local/laya/base $dadosEscada .local/laya/escada-candidata-nova --numeric-telemetry --loss-mode stick_mse --steps 200 --batch-size 16 --baseline-output .local/laya/escada-antes-nova
+uv run python -m zelda_ai.laya_ladder_curriculum C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --sessions 3 --candidate .local/laya/escada-candidata-nova --base .local/laya/base --python .local/laya-env/Scripts/python.exe
+```
+
 O controle assíncrono do Laya agora preserva a direção escolhida em coordenadas do mundo e reprojeta o analógico pela orientação de input atual do SoH. Isso acompanha a câmera girando dentro de uma sala; a vista superior usa o ângulo nativo, sem depender da direção visual. Os testes automatizados cobrem esses casos. No jogo, o novo lote exercitou a rotação e concluiu **25/30 caminhadas**, abaixo das 28/30 anteriores; não demonstrou ganho de confiabilidade nem entrou em vista superior. As falhas e os limites estão no [registro de câmera](docs/validation/laya_camera_2026-10-04.json).
 
 O treino parte do [Laya base publicado](https://huggingface.co/convaiinnovations/laya), com revisão e SHA-256 fixados, em um ambiente CUDA separado do aplicativo. Nenhum peso ou dado de trading entra no treino. O novo candidato recebe telemetria numérica limitada em uma projeção treinável ligada às camadas de decisão do Laya. O encoder congelado reutiliza apenas a representação do esquema fixo; os valores observados passam pela rede a cada decisão.

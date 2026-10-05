@@ -335,8 +335,12 @@ def prepare_suite(settings, executable: Path, source_home: Path, *, episodes, se
 
 async def _motor_episode(bridge, frozen, directory, *, deadline):
     initial = bridge.state.model_copy(deep=True)
-    controller = ContinuousController(bridge, frozen / ARTIFACTS[0], training_enabled=False,
-                                      route_graph_path=frozen / ARTIFACTS[1], room_map_path=frozen / ARTIFACTS[2])
+    # A cold optimizer/CUDA/checkpoint load must not starve native packets and
+    # expire Bridge.connected before the first motor tick. Loading still pays
+    # the existing scenario deadline; the receive loop remains responsive.
+    controller = await asyncio.to_thread(
+        ContinuousController, bridge, frozen / ARTIFACTS[0], training_enabled=False,
+        route_graph_path=frozen / ARTIFACTS[1], room_map_path=frozen / ARTIFACTS[2])
     controller.executor.room_budget_s = max(1, deadline - time.monotonic())
     objective = AgentIntent(objective="Leave the currently observed room through a physical portal",
                             summary="Leave the currently observed room through a physical portal", mode="explore",
@@ -366,9 +370,15 @@ async def _motor_episode(bridge, frozen, directory, *, deadline):
     def bounded_active():
         return time.monotonic() < motor_deadline and active()
 
-    await controller.run(bounded_active, publish)
+    motor_failure = None
+    try:
+        await controller.run(bounded_active, publish)
+    except RuntimeError as exc:
+        # The controller releases authority in its finally path. Preserve
+        # any already-consumed inputs instead of losing the failed episode.
+        motor_failure = f"RuntimeError:{str(exc)[:160]}"
     final = bridge.state
-    verified_crossing = portal_crossed(initial, final)
+    verified_crossing = motor_failure is None and portal_crossed(initial, final)
     if verified_crossing:
         try:
             final = await settle(bridge, deadline=deadline)
@@ -379,7 +389,8 @@ async def _motor_episode(bridge, frozen, directory, *, deadline):
     telemetry = controller.telemetry()
     write_json(directory / "motor.json", {"initial": initial.model_dump(),
                "final": final.model_dump() if final else None, "controller": telemetry,
-               "objective_unchanged": controller.intent == objective, "trace": list(full_trace), "receipts": receipts})
+               "objective_unchanged": controller.intent == objective, "trace": list(full_trace), "receipts": receipts,
+               "motor_failure": motor_failure})
     return {"settled_crossing": verified_crossing, "consumed_commands": len(receipts),
             "objective_unchanged": controller.intent == objective,
             "run_updates": telemetry["learning"]["run_updates"],
@@ -388,7 +399,7 @@ async def _motor_episode(bridge, frozen, directory, *, deadline):
             "final_context": context(final) if final else None,
             "final_position": final.player.position if final and final.player else None,
             "reason": "observed_settled_portal_crossing" if verified_crossing
-                      else controller.executor.reason or "motor_budget_or_disconnect"}
+                      else motor_failure or controller.executor.reason or "motor_budget_or_disconnect"}
 
 
 async def qualify_g1(settings, executable, source_home, *, episodes=100, seed=1042026, save_slot=2, seconds=120):

@@ -10,15 +10,15 @@ import math
 import time
 from dataclasses import dataclass, field
 
-from .descent_task import ObservedDescentTask
-from .execution import physical_context
+from .ladder_task import LadderDescentTask
 
 # A numeric action palette, with no semantic context/button association.
 PROBES = ((-60, 0), (0, -60), (0, 60), (60, 0))
 
 
 @dataclass
-class AttachedDescentTask(ObservedDescentTask):
+class AttachedDescentTask(LadderDescentTask):
+    VERSION = "observed-attached-descent-reference-v1"
     stable_position: tuple | None = None
     stable_since: float | None = None
     raw_probe: tuple | None = None
@@ -31,32 +31,6 @@ class AttachedDescentTask(ObservedDescentTask):
     calibration: list = field(default_factory=list)
     input_frame: tuple | None = None
 
-    @classmethod
-    def continue_from(cls, game, parent, *, now=None):
-        now = time.monotonic() if now is None else now
-        if (not isinstance(parent, ObservedDescentTask) or parent.failure != "unsupported_locomotor_mode"
-                or physical_context(game) != parent.context or game.scene_epoch != parent.scene_epoch
-                or any(event not in parent.load_events for event in cls._loads(game)) or now >= parent.deadline
-                or not game.player or not game.player.climbing_ladder
-                or game.player.hanging_ledge or game.player.climbing_ledge
-                or game.camera_input_yaw is None):
-            raise ValueError("An observed ladder handoff must preserve the live descent context and budget")
-        if not any(abs(y - parent.target[1]) <= 4 for _, _, y, _ in game.navmesh.cells):
-            raise ValueError("The lower floor must still have current local collision support")
-        task = cls._create(game, "ladder_down", parent.target, game.player.position,
-                           now=now, budget_s=min(20, parent.deadline - now))
-        task.version = "observed-attached-descent-reference-v1"
-        return task
-
-    def accepts_attached_mode(self, game):
-        return bool(game.player.climbing_ladder and not game.player.hanging_ledge
-                    and not game.player.climbing_ledge)
-
-    @staticmethod
-    def grounded(game):
-        return bool(ObservedDescentTask.grounded(game) and not game.player.climbing_ladder
-                    and not game.player.hanging_ledge and not game.player.climbing_ledge)
-
     def observe(self, game, *, consumed, now=None):
         now = time.monotonic() if now is None else now
         fresh = game.seq > self.last_seq and game.seq > self.origin_seq
@@ -65,8 +39,6 @@ class AttachedDescentTask(ObservedDescentTask):
             return
         if not game.player.climbing_ladder:
             self.raw_probe = None
-            if abs(game.player.position[1] - self.target[1]) > 4:
-                self.interrupt("attachment_left_before_landing")
             return
         current_frame = (game.camera_input_yaw, game.player.yaw)
         if current_frame[0] is None:

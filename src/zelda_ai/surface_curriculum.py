@@ -46,7 +46,8 @@ def select_surface(game, direction, variant):
     return rows[variant % len(rows)]
 
 
-async def run_task(bridge, frozen, task, directory, *, policy=None, demonstrations=False):
+async def run_task(bridge, frozen, task, directory, *, policy=None, demonstrations=False,
+                   feature_encoder=encode_surface, feature_profile=None):
     directory.mkdir(parents=True, exist_ok=True)
     controller = ContinuousController(bridge, frozen / ARTIFACTS[0], training_enabled=False,
         route_graph_path=frozen / ARTIFACTS[1], room_map_path=frozen / ARTIFACTS[2])
@@ -64,10 +65,12 @@ async def run_task(bridge, frozen, task, directory, *, policy=None, demonstratio
         active = controller.local_task
         if active and active.phase in {"prepare", "execute"} and controller.last_setpoint.reason == "local_task":
             requested[seq] = {"command_seq": seq, "observation_seq": game.seq,
-                "scene_epoch": game.scene_epoch, "features": encode_surface(game, active),
+                "scene_epoch": game.scene_epoch, "features": feature_encoder(game, active),
                 "action": [controller.last_setpoint.stick_x / 80, controller.last_setpoint.stick_y / 80],
                 "buttons": controller.last_setpoint.buttons, "source": "soh",
-                "controller": "reference" if policy is None else "candidate", "reference_blend": 0}
+                "controller": "reference" if policy is None else "candidate", "reference_blend": 0,
+                "reference_calibrated": getattr(active, "learned_stick", None) is not None,
+                "ladder_attached": game.player.climbing_ladder}
         if controller.executor.trace:
             frames.append({"state": game.model_dump(), "motor": controller.executor.trace[-1]})
 
@@ -80,6 +83,7 @@ async def run_task(bridge, frozen, task, directory, *, policy=None, demonstratio
     rows = [{**row, "first_tick": receipts[seq]["first_tick"], "successful_episode": successful}
             for seq, row in requested.items() if seq in receipts]
     report = {"source": "soh", "success": successful, "task": controller.last_local_task,
+        "feature_profile": feature_profile,
         "initial": initial.model_dump(), "final": bridge.state.model_dump(), "frames": frames,
         "receipts": list(receipts.values()), "demonstrations": rows if demonstrations else [],
         "actions": rows, "intent": intent.model_dump(), "final_intent": controller.intent.model_dump(),

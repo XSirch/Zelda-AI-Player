@@ -7,18 +7,22 @@ trainable projection on every decision, never the cache or a handwritten stick.
 
 from __future__ import annotations
 
-from .laya_data import FEATURE_NAMES, PROFILE, bounded_state
+from .laya_data import FEATURE_NAMES, PROFILE, bounded_state, profile_features
 
 TEXT_REPRESENTATION = "text_choice_v1"
 NUMERIC_REPRESENTATION = "numeric_conditioned_choice_v2"
 ENCODER_SCHEMA = {"profile": PROFILE, "features": list(FEATURE_NAMES), "values": "numeric_conditioning"}
 
 
+def encoder_schema(profile):
+    return {"profile": profile, "features": list(profile_features(profile)), "values": "numeric_conditioning"}
+
+
 def numeric_values(rows):
     values = []
     for row in rows:
         state = row["state"]
-        if state != bounded_state(state["history_oldest_first"]):
+        if state != bounded_state(state["history_oldest_first"], profile=state["profile"]):
             raise ValueError("Unexpected fields in numeric walking input")
         current = state["history_oldest_first"][-1]
         values.extend([current + [1.0, 0.0], current + [0.0, 1.0]])
@@ -32,7 +36,8 @@ def attach_numeric_conditioning(model):
         raise ValueError("Numeric schema caching requires a frozen encoder")
     width = model.encoder.config.hidden_size
     adapter = torch.nn.Sequential(
-        torch.nn.Linear(len(FEATURE_NAMES) + 2, 128), torch.nn.SiLU(), torch.nn.Linear(128, width)
+        torch.nn.Linear(len(profile_features(getattr(model, "observation_profile", PROFILE))) + 2, 128),
+        torch.nn.SiLU(), torch.nn.Linear(128, width)
     ).to("cuda")
     torch.nn.init.zeros_(adapter[-1].weight)
     torch.nn.init.zeros_(adapter[-1].bias)

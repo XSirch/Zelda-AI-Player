@@ -1,0 +1,1600 @@
+{
+  "date": "2026-10-05",
+  "source": "soh",
+  "provider_calls": 0,
+  "screenshots_to_models": 0,
+  "collection": {
+    "suite": "g1-a67ebd3bf19f",
+    "seed": 4103300,
+    "planned_trials": 6,
+    "attempted_trials": 5,
+    "successful_trials": 5,
+    "portal_preparations_successful": 5,
+    "candidate_actions": 0,
+    "reference_actions": 1012,
+    "reference_actions_scope": "portal_plus_descent_only; normal_menu_startup_input_excluded",
+    "failure_reasons": {
+      "RuntimeError:Portal preparation failed": 1
+    },
+    "traces": [
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-attached-descent-reference-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 84,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 99.72000122070312,
+        "final_height": -80.0,
+        "minimum_height": -80.96997833251953,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            -60,
+            0
+          ],
+          [
+            0,
+            -60
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 84,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 16,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.72000122070312,
+        "minimum_height": 99.72000122070312,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -32
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -52
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -18,
+            -36
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-attached-descent-reference-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 86,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 99.79000091552734,
+        "final_height": -80.0,
+        "minimum_height": -80.969970703125,
+        "maximum_height": 99.79000091552734,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            -60,
+            0
+          ],
+          [
+            0,
+            -60
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 86,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 16,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.79000091552734,
+        "minimum_height": 99.79000091552734,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -55
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -42
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -19,
+            -35
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-4/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-attached-descent-reference-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 89,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 99.79000091552734,
+        "final_height": -80.0,
+        "minimum_height": -80.969970703125,
+        "maximum_height": 99.79000091552734,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            -60,
+            0
+          ],
+          [
+            0,
+            -60
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 89,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-4/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 18,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.79000091552734,
+        "minimum_height": 99.79000091552734,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -55
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -47
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -34
+          ],
+          [
+            -19,
+            -35
+          ],
+          [
+            -18,
+            -36
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-5/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-attached-descent-reference-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 88,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 99.79000091552734,
+        "final_height": -80.0,
+        "minimum_height": -80.969970703125,
+        "maximum_height": 99.79000091552734,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            -60,
+            0
+          ],
+          [
+            0,
+            -60
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 88,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-5/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 16,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.79000091552734,
+        "minimum_height": 99.79000091552734,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -55
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -34
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -42
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -19,
+            -35
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-6/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-attached-descent-reference-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 87,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 99.70000457763672,
+        "final_height": -80.0,
+        "minimum_height": -80.969970703125,
+        "maximum_height": 99.70000457763672,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            -60,
+            0
+          ],
+          [
+            0,
+            -60
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 87,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-6/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 17,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.70000457763672,
+        "minimum_height": 99.70000457763672,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -52
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -34
+          ],
+          [
+            -19,
+            -38
+          ],
+          [
+            -19,
+            -35
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      }
+    ],
+    "worker_responses": 0,
+    "candidate_latency_ms": null,
+    "sampled_output_age_max_ms": null,
+    "expired_responses": 0,
+    "context_rejections": 0,
+    "manifest_sha256": "200c617f1881e7bf33cf431a83ecb8f539e80fc89b081d22b82069d020c9fc1b",
+    "report_sha256": "c9d4d5473907b38937bc006f398f35a1007629a975a7523ecb4ab28430ad41ef",
+    "candidate_sha256": {},
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "source_sha256": {
+      "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+      "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+      "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+      "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+      "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+      "src\\zelda_ai\\g1.py": "38de6121b128c0ce75940bcaaf2aa4c0386d8e5c7e2e5bd105189af691be0a99",
+      "src\\zelda_ai\\laya_curriculum.py": "3d7db439df0dbc27b2bfe6f96724cf247aa0be820f548049ab0a2548b095bc4b",
+      "src\\zelda_ai\\laya_data.py": "fa1139cb59ed412099ca11e2984fe6845cc025811222172f64892e85fdb47d66",
+      "src\\zelda_ai\\laya_ladder_curriculum.py": "88dae5dcc539387764d44b5ed0329077a59f03086ef4ab26a408c90819031e29",
+      "src\\zelda_ai\\laya_ladder_data.py": "a318adb6d7e465f155a8eef57b3f1ff5df9a8761e293234d2717853ef7ff2c61",
+      "src\\zelda_ai\\laya_numeric.py": "19123b7a88206b89d9c6b1f6bd892d025371c93a34f2aab88e7129c5c73bdae9",
+      "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+      "src\\zelda_ai\\laya_training.py": "c6cbd3b5307ccb3abcef44e5e9a95f1bbb28fdb9a603a0ec2afc3875ad6e98cc",
+      "src\\zelda_ai\\laya_worker.py": "3b9f1077bd3160fcdb41864dd7d20d78c9ae97a250a5ca501727353f9ca1fd3e",
+      "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+      "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+      "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+      "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+      "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+      "src\\zelda_ai\\surface_curriculum.py": "2d0ebfe98cdfabb58de05c21e875627cba78c1773d0844c575deddac9978e17a",
+      "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+      "src\\zelda_ai\\autonomy\\attached_descent.py": "5ee750ddb22f926cf6af62d095c5caf8549023e2b9eaa59772b7563b59f24300",
+      "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+      "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+      "src\\zelda_ai\\autonomy\\descent_task.py": "0968d69fd1b0f2fc1d6b3a6aa149f599666ead4850794e1fcbddbc1edddf128a",
+      "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+      "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+      "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+      "src\\zelda_ai\\autonomy\\ladder_task.py": "e85b98c9bb09519ccba7fcf542da34f9e8022195c95a27c347c39deb245d5c7f",
+      "src\\zelda_ai\\autonomy\\laya_ladder_policy.py": "85df4428e90ca4f5f6e0350db355947805e3c577a6dae7a46985cf1d3078c1cc",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+      "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+      "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+      "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+      "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+      "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+      "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+      "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+      "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+      "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+      "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+      "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+      "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+      "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+      "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398",
+      "native\\ActorRegistry.hpp": "056d9475fedde4021e950284e3793a2a31b105351e810b1c836215cfc27520d3",
+      "native\\InputLease.hpp": "3141c734ce998e1e75018812061f6b147293ffc6a37466a214de2a7779d765f8",
+      "native\\InputScheduler.hpp": "149e769c11d09e357d1f43158b9fecb1a042719760989a9a694e5b68e1edcb57",
+      "native\\StartupGuard.hpp": "e90ff60054ab21a8e0fe4d28898a05c31071293d427648bbc39fa0f297687ed1",
+      "native\\ZeldaAiBridge.cpp": "b7d8be160fc2423522fe8daa9b7b023027540516f33b423674b8d52be3a0b75a",
+      "native\\ZeldaAiBridge.h": "b75ca38d14d77eb9db87f2f732714abf5995dd786d4fac5a209c57794b7a280c"
+    },
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "current_pins_rehashed": false,
+    "strict_utf8_finite_json_files": 58,
+    "reference_warmup_before_native_launch": null,
+    "integrity": "terminal harness pin checks and frozen/candidate rehash; historical source changes retained"
+  },
+  "legacy_before_cold_start_fix": {
+    "suite": "g1-145e0e9e82c5",
+    "seed": 4103500,
+    "planned_trials": 3,
+    "attempted_trials": 2,
+    "successful_trials": 0,
+    "portal_preparations_successful": 2,
+    "candidate_actions": 103,
+    "reference_actions": 175,
+    "reference_actions_scope": "portal_plus_descent_only; normal_menu_startup_input_excluded",
+    "failure_reasons": {
+      "RuntimeError:Portal preparation failed": 1,
+      "no_geometric_progress": 2
+    },
+    "traces": [
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": false,
+        "failure": "no_geometric_progress",
+        "consumed_actions": 58,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.88999938964844,
+        "final_height": 53.00001525878906,
+        "minimum_height": 53.00001525878906,
+        "maximum_height": 99.88999938964844,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -2,
+            2
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 16,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.88999938964844,
+        "minimum_height": 99.88999938964844,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -52
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -18,
+            -36
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": false,
+        "failure": "no_geometric_progress",
+        "consumed_actions": 45,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.6500015258789,
+        "final_height": 53.0000114440918,
+        "minimum_height": 53.0000114440918,
+        "maximum_height": 100.01000213623047,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -2,
+            2
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 15,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.6500015258789,
+        "minimum_height": 99.6500015258789,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -33
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -52
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -18,
+            -36
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      }
+    ],
+    "worker_responses": 103,
+    "candidate_latency_ms": {
+      "p95": 100.19689999171533,
+      "max": 281.25850000651553
+    },
+    "sampled_output_age_max_ms": 149.69400000700261,
+    "expired_responses": 6,
+    "context_rejections": 0,
+    "manifest_sha256": "39c76737caf75ce956a896e3e4d30d0a5978e72824b18181ae1b1ff1fee93d80",
+    "report_sha256": "d77a745e0fc22ad250bbed7673ab42cc3151d25c1b2820c9e1b5367a5c8271d7",
+    "candidate_sha256": {
+      "candidate.json": "809b025bc1f16ed47ada1e4cb311eea3607d939721ac00cf1c49deed37f5327d",
+      "heads.safetensors": "83a321d31ccd8b317c23a964ff2c1462f3b06acc21216daa543ed54f60798945"
+    },
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "source_sha256": {
+      "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+      "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+      "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+      "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+      "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+      "src\\zelda_ai\\g1.py": "38de6121b128c0ce75940bcaaf2aa4c0386d8e5c7e2e5bd105189af691be0a99",
+      "src\\zelda_ai\\laya_curriculum.py": "3d7db439df0dbc27b2bfe6f96724cf247aa0be820f548049ab0a2548b095bc4b",
+      "src\\zelda_ai\\laya_data.py": "fa1139cb59ed412099ca11e2984fe6845cc025811222172f64892e85fdb47d66",
+      "src\\zelda_ai\\laya_ladder_curriculum.py": "88dae5dcc539387764d44b5ed0329077a59f03086ef4ab26a408c90819031e29",
+      "src\\zelda_ai\\laya_ladder_data.py": "a318adb6d7e465f155a8eef57b3f1ff5df9a8761e293234d2717853ef7ff2c61",
+      "src\\zelda_ai\\laya_numeric.py": "19123b7a88206b89d9c6b1f6bd892d025371c93a34f2aab88e7129c5c73bdae9",
+      "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+      "src\\zelda_ai\\laya_training.py": "c6cbd3b5307ccb3abcef44e5e9a95f1bbb28fdb9a603a0ec2afc3875ad6e98cc",
+      "src\\zelda_ai\\laya_worker.py": "3b9f1077bd3160fcdb41864dd7d20d78c9ae97a250a5ca501727353f9ca1fd3e",
+      "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+      "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+      "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+      "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+      "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+      "src\\zelda_ai\\surface_curriculum.py": "2d0ebfe98cdfabb58de05c21e875627cba78c1773d0844c575deddac9978e17a",
+      "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+      "src\\zelda_ai\\autonomy\\attached_descent.py": "5ee750ddb22f926cf6af62d095c5caf8549023e2b9eaa59772b7563b59f24300",
+      "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+      "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+      "src\\zelda_ai\\autonomy\\descent_task.py": "0968d69fd1b0f2fc1d6b3a6aa149f599666ead4850794e1fcbddbc1edddf128a",
+      "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+      "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+      "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+      "src\\zelda_ai\\autonomy\\ladder_task.py": "e85b98c9bb09519ccba7fcf542da34f9e8022195c95a27c347c39deb245d5c7f",
+      "src\\zelda_ai\\autonomy\\laya_ladder_policy.py": "85df4428e90ca4f5f6e0350db355947805e3c577a6dae7a46985cf1d3078c1cc",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+      "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+      "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+      "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+      "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+      "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+      "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+      "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+      "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+      "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+      "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+      "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+      "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+      "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+      "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398",
+      "native\\ActorRegistry.hpp": "056d9475fedde4021e950284e3793a2a31b105351e810b1c836215cfc27520d3",
+      "native\\InputLease.hpp": "3141c734ce998e1e75018812061f6b147293ffc6a37466a214de2a7779d765f8",
+      "native\\InputScheduler.hpp": "149e769c11d09e357d1f43158b9fecb1a042719760989a9a694e5b68e1edcb57",
+      "native\\StartupGuard.hpp": "e90ff60054ab21a8e0fe4d28898a05c31071293d427648bbc39fa0f297687ed1",
+      "native\\ZeldaAiBridge.cpp": "b7d8be160fc2423522fe8daa9b7b023027540516f33b423674b8d52be3a0b75a",
+      "native\\ZeldaAiBridge.h": "b75ca38d14d77eb9db87f2f732714abf5995dd786d4fac5a209c57794b7a280c"
+    },
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "current_pins_rehashed": false,
+    "strict_utf8_finite_json_files": 30,
+    "reference_warmup_before_native_launch": null,
+    "integrity": "terminal harness pin checks and frozen/candidate rehash; historical source changes retained"
+  },
+  "thread_only_before": {
+    "suite": "g1-66f9c6b64b7e",
+    "seed": 4103500,
+    "planned_trials": 3,
+    "attempted_trials": 2,
+    "successful_trials": 0,
+    "portal_preparations_successful": 2,
+    "candidate_actions": 106,
+    "reference_actions": 197,
+    "reference_actions_scope": "portal_plus_descent_only; normal_menu_startup_input_excluded",
+    "failure_reasons": {
+      "RuntimeError:state_feedback_timeout": 1,
+      "no_geometric_progress": 2
+    },
+    "traces": [
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": false,
+        "failure": "no_geometric_progress",
+        "consumed_actions": 54,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.79000091552734,
+        "final_height": 53.00001525878906,
+        "minimum_height": 53.00001525878906,
+        "maximum_height": 99.81999969482422,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -2,
+            2
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 17,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.79000091552734,
+        "minimum_height": 99.79000091552734,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -52
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -19,
+            -38
+          ],
+          [
+            -19,
+            -35
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": false,
+        "failure": "no_geometric_progress",
+        "consumed_actions": 52,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.81999969482422,
+        "final_height": 53.0,
+        "minimum_height": 53.0,
+        "maximum_height": 99.81999969482422,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -2,
+            2
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 18,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.81999969482422,
+        "minimum_height": 99.81999969482422,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -33
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -47
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -18,
+            -36
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      }
+    ],
+    "worker_responses": 105,
+    "candidate_latency_ms": {
+      "p95": 50.43170000135433,
+      "max": 159.85040001396555
+    },
+    "sampled_output_age_max_ms": 147.35290000680834,
+    "expired_responses": 2,
+    "context_rejections": 0,
+    "manifest_sha256": "c1baa1f66d1b0c4b68f6f247b4964a7052aa12187202c70ace47643f7418cfff",
+    "report_sha256": "4a9669741cb07beb4dfd87713b4ed549cda36848d63e801327fc6528dbe41c9e",
+    "candidate_sha256": {
+      "candidate.json": "809b025bc1f16ed47ada1e4cb311eea3607d939721ac00cf1c49deed37f5327d",
+      "heads.safetensors": "83a321d31ccd8b317c23a964ff2c1462f3b06acc21216daa543ed54f60798945"
+    },
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "source_sha256": {
+      "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+      "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+      "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+      "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+      "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+      "src\\zelda_ai\\g1.py": "e29f9deea0521f5cd950de723ee8272937c57c72a99fcb92b3dea5fe7a7f47be",
+      "src\\zelda_ai\\laya_curriculum.py": "3d7db439df0dbc27b2bfe6f96724cf247aa0be820f548049ab0a2548b095bc4b",
+      "src\\zelda_ai\\laya_data.py": "fa1139cb59ed412099ca11e2984fe6845cc025811222172f64892e85fdb47d66",
+      "src\\zelda_ai\\laya_ladder_curriculum.py": "88dae5dcc539387764d44b5ed0329077a59f03086ef4ab26a408c90819031e29",
+      "src\\zelda_ai\\laya_ladder_data.py": "a318adb6d7e465f155a8eef57b3f1ff5df9a8761e293234d2717853ef7ff2c61",
+      "src\\zelda_ai\\laya_numeric.py": "19123b7a88206b89d9c6b1f6bd892d025371c93a34f2aab88e7129c5c73bdae9",
+      "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+      "src\\zelda_ai\\laya_training.py": "c6cbd3b5307ccb3abcef44e5e9a95f1bbb28fdb9a603a0ec2afc3875ad6e98cc",
+      "src\\zelda_ai\\laya_worker.py": "3b9f1077bd3160fcdb41864dd7d20d78c9ae97a250a5ca501727353f9ca1fd3e",
+      "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+      "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+      "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+      "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+      "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+      "src\\zelda_ai\\surface_curriculum.py": "2d0ebfe98cdfabb58de05c21e875627cba78c1773d0844c575deddac9978e17a",
+      "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+      "src\\zelda_ai\\autonomy\\attached_descent.py": "5ee750ddb22f926cf6af62d095c5caf8549023e2b9eaa59772b7563b59f24300",
+      "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+      "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+      "src\\zelda_ai\\autonomy\\descent_task.py": "0968d69fd1b0f2fc1d6b3a6aa149f599666ead4850794e1fcbddbc1edddf128a",
+      "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+      "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+      "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+      "src\\zelda_ai\\autonomy\\ladder_task.py": "e85b98c9bb09519ccba7fcf542da34f9e8022195c95a27c347c39deb245d5c7f",
+      "src\\zelda_ai\\autonomy\\laya_ladder_policy.py": "85df4428e90ca4f5f6e0350db355947805e3c577a6dae7a46985cf1d3078c1cc",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+      "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+      "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+      "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+      "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+      "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+      "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+      "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+      "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+      "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+      "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+      "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+      "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+      "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+      "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398",
+      "native\\ActorRegistry.hpp": "056d9475fedde4021e950284e3793a2a31b105351e810b1c836215cfc27520d3",
+      "native\\InputLease.hpp": "3141c734ce998e1e75018812061f6b147293ffc6a37466a214de2a7779d765f8",
+      "native\\InputScheduler.hpp": "149e769c11d09e357d1f43158b9fecb1a042719760989a9a694e5b68e1edcb57",
+      "native\\StartupGuard.hpp": "e90ff60054ab21a8e0fe4d28898a05c31071293d427648bbc39fa0f297687ed1",
+      "native\\ZeldaAiBridge.cpp": "b7d8be160fc2423522fe8daa9b7b023027540516f33b423674b8d52be3a0b75a",
+      "native\\ZeldaAiBridge.h": "b75ca38d14d77eb9db87f2f732714abf5995dd786d4fac5a209c57794b7a280c"
+    },
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "current_pins_rehashed": false,
+    "strict_utf8_finite_json_files": 27,
+    "reference_warmup_before_native_launch": null,
+    "integrity": "terminal harness pin checks and frozen/candidate rehash; historical source changes retained"
+  },
+  "before": {
+    "suite": "g1-07d689bc1239",
+    "seed": 4103500,
+    "planned_trials": 3,
+    "attempted_trials": 2,
+    "successful_trials": 0,
+    "portal_preparations_successful": 2,
+    "candidate_actions": 103,
+    "reference_actions": 260,
+    "reference_actions_scope": "portal_plus_descent_only; normal_menu_startup_input_excluded",
+    "failure_reasons": {
+      "RuntimeError:state_feedback_timeout": 1,
+      "no_geometric_progress": 2
+    },
+    "traces": [
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": false,
+        "failure": "no_geometric_progress",
+        "consumed_actions": 56,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.70000457763672,
+        "final_height": 53.00001525878906,
+        "minimum_height": 53.00001525878906,
+        "maximum_height": 99.70000457763672,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -2,
+            2
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 13,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.70000457763672,
+        "minimum_height": 99.70000457763672,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -55
+          ],
+          [
+            -23,
+            -33
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -34
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -18,
+            -37
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": false,
+        "failure": "no_geometric_progress",
+        "consumed_actions": 47,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.72000122070312,
+        "final_height": 53.0000114440918,
+        "minimum_height": 53.0000114440918,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -2,
+            2
+          ],
+          [
+            0,
+            0
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 18,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.72000122070312,
+        "minimum_height": 99.72000122070312,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -47
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -18,
+            -36
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      }
+    ],
+    "worker_responses": 103,
+    "candidate_latency_ms": {
+      "p95": 51.75109999254346,
+      "max": 162.54200000548735
+    },
+    "sampled_output_age_max_ms": 141.7351999989478,
+    "expired_responses": 2,
+    "context_rejections": 0,
+    "manifest_sha256": "cd23f291c07b13883ee7d54966fb7e8fa67cd02090d24ebd8d48236146e9d6d9",
+    "report_sha256": "d40d76cbb4373fc459cc12c8e01f3cc0579d8ef47ede2c0da9e6b67a047f0c78",
+    "candidate_sha256": {
+      "candidate.json": "809b025bc1f16ed47ada1e4cb311eea3607d939721ac00cf1c49deed37f5327d",
+      "heads.safetensors": "83a321d31ccd8b317c23a964ff2c1462f3b06acc21216daa543ed54f60798945"
+    },
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "source_sha256": {
+      "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+      "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+      "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+      "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+      "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+      "src\\zelda_ai\\g1.py": "c6a0c34d983d1bc4cf19908cf84070382888967c0b568825dd2dccf48d9ebd12",
+      "src\\zelda_ai\\laya_curriculum.py": "3d7db439df0dbc27b2bfe6f96724cf247aa0be820f548049ab0a2548b095bc4b",
+      "src\\zelda_ai\\laya_data.py": "fa1139cb59ed412099ca11e2984fe6845cc025811222172f64892e85fdb47d66",
+      "src\\zelda_ai\\laya_ladder_curriculum.py": "67b127d3d323912145a4ba453a1afc2017ad96b1ba6020d0669f719b4830ea0c",
+      "src\\zelda_ai\\laya_ladder_data.py": "a318adb6d7e465f155a8eef57b3f1ff5df9a8761e293234d2717853ef7ff2c61",
+      "src\\zelda_ai\\laya_numeric.py": "19123b7a88206b89d9c6b1f6bd892d025371c93a34f2aab88e7129c5c73bdae9",
+      "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+      "src\\zelda_ai\\laya_training.py": "c6cbd3b5307ccb3abcef44e5e9a95f1bbb28fdb9a603a0ec2afc3875ad6e98cc",
+      "src\\zelda_ai\\laya_worker.py": "3b9f1077bd3160fcdb41864dd7d20d78c9ae97a250a5ca501727353f9ca1fd3e",
+      "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+      "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+      "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+      "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+      "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+      "src\\zelda_ai\\surface_curriculum.py": "2d0ebfe98cdfabb58de05c21e875627cba78c1773d0844c575deddac9978e17a",
+      "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+      "src\\zelda_ai\\autonomy\\attached_descent.py": "5ee750ddb22f926cf6af62d095c5caf8549023e2b9eaa59772b7563b59f24300",
+      "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+      "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+      "src\\zelda_ai\\autonomy\\descent_task.py": "0968d69fd1b0f2fc1d6b3a6aa149f599666ead4850794e1fcbddbc1edddf128a",
+      "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+      "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+      "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+      "src\\zelda_ai\\autonomy\\ladder_task.py": "e85b98c9bb09519ccba7fcf542da34f9e8022195c95a27c347c39deb245d5c7f",
+      "src\\zelda_ai\\autonomy\\laya_ladder_policy.py": "85df4428e90ca4f5f6e0350db355947805e3c577a6dae7a46985cf1d3078c1cc",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+      "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+      "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+      "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+      "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+      "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+      "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+      "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+      "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+      "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+      "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+      "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+      "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+      "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+      "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398",
+      "native\\ActorRegistry.hpp": "056d9475fedde4021e950284e3793a2a31b105351e810b1c836215cfc27520d3",
+      "native\\InputLease.hpp": "3141c734ce998e1e75018812061f6b147293ffc6a37466a214de2a7779d765f8",
+      "native\\InputScheduler.hpp": "149e769c11d09e357d1f43158b9fecb1a042719760989a9a694e5b68e1edcb57",
+      "native\\StartupGuard.hpp": "e90ff60054ab21a8e0fe4d28898a05c31071293d427648bbc39fa0f297687ed1",
+      "native\\ZeldaAiBridge.cpp": "b7d8be160fc2423522fe8daa9b7b023027540516f33b423674b8d52be3a0b75a",
+      "native\\ZeldaAiBridge.h": "b75ca38d14d77eb9db87f2f732714abf5995dd786d4fac5a209c57794b7a280c"
+    },
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "current_pins_rehashed": true,
+    "strict_utf8_finite_json_files": 27,
+    "reference_warmup_before_native_launch": {
+      "elapsed_ms": 3627.478599999449,
+      "native_commands": 0,
+      "run_updates": 0
+    },
+    "integrity": "terminal harness pin checks and frozen/candidate rehash; historical source changes retained"
+  },
+  "after": {
+    "suite": "g1-1e71bbc02b9d",
+    "seed": 4103500,
+    "planned_trials": 3,
+    "attempted_trials": 2,
+    "successful_trials": 2,
+    "portal_preparations_successful": 2,
+    "candidate_actions": 112,
+    "reference_actions": 207,
+    "reference_actions_scope": "portal_plus_descent_only; normal_menu_startup_input_excluded",
+    "failure_reasons": {
+      "RuntimeError:state_feedback_timeout": 1
+    },
+    "traces": [
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 58,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.70000457763672,
+        "final_height": -80.0,
+        "minimum_height": -80.96996307373047,
+        "maximum_height": 100.01000213623047,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            -60
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-2/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 16,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.70000457763672,
+        "minimum_height": 99.70000457763672,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -23,
+            -55
+          ],
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -47
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -35
+          ],
+          [
+            -19,
+            -35
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/attached-motor/task.json",
+        "version": "observed-ladder-descent-task-v1",
+        "success": true,
+        "failure": null,
+        "consumed_actions": 54,
+        "controller": [
+          "candidate"
+        ],
+        "initial_height": 99.81999969482422,
+        "final_height": -80.0,
+        "minimum_height": -80.96998596191406,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 3,
+        "raw_sticks": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            -60
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      },
+      {
+        "trace": "native-session-3/descent-preparation/attempt-1/motor/task.json",
+        "version": "observed-descent-reference-v2",
+        "success": false,
+        "failure": "unsupported_locomotor_mode",
+        "consumed_actions": 18,
+        "controller": [
+          "reference"
+        ],
+        "initial_height": 100.0,
+        "final_height": 99.81999969482422,
+        "minimum_height": 99.81999969482422,
+        "maximum_height": 100.0,
+        "ground_verification_frames": 0,
+        "raw_sticks": [
+          [
+            -22,
+            -56
+          ],
+          [
+            -22,
+            -52
+          ],
+          [
+            -22,
+            -33
+          ],
+          [
+            -21,
+            -34
+          ],
+          [
+            -20,
+            -42
+          ],
+          [
+            -19,
+            -35
+          ]
+        ],
+        "demonstration_actions": 0,
+        "top_down_observations": 0
+      }
+    ],
+    "worker_responses": 114,
+    "candidate_latency_ms": {
+      "p95": 90.77409999736119,
+      "max": 224.45259999949485
+    },
+    "sampled_output_age_max_ms": 149.93159999721684,
+    "expired_responses": 3,
+    "context_rejections": 0,
+    "manifest_sha256": "e2660f06c70be77d8bb25de9890627258fa9c2ce22f7190f433474481d69e31e",
+    "report_sha256": "35c70e4e0a0e194c555e320778262531b021bf970e4b3b5cf0bb4446aed610b9",
+    "candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "source_sha256": {
+      "src\\zelda_ai\\app.py": "96b31b5d776064ae283560cbc14b1ec3247ff404bccabe64e07a2f9c267bdeee",
+      "src\\zelda_ai\\bridge.py": "f763e805d715e32b5415e57545732e8168d40ba9b2ba96e46f8c952790217f09",
+      "src\\zelda_ai\\budgets.py": "6e9d48ce44775a4b0fe25974d5cfd065dce762e873bd5fece80c7296d645cbad",
+      "src\\zelda_ai\\cli.py": "ffcd1666e01a645603b40c3b76eea0465ae0884181ee45efecbecaf9a74ff192",
+      "src\\zelda_ai\\config.py": "133bc0b3ee56f198d47b44ea85756a0291957397aab491c86c865e6c818301e9",
+      "src\\zelda_ai\\g1.py": "c6a0c34d983d1bc4cf19908cf84070382888967c0b568825dd2dccf48d9ebd12",
+      "src\\zelda_ai\\laya_curriculum.py": "3d7db439df0dbc27b2bfe6f96724cf247aa0be820f548049ab0a2548b095bc4b",
+      "src\\zelda_ai\\laya_data.py": "fa1139cb59ed412099ca11e2984fe6845cc025811222172f64892e85fdb47d66",
+      "src\\zelda_ai\\laya_ladder_curriculum.py": "67b127d3d323912145a4ba453a1afc2017ad96b1ba6020d0669f719b4830ea0c",
+      "src\\zelda_ai\\laya_ladder_data.py": "a318adb6d7e465f155a8eef57b3f1ff5df9a8761e293234d2717853ef7ff2c61",
+      "src\\zelda_ai\\laya_numeric.py": "19123b7a88206b89d9c6b1f6bd892d025371c93a34f2aab88e7129c5c73bdae9",
+      "src\\zelda_ai\\laya_qualification.py": "81d5466937cdfd5827c2d1f47418dd73fddc38c31dd309bb622780308ac295d8",
+      "src\\zelda_ai\\laya_training.py": "c6cbd3b5307ccb3abcef44e5e9a95f1bbb28fdb9a603a0ec2afc3875ad6e98cc",
+      "src\\zelda_ai\\laya_worker.py": "3b9f1077bd3160fcdb41864dd7d20d78c9ae97a250a5ca501727353f9ca1fd3e",
+      "src\\zelda_ai\\models.py": "c54262bd10da971ddea8f0b70f53eb2fb8c0a9109742471a818d43bb0df45ded",
+      "src\\zelda_ai\\qualification.py": "0a73f80268eccf5a42178ed2a4ba6d82231f87c32a17f4ee466a8cf361761f7a",
+      "src\\zelda_ai\\simulator.py": "6e8d2b1c3efd1c0a8ca5fd570b92ce0ce4869eb1b4f1371746045cca077d6a76",
+      "src\\zelda_ai\\startup.py": "c3b76e9f5968103f4e5c90eb623186c880e085319a5d4db511d1bbd36c77de0d",
+      "src\\zelda_ai\\store.py": "30e8e3b4548c5dd53728471dfca06f112c14b1a5699844d9d7a052acad80beaf",
+      "src\\zelda_ai\\surface_curriculum.py": "2d0ebfe98cdfabb58de05c21e875627cba78c1773d0844c575deddac9978e17a",
+      "src\\zelda_ai\\__init__.py": "769f93d8fe988bd423cfa541905a30b4bdaceb5cd975098952171ce6e673633d",
+      "src\\zelda_ai\\autonomy\\attached_descent.py": "5ee750ddb22f926cf6af62d095c5caf8549023e2b9eaa59772b7563b59f24300",
+      "src\\zelda_ai\\autonomy\\champions.py": "c254ac0a11e52cf73a68a7cbd418007771b173b7ff0474e8282dcd39592d2519",
+      "src\\zelda_ai\\autonomy\\controller.py": "4fb1238307d11cc4c4061c8e93023a11fb13a3183b297c63cff7acc8fed15a28",
+      "src\\zelda_ai\\autonomy\\descent_task.py": "0968d69fd1b0f2fc1d6b3a6aa149f599666ead4850794e1fcbddbc1edddf128a",
+      "src\\zelda_ai\\autonomy\\execution.py": "c9651b583ddefab656c9f550744a53bbfea5e68d8bc32fecf9227d48956d371d",
+      "src\\zelda_ai\\autonomy\\features.py": "a6f5ca23dc9869a96eb31f211e86fdbd3435f5c980faebbfcf3ea8f762675a0a",
+      "src\\zelda_ai\\autonomy\\imitation.py": "d74108b0769d481ab75a2761020df844baf22b1dac315f8a258aed3a35a3bc17",
+      "src\\zelda_ai\\autonomy\\ladder_task.py": "e85b98c9bb09519ccba7fcf542da34f9e8022195c95a27c347c39deb245d5c7f",
+      "src\\zelda_ai\\autonomy\\laya_ladder_policy.py": "85df4428e90ca4f5f6e0350db355947805e3c577a6dae7a46985cf1d3078c1cc",
+      "src\\zelda_ai\\autonomy\\laya_policy.py": "0325ad356877b3ab7e8bf6c09cae234de27a8f388ae087c121031ea02e8dd4eb",
+      "src\\zelda_ai\\autonomy\\lifetime.py": "e0277ee9a7ccdf6cc5271f3207ab73066c8a572ffd917d8f22be35b9f3eb1615",
+      "src\\zelda_ai\\autonomy\\local_tasks.py": "ffb58f027de0c7de7a85c721285bf4c209226924fb2507c72f425c2e0f631de6",
+      "src\\zelda_ai\\autonomy\\ml_policy.py": "91380c34b8d624f5fe767f39de60133b2863cd8506a8ddbcba014f5226846461",
+      "src\\zelda_ai\\autonomy\\models.py": "4c2ac0ecea2ff13e5a9fa007d85a288f2e3647d510043f27c650104bb81a595c",
+      "src\\zelda_ai\\autonomy\\navigation.py": "3bae38a822205d073434205b3b109eb088425265b02efb1d217c50891e2d0f66",
+      "src\\zelda_ai\\autonomy\\objectives.py": "5871d1c98a31466982ba5626eebf80535d47cc22e042881019255704d981a619",
+      "src\\zelda_ai\\autonomy\\prompt.py": "8e6ce4c101edec6dc8dbf365410f6b61f8f0cc2abbc5d2fb949f409528e8420f",
+      "src\\zelda_ai\\autonomy\\reward.py": "439c32ca9607e8b2de5338a551bc6416699b271d40ff1a30657f825479547e80",
+      "src\\zelda_ai\\autonomy\\room_map.py": "92bbcdd696c954542e3bc736c4a5a48100f0ff75764635672973b7ccbcfd60f8",
+      "src\\zelda_ai\\autonomy\\routes.py": "dbecba2c942f293c0414415e2fa596198e5dc92fd361ce2a75952421b14bfe91",
+      "src\\zelda_ai\\autonomy\\runtime.py": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+      "src\\zelda_ai\\autonomy\\__init__.py": "3e43895e29d4aa270376ea564080c9427bbbff4377a58a74c2727ff0918609f5",
+      "src\\zelda_ai\\control\\authority.py": "974ebd62d1082aea58f27a4e3feed732185bff2377b73d94a628941c483748a0",
+      "src\\zelda_ai\\control\\__init__.py": "e1f2f6eb089ab7d335f385595a55056ed017531b60cb39594a1135278b8fd108",
+      "src\\zelda_ai\\providers\\base.py": "bf32dd77af1a7eb288c0858c58c5298c4a41b87bf22929c5b9825da2d679eca7",
+      "src\\zelda_ai\\providers\\codex.py": "3d5a19cd37a121e9ae65191bf96d8265a2bf04eca23b5bbf27568bbd0e215ab9",
+      "src\\zelda_ai\\providers\\openrouter.py": "9f2da079d96ecc6453dd19099774050c0cb590e010ce205895700354248348ad",
+      "src\\zelda_ai\\providers\\__init__.py": "73b399be646acf73524624bb86418fc7868e8133908bbd9a9bd52b4e08b1b398",
+      "native\\ActorRegistry.hpp": "056d9475fedde4021e950284e3793a2a31b105351e810b1c836215cfc27520d3",
+      "native\\InputLease.hpp": "3141c734ce998e1e75018812061f6b147293ffc6a37466a214de2a7779d765f8",
+      "native\\InputScheduler.hpp": "149e769c11d09e357d1f43158b9fecb1a042719760989a9a694e5b68e1edcb57",
+      "native\\StartupGuard.hpp": "e90ff60054ab21a8e0fe4d28898a05c31071293d427648bbc39fa0f297687ed1",
+      "native\\ZeldaAiBridge.cpp": "b7d8be160fc2423522fe8daa9b7b023027540516f33b423674b8d52be3a0b75a",
+      "native\\ZeldaAiBridge.h": "b75ca38d14d77eb9db87f2f732714abf5995dd786d4fac5a209c57794b7a280c"
+    },
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "current_pins_rehashed": true,
+    "strict_utf8_finite_json_files": 27,
+    "reference_warmup_before_native_launch": {
+      "elapsed_ms": 8054.819199998747,
+      "native_commands": 0,
+      "run_updates": 0
+    },
+    "integrity": "terminal harness pin checks and frozen/candidate rehash; historical source changes retained"
+  },
+  "training": {
+    "profile": "laya-observed-attached-descent-v1",
+    "base_repo": "convaiinnovations/laya",
+    "base_revision": "7b928d828b7b0e022f929d9bd2e44165aa270148",
+    "base_sha256": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+    "source_revision": "573e5b62696ba441230cd6be71d593331b5d23af",
+    "heads_sha256": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6",
+    "before_candidate_sha256": "809b025bc1f16ed47ada1e4cb311eea3607d939721ac00cf1c49deed37f5327d",
+    "steps": 200,
+    "seed": 4103400,
+    "batch_size": 16,
+    "loss_mode": "stick_mse",
+    "stick_readout": "expectation",
+    "trainable_parameters": 26645763,
+    "encoder_frozen": true,
+    "representation": "numeric_conditioned_choice_v2",
+    "numeric_history_usage": "current_frame_only",
+    "dataset": {
+      "profile": "laya-observed-attached-descent-v1",
+      "split_unit": "episode",
+      "episode_grouping": "native_instance",
+      "source": "soh",
+      "provider_calls": 0,
+      "records": {
+        "train": 136,
+        "validation": 46,
+        "test": 46
+      },
+      "episodes": {
+        "train": 3,
+        "validation": 1,
+        "test": 1
+      },
+      "sha256": {
+        "train": "daac871cfae77637bf3eb1649560040a46f246a25e1018f196f75ae291d88be8",
+        "validation": "30ff01866731021d9e503a2d2967a945187b7061fc447add82c25cef39947f78",
+        "test": "f2f82cea027c355630e7260a0d93cc959f9727ce806d1c7f77270d679aad7cde"
+      },
+      "source_task_sha256": {
+        "native-session-2/descent-preparation/attempt-1/attached-motor/task.json": "f33c8df1461db8dbf0895333eebb42c4f5d37a869040d315f027e24e61e4dfa3",
+        "native-session-3/descent-preparation/attempt-1/attached-motor/task.json": "f3831355a45239e3da84b00cbe76e5a6e1560ab0398eb296c4d927f8a3c65b97",
+        "native-session-4/descent-preparation/attempt-1/attached-motor/task.json": "6fdebce1e3e65542dba1bdc338ef5789b563cc2d9d8ccc4b851baedfdc5aca2a",
+        "native-session-5/descent-preparation/attempt-1/attached-motor/task.json": "b620553a22ad8a5c58cef5a22b0103e1daf23bf76a6102dd8dc9f6750517d115",
+        "native-session-6/descent-preparation/attempt-1/attached-motor/task.json": "8bfb685f5c140a7ab532689e116f0d61fb01465cf6e4b8c9bc21022e9a0c964d"
+      },
+      "stick_bins": [
+        -80,
+        -60,
+        -40,
+        -20,
+        0,
+        20,
+        40,
+        60,
+        80
+      ],
+      "excluded": {
+        "uncalibrated_or_unattached_action": 206
+      },
+      "coverage": "observed_attached_ladder_descent_only_no_approach_buttons_combat_or_campaign"
+    },
+    "before_validation": {
+      "records": 46,
+      "axis_accuracy": 0.0,
+      "joint_accuracy": 0.0,
+      "stick_mae_native_units": 32.0,
+      "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+      "latency_samples": 20,
+      "p50_ms": 9.166150004602969,
+      "p95_ms": 10.872099999687634,
+      "max_ms": 12.161000006017275,
+      "physical_gameplay_evaluated": false,
+      "stick_readout": "expectation",
+      "accuracy_scope": "choice_argmax_labels"
+    },
+    "after_validation": {
+      "records": 46,
+      "axis_accuracy": 0.5,
+      "joint_accuracy": 0.0,
+      "stick_mae_native_units": 0.5,
+      "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+      "latency_samples": 20,
+      "p50_ms": 7.731849997071549,
+      "p95_ms": 8.963799991761334,
+      "max_ms": 9.502100001554936,
+      "physical_gameplay_evaluated": false,
+      "stick_readout": "expectation",
+      "accuracy_scope": "choice_argmax_labels"
+    },
+    "reserved_test": {
+      "records": 46,
+      "axis_accuracy": 0.5,
+      "joint_accuracy": 0.0,
+      "stick_mae_native_units": 0.5,
+      "latency_scope": "two_axes_tokenize_transfer_forward_readback",
+      "latency_samples": 20,
+      "p50_ms": 8.459349999611732,
+      "p95_ms": 10.745200008386746,
+      "max_ms": 11.545599991222844,
+      "physical_gameplay_evaluated": false,
+      "stick_readout": "expectation",
+      "accuracy_scope": "choice_argmax_labels"
+    },
+    "majority_baseline_test": {
+      "stick": [
+        0,
+        -60
+      ],
+      "axis_accuracy": 1.0,
+      "joint_accuracy": 1.0,
+      "stick_mae_native_units": 0.0
+    },
+    "device": "NVIDIA GeForce RTX 4070 Laptop GPU"
+  },
+  "promotion": "disabled",
+  "g2_complete": false,
+  "limitations": [
+    "Only one normal-world child initial profile and attached descent were exercised.",
+    "Reference portal/attachment is excluded from candidate capability and labels.",
+    "Labels all use the same physical direction; a constant comparator is better offline.",
+    "No proof of general ladder navigation, climbing up, learned buttons/combat or sword acquisition.",
+    "Full campaign, runtime promotion and actual top-down qualification remain outstanding.",
+    "Preparation failures are retained; warmup did not prove normal-save startup reliable.",
+    "One thread-only startup timeout has no full motor trace; its reference count remains unverified.",
+    "Fresh native sessions are not perfectly paired physical trajectories.",
+    "Latency measures local replies/leases, not full observation-to-physical-reaction time."
+  ],
+  "validation": {
+    "pytest_passed": 413,
+    "pytest_skipped": 20,
+    "pytest_warning": "existing Starlette/httpx deprecation",
+    "native_pytest_skip_reason": "g++/clang++ unavailable",
+    "web_production_build": "passed",
+    "focused_ruff": "passed",
+    "native_changes": false,
+    "new_native_build_claimed": false,
+    "strict_utf8": "passed",
+    "strict_utf8_text_files": 26,
+    "contextual_corruption_candidates": 0,
+    "dataset_jsonl_records_verified": 228,
+    "finite_native_json_files_verified": 169
+  }
+}

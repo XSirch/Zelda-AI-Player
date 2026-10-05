@@ -15,6 +15,10 @@ from pathlib import Path
 PROFILE = "laya-observed-walking-v1"
 FEATURE_NAMES = ("goal_heading_sin", "goal_heading_cos", "mirrored", "goal_distance",
                  "goal_height", "speed", "surface_up", "surface_down", "observed_cell")
+LADDER_PROFILE = "laya-observed-attached-descent-v1"
+LADDER_FEATURE_NAMES = ("goal_height", "goal_distance", "body_yaw_sin", "body_yaw_cos",
+                       "input_yaw_sin", "input_yaw_cos", "mirrored", "ladder_attached", "ground_contact")
+PROFILE_FEATURES = {PROFILE: FEATURE_NAMES, LADDER_PROFILE: LADDER_FEATURE_NAMES}
 STICK_BINS = (-80, -60, -40, -20, 0, 20, 40, 60, 80)
 HISTORY_LIMIT = 4
 QUESTIONS = {
@@ -22,6 +26,21 @@ QUESTIONS = {
            "criteria": {str(v): None for v in STICK_BINS}}
     for axis in ("stick_x", "stick_y")
 }
+
+
+def profile_features(profile):
+    if not isinstance(profile, str) or profile not in PROFILE_FEATURES:
+        raise ValueError("Unknown Zelda observation profile")
+    return PROFILE_FEATURES[profile]
+
+
+def profile_questions(profile):
+    profile_features(profile)
+    if profile == PROFILE:
+        return QUESTIONS
+    return {axis: {**definition, "instructions":
+        f"Choose the raw executed N64 analog {axis} while attached to an observed ladder descent."}
+        for axis, definition in QUESTIONS.items()}
 
 
 def digest(path: Path) -> str:
@@ -32,13 +51,14 @@ def digest(path: Path) -> str:
     return h.hexdigest()
 
 
-def bounded_state(history: list[list[float]]) -> dict:
+def bounded_state(history: list[list[float]], *, profile=PROFILE) -> dict:
+    names = profile_features(profile)
     if not 1 <= len(history) <= HISTORY_LIMIT:
         raise ValueError("Use one to four observed feature frames")
     for row in history:
-        if len(row) != len(FEATURE_NAMES) or any(not math.isfinite(v) or abs(v) > 1 for v in row):
-            raise ValueError("Invalid bounded walking telemetry")
-    return {"profile": PROFILE, "features": list(FEATURE_NAMES),
+        if len(row) != len(names) or any(not math.isfinite(v) or abs(v) > 1 for v in row):
+            raise ValueError("Invalid bounded telemetry")
+    return {"profile": profile, "features": list(names),
             "history_oldest_first": [[round(v, 4) for v in row] for row in history]}
 
 
@@ -48,16 +68,21 @@ def quantize(value: float) -> int:
     return min(STICK_BINS, key=lambda v: (abs(v - value), abs(v), v))
 
 
-def validate_record(row: dict) -> None:
-    if (row.get("profile") != PROFILE or row.get("source") != "soh"
+def validate_record(row: dict, *, profile=PROFILE) -> None:
+    profile_features(profile)
+    if (row.get("profile") != profile or row.get("source") != "soh"
             or row.get("controller") != "reference" or row.get("first_tick", 0) <= 0
             or row.get("buttons") != 0 or not row.get("successful_episode")
             or row.get("reference_blend") != 0 or not row.get("episode_id")
             or row.get("observation_seq", -1) < 0 or row.get("command_seq", 0) <= 0):
         raise ValueError("Only successful consumed real reference walking actions may be labels")
     state = row.get("state", {})
-    if state != bounded_state(state.get("history_oldest_first", [])):
+    if state != bounded_state(state.get("history_oldest_first", []), profile=profile):
         raise ValueError("Unexpected state fields or incompatible observation profile")
+    if profile == LADDER_PROFILE and (row.get("family") != "ladder_down"
+            or row.get("reference_calibrated") is not True or row.get("ladder_attached") is not True
+            or state["history_oldest_first"][-1][7] != 1):
+        raise ValueError("Attached labels require consumed calibrated reference input in actual ladder mode")
     action = row.get("executed_stick", [])
     if len(action) != 2 or row.get("labels") != [quantize(v) for v in action]:
         raise ValueError("Labels must represent the actual executed stick")
@@ -65,7 +90,9 @@ def validate_record(row: dict) -> None:
 
 def load_dataset(directory: Path) -> tuple[dict, dict[str, list[dict]]]:
     manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
-    if manifest.get("profile") != PROFILE or manifest.get("split_unit") != "episode":
+    profile = manifest.get("profile")
+    profile_features(profile)
+    if manifest.get("split_unit") != "episode":
         raise ValueError("Incompatible dataset manifest")
     splits, owners, commands = {}, {}, set()
     for name in ("train", "validation", "test"):
@@ -77,7 +104,7 @@ def load_dataset(directory: Path) -> tuple[dict, dict[str, list[dict]]]:
             raise ValueError("Every reserved split must contain real records")
         last_seq = {}
         for row in rows:
-            validate_record(row)
+            validate_record(row, profile=profile)
             ep = row["episode_id"]
             if ep in owners and owners[ep] != name:
                 raise ValueError("Episode leakage between train and reserved evaluation")
