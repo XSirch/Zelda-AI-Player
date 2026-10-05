@@ -24,6 +24,8 @@ Para verificar também o retorno à caminhada, acrescente os dois argumentos aba
 --ladder-candidate .local/laya/candidate-attached-descent-20261005 --post-descent-walks 3
 ```
 
+O adapter **3.11** também refina componentes pequenos, com até quatro células acessíveis. A grade de 35 unidades mantém o alcance de 280 unidades e todas as verificações de colisão. O novo lote concluiu **6/6 sequências**, incluindo **18/18 caminhadas externas** e **5/5 resets no mesmo SoH**, com os pesos congelados. As consultas de navegação levaram até **10,7 ms**; isso não mede o tempo completo de reação física. A amostra ainda não qualifica navegação geral ou coleta da espada. Veja o [registro da resolução local](docs/validation/laya_navigation_resolution_2026-10-05.json).
+
 Cada troca libera o input e as respostas pendentes. Antes de caminhar novamente, o harness exige uma nova observação completa de colisão no mesmo contexto. O relógio de progresso do supervisor continua por toda a sequência. As amostras ainda são pequenas, e os perfis continuam experimentais.
 
 O adapter **3.9** separa o contato com uma borda escalável das ligações de caminhada. A verificação de chegada exige contato real com o chão: estar no alto durante um salto ou uma animação de subida não basta. O motor identifica os estados de natação, mergulho e movimento submerso pelas flags nativas e interrompe a política de caminhada ao entrar na água. Os controladores e o aprendizado desses movimentos ainda precisam de validação no jogo.

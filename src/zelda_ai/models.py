@@ -108,6 +108,9 @@ class NavigationMeshSnapshot(StrictModel):
     # solution flag. Old adapters retain the explicit zero default.
     backface_rejections: int = Field(default=0, ge=0, le=8192)
     lower_band_rejections: int = Field(default=0, ge=0, le=8192)
+    refined_component_cells: int = Field(default=0, ge=0, le=4)
+    # Native query time, including a coarse retry when refined. Unknown on old adapters.
+    query_us: int | None = Field(default=None, ge=0, le=60_000_000)
 
     @property
     def available(self) -> bool:

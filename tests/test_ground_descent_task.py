@@ -84,3 +84,15 @@ def test_invented_or_unsupported_descent_is_rejected(state):
     state.traversal_affordances = []
     with pytest.raises(ValueError, match="currently observed"):
         GroundDescentApproachTask.create(state, row)
+
+
+def test_refined_mesh_preserves_native_lower_landing_extent(state):
+    row = descent(state)
+    state.navmesh.step, state.navmesh.half_extent = 35, 8
+    state.navmesh.refined_component_cells = 4
+    row.target_position, row.height_delta = (35, -80, 0), -180
+    state.navmesh.cells = [(0, 0, 100., 0), (1, 0, -80., 0)]
+    task = GroundDescentApproachTask.create(state, row, now=0)
+    assert task.target == (35, -80, 0)
+    assert task.steering_point(state) == (35, 100, 0)
+    assert encode_surface(state, task)[4] == 0

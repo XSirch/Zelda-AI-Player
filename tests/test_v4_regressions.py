@@ -124,6 +124,20 @@ def test_lower_body_diagnostic_preserves_legacy_unknown_and_cannot_create_links(
             NavigationMeshSnapshot(lower_band_rejections=invalid)
 
 
+def test_navigation_refinement_diagnostics_do_not_authorize_unobserved_links(state):
+    from pydantic import ValidationError
+
+    legacy = NavigationMeshSnapshot(step=70, half_extent=1, cells=[(0, 0, 0., 0)])
+    assert legacy.query_us is None and legacy.refined_component_cells == 0
+    state.navmesh = NavigationMeshSnapshot(step=35, half_extent=8,
+        cells=[(0, 0, 0., 0), (1, 0, 0., 0)], refined_component_cells=3, query_us=2400)
+    assert observed_local_path(state, (35., 0., 0.)) is None
+    for field, invalid in (("query_us", -1), ("query_us", 60_000_001),
+                           ("refined_component_cells", -1), ("refined_component_cells", 5)):
+        with pytest.raises(ValidationError):
+            NavigationMeshSnapshot(**{field: invalid})
+
+
 def test_portal_requires_context_change_and_supervisor_bounds_failed_room(state):
     supervisor = ExecutionSupervisor(room_budget_s=4.0)
     hint = {"active": True, "exit_active": True, "target": (0.0, 0.0, 0.0), "escape_key": "portal"}

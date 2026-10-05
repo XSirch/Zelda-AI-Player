@@ -5,6 +5,7 @@
 #include "ActorRegistry.hpp"
 #include "StartupGuard.hpp"
 #include "NavMeshQueries.hpp"
+#include "NavigationResolution.hpp"
 #include <SDL2/SDL_net.h>
 #include <nlohmann/json.hpp>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -42,7 +43,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.10";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.11";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -764,8 +765,9 @@ json TraversalAffordances(Player* player) {
 }
 
 json NavigationMesh(Player* player, float step = 70.0f) {
-    constexpr int HALF_EXTENT = 4;
-    constexpr int SIDE = HALF_EXTENT * 2 + 1;
+    const int64_t queryStartedUs = NowUs();
+    const int HALF_EXTENT = zelda_ai::NavigationHalfExtent(step);
+    constexpr int MAX_SIDE = 17;
     const float STEP = step;
     constexpr float MAX_HEIGHT_DELTA = 24.0f;
     constexpr float BODY_CLEARANCE = 18.0f;
@@ -785,6 +787,7 @@ json NavigationMesh(Player* player, float step = 70.0f) {
         {"scene_exits", json::array()},
         {"backface_rejections", 0},
         {"lower_band_rejections", 0},
+        {"refined_component_cells", 0},
     };
     if (!player) {
         result["step"] = 0.0f;
@@ -805,7 +808,7 @@ json NavigationMesh(Player* player, float step = 70.0f) {
         float y = 0.0f;
         float z = 0.0f;
     };
-    Cell grid[SIDE][SIDE]{};
+    Cell grid[MAX_SIDE][MAX_SIDE]{};
     ExitSamples exits[32]{};
     const Vec3f origin = player->actor.world.pos;
     result["origin"] = {origin.x, player->actor.floorHeight, origin.z};
@@ -992,14 +995,19 @@ json NavigationMesh(Player* player, float step = 70.0f) {
         }
     }
 
-    // A coarse lattice can strand the root at a narrow turn even when a
-    // shorter body-clear segment exists. Requery once at half resolution;
+    // A tiny coarse component can strand Link at a narrow turn even with
+    // some root links. Requery once at half resolution and the SAME extent;
     // retain all floor, body, diagonal and lower-band checks. No old links
-    // are merged and no segment is authorized by a thin probe alone. The
-    // independent exit scan keeps its original 280-unit observation window.
-    if (STEP > 35.0f && grid[HALF_EXTENT][HALF_EXTENT].floor &&
-        grid[HALF_EXTENT][HALF_EXTENT].links == 0) {
-        return NavigationMesh(player, 35.0f);
+    // are merged and no segment is authorized by a thin probe alone.
+    const int componentCells = zelda_ai::NavigationComponentSize(HALF_EXTENT, [&](int gx, int gz) {
+        const auto& cell = grid[gz + HALF_EXTENT][gx + HALF_EXTENT];
+        return zelda_ai::NavigationCellLinks{validCell(gx, gz), cell.links};
+    });
+    if (zelda_ai::NeedsNavigationRefinement(STEP, componentCells)) {
+        auto refined = NavigationMesh(player, 35.0f);
+        refined["refined_component_cells"] = componentCells;
+        refined["query_us"] = NowUs() - queryStartedUs; // Includes both current queries.
+        return refined;
     }
 
     for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {
@@ -1068,6 +1076,7 @@ json NavigationMesh(Player* player, float step = 70.0f) {
             {"direct_reachable", directReachable},
         });
     }
+    result["query_us"] = NowUs() - queryStartedUs;
     return result;
 }
 

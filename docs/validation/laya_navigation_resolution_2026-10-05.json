@@ -1,0 +1,322 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "source": "soh",
+  "scope": "tiny_current_collision_component_refinement_and_frozen_laya_composition",
+  "goal": "Obtain the Kokiri Sword",
+  "completion": "equipment:Kokiri Sword",
+  "observation_profile": "instrumented_local_v1",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "reference_blend": 0,
+  "demonstration_labels": 0,
+  "promotion": "disabled",
+  "campaign_qualified": false,
+  "feedback": {
+    "retained_failure_batch": "g1-afe6d38234db",
+    "episode": 1,
+    "failure": "observed_approach_exhausted",
+    "coarse_step": 70,
+    "root_links": 1,
+    "reachable_cells": 3,
+    "used_detours": 3,
+    "recorded_mesh_replay": ".local/replay_coarse_component_20261005.py",
+    "old_packet_has_no_fine_observations": true,
+    "selector_regression": "recorded_small_component_requests_refinement",
+    "msvc_red_exit": 1,
+    "msvc_green_exit": 0,
+    "physical_runs_are_not_paired_counterfactual_replays": true,
+    "previous_batch_pins_reverified": [
+      {
+        "suite_id": "g1-9fce8747836b",
+        "pins_verified": 77,
+        "matching_archives": [
+          {
+            "file": "soh.exe",
+            "sha256": "21780c11c8b967d2b4e2c49023907e80161299bf8e7a55d8c4d200169fbe0ca0",
+            "matching_archive": ".local/pre-portal-component-refinement-20261005/soh.exe"
+          },
+          {
+            "file": "laya_motor.py",
+            "sha256": "e6f7149c1d09e912bc36ef3258170fdd91e68d91fef5de174dddfcffb7a22002",
+            "matching_archive": ".local/pre-laya-return-walking-20261005/laya_motor.py"
+          },
+          {
+            "file": "laya_portal_evaluation.py",
+            "sha256": "90c76f406c6162ac8c16b84063a0e79a766c455ba5162b5f4082fba17c232502",
+            "matching_archive": ".local/pre-laya-return-walking-20261005/laya_portal_evaluation.py"
+          },
+          {
+            "file": "laya_traversal.py",
+            "sha256": "baf4142c949b3eb35b6b1ef4c40628db706e778d096909708a3ba94cefa56d4c",
+            "matching_archive": ".local/pre-laya-return-walking-20261005/laya_traversal.py"
+          },
+          {
+            "file": "models.py",
+            "sha256": "52277583a317f00e31f35e0a7b450c14d1d67a30f1fd58297f131c08e55e6ec0",
+            "matching_archive": ".local/pre-portal-component-refinement-20261005/models.py"
+          },
+          {
+            "file": "ZeldaAiBridge.cpp",
+            "sha256": "bfac32fc9e176f73af89c73840b6684fa1411f2bc8d3690a142514b94d8916c4",
+            "matching_archive": ".local/pre-portal-component-refinement-20261005/ZeldaAiBridge.cpp"
+          }
+        ]
+      },
+      {
+        "suite_id": "g1-afe6d38234db",
+        "pins_verified": 77,
+        "matching_archives": [
+          {
+            "file": "soh.exe",
+            "sha256": "21780c11c8b967d2b4e2c49023907e80161299bf8e7a55d8c4d200169fbe0ca0",
+            "matching_archive": ".local/pre-portal-component-refinement-20261005/soh.exe"
+          },
+          {
+            "file": "models.py",
+            "sha256": "52277583a317f00e31f35e0a7b450c14d1d67a30f1fd58297f131c08e55e6ec0",
+            "matching_archive": ".local/pre-portal-component-refinement-20261005/models.py"
+          },
+          {
+            "file": "ZeldaAiBridge.cpp",
+            "sha256": "bfac32fc9e176f73af89c73840b6684fa1411f2bc8d3690a142514b94d8916c4",
+            "matching_archive": ".local/pre-portal-component-refinement-20261005/ZeldaAiBridge.cpp"
+          }
+        ]
+      }
+    ]
+  },
+  "native_adapter": {
+    "bridge_build": "rt-input-v3.11",
+    "component_refinement_threshold": 4,
+    "coarse_step": 70,
+    "fine_step": 35,
+    "world_extent": 280,
+    "fine_max_cells": 289,
+    "new_observations_only": true,
+    "links_merged": false,
+    "unchanged_checks": [
+      "body_clearance",
+      "lower_body",
+      "backfaces",
+      "floor_continuity",
+      "diagonal"
+    ],
+    "before_archive": ".local/pre-portal-component-refinement-20261005/sha256.json",
+    "executable_sha256": "4c5f5d48f8c46fda435b62f2db3ad68461e7c70f33259200c9c3a141eac33536"
+  },
+  "batch": {
+    "suite_id": "g1-b1148c1097ec",
+    "runner": "laya-observed-portal-eval-v3",
+    "seed": 4106000,
+    "scenario_budget_seconds": 161,
+    "planned": 6,
+    "attempted": 6,
+    "successful": 6,
+    "native_processes": 1,
+    "native_groups": 1,
+    "normal_resets_verified": 5,
+    "consumed_candidate_actions": 1391,
+    "consumed_by_stage": {
+      "attached-ladder": 438,
+      "ground-approach": 66,
+      "portal": 605,
+      "post-descent-walk-1": 68,
+      "post-descent-walk-2": 138,
+      "post-descent-walk-3": 76
+    },
+    "post_descent_walks_planned": 18,
+    "post_descent_walks_attempted": 18,
+    "post_descent_walks_successful": 18,
+    "pins_verified": 78,
+    "integrity_after_shutdown": true,
+    "shutdown_child_exit_status": null,
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "walking_candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "ladder_candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "walking_worker": {
+      "responses": 948,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "camera_reprojected_outputs": 849,
+      "camera_delta_max_deg": 12.128906250000004,
+      "provider_calls": 0,
+      "training_updates": 0,
+      "response": {
+        "samples": 948,
+        "p95_ms": 5.915599999752885,
+        "max_ms": 9.095600000364357
+      },
+      "sampled_output_age_max_ms": 68.32909999957337,
+      "full_physical_reaction_ms": null
+    },
+    "ladder_worker": {
+      "responses": 430,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "camera_reprojected_outputs": 0,
+      "camera_delta_max_deg": 0.0,
+      "provider_calls": 0,
+      "training_updates": 0,
+      "response": {
+        "samples": 430,
+        "p95_ms": 6.757099999958882,
+        "max_ms": 8.234599999923375
+      },
+      "sampled_output_age_max_ms": 69.44969999949535,
+      "full_physical_reaction_ms": null
+    },
+    "episodes": [
+      {
+        "index": 1,
+        "attempted": true,
+        "success": true,
+        "reason": null,
+        "consumed_actions": 221,
+        "objective_unchanged": true,
+        "run_updates": 0,
+        "raw_button_actions": 0,
+        "landing_verified": true,
+        "post_descent_walks_successful": 3
+      },
+      {
+        "index": 2,
+        "attempted": true,
+        "success": true,
+        "reason": null,
+        "consumed_actions": 233,
+        "objective_unchanged": true,
+        "run_updates": 0,
+        "raw_button_actions": 0,
+        "landing_verified": true,
+        "post_descent_walks_successful": 3
+      },
+      {
+        "index": 3,
+        "attempted": true,
+        "success": true,
+        "reason": null,
+        "consumed_actions": 243,
+        "objective_unchanged": true,
+        "run_updates": 0,
+        "raw_button_actions": 0,
+        "landing_verified": true,
+        "post_descent_walks_successful": 3
+      },
+      {
+        "index": 4,
+        "attempted": true,
+        "success": true,
+        "reason": null,
+        "consumed_actions": 245,
+        "objective_unchanged": true,
+        "run_updates": 0,
+        "raw_button_actions": 0,
+        "landing_verified": true,
+        "post_descent_walks_successful": 3
+      },
+      {
+        "index": 5,
+        "attempted": true,
+        "success": true,
+        "reason": null,
+        "consumed_actions": 217,
+        "objective_unchanged": true,
+        "run_updates": 0,
+        "raw_button_actions": 0,
+        "landing_verified": true,
+        "post_descent_walks_successful": 3
+      },
+      {
+        "index": 6,
+        "attempted": true,
+        "success": true,
+        "reason": null,
+        "consumed_actions": 232,
+        "objective_unchanged": true,
+        "run_updates": 0,
+        "raw_button_actions": 0,
+        "landing_verified": true,
+        "post_descent_walks_successful": 3
+      }
+    ],
+    "all_ground_approaches_began_with_refined_mesh": true,
+    "preserved_landing_drop_units": 180
+  },
+  "observed_navigation": {
+    "unique_full_snapshots": 507,
+    "refined_snapshots": 136,
+    "refined_from_component_sizes": {
+      "4": 31,
+      "2": 62,
+      "3": 39,
+      "1": 4
+    },
+    "fine_root_component_sizes": {
+      "16": 24,
+      "31": 29,
+      "27": 11,
+      "26": 7,
+      "29": 12,
+      "28": 12,
+      "32": 12,
+      "30": 23,
+      "33": 2,
+      "25": 3,
+      "1": 1
+    },
+    "nonisolated_refined_portal_snapshots_with_current_approach": 108,
+    "max_observed_mesh_cells": 249,
+    "native_query_time": {
+      "samples": 507,
+      "p95_ms": 3.226,
+      "max_ms": 10.744
+    },
+    "refined_query_time": {
+      "samples": 136,
+      "p95_ms": 8.939,
+      "max_ms": 10.744
+    },
+    "refined_snapshots_by_scene": {
+      "52": 111,
+      "85": 25
+    }
+  },
+  "validation": {
+    "pytest_passed": 478,
+    "pytest_skipped": 22,
+    "skip_reason": "g++/clang++ absent; these are not native successes",
+    "msvc_scheduler_cases": 19,
+    "msvc_walking_clearance_cases": 10,
+    "msvc_navigation_resolution_cases": 9,
+    "soh_release_build_exit": 0,
+    "native_build_log": ".local/soh-build-3.11-20261005.log",
+    "native_build_warnings": "upstream compiler/linker warnings retained in log",
+    "web_production_build": "passed",
+    "focused_ruff": "passed",
+    "written_utf8_text_files_checked": 32,
+    "native_utf8_finite_json_files_checked": 60,
+    "original_build_capture_encoding": "UTF-16LE with BOM; preserved separately from UTF-8 log",
+    "owned_games_and_workers_after_shutdown": 0,
+    "percentile_method": "nearest_rank"
+  },
+  "limits": [
+    "small sample in one native group",
+    "normal resets reload the current working save",
+    "unchanged weights; no measured new learning",
+    "full physical reaction latency unknown",
+    "Sword acquisition, general navigation, G2-G5 and campaign unqualified",
+    "native top-down, water, fence and ledge controllers remain unqualified"
+  ]
+}
