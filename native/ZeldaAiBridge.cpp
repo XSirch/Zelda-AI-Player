@@ -42,7 +42,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.9";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.10";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -763,15 +763,15 @@ json TraversalAffordances(Player* player) {
     return result;
 }
 
-json NavigationMesh(Player* player) {
+json NavigationMesh(Player* player, float step = 70.0f) {
     constexpr int HALF_EXTENT = 4;
     constexpr int SIDE = HALF_EXTENT * 2 + 1;
-    constexpr float STEP = 70.0f;
+    const float STEP = step;
     constexpr float MAX_HEIGHT_DELTA = 24.0f;
     constexpr float BODY_CLEARANCE = 18.0f;
     constexpr float EDGE_FLOOR_TOLERANCE = 24.0f;
     constexpr int EDGE_FLOOR_SAMPLES = 4;
-    constexpr int EXIT_SCAN_HALF_EXTENT = HALF_EXTENT * 2;
+    constexpr int EXIT_SCAN_HALF_EXTENT = 8;
     constexpr float EXIT_SCAN_STEP = 35.0f;
     constexpr float EXIT_INTERIOR_BLEND = 0.65f;
     static const int dx[] = {0, 1, 1, 1, 0, -1, -1, -1};
@@ -990,6 +990,16 @@ json NavigationMesh(Player* player) {
                 neighbor.links |= static_cast<uint8_t>(1u << (direction + 4));
             }
         }
+    }
+
+    // A coarse lattice can strand the root at a narrow turn even when a
+    // shorter body-clear segment exists. Requery once at half resolution;
+    // retain all floor, body, diagonal and lower-band checks. No old links
+    // are merged and no segment is authorized by a thin probe alone. The
+    // independent exit scan keeps its original 280-unit observation window.
+    if (STEP > 35.0f && grid[HALF_EXTENT][HALF_EXTENT].floor &&
+        grid[HALF_EXTENT][HALF_EXTENT].links == 0) {
+        return NavigationMesh(player, 35.0f);
     }
 
     for (int gz = -HALF_EXTENT; gz <= HALF_EXTENT; ++gz) {

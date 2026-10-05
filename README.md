@@ -6,6 +6,16 @@ A fundação do motor V4 corrige a projeção horizontal invertida do controle n
 
 ## Laya base: treino e avaliação local
 
+O Laya agora tem um piloto para atravessar saídas nativas observadas. O planejador mantém pontos de passagem no mundo, aceita aproximações parciais pela colisão atual e exige uma transição física seguida de três observações novas com Link parado no chão. Chegar perto da saída não encerra a tarefa. O objetivo rastreável continua sendo obter a Kokiri Sword durante toda a tentativa.
+
+Os dois primeiros lotes saíram da casa em **2/3 tentativas cada**, usando somente o analógico do candidato congelado, sem mistura com o controle de referência, treino ou chamadas a provedores. Um desvio que primeiro se afastou da saída funcionou no jogo; a falha restante deixou a posição de Link sem ligações na malha observada. O adapter **3.10** testa uma malha menor somente nesse caso, preservando as verificações de corpo e piso. O lote seguinte concluiu **6/6 saídas**, com **5/5 resets** no mesmo processo; o modelo respondeu em até **37,5 ms** nesse lote. A amostra ainda é pequena e o tempo completo de reação física permanece sem medição. Resultados completos ficam no [registro do controle de portais](docs/validation/laya_portal_control_2026-10-05.json).
+
+Este piloto continua fora do botão INICIAR. Ele avalia saídas de piso alcançáveis pela telemetria atual; ainda não comprova acesso à escada, coleta da espada ou conclusão da campanha. Para executá-lo com a base e o candidato locais existentes:
+
+```powershell
+uv run python -m zelda_ai.laya_portal_evaluation C:/Projetos/Shipwright-AI/x64/Release/soh.exe --source-home .local/qualification/g1-da24d7be4d70/seed-home --episodes 3 --candidate .local/laya/candidate-numeric-stick-mse --base .local/laya/base --python .local/laya-env/Scripts/python.exe
+```
+
 O adapter **3.9** separa o contato com uma borda escalável das ligações de caminhada. A verificação de chegada exige contato real com o chão: estar no alto durante um salto ou uma animação de subida não basta. O motor identifica os estados de natação, mergulho e movimento submerso pelas flags nativas e interrompe a política de caminhada ao entrar na água. Os controladores e o aprendizado desses movimentos ainda precisam de validação no jogo.
 
 A avaliação de um candidato congelado agora mantém **um processo do SoH** e usa o reset normal entre os blocos de tarefas. O atalho é configurado somente na cópia de QA; cada reset exige input consumido, retorno observado ao título e um novo carregamento normal do Arquivo 2. Os comandos e as respostas antigas do modelo são liberados antes de continuar. Um reset recarrega o save de trabalho, com o progresso que o próprio jogo salvou. Os blocos reutilizados continuam pertencendo ao mesmo grupo nativo; a coleta para treino mantém processos separados para preservar a divisão entre treino, validação e teste. `--fresh-processes` permite uma avaliação com instâncias separadas.

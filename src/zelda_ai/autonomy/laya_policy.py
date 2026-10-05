@@ -140,8 +140,8 @@ class LayaWalkingPolicy:
             self.closed
             or self.failure
             or task.terminal
-            or task.phase == "verify"
-            or task.kind not in {"observed_cell", "stairs_or_slope_up", "stairs_or_slope_down"}
+            or task.phase in {"verify", "transition"}
+            or task.kind not in {"observed_cell", "observed_portal", "stairs_or_slope_up", "stairs_or_slope_down"}
             or game.source != "soh"
             or not game.in_game
             or not game.player

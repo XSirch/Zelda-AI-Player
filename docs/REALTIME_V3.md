@@ -1,6 +1,6 @@
 # Realtime input foundation (Native Bridge V3)
 
-This document describes **Native Bridge v3.1 / Adapter v3.1**, the low-level SoH bridge used by Autonomy V3. The realtime wire protocol is `3`; protocol `2` adapters are intentionally incompatible so stale native builds fail clearly.
+This document describes the low-level SoH bridge used by Autonomy V3, currently **Adapter v3.10**. The realtime wire protocol is `3`; protocol `2` adapters are intentionally incompatible so stale native builds fail clearly.
 
 ## Responsibilities
 
@@ -23,6 +23,8 @@ The Python ML actor renews a short setpoint lease at ~20 Hz. If Python stops ren
 ## Structured geometry
 
 Navigation probes, traversal observations, scene-exit surfaces and the compact collision NavMesh can remain in the wire state as observations. Autonomy V3 may learn from these features; it does not call a Python A* skill executor.
+
+Adapter 3.10 first queries the existing 70-unit local lattice. If its current player cell has no walking links, it reobserves one 35-unit lattice with the same 81-cell limit. The shorter segments retain floor continuity, diagonal restrictions, body clearance, backface and lower-body wall checks. This is a current collision observation; no previous mesh edges are merged or stored as traversed routes. The independent native exit scan retains its 280-unit extent. A refined mesh may still contain an isolated root and must not authorize collision-blind movement. Experimental local tasks may consume these observations under their own bounded physical contracts; this does not qualify general navigation.
 
 ## Deployment
 

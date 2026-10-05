@@ -81,6 +81,15 @@ CASE(degenerate_edge_fails_closed) {
         [&](Point, Point) { ++queries; return false; });
     REQUIRE(result.blocked && !result.lowerBandBlocked && queries == 0);
 }
+CASE(short_segment_can_stop_before_a_turn) {
+    const std::vector<Box> obstacles{{{-100, 0, 50}, {100, 40, 51}}};
+    REQUIRE(Inspect({0, 0, 0}, {0, 0, 70}, obstacles).blocked);
+    REQUIRE(!Inspect({0, 0, 0}, {0, 0, 35}, obstacles).blocked);
+}
+CASE(short_segment_still_rejects_lower_body_obstacle) {
+    const auto result = Inspect({0, 0, 0}, {0, 0, 35}, {{{-100, 0, 20}, {100, 21, 21}}});
+    REQUIRE(result.blocked && result.lowerBandBlocked);
+}
 
 int main(int argc, char** argv) {
     struct Test { const char* name; void (*run)(); };
@@ -93,6 +102,8 @@ int main(int argc, char** argv) {
         {"clear_slope_remains_clear", clear_slope_remains_clear},
         {"obstacle_below_body_remains_clear", obstacle_below_body_remains_clear},
         {"degenerate_edge_fails_closed", degenerate_edge_fails_closed},
+        {"short_segment_can_stop_before_a_turn", short_segment_can_stop_before_a_turn},
+        {"short_segment_still_rejects_lower_body_obstacle", short_segment_still_rejects_lower_body_obstacle},
     };
     bool found = argc == 1;
     for (const auto& test : tests) {

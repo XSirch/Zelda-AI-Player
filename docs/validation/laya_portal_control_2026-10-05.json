@@ -1,0 +1,618 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "source": "soh",
+  "scope": "frozen_laya_current_observed_floor_portals",
+  "objective": "Obtain the Kokiri Sword",
+  "completion": "equipment:Kokiri Sword",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "reference_blend": 0,
+  "demonstration_labels": 0,
+  "campaign_qualified": false,
+  "INICIAR_promoted": false,
+  "batches": [
+    {
+      "suite_id": "g1-fe33c1fa027e",
+      "seed": 4105600,
+      "planned": 3,
+      "attempted": 3,
+      "successful": 2,
+      "native_processes": 1,
+      "native_groups": 1,
+      "normal_resets_verified": 2,
+      "all_initial_scenes": [
+        52
+      ],
+      "consumed_candidate_actions": 284,
+      "integrity_after_shutdown": true,
+      "pins_rechecked": 74,
+      "historical_matching_archives": [
+        {
+          "file": "soh.exe",
+          "sha256": "fadb26138d51da10bcec94645ba1dfc6977389df6520b45d1d6d21c11eddb047",
+          "archive": ".local/pre-portal-fine-mesh-20261005/soh.exe"
+        },
+        {
+          "file": "laya_portal_evaluation.py",
+          "sha256": "3dd688673a4c71b3650902ec78aa31efc9e6a09478ebc48e76922d3878bf4f1e",
+          "archive": ".local/pre-portal-recovery-20261005/laya_portal_evaluation.py"
+        },
+        {
+          "file": "portal_task.py",
+          "sha256": "2f03c123aba8ed7b36f1dffc197df8f780f0996647b61577d18d2a1bd40b2858",
+          "archive": ".local/pre-portal-recovery-20261005/portal_task.py"
+        },
+        {
+          "file": "ZeldaAiBridge.cpp",
+          "sha256": "e298f6c0a62c819e07c0fa431c39909bd22a0d569829b5e92ee617e9c43173cd",
+          "archive": ".local/pre-portal-fine-mesh-20261005/ZeldaAiBridge.cpp"
+        }
+      ],
+      "native_executable_sha256": "fadb26138d51da10bcec94645ba1dfc6977389df6520b45d1d6d21c11eddb047",
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "frozen_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "worker": {
+        "responses": 284,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 279,
+        "camera_delta_max_deg": 12.749633789062509,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_ms_p95": 26.05050000420306,
+        "response_ms_max": 35.33400000014808,
+        "sampled_output_age_ms_max": 75.0971999950707,
+        "complete_physical_reaction_ms": null
+      },
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 116,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1360947445-114248826",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1360947445-114248826",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": false,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v1",
+          "local_detours": 0,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 120,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1360947445-114248826",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1360947445-114248826",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v1",
+          "local_detours": 0,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        },
+        {
+          "index": 3,
+          "attempted": true,
+          "success": false,
+          "reason": "observed_approach_exhausted",
+          "consumed_actions": 48,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1360947445-114248826",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": null,
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v1",
+          "local_detours": 0,
+          "settled_verification_frames": 0,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        }
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled"
+    },
+    {
+      "suite_id": "g1-c200f87c62c5",
+      "seed": 4105700,
+      "planned": 3,
+      "attempted": 3,
+      "successful": 2,
+      "native_processes": 1,
+      "native_groups": 1,
+      "normal_resets_verified": 2,
+      "all_initial_scenes": [
+        52
+      ],
+      "consumed_candidate_actions": 285,
+      "integrity_after_shutdown": true,
+      "pins_rechecked": 74,
+      "historical_matching_archives": [
+        {
+          "file": "soh.exe",
+          "sha256": "fadb26138d51da10bcec94645ba1dfc6977389df6520b45d1d6d21c11eddb047",
+          "archive": ".local/pre-portal-fine-mesh-20261005/soh.exe"
+        },
+        {
+          "file": "ZeldaAiBridge.cpp",
+          "sha256": "e298f6c0a62c819e07c0fa431c39909bd22a0d569829b5e92ee617e9c43173cd",
+          "archive": ".local/pre-portal-fine-mesh-20261005/ZeldaAiBridge.cpp"
+        }
+      ],
+      "native_executable_sha256": "fadb26138d51da10bcec94645ba1dfc6977389df6520b45d1d6d21c11eddb047",
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "frozen_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "worker": {
+        "responses": 286,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 344,
+        "camera_delta_max_deg": 16.7156982421875,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_ms_p95": 28.35350000532344,
+        "response_ms_max": 41.6345999983605,
+        "sampled_output_age_ms_max": 141.46220000111498,
+        "complete_physical_reaction_ms": null
+      },
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 109,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "355399101-114889863",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "355399101-114889863",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": false,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 0,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 116,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "355399101-114889863",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "355399101-114889863",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 1,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        },
+        {
+          "index": 3,
+          "attempted": true,
+          "success": false,
+          "reason": "observed_approach_exhausted",
+          "consumed_actions": 60,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "355399101-114889863",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": null,
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 1,
+          "settled_verification_frames": 0,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        }
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled"
+    },
+    {
+      "suite_id": "g1-0c709aae19e0",
+      "seed": 4105700,
+      "planned": 6,
+      "attempted": 6,
+      "successful": 6,
+      "native_processes": 1,
+      "native_groups": 1,
+      "normal_resets_verified": 5,
+      "all_initial_scenes": [
+        52
+      ],
+      "consumed_candidate_actions": 843,
+      "integrity_after_shutdown": true,
+      "pins_rechecked": 74,
+      "historical_matching_archives": [],
+      "native_executable_sha256": "21780c11c8b967d2b4e2c49023907e80161299bf8e7a55d8c4d200169fbe0ca0",
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "frozen_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "worker": {
+        "responses": 844,
+        "expired_responses": 0,
+        "context_rejections": 0,
+        "camera_reprojected_outputs": 1031,
+        "camera_delta_max_deg": 16.62780761718749,
+        "provider_calls": 0,
+        "training_updates": 0,
+        "response_ms_p95": 5.9585000003608,
+        "response_ms_max": 37.48429999996006,
+        "sampled_output_age_ms_max": 92.67940000017916,
+        "complete_physical_reaction_ms": null
+      },
+      "episodes": [
+        {
+          "index": 1,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 160,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1172410541-3363407",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1172410541-3363407",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": false,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 1,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 3,
+          "observed_fine_connected_roots": 3,
+          "motor_failure": null
+        },
+        {
+          "index": 2,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 157,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1172410541-3363407",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1172410541-3363407",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 1,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 1,
+          "observed_fine_connected_roots": 1,
+          "motor_failure": null
+        },
+        {
+          "index": 3,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 158,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1172410541-3363407",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1172410541-3363407",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 1,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 5,
+          "observed_fine_connected_roots": 5,
+          "motor_failure": null
+        },
+        {
+          "index": 4,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 154,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1172410541-3363407",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1172410541-3363407",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 1,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 4,
+          "observed_fine_connected_roots": 4,
+          "motor_failure": null
+        },
+        {
+          "index": 5,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 98,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1172410541-3363407",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1172410541-3363407",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 0,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 2,
+          "observed_fine_connected_roots": 2,
+          "motor_failure": null
+        },
+        {
+          "index": 6,
+          "attempted": true,
+          "success": true,
+          "reason": null,
+          "consumed_actions": 116,
+          "objective_unchanged": true,
+          "run_updates": 0,
+          "raw_button_actions": 0,
+          "initial_context": [
+            "1172410541-3363407",
+            52,
+            0,
+            false,
+            "child"
+          ],
+          "final_context": [
+            "1172410541-3363407",
+            85,
+            0,
+            false,
+            "child"
+          ],
+          "reset_verified": true,
+          "fresh_normal_loads": 1,
+          "task_version": "observed-walking-portal-v2",
+          "local_detours": 0,
+          "settled_verification_frames": 3,
+          "observed_fine_full_snapshots": 0,
+          "observed_fine_connected_roots": 0,
+          "motor_failure": null
+        }
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "promotion": "disabled"
+    }
+  ],
+  "baseline": {
+    "initial_observation_replay": {
+      "script": ".local/portal_baseline_20261005.py",
+      "runs": 2,
+      "ordinary_cell_factory_rejected_partial_approach": true
+    },
+    "detour_regression": {
+      "red_before_recovery": true,
+      "green_after_recovery": true,
+      "scope": "synthetic_current_link_graph"
+    },
+    "isolated_root_replay": {
+      "script": ".local/replay_isolated_portal_20261005.py",
+      "runs": 2,
+      "native_recorded_step": 70,
+      "native_recorded_root_links": 0,
+      "planner_returned_path": false,
+      "scope": "recorded_native_observation_not_new_gameplay"
+    }
+  },
+  "native_adapter": {
+    "version": "3.10",
+    "coarse_step": 70,
+    "isolated_root_step": 35,
+    "cells_per_lattice_max": 81,
+    "exit_scan_extent": 280,
+    "floor_body_backface_lower_band_checks_retained": true,
+    "old_mesh_edges_merged": false,
+    "native_release_build_exit_code": 0,
+    "native_release_build_warnings": "upstream/compiler warnings retained in local UTF-8 build log"
+  },
+  "checks": {
+    "pytest": {
+      "passed": 465,
+      "skipped": 21,
+      "warning": "existing Starlette/httpx deprecation"
+    },
+    "msvc_cpp20": {
+      "scheduler": 19,
+      "walking_clearance": 10
+    },
+    "web_production_build": true,
+    "focused_ruff": true,
+    "written_text_utf8": {
+      "passed": true,
+      "texts": 32,
+      "replacement_characters": 0
+    },
+    "native_batch_json": {
+      "strict_utf8": true,
+      "finite_json": true,
+      "files": 54
+    }
+  },
+  "limitations": [
+    "Small, non-paired pilots; all started from normal Arquivo 2 house spawn.",
+    "One native group per batch; reset episodes are not independent native groups.",
+    "No new training or learning improvement measured.",
+    "Exact child shutdown exit status was not collected.",
+    "Physical reaction latency remains unknown.",
+    "Kokiri Sword, native top-down, general navigation, ledge/water/ladder promotion and full campaign are not qualified."
+  ]
+}

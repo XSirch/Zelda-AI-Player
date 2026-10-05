@@ -26,7 +26,9 @@ def encode_surface(game, task):
             min(1., math.hypot(dx, dz) / 200), max(-1., min(1., (point[1] - position[1]) / 100)),
             max(0., min(1., game.player.speed_xz / 10)),
             float(task.kind == "stairs_or_slope_up"), float(task.kind == "stairs_or_slope_down"),
-            float(task.kind == "observed_cell")]
+            # A floor portal has the same point-steering input contract. Its
+            # physical transition postcondition belongs to the local task.
+            float(task.kind in {"observed_cell", "observed_portal"})]
 
 
 class SurfacePolicy:
