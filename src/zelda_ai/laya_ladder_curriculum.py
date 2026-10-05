@@ -9,30 +9,16 @@ import time
 from pathlib import Path
 
 from .app import bridge_secret
-from .autonomy.controller import ContinuousController
 from .autonomy.laya_ladder_policy import LayaLadderPolicy
 from .bridge import Bridge, bind_bridge
 from .config import Settings
-from .g1 import ARTIFACTS, OwnedProcess, prepare_suite, settle, write_json
+from .g1 import OwnedProcess, prepare_suite, settle, write_json
 from .laya_curriculum import prepare_observed_descent, prepare_portal_start
 from .laya_data import digest
 from .laya_ladder_data import export_ladders
 from .laya_training import verify_base
-from .startup import enter_playable_save
-
-
-async def warm_reference(frozen):
-    """Pay cold GPU/optimizer initialization before any native process exists."""
-    bridge = Bridge("local-warmup-without-native-peer", allow_simulator=False)
-    started = time.monotonic()
-    try:
-        controller = await asyncio.to_thread(ContinuousController, bridge, frozen / ARTIFACTS[0],
-            training_enabled=False, route_graph_path=frozen / ARTIFACTS[1], room_map_path=frozen / ARTIFACTS[2])
-        if bridge.command_seq != 0 or controller.training_enabled or controller.policy.updates != controller.starting_updates:
-            raise RuntimeError("Warmup must not send inputs or train")
-        return {"elapsed_ms": (time.monotonic() - started) * 1000, "native_commands": 0, "run_updates": 0}
-    finally:
-        bridge.close()
+from .startup import StartupFailure, enter_playable_save
+from .surface_curriculum import warm_reference
 
 
 async def ladder_curriculum(settings, executable, source_home, *, sessions=3, save_slot=2,
@@ -107,6 +93,8 @@ async def ladder_curriculum(settings, executable, source_home, *, sessions=3, sa
                         run_updates=sum(attempt["run_updates"] for attempt in descent["attempts"]),
                         objective_unchanged=all(attempt["objective_unchanged"] for attempt in descent["attempts"]))
             except (ValueError, RuntimeError, OSError, TimeoutError) as exc:
+                if isinstance(exc, StartupFailure):
+                    write_json(trial / "startup.json", exc.report)
                 record["reason"] = f"{type(exc).__name__}:{str(exc)[:160]}"
             finally:
                 bridge.close()

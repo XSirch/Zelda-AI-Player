@@ -155,6 +155,10 @@ class AutonomyRuntime:
         while self.persist_tasks:
             tasks = list(self.persist_tasks)
             await asyncio.gather(*tasks, return_exceptions=True)
+            # Gathering already-finished jobs can return without yielding to
+            # their discard callbacks. Remove only the settled snapshot; jobs
+            # added while awaiting it still need their own drain iteration.
+            self.persist_tasks.difference_update(tasks)
 
     async def _refresh_metrics(self, run_id: str | None = None):
         target_run = run_id or self.run_id

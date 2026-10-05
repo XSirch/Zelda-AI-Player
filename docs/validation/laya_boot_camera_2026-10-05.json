@@ -1,0 +1,337 @@
+{
+  "date": "2026-10-05",
+  "observation_profile": "instrumented_local_v1",
+  "source": "soh",
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "promotion": "disabled",
+  "decision_response_budget_ms": 100,
+  "actuation_grace_ms": 50,
+  "boot_optimization": {
+    "profile": "laya-observed-attached-descent-v1",
+    "reserved_native_records": 46,
+    "before_load_s": 29.099790699998266,
+    "after_load_s": 11.912551300003543,
+    "all_state_tensors_identical": true,
+    "all_reserved_logits_identical": true,
+    "all_reserved_executed_sticks_identical": true,
+    "tensor_sha256": "c5ff46be0124d13b16e884a19a85f843896ec592b4cf5ecf21ee7372893a14e0",
+    "candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "dataset_manifest_sha256": "138c7ca080d53749565ab8032f0c3c5ee342c12e043de91c49cdc87025afd415",
+    "base_only_training_rng_path_unchanged": true,
+    "timing_not_perfectly_controlled_for_os_caches": true,
+    "before_audit_sha256": "9ff2c21f2e8cca07adebb40b5b6290ff1c558849eecb5c70cc4505d0e6ed318f",
+    "after_audit_sha256": "96a0723b1a9c1824d54e3978806b9c05675ec0f845fbde8cf3fd50f354ec436c"
+  },
+  "worker_startup_failures": [
+    {
+      "suite": "g1-e93cc44954be",
+      "worker_handshake_deadline_s": 45,
+      "worker_ready": false,
+      "native_sessions_attempted": 0,
+      "failure_evidence_source": "observed_executor_exception",
+      "worker_log_sha256": "c43d874eb1f91a9168e65334bceb9b3f9533aff9bdfd34b88b432b151c4fe10a",
+      "manifest_sha256": "6808ea673f930e20f9262c0b37fc30c76e99b42342b44040bb8114df24ce2e1e"
+    },
+    {
+      "suite": "g1-feac55d3645b",
+      "worker_handshake_deadline_s": 45,
+      "worker_ready": false,
+      "native_sessions_attempted": 0,
+      "failure_evidence_source": "observed_executor_exception",
+      "worker_log_sha256": "1c0cd9162cde9755c3222ac49e6b3d5b64a1215476a411f3e87b4270af5e82d9",
+      "manifest_sha256": "eeb03c15922031ddb342e41d3cb72014329212560c284d7f9535499e0fd94d6a"
+    }
+  ],
+  "startup_diagnostic_batches": [
+    {
+      "suite": "g1-689b5346a293",
+      "planned_sessions": 3,
+      "verified_loads_and_settles": 3,
+      "worker_present": false,
+      "worker_ready_s": null,
+      "worker_replies": 0,
+      "recorded_terminal_pin_check": true,
+      "provider_calls": 0,
+      "report_sha256": "605a8a0ab74e3dde2e7a984b1efde6e776090ceed41005ee86787cf62719b6f0",
+      "manifest_sha256": "c3e7b9ccc07a406d92d82928ead083e04702a63693c2089eaf1203a0c153e69f"
+    },
+    {
+      "suite": "g1-5cf8f2e0b962",
+      "planned_sessions": 3,
+      "verified_loads_and_settles": 3,
+      "worker_present": true,
+      "worker_ready_s": 28.18441659999371,
+      "worker_replies": 0,
+      "recorded_terminal_pin_check": true,
+      "provider_calls": 0,
+      "report_sha256": "fa6a01fb6d7507bb721d0d826f00b016407bdf3b6d456ca5702b4d941331db93",
+      "manifest_sha256": "f2ffb6d9ac5d68a0c0591158db9d2300e36a24f14d5bfb37c6bb9d808898ae14"
+    }
+  ],
+  "walking_before_prelaunch_warmup": {
+    "batch": {
+      "suite": "g1-fceb595c5ff4",
+      "seed": 4102500,
+      "native_sessions": 3,
+      "tasks_per_session": 5,
+      "attempted": 15,
+      "successful": 12,
+      "consumed_actions": 499,
+      "source": "soh",
+      "observation_profile": "instrumented_local_v1",
+      "save_slot": 2,
+      "task_versions": [
+        "observed-analog-task-v2"
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "reference_blend": 0,
+      "objectives_unchanged": true,
+      "promotion": "disabled",
+      "g2_complete": false,
+      "failure_reasons": {
+        "motor_stopped": 1,
+        "attempt_timeout": 2
+      },
+      "failures": [
+        {
+          "session": 1,
+          "index": 1,
+          "reason": "motor_stopped"
+        },
+        {
+          "session": 2,
+          "index": 2,
+          "reason": "attempt_timeout"
+        },
+        {
+          "session": 2,
+          "index": 5,
+          "reason": "attempt_timeout"
+        }
+      ],
+      "worker": {
+        "round_trip_ms": {
+          "samples": 497,
+          "p50": 39.49320000538137,
+          "p95": 113.75649999536108,
+          "maximum": 445.30049999593757
+        },
+        "inference_ms": {
+          "samples": 497,
+          "p50": 34.631899994565174,
+          "p95": 71.43709999218117,
+          "maximum": 357.08419998991303
+        },
+        "output_age_ms": {
+          "samples": 594,
+          "p50": 69.2607999953907,
+          "p95": 138.43200000701472,
+          "maximum": 147.9311000002781
+        }
+      },
+      "expired_responses": 29,
+      "context_rejections": 0,
+      "responses": 497,
+      "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+      "client_command_to_native_consumption_ms": {
+        "samples": 499,
+        "p50": 25.245,
+        "p95": 47.146,
+        "maximum": 50.576
+      },
+      "full_observation_to_physical_reaction_ms": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "report_sha256": "73402afd2d04ea29a33f5dac129f877566b7cb67744d92351a81d5d2f7ebbbb4",
+      "manifest_sha256": "2b643c10e838baacfbdb77b5bb9ed81329f8f2f5745c3153c06181165b5f26c0",
+      "frozen_artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "strict_utf8_and_finite_json_files_verified": 45,
+      "source_files_count": 49,
+      "relevant_source_sha256": {
+        "src\\zelda_ai\\laya_curriculum.py": "3d7db439df0dbc27b2bfe6f96724cf247aa0be820f548049ab0a2548b095bc4b",
+        "src\\zelda_ai\\laya_ladder_curriculum.py": "81371f4672a4b4f136c0372931a3ca1b0247f543c09c236c46bb1d3ff09170eb",
+        "src\\zelda_ai\\laya_training.py": "2a6979db78b84358d143897a611c623ab66226bb608ff170e064ae4338c74b80",
+        "src\\zelda_ai\\startup.py": "e90984d238fda67b699a8e6dfe1352689d8e9d3a30aadd2147cc2342abf6955a",
+        "src\\zelda_ai\\surface_curriculum.py": "2d0ebfe98cdfabb58de05c21e875627cba78c1773d0844c575deddac9978e17a"
+      }
+    },
+    "camera": {
+      "native_input_yaw_observations": 612,
+      "changing_yaw_observations": 380,
+      "largest_observed_yaw_delta_deg": 15.2215576171875,
+      "steep_top_down_observations": 0,
+      "camera_reprojected_outputs": 420,
+      "request_to_application_camera_delta_max_deg": 16.270751953125014
+    },
+    "pinned_integrity_at_export_with_exact_historical_surface_bytes": true,
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5"
+  },
+  "walking_after_prelaunch_warmup": {
+    "batch": {
+      "suite": "g1-c8a4001770a9",
+      "seed": 4102500,
+      "native_sessions": 3,
+      "tasks_per_session": 5,
+      "attempted": 15,
+      "successful": 14,
+      "consumed_actions": 475,
+      "source": "soh",
+      "observation_profile": "instrumented_local_v1",
+      "save_slot": 2,
+      "task_versions": [
+        "observed-analog-task-v2"
+      ],
+      "provider_calls": 0,
+      "training_updates": 0,
+      "reference_blend": 0,
+      "objectives_unchanged": true,
+      "promotion": "disabled",
+      "g2_complete": false,
+      "failure_reasons": {
+        "attempt_timeout": 1
+      },
+      "failures": [
+        {
+          "session": 3,
+          "index": 3,
+          "reason": "attempt_timeout"
+        }
+      ],
+      "worker": {
+        "round_trip_ms": {
+          "samples": 480,
+          "p50": 44.222399999853224,
+          "p95": 111.29919999802951,
+          "maximum": 365.7435000059195
+        },
+        "inference_ms": {
+          "samples": 480,
+          "p50": 39.38949998700991,
+          "p95": 74.46069999423344,
+          "maximum": 293.19509999186266
+        },
+        "output_age_ms": {
+          "samples": 545,
+          "p50": 71.34899999073241,
+          "p95": 142.1210999978939,
+          "maximum": 149.91769999323878
+        }
+      },
+      "expired_responses": 40,
+      "context_rejections": 0,
+      "responses": 480,
+      "timing_metrics_scope": "most_recent_up_to_4096_samples_per_worker_metric",
+      "client_command_to_native_consumption_ms": {
+        "samples": 475,
+        "p50": 25.404,
+        "p95": 48.77,
+        "maximum": 59.36
+      },
+      "full_observation_to_physical_reaction_ms": null,
+      "candidate_sha256": {
+        "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+        "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+      },
+      "report_sha256": "ae897b783b5423b13dfeb698e3bad3399580f15ad7977629933e506f1c175a1f",
+      "manifest_sha256": "acaf92e4f1f8d8e87be09ca90c5d363573b61206438550dc87a75ef20e39c1ae",
+      "frozen_artifact_sha256": {
+        "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+        "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+        "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+      },
+      "strict_utf8_and_finite_json_files_verified": 45,
+      "source_files_count": 49,
+      "relevant_source_sha256": {
+        "src\\zelda_ai\\laya_curriculum.py": "49b6babf4b9aebb1230a4ae0dfe7fa46fa276b3c9157ef78e7e984b4e50b9518",
+        "src\\zelda_ai\\laya_ladder_curriculum.py": "685fc9f4d5afcc2651c0d2c0be4e269f5d166e0a5fa2c3fef4ac7c1bd5262925",
+        "src\\zelda_ai\\laya_training.py": "2a6979db78b84358d143897a611c623ab66226bb608ff170e064ae4338c74b80",
+        "src\\zelda_ai\\startup.py": "6e8b1d6c5c5285f0779be25fd2659ac5b47bbb1bdb3ab74bfe6191e8f8cc89fb",
+        "src\\zelda_ai\\surface_curriculum.py": "03689376d96f3bf5b46ee315518da3042b14bf757c7022b6fa8ab73e942ed7f6"
+      }
+    },
+    "camera": {
+      "native_input_yaw_observations": 603,
+      "changing_yaw_observations": 377,
+      "largest_observed_yaw_delta_deg": 24.3731689453125,
+      "steep_top_down_observations": 0,
+      "camera_reprojected_outputs": 395,
+      "request_to_application_camera_delta_max_deg": 24.373168945312496
+    },
+    "pinned_integrity_at_terminal_export": true,
+    "native_executable_sha256": "d19ea01749eb4b8810cf20c4a4da0c016343cd9319c10863586d1d4625f1a0e5",
+    "reference_warmup_before_native_launch": {
+      "elapsed_ms": 4735.44750000292,
+      "native_commands": 0,
+      "run_updates": 0
+    }
+  },
+  "discarded_async_constructor_experiment": {
+    "suite": "g1-97caa7240ce6",
+    "planned_tasks": 15,
+    "attempted_tasks": 10,
+    "successful_tasks": 0,
+    "consumed_candidate_actions": 0,
+    "unattempted_tasks": 5,
+    "task_failure": "stale_origin_observation_rejected",
+    "terminal_failure": "state_feedback_timeout_during_normal_save_startup",
+    "terminal_failure_evidence_source": "observed_executor_exception",
+    "final_report_present": false,
+    "startup_exception_trace_present": false,
+    "current_constructor_remains_synchronous_after_prelaunch_warmup": true,
+    "progress_sha256": "d7ccf61a30bced4f3e5708e9f3c606b2fe08c9598a25c7d8f52b1cd84482618a",
+    "manifest_sha256": "6b1d3605c8e5f58441bee4d6e3a493f3f2c114a38c9329f74f8285a10d9e1494"
+  },
+  "strict_utf8_and_finite_json_files_verified": {
+    "g1-e93cc44954be": 4,
+    "g1-feac55d3645b": 4,
+    "g1-689b5346a293": 14,
+    "g1-5cf8f2e0b962": 14,
+    "g1-fceb595c5ff4": 45,
+    "g1-97caa7240ce6": 23,
+    "g1-c8a4001770a9": 45
+  },
+  "limitations": [
+    "Short house walks only; neither sword nor full campaign.",
+    "Same seed does not make trajectories or later observed targets perfectly paired.",
+    "Native steep top-down coverage is zero; those regressions remain automated-test-only.",
+    "The recurrent normal-save feedback timeout remains unresolved; failure persistence now has unit coverage.",
+    "The 100 ms decision target is not a guaranteed full physical reaction time.",
+    "Candidate movement produces no training demonstrations or updates; G2 and INICIAR promotion remain disabled."
+  ],
+  "validation": {
+    "pytest_passed": 418,
+    "pytest_skipped": 20,
+    "native_skip_reason": "g++/clang++ unavailable",
+    "web_build": "passed",
+    "focused_ruff": "passed_Laya_sources_and_new_tests",
+    "strict_written_text_utf8": "passed",
+    "native_cpp_changed": false,
+    "new_native_cpp_build_claimed": false,
+    "pytest_warning": "existing Starlette/httpx deprecation",
+    "runtime_ruff": "one unchanged pre-existing E731 in budget reservation lambda",
+    "strict_written_text_files_verified": 205
+  },
+  "runtime_stop_regression": {
+    "cause": "completed_gather_snapshot_spins_before_discard_callbacks_can_run",
+    "red_subprocess_deadline_s": 15,
+    "regression_cases_passed": 2,
+    "full_suite_objective_lock_case_passed": true,
+    "after_native_batches": true,
+    "new_native_runtime_validation": false,
+    "before_sha256": "2d3942f96bdf86b46a4ac85e7c3f46248590fa13a6bb6f3eb7247d9210eb5a9a",
+    "after_sha256": "7877eda6146329a02b12ae501cbe800583c77405e4658dc5ab0d8b072bdda378",
+    "standalone_objective_lock_case": "separate_cold_start_1s_provider_wait_timeout; full_suite_case_passed"
+  }
+}

@@ -50,7 +50,7 @@ def test_cold_controller_loading_does_not_block_native_heartbeat(state, tmp_path
 
 
 def test_reference_warmup_has_no_native_peer_training_or_inputs(tmp_path, monkeypatch):
-    from zelda_ai import laya_ladder_curriculum
+    from zelda_ai import surface_curriculum
 
     observed = []
 
@@ -58,7 +58,7 @@ def test_reference_warmup_has_no_native_peer_training_or_inputs(tmp_path, monkey
         observed.append((bridge.state, bridge.peer, kwargs["training_enabled"]))
         return SimpleNamespace(training_enabled=False, policy=SimpleNamespace(updates=7), starting_updates=7)
 
-    monkeypatch.setattr(laya_ladder_curriculum, "ContinuousController", constructor)
+    monkeypatch.setattr(surface_curriculum, "ContinuousController", constructor)
     result = asyncio.run(warm_reference(tmp_path))
     assert observed == [(None, None, False)]
     assert result["native_commands"] == result["run_updates"] == 0

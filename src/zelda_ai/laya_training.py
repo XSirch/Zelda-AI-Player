@@ -15,6 +15,7 @@ import shutil
 import statistics
 import time
 import urllib.request
+from contextlib import nullcontext
 from pathlib import Path
 
 from .laya_data import (
@@ -142,7 +143,17 @@ def load_model(base: Path, candidate: Path | None = None, *, encoder_layers=0, n
         raise RuntimeError("CUDA is required for this pilot; no silent CPU fallback")
     cfg = json.loads((base / "rl_agent_config.json").read_text(encoding="utf-8"))
     tokenizer = PreTrainedTokenizerFast.from_pretrained(str(base / "tokenizer"), local_files_only=True)
-    model = build_model(cfg, encoder_dir=str(base / "encoder"))
+    # A frozen candidate runs in an isolated process and replaces every tensor
+    # with strict checkpoint loads. Avoid costly random weights that are thrown
+    # away immediately. Keep base-only training's RNG consumption unchanged.
+    if candidate:
+        from transformers.modeling_utils import no_init_weights
+
+        initialization = no_init_weights()
+    else:
+        initialization = nullcontext()
+    with initialization:
+        model = build_model(cfg, encoder_dir=str(base / "encoder"))
     model.encoder.config.reference_compile = False
     model.load_state_dict(load_file(str(base / "model.safetensors")), strict=True)
     model.encoder.requires_grad_(False)

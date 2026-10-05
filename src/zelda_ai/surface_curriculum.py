@@ -46,6 +46,20 @@ def select_surface(game, direction, variant):
     return rows[variant % len(rows)]
 
 
+async def warm_reference(frozen):
+    """Pay cold GPU/optimizer initialization before any native process exists."""
+    bridge = Bridge("local-warmup-without-native-peer", allow_simulator=False)
+    started = time.monotonic()
+    try:
+        controller = await asyncio.to_thread(ContinuousController, bridge, frozen / ARTIFACTS[0],
+            training_enabled=False, route_graph_path=frozen / ARTIFACTS[1], room_map_path=frozen / ARTIFACTS[2])
+        if bridge.command_seq != 0 or controller.training_enabled or controller.policy.updates != controller.starting_updates:
+            raise RuntimeError("Warmup must not send inputs or train")
+        return {"elapsed_ms": (time.monotonic() - started) * 1000, "native_commands": 0, "run_updates": 0}
+    finally:
+        bridge.close()
+
+
 async def run_task(bridge, frozen, task, directory, *, policy=None, demonstrations=False,
                    feature_encoder=encode_surface, feature_profile=None):
     directory.mkdir(parents=True, exist_ok=True)

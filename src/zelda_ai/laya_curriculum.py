@@ -25,7 +25,7 @@ from .config import Settings
 from .g1 import OwnedProcess, _motor_episode, context, portal_crossed, prepare_suite, settle, write_json
 from .laya_data import LADDER_PROFILE, digest, export_surfaces
 from .startup import enter_playable_save
-from .surface_curriculum import run_task
+from .surface_curriculum import run_task, warm_reference
 
 
 def observed_target(game, rng):
@@ -218,6 +218,8 @@ async def collect(
     )
     manifest["candidate_sha256"] = expected_candidate
     write_json(directory / "manifest.json", manifest)
+    manifest["reference_warmup_before_native_launch"] = await warm_reference(directory / "frozen")
+    write_json(directory / "manifest.json", manifest)
     records, preparations = [], []
     for session in range(sessions):
         home = directory / f"native-session-{session + 1}"
@@ -242,7 +244,8 @@ async def collect(
                     await asyncio.sleep(0.05)
                 if not bridge.connected or not bridge.realtime or bridge.state.protocol != 3:
                     raise RuntimeError("Real native input-receipt bridge unavailable")
-                startup = await enter_playable_save(bridge, save_slot - 1, budget_s=60)
+                startup = await enter_playable_save(bridge, save_slot - 1, budget_s=60,
+                    failure_report=lambda report: write_json(home / "startup.json", report))
                 write_json(home / "startup.json", startup)
                 if startup["status"] != "loaded":
                     raise RuntimeError(startup.get("reason", "Native save not loaded"))
