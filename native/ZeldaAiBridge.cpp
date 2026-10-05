@@ -41,7 +41,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.2";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.5";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -613,7 +613,10 @@ json TraversalAffordances(Player* player) {
             s32 bgId = BGCHECK_SCENE;
             const bool hit = BgCheck_EntityLineTest1(
                 &gPlayState->colCtx, &start, &end, &hitPos, &poly,
-                true, false, false, true, &bgId) != 0;
+                // Observation from a ladder top can approach the back face.
+                // Query both faces here; the first solid hit still occludes
+                // geometry behind it. Native movement collision is unchanged.
+                true, false, false, false, &bgId) != 0;
             if (!hit || !poly) continue;
             const int flags = SurfaceType_GetWallFlags(&gPlayState->colCtx, poly, bgId);
             if (!(flags & (WALL_FLAG_LADDER | WALL_FLAG_LADDER_TOP | WALL_FLAG_CLIMBABLE))) continue;

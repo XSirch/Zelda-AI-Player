@@ -150,6 +150,30 @@ def test_top_down_without_native_input_yaw_cannot_reuse_a_lease(state):
     asyncio.run(scenario())
 
 
+def test_walking_candidate_cannot_reuse_a_reply_for_an_untrained_descent_mode(state):
+    async def scenario():
+        process = FakeWorker()
+        policy = LayaWalkingPolicy(process)
+        try:
+            task = task_for(state)
+            policy(state, task)
+            await asyncio.sleep(0)
+            await process.replies.put({"id": process.sent[0]["id"], "stick": [20, 60],
+                                       "inference_ms": 5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert policy(state, task) == (20, 60)
+            task.kind = "ledge_down"
+            assert policy(state, task) == (0, 0)
+            assert policy.pending is None
+            assert policy.lease.owner is None
+            assert len(process.sent) == 1
+        finally:
+            await policy.close()
+
+    asyncio.run(scenario())
+
+
 def test_inflight_response_cannot_reenter_a_changed_context_or_stopped_policy(state):
     async def scenario():
         process = FakeWorker()

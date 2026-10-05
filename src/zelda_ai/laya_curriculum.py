@@ -13,6 +13,7 @@ import uuid
 from pathlib import Path
 
 from .app import bridge_secret
+from .autonomy.descent_task import ObservedDescentTask
 from .autonomy.laya_policy import LayaWalkingPolicy
 from .autonomy.local_tasks import LocalTask
 from .autonomy.navigation import observed_local_path
@@ -56,8 +57,72 @@ async def prepare_portal_start(bridge, frozen, directory):
                    and result["objective_unchanged"] and result["run_updates"] == 0
                    and portal_crossed(initial, bridge.state))
     report = {**result, "success": success, "source": "soh", "provider_calls": 0,
+              "kind": "portal",
               "controller": "frozen_v3_motor_qa_preparation",
               "candidate_actions": 0, "included_in_laya_training": False}
+    write_json(directory / "report.json", report)
+    return report
+
+
+async def prepare_observed_descent(bridge, frozen, directory):
+    """Try a current landing proposal; never infer a hidden route or button."""
+    directory.mkdir(parents=True, exist_ok=True)
+    initial_context = context(bridge.state)
+    report = {"success": False, "source": "soh", "provider_calls": 0, "kind": "descent",
+              "controller": "observed_descent_reference_qa_preparation",
+              "candidate_actions": 0, "included_in_laya_training": False,
+              "reason": "no_supported_observed_landing", "consumed_actions": 0, "attempts": []}
+    attempted = []
+    for index in range(3):
+        # The prior attempt may reveal a different opening. Only reconsider
+        # CURRENT native proposals, with a bounded local cooldown for failed
+        # landing regions. This list never becomes a learned route/edge.
+        rows = sorted((r for r in bridge.state.traversal_affordances if r.kind == "ledge_down"),
+                      key=lambda r: r.distance)
+        task = None
+        for row in rows:
+            if any(math.hypot(row.target_position[0] - p[0], row.target_position[2] - p[2]) <= 140
+                   and abs(row.target_position[1] - p[1]) <= 24 for p in attempted):
+                continue
+            try:
+                task = ObservedDescentTask.create(bridge.state, row)
+            except ValueError:
+                continue
+            break
+        if task is None or context(bridge.state) != initial_context:
+            break
+        attempted.append(task.target)
+        result, _ = await run_task(bridge, frozen, task, directory / f"attempt-{index + 1}" / "motor")
+        checks = (
+            (context(bridge.state) == initial_context, "context_changed"),
+            (task.landing_verified(bridge.state), "landing_not_verified"),
+            (result.get("source") == "soh", "invalid_source"),
+            (result["consumed_actions"] > 0, "missing_consumed_input"),
+            (result["objective_unchanged"], "objective_changed"),
+            (result["run_updates"] == 0, "evaluation_trained"),
+            (result.get("reference_blend") == 0, "reference_blend"),
+            (result.get("provider_calls") == 0, "provider_calls"),
+        )
+        success = bool(result["success"] and all(valid for valid, _ in checks))
+        reason = ("observed_verified_landing" if success else result["task"]["failure"]
+                  or next((reason for valid, reason in checks if not valid), "unverified_descent"))
+        attempt = dict(
+            success=success, reason=reason, consumed_actions=result["consumed_actions"],
+            objective_unchanged=result["objective_unchanged"], run_updates=result["run_updates"],
+            provider_calls=result.get("provider_calls"), reference_blend=result.get("reference_blend"),
+            initial_position=result["initial"]["player"]["position"],
+            final_position=result["final"]["player"]["position"],
+            landing_target=task.target, upper_floor_approach=task.approach,
+            task_version=task.version,
+        )
+        report["attempts"].append(attempt)
+        report["consumed_actions"] += attempt["consumed_actions"]
+        calls = [a["provider_calls"] for a in report["attempts"]]
+        report["provider_calls"] = sum(calls) if all(type(c) is int and c >= 0 for c in calls) else None
+        report.update(success=attempt["success"], reason=attempt["reason"])
+        write_json(directory / "report.json", report)
+        if attempt["success"]:
+            break
     write_json(directory / "report.json", report)
     return report
 
@@ -74,12 +139,15 @@ async def collect(
     policy=None,
     candidate=None,
     cross_initial_portal=False,
+    descend_observed_ledge=False,
 ):
     if not 3 <= sessions <= 12 or not 3 <= tasks <= 40:
         raise ValueError("Use 3..12 native sessions and 3..40 tasks per session")
     if (policy is None) != (candidate is None):
         raise ValueError("Frozen candidate evaluation requires both policy and checkpoint provenance")
-    session_budget = 60 + tasks * 14 + (120 if cross_initial_portal else 0)
+    if descend_observed_ledge and not cross_initial_portal:
+        raise ValueError("Observed descent preparation requires cross_initial_portal")
+    session_budget = 60 + tasks * 14 + (120 if cross_initial_portal else 0) + (75 if descend_observed_ledge else 0)
     directory, manifest = prepare_suite(
         settings,
         executable,
@@ -90,7 +158,7 @@ async def collect(
         seconds=session_budget,
     )
     manifest.update(
-        runner_version="laya-reference-walking-v2" if policy is None else "laya-continuous-walking-eval-v2",
+        runner_version="laya-reference-walking-v3" if policy is None else "laya-continuous-walking-eval-v3",
         native_sessions=sessions,
         tasks_per_session=tasks,
         scope="current_observed_walking_cells_only",
@@ -104,6 +172,7 @@ async def collect(
         preparation_controller="frozen_v3_motor" if cross_initial_portal else None,
         preparation_in_candidate_results=False,
         preparation_in_training=False,
+        observed_descent_preparation=descend_observed_ledge,
     )
     expected_candidate = (
         {name: digest(candidate / name) for name in ("candidate.json", "heads.safetensors")}
@@ -147,6 +216,11 @@ async def collect(
                         bridge, directory / "frozen", home / "portal-preparation",
                     )
                     preparations.append({"session": session + 1, **preparation})
+                    if preparation["success"] and descend_observed_ledge:
+                        preparation = await prepare_observed_descent(
+                            bridge, directory / "frozen", home / "descent-preparation",
+                        )
+                        preparations.append({"session": session + 1, **preparation})
                     write_json(directory / "preparations.json", preparations)
                     if policy is not None:
                         policy.invalidate()
@@ -173,7 +247,8 @@ async def collect(
                     }
                     try:
                         if preparation is not None and not preparation["success"]:
-                            raise RuntimeError("initial_portal_preparation_failed")
+                            kind = preparation.get("kind", "portal")
+                            raise RuntimeError(f"initial_{kind}_preparation_failed")
                         task = LocalTask.observed_cell(bridge.state, observed_target(bridge.state, rng))
                         record["attempted"] = True
                         result, rows = await run_task(
@@ -296,9 +371,14 @@ def main():
     parser.add_argument("--cross-initial-portal", action="store_true",
                         help="Use the frozen motor for a verified normal-input portal preparation; "
                              "exclude preparation from Laya results/training")
+    parser.add_argument("--descend-observed-ledge", action="store_true",
+                        help="After portal preparation, try a bounded current-observed landing "
+                             "with reference control; excludes descent from Laya results/training")
     args = parser.parse_args()
     if args.candidate and (not args.base or not args.python):
         parser.error("--candidate requires --base and --python")
+    if args.descend_observed_ledge and not args.cross_initial_portal:
+        parser.error("--descend-observed-ledge requires --cross-initial-portal")
     runner = evaluate if args.candidate else collect
     extras = {"candidate": args.candidate, "base": args.base, "python": args.python} if args.candidate else {}
     asyncio.run(
@@ -311,6 +391,7 @@ def main():
             seed=args.seed,
             save_slot=args.save_slot,
             cross_initial_portal=args.cross_initial_portal,
+            descend_observed_ledge=args.descend_observed_ledge,
             **extras,
         )
     )

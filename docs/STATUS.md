@@ -1,5 +1,29 @@
 # Implementation status — V3, V4 motor foundation and local curriculum
 
+## Bounded descent preparation and native ladder observations on 2026-10-04
+
+The separate QA profile `--descend-observed-ledge --cross-initial-portal` attempts a descent from a currently observed floor-ray landing. It approaches only through current directed upper-floor collision cells, keeps the landing proposal ephemeral, cools down failed regions and tries at most three distinct proposals. Actual success requires three fresh stopped ground-contact frames at the landing, native consumption, the same context and unchanged objective, zero updates/provider calls/reference blend, and SoH evidence. Airborne passage, simulated output and ladder/ledge attachment cannot credit a walking descent. Preparation remains outside Laya training and candidate results.
+
+Five terminal native batches used Arquivo 2, seed `4103100`, three copied native homes and five planned candidate tasks per session:
+
+| Batch | Native build | Reference descent attempts / successful | Recorded ladder-observation frames |
+| --- | --- | --- | --- |
+| `g1-b27280082c23` | 3.2 | 3 / 0 | 0 |
+| `g1-1d0e02e7eef8` | 3.2 | 6 / 0 | 0 |
+| `g1-886f948b68ab` | 3.3 | 6 / 0 | 10 |
+| `g1-3f0bd1f266fa` | 3.4 | 6 / 0 | 9 |
+| `g1-e046a2dec225` | 3.5 | 6 / 0 | 7 |
+
+All **15/15 initial portal preparations** succeeded, but all **27 reference descent attempts** failed with `no_geometric_progress`. Every recorded descent pose remained at height **100**, with actual wall-contact frames and no ladder attachment or hanging state. The current floor proposals do not demonstrate a reachable descent opening. The first prototype tried one region; later trials reconsidered currently observed alternatives with local cooldown. The adjacent coarse mesh sample may have a different slope height from a native landing-ray hit; the latter remains the explicit landing evidence. This correction did not produce a physical success.
+
+The failed preparation left **75 planned Laya tasks, zero attempted**, zero consumed candidate actions and zero worker replies. Candidate latency is **null**, because it was not measured. No failed reference action became a positive demonstration, no candidate update occurred and no gameplay success was credited to Laya. Its walking policy now also invalidates a cached response when the task changes to an unsupported traversal kind. The camera-aware walking transform remains separate from attached ladder control; actual native top-down validation is still outstanding.
+
+Pinned SoH's `CollisionPoly_LineVsPoly` excludes a back-face crossing when `chkOneFace` is true. Native 3.3 changed only climb-observation rays to query both faces, retaining each ray's first solid hit as occlusion; blocking/floor/navmesh and physical movement queries stayed unchanged. The new batches observed some `ladder_up` surface proposals with wall flags **3**, thirty units below the standing floor. They did not expose a usable `Down` context or prove climbing direction, attachment, a complete ladder path or traversal. Native 3.4 separately added a shallow floor-minus-four band; no ladder proposal appeared at that height. That band was removed. Final **3.5** restores the original three heights and retains the two-face observation query. Fresh-process trajectories/timing are not perfectly paired, and these observations do not qualify general ladder detection.
+
+The final pinned SoH Release build completed with exit code 0 and supplied actual `rt-input-v3.5` packets. Original/frozen motor and map files, candidate weights and per-batch source/native pins passed the harness checks; the final batch pins were also rehashed after shutdown. Source/executable changes between experiments are intentional and recorded separately. Owned game/worker processes closed normally. There were zero provider calls, screenshots, teleports or operator game inputs. The **227 JSON files** passed strict UTF-8 and finite-JSON parsing. Sanitized evidence: [validation/laya_descent_2026-10-04.json](validation/laya_descent_2026-10-04.json). Descent, mode-specific learning, sword acquisition and G2–G5 remain unqualified; INICIAR has not been switched to the Laya candidate.
+
+Validation: **374 pytest cases passed, 20 skipped**, with the existing Starlette/httpx warning. The skips require unavailable g++/clang++ and are not successful native tests. Web production build and focused Ruff checks passed. The separate MSVC C++20 scheduler harness passed **19 cases**; the complete SoH builds also completed independently. Final changed-file UTF-8 verification passed.
+
 ## Verified portal preparation and exterior Laya walking on 2026-10-04
 
 The walking curriculum now accepts `--cross-initial-portal`. It loads the selected existing save through normal startup input, then lets the frozen V3 motor leave the initial room. A preparation is valid only with consumed commands, an unchanged objective, zero updates and an actual settled same-instance portal crossing. Preparation control/results are attributed separately and excluded from Laya actions and training data. Failed preparation leaves subsequent tasks unattempted rather than crediting synthetic candidate movement. Reports distinguish planned/attempted/successful tasks and preserve native evidence before a potentially invalid dataset export.

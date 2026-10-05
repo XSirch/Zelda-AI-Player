@@ -39,6 +39,10 @@ O loader valida a base, a origem da biblioteca e os pesos do candidato. A avalia
 
 Para avaliar após uma saída real da sala inicial, acrescente `--cross-initial-portal` ao comando do currículo. O motor V3 congelado faz essa preparação pelos controles normais; suas ações não entram nos resultados nem no treino do Laya. O primeiro lote confirmou três saídas da casa e **15/15 caminhadas do Laya na plataforma externa**. Todas permaneceram na altura da plataforma: descida, exploração da floresta e coleta da espada continuam sem qualificação. Veja o [registro da avaliação externa](docs/validation/laya_portal_walking_2026-10-04.json).
 
+A investigação de descida usa `--descend-observed-ledge` junto de `--cross-initial-portal`. Essa preparação experimental recebe somente propostas de piso da colisão local atual, tenta até três regiões distintas e exige aterrissagem parada em três observações novas. As falhas ficam registradas e impedem o início do candidato naquele save de trabalho. Ações dessa preparação pertencem ao controlador de referência e ficam fora do treino do Laya. Os resultados estão no [registro de descida](docs/validation/laya_descent_2026-10-04.json).
+
+O perfil de caminhada também libera respostas pendentes ao receber uma tarefa de queda ou escalada. A correção pela câmera vale para movimento no solo; o controle preso a uma escada exige uma política de modo própria. A consulta nativa passou a observar as duas faces das superfícies escaláveis, mantendo a primeira colisão como barreira de oclusão. Detectar essa superfície ainda exige comprovar aproximação, interação e travessia no jogo.
+
 ## Autonomy V3
 
 Ao clicar **INICIAR**, três loops independentes trabalham em paralelo:
