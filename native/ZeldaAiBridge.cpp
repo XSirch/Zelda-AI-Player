@@ -6,6 +6,7 @@
 #include "StartupGuard.hpp"
 #include "NavMeshQueries.hpp"
 #include "NavigationResolution.hpp"
+#include "NavigationRefinement.hpp"
 #include "ContainerPose.hpp"
 #include "DialogueObservation.hpp"
 #include "ProgressAutosave.hpp"
@@ -48,7 +49,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.14";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.15";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -127,6 +128,7 @@ struct BridgeData {
     uint64_t fullSeq = 0, captureTick = 0, contextEpoch = 0, eventAck = 0;
     int previousMode = -1;
     bool forceFull = true;
+    zelda_ai::NavigationRefinementWindow navigationRefinement;
     OSContPad lastDelivered{};
     bool wasOwned = false;
     zelda_ai::ActorRegistry actors;
@@ -193,6 +195,9 @@ struct BridgeData {
                 const std::string kind = data.at("kind").get<std::string>();
                 if (kind == "observe_ack") {
                     eventAck = std::max(eventAck, std::min(number("event_cursor"), eventSeq));
+                    if (data.value("refine_navigation", false) && navigationRefinement.Request(
+                        number("refinement_request_id"),number("scene_epoch"),number("context_epoch"),
+                        number("base_seq"),sceneEpoch,contextEpoch,seq,NowMs())) forceFull = true;
                     if (data.value("request_full", false)) forceFull = true;
                     continue;
                 }
@@ -237,7 +242,9 @@ struct BridgeData {
                     if (!stepsAllowed) continue;
                 }
                 const auto nowUs = NowUs();
-                scheduler.Accept(command, nowUs / 1000, nowUs);
+                if (scheduler.Accept(command, nowUs / 1000, nowUs) &&
+                    (command.kind == zelda_ai::InputKind::Release || command.kind == zelda_ai::InputKind::Cancel))
+                    navigationRefinement.Cancel();
             } catch (const std::exception&) {
                 // Malformed, unauthorized or out-of-context packets never drive the controller.
             }
@@ -1451,7 +1458,7 @@ void Snapshot() {
         {"bridge_build", BRIDGE_BUILD},
         {"capabilities", {"fast_state", "input_sequence", "consumed_receipts", "client_to_consume_latency",
                           "player_relative_dodge_state", "control_stick_direction", "ml_combat_state",
-                          "actor_uid", "event_cursor", "local_navmesh", "probe_yaw_v2", "scene_exit_surfaces",
+                          "actor_uid", "event_cursor", "local_navmesh", "navmesh_refinement", "probe_yaw_v2", "scene_exit_surfaces",
                           "traversal_affordances_v1", "story_progress_v1", "scene_autosave_v1", "progress_autosave_v1", "container_lid_pose_v1", "startup_controls_v1"}},
         {"token", bridge.token},
         {"source", "soh"},
@@ -1618,7 +1625,9 @@ void Snapshot() {
             if (full && !state["paused"].get<bool>() && !state["cutscene_active"].get<bool>() &&
                 state["game_over_state"].get<int>() == 0 && !state["dialogue"]["active"].get<bool>()) {
                 state["traversal_affordances"] = TraversalAffordances(player);
-                auto navigation = NavigationMesh(player);
+                const bool refined = bridge.navigationRefinement.Active(NowMs(),bridge.sceneEpoch,bridge.contextEpoch);
+                auto navigation = NavigationMesh(player,refined ? 35.0f : 70.0f);
+                navigation["refinement_request_id"] = refined ? bridge.navigationRefinement.requestId : 0;
                 state["scene_exits"] = navigation["scene_exits"];
                 navigation.erase("scene_exits");
                 state["navmesh"] = navigation;

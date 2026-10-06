@@ -50,6 +50,26 @@ class Bridge(asyncio.DatagramProtocol):
         self.dropped_samples = 0
         self._last_resync = 0.0
         self._last_heartbeat = 0.0
+        self._last_navigation_refinement = float('-inf')
+
+    def request_navigation_refinement(self, *, request_id):
+        """Read-only current-context collision query, with no controller command."""
+        game, now = self.state, time.monotonic()
+        if (not self.connected or not self.realtime or not self.transport or not self.peer
+                or game.source != 'soh' or 'navmesh_refinement' not in game.capabilities
+                or now-self.last_seen > .3):
+            return False
+        if not isinstance(request_id,int) or isinstance(request_id,bool) or not 0<request_id<=game.seq:
+            raise ValueError('Invalid navigation refinement request identity')
+        if now-self._last_navigation_refinement < .5:
+            return False
+        self.transport.sendto(json.dumps({'protocol':3,'kind':'observe_ack','token':self.token,
+            'instance_id':game.instance_id,'event_cursor':self._event_cursor,'request_full':False,
+            'refine_navigation':True,'refinement_request_id':request_id,
+            'scene_epoch':game.scene_epoch,'context_epoch':game.context_epoch,'base_seq':game.seq},
+            separators=(',',':')).encode(),self.peer)
+        self._last_navigation_refinement = now
+        return True
 
     def connection_made(self, transport):
         self.transport = transport

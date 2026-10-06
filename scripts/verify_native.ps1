@@ -12,6 +12,7 @@ $harnesses = @(
     @{ Name = 'scheduler'; Source = 'native_input_scheduler.cpp' },
     @{ Name = 'walking-clearance'; Source = 'native_walking_clearance.cpp' },
     @{ Name = 'navigation-resolution'; Source = 'native_navigation_resolution.cpp' },
+    @{ Name = 'navigation-refinement'; Source = 'native_navigation_refinement.cpp' },
     @{ Name = 'container-pose'; Source = 'native_container_pose.cpp' },
     @{ Name = 'dialogue-observation'; Source = 'native_dialogue_observation.cpp' },
     @{ Name = 'progress-autosave'; Source = 'native_progress_autosave.cpp' }

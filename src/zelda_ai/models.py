@@ -100,6 +100,7 @@ class SceneExitObservation(StrictModel):
 
 class NavigationMeshSnapshot(StrictModel):
     """Compact local walkable graph produced from SoH collision on full snapshots."""
+    refinement_request_id: int = Field(default=0, ge=0)
     origin: tuple[float, float, float] = (0.0, 0.0, 0.0)
     step: float = Field(default=0.0, ge=0.0, le=500.0)
     half_extent: int = Field(default=0, ge=0, le=8)

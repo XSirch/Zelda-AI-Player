@@ -181,19 +181,22 @@ def test_run_mode_defaults_to_training():
 def test_current_native_capability_advertisement_fits_the_client_contract(state):
     import re
     from pathlib import Path
+
     from zelda_ai.models import GameState
 
     native = (Path(__file__).parents[1] / "native/ZeldaAiBridge.cpp").read_text(encoding="utf-8")
     block = native.split('{"capabilities", {', 1)[1].split('}},', 1)[0]
     capabilities = re.findall(r'"([^"\n]+)"', block)
-    assert len(capabilities) == 18
+    assert 0 < len(capabilities) == len(set(capabilities)) <= 32
     game = GameState.model_validate({**state.model_dump(), "capabilities": capabilities})
     assert "progress_autosave_v1" in game.capabilities
     assert "container_lid_pose_v1" in game.capabilities
+    assert 'navmesh_refinement' in game.capabilities
 
 
 def test_capability_advertisement_remains_bounded(state):
     from pydantic import ValidationError
+
     from zelda_ai.models import GameState
     with pytest.raises(ValidationError):
         GameState.model_validate({**state.model_dump(), "capabilities": ["cap"] * 33})

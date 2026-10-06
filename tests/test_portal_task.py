@@ -115,6 +115,99 @@ def test_exhausted_partial_approach_never_becomes_a_collision_blind_exit_target(
     assert task.reference_stick(state) == (0, 0)
 
 
+def refinement_boundary(state):
+    row = observed(state)
+    state.protocol = 3
+    state.capabilities = ['navmesh_refinement']
+    state.full_seq = state.seq
+    task = ObservedPortalTask.create(state,row,now=0)
+    state.player.position = (0,0,70)
+    state.seq += 1
+    state.full_seq = state.seq
+    state.navmesh = NavigationMeshSnapshot(origin=(0,0,70),step=70,half_extent=1,
+        cells=[(0,0,0.,0)])
+    task.observe(state,consumed=True,now=1)
+    return task
+
+
+def test_exhausted_current_coarse_portal_requests_neutral_refinement_before_failing(state):
+    task = refinement_boundary(state)
+    assert task.phase == 'collision_refinement' and task.failure is None
+    assert task.reference_stick(state) == (0,0)
+    assert task.guidance(state)['active'] is False
+    assert task.deadline == 30 and task.progress_at == 1
+
+
+def test_fresh_owned_fine_collision_can_resume_same_bounded_portal_without_synthesized_path(state):
+    task = refinement_boundary(state)
+    assert task.phase == 'collision_refinement'
+    state.seq += 1
+    state.full_seq = state.seq
+    state.navmesh = NavigationMeshSnapshot(origin=(0,0,70),step=35,half_extent=2,
+        cells=[(0,0,0.,1),(0,1,0.,1),(0,2,0.,0)],refinement_request_id=task.origin_seq)
+    task.observe(state,consumed=False,now=1.2)
+    assert task.phase == 'execute' and task.failure is None
+    assert task.steering_point(state) == (0,0,105)
+    assert task.target == (0,0,160) and task.deadline == 30
+    assert task.progress_at == 1
+
+
+@pytest.mark.parametrize('change',['old_snapshot','wrong_request','coarse'])
+def test_unowned_or_old_collision_cannot_resume_a_waiting_portal(state,change):
+    task = refinement_boundary(state)
+    state.seq += 1
+    if change != 'old_snapshot':
+        state.full_seq = state.seq
+    state.navmesh = NavigationMeshSnapshot(origin=(0,0,70),step=70 if change=='coarse' else 35,
+        half_extent=2,cells=[(0,0,0.,1),(0,1,0.,0)],
+        refinement_request_id=task.origin_seq+1 if change=='wrong_request' else task.origin_seq)
+    task.observe(state,consumed=False,now=1.2)
+    assert task.phase == 'collision_refinement' and task.reference_stick(state)==(0,0)
+
+
+def test_fine_query_without_real_continuation_fails_without_second_query_or_wall_steering(state):
+    task = refinement_boundary(state)
+    state.seq += 1
+    state.full_seq = state.seq
+    state.navmesh = NavigationMeshSnapshot(origin=(0,0,70),step=35,half_extent=2,
+        cells=[(0,0,0.,0)],refinement_request_id=task.origin_seq)
+    task.observe(state,consumed=False,now=1.2)
+    assert task.phase=='failed' and task.failure=='observed_approach_exhausted'
+    assert task.collision_refinement_count==1 and task.reference_stick(state)==(0,0)
+
+
+@pytest.mark.parametrize('expired',['wait','geometric_progress','task_deadline'])
+def test_collision_wait_preserves_original_progress_and_deadline_budgets(state,expired):
+    task = refinement_boundary(state)
+    if expired=='geometric_progress':
+        task.progress_at = -2
+    now=30 if expired=='task_deadline' else 2
+    task.observe(state,consumed=False,now=now)
+    assert task.phase=='failed'
+    assert task.failure=={'wait':'collision_refinement_timeout','geometric_progress':'no_geometric_progress',
+        'task_deadline':'attempt_timeout'}[expired]
+
+
+def test_motor_refresh_does_not_call_laya_or_apply_old_stick_while_collision_query_owns_wait(state,tmp_path):
+    import time
+
+    from zelda_ai.autonomy.controller import ContinuousController, Setpoint
+    from zelda_ai.bridge import Bridge
+
+    task = refinement_boundary(state)
+    class Policy:
+        refresh_at_motor_cadence = True
+        def __call__(self,*args):
+            raise AssertionError('A waiting query cannot invoke a movement candidate')
+    bridge = Bridge('x'*32)
+    bridge.state,bridge.last_seen = state,time.monotonic()
+    controller = ContinuousController(bridge,tmp_path/'policy.pt',training_enabled=False)
+    controller.local_task,controller.local_stick_policy = task,Policy()
+    controller.last_setpoint = Setpoint(stick_x=60,reason='local_task')
+    controller._refresh_camera_relative_setpoint(state)
+    assert controller.last_setpoint.stick_x==controller.last_setpoint.stick_y==0
+
+
 def test_observed_connected_detour_can_temporarily_move_away_from_exit(state):
     row = observed(state)
     row.position = (0, 0, -210)

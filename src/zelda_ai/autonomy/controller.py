@@ -316,6 +316,10 @@ class ContinuousController:
         if camera_modal_active(game.player) and not task.accepts_camera_modal(game):
             task.interrupt("camera_modal_owns_control")
         task.observe(game, consumed=consumed)
+        if getattr(task,'collision_refinement_count',0) and task.phase in {'execute','collision_refinement'}:
+            if task.phase == 'collision_refinement' and hasattr(self.local_stick_policy,'invalidate'):
+                self.local_stick_policy.invalidate()
+            self.bridge.request_navigation_refinement(request_id=task.origin_seq)
         return task.guidance(game)
 
     @staticmethod
@@ -410,7 +414,7 @@ class ContinuousController:
             and getattr(self.local_stick_policy, "refresh_at_motor_cadence", False)
         ):
             task = self.local_task
-            if task.terminal or task.phase == "verify":
+            if task.terminal or task.phase in {"verify",'collision_refinement'}:
                 stick = (0, 0)
             else:
                 stick = self.local_stick_policy(game, task)
@@ -1705,7 +1709,7 @@ class ContinuousController:
         setpoint, sample = self._sample_setpoint(observation, guidance)
         if local_owned:
             task = self.local_task
-            if task.terminal or task.phase == "verify":
+            if task.terminal or task.phase in {"verify",'collision_refinement'}:
                 stick = (0, 0)
             elif self.local_stick_policy is None:
                 stick = task.reference_stick(game)

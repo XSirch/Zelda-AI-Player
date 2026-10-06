@@ -36,12 +36,13 @@ async def execute_frozen_task(controller, bridge, task, policy, directory, *, en
         game, owned = bridge.state, controller.local_task
         if observe and game:
             observe(game)
-        if (owned and game.player and owned.phase in {"prepare", "execute"}
+        if (owned and game.player and owned.phase in {"prepare", "execute",'collision_refinement'}
                 and bridge.command_seq > first_seq
                 and controller.last_setpoint.reason in {"local_task", "dialogue_disengage"}):
             requested[bridge.command_seq] = {"observation_seq": game.seq, "features": encoder(game, owned),
                 "stick": [controller.last_setpoint.stick_x, controller.last_setpoint.stick_y],
-                "buttons": controller.last_setpoint.buttons, "source": controller.last_setpoint.reason}
+                "buttons": controller.last_setpoint.buttons, "source": controller.last_setpoint.reason,
+                'collision_refinement_neutral':owned.phase=='collision_refinement'}
         if game and len(frames) < 660:
             frames.append({"state": game.model_dump(), "task": task.snapshot(),
                            "reason": controller.last_setpoint.reason})
@@ -59,6 +60,8 @@ async def execute_frozen_task(controller, bridge, task, policy, directory, *, en
     receipts = {s: r.model_dump() for s, r in bridge.receipts.items()
                 if s > first_seq and r.first_tick > 0}
     consumed = sum(s in receipts for s in requested)
+    refinement_neutral = sum(s in receipts and r.get('collision_refinement_neutral',False)
+        for s,r in requested.items())
     buttons = sum(bool(row["pressed"]) for row in receipts.values())
     unchanged, updates = controller.intent == objective, controller.policy.updates - starting_updates
     success = bool(failure is None and task.phase == "succeeded" and consumed > 0
@@ -66,6 +69,7 @@ async def execute_frozen_task(controller, bridge, task, policy, directory, *, en
     report = {"source": "soh", "success": success, "task": task.snapshot(), "initial": initial.model_dump(),
               "final": bridge.state.model_dump(), "frames": frames, "requested": requested,
               "receipts": receipts, "consumed_actions": consumed, "raw_button_actions": buttons,
+              'collision_refinement_neutral_consumed_actions':refinement_neutral,
               "objective": objective.model_dump(), "final_objective": controller.intent.model_dump(),
               "objective_unchanged": unchanged, "run_updates": updates, "provider_calls": 0,
               "reference_blend": 0, "demonstration_labels": 0, "motor_failure": failure}

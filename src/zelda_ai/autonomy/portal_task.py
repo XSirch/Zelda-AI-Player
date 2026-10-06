@@ -26,6 +26,9 @@ class ObservedPortalTask(LocalTask):
     corridor_replans: int = 0
     local_detours: tuple = ()
     visited_positions: tuple = ()
+    collision_refinement_count: int = 0
+    collision_refinement_started: float | None = None
+    collision_refinement_full_seq: int = 0
 
     @classmethod
     def create(cls, game, exit_observation, *, now=None, budget_s=30):
@@ -41,7 +44,7 @@ class ObservedPortalTask(LocalTask):
         task.initial_events = tuple(e.id for e in game.events)
         task.last_source_position = tuple(game.player.position)
         task.visited_positions = (tuple(game.player.position),)
-        task.version = "observed-walking-portal-v2"
+        task.version = "observed-walking-portal-v3"
         task._plan(game, exit_observation)
         task._track_waypoint(game)
         return task
@@ -85,6 +88,16 @@ class ObservedPortalTask(LocalTask):
 
     def steering_point(self, game):
         return self._corridor_point()
+
+    def _exhausted_approach(self, game, now):
+        if (game.protocol == 3 and 'navmesh_refinement' in game.capabilities
+                and game.navmesh.step > 35 and not self.collision_refinement_count):
+            self.collision_refinement_count = 1
+            self.collision_refinement_started = now
+            self.collision_refinement_full_seq = game.full_seq
+            self.phase = 'collision_refinement'
+        else:
+            self.phase, self.failure = 'failed', 'observed_approach_exhausted'
 
     def observe(self, game, *, consumed, now=None):
         if self.terminal:
@@ -146,6 +159,23 @@ class ObservedPortalTask(LocalTask):
         if observation is None:
             self.interrupt("current_native_exit_lost")
             return
+        if self.phase == 'collision_refinement':
+            if now-self.progress_at >= 2.5:
+                self.phase, self.failure = 'failed','no_geometric_progress'
+                return
+            owned_fine = (game.full_seq > self.collision_refinement_full_seq
+                and 0 < game.navmesh.step <= 35
+                and game.navmesh.refinement_request_id == self.origin_seq)
+            if not owned_fine:
+                if now-self.collision_refinement_started >= 1:
+                    self.phase, self.failure = 'failed','collision_refinement_timeout'
+                return
+            try:
+                self._plan(game,observation)
+            except ValueError:
+                self.phase, self.failure = 'failed','observed_approach_exhausted'
+                return
+            self.phase = 'execute'
         while (self.waypoint_index + 1 < len(self.corridor)
                and self._waypoint_reached(game.player.position, self._corridor_point())):
             self.waypoint_index += 1
@@ -153,7 +183,7 @@ class ObservedPortalTask(LocalTask):
             try:
                 self._plan(game, observation)
             except ValueError:
-                self.phase, self.failure = "failed", "observed_approach_exhausted"
+                self._exhausted_approach(game,now)
                 return
         elif not self.corridor:
             # A direct exit floor query is current evidence, not a permanent
@@ -161,7 +191,7 @@ class ObservedPortalTask(LocalTask):
             try:
                 self._plan(game, observation)
             except ValueError:
-                self.phase, self.failure = "failed", "observed_approach_exhausted"
+                self._exhausted_approach(game,now)
                 return
         self._track_waypoint(game)
         self.best_distance = min(self.best_distance, math.dist(game.player.position, self.target))
@@ -171,12 +201,12 @@ class ObservedPortalTask(LocalTask):
             self.phase = "execute"  # Proximity never completes or brakes a portal.
 
     def reference_stick(self, game):
-        if self.phase == "transition":
+        if self.phase in {"transition",'collision_refinement'}:
             return (0, 0)
         return super().reference_stick(game)
 
     def guidance(self, game):
-        if self.phase == "transition" or not game.player:
+        if self.phase in {"transition",'collision_refinement'} or not game.player:
             return {"active": False, "source": "observed_portal_transition", "target": self.target,
                     "stick": (0, 0), "strength": 0., "button_quiet": 1., "blocked": False}
         return {**super().guidance(game), "local_path_active": bool(self.corridor)}
