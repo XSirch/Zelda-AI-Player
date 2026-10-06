@@ -10,7 +10,7 @@ import time
 from collections import Counter
 
 from .camera_task import ObservedCameraReturnTask, eligible_camera_return
-from .collectible_task import ObservedCollectibleApproachTask
+from .collectible_task import ObservedCollectibleApproachTask, resource_values
 from .container_task import ObservedContainerApproachTask
 from .context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask, eligible_context
 from .execution import physical_context
@@ -21,8 +21,15 @@ from .navigation import observed_local_path
 from .portal_task import ObservedPortalTask
 
 
+class CurrentTasksCooling(ValueError):
+    """Current observed tasks can be reconsidered after a real local cooldown."""
+    def __init__(self, retry_at):
+        super().__init__("no_eligible_current_collision_task:current_tasks_cooling")
+        self.retry_at = retry_at
+
+
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v13"
+    VERSION = "current-collision-exploration-plan-v15"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
@@ -35,6 +42,10 @@ class ObservedExplorationPlan:
         self.origins, self.max_radius = {}, {}
         self.context_actions = Counter()
         self.opened_containers = {}
+        self.no_gain_pickups = {}
+        self.no_gain_deferrals, self.cooldown_replans = 0, 0
+        self.last_resources, self.last_pickup_signature = {}, None
+        self.last_scene_epoch, self.last_load_events, self.last_safe_ground = None, (), False
         self.read_actor_contexts = {}
         self.progress_tokens, self.progress_revision, self.progress_initialized = set(), 0, False
         self.event_ids = set()
@@ -56,7 +67,18 @@ class ObservedExplorationPlan:
                 or game.game_over_state or game.seq <= self.last_seq):
             return
         now = time.monotonic() if now is None else now
+        if self.last_seq >= 0 and (self.last_context and game.instance_id != self.last_context[0]
+                or any(e.id not in self.event_ids and e.kind in {"save_loaded", "player_died", "game_over"}
+                    for e in game.events)):
+            self.no_gain_pickups.clear()
         self.last_seq = game.seq
+        self.last_resources = resource_values(game)
+        self.last_pickup_signature = self.pickup_signature(game)
+        self.last_scene_epoch = game.scene_epoch
+        self.last_load_events = LocalTask._loads(game)
+        self.last_safe_ground = bool(grounded(game.player) and not camera_modal_active(game.player)
+            and not game.dialogue.active and not game.cutscene_active
+            and not game.paused and not game.pause_menu.active)
         tokens = ({("item", value) for value in game.inventory if 0 <= value < 255}
             | {("equipment", name) for name in game.progress.owned_equipment}
             | {("quest", name) for name in game.progress.quest_items}
@@ -107,6 +129,7 @@ class ObservedExplorationPlan:
         now = time.monotonic() if now is None else now
         key = self.task_key(task)
         self._departure_outcome(task, success=success, now=now)
+        self._pickup_outcome(task, success=success, now=now)
         if (success and isinstance(task, LinearDialogueTask) and task.phase == "succeeded"
                 and task.observed_effect == "dialogue_closed" and task.consumed
                 and task.verification_frames >= 3):
@@ -126,6 +149,58 @@ class ObservedExplorationPlan:
             failures = self.failures.get(key, 0)
         self.bounded_put(self.failures, key, failures, limit=512)
         self.bounded_put(self.retry_after, key, now + (30 if isinstance(task, ObservedPortalTask) else 20), limit=512)
+
+    @staticmethod
+    def pickup_signature(game):
+        # Only Link's observed resources/inventory: no drop params or contents.
+        return (tuple(sorted(resource_values(game).items())), tuple(game.inventory))
+
+    def _matching_pickup_memories(self, context, target):
+        return [(key, row) for key, row in self.no_gain_pickups.items()
+            if row["context"] == context and abs(row["position"][1]-target[1]) <= 4
+            and math.hypot(row["position"][0]-target[0], row["position"][2]-target[2]) <= 8]
+
+    def _pickup_outcome(self, task, *, success, now):
+        if not isinstance(task, ObservedCollectibleApproachTask):
+            return
+        matches = self._matching_pickup_memories(task.context, task.target)
+        if (success and task.phase == "succeeded" and task.contact_seen and task.consumed
+                and task.gain_seq is not None and task.gain_values and task.verification_frames >= 3):
+            for key, _ in matches:
+                del self.no_gain_pickups[key]
+            return
+        if (success or task.phase != "failed" or task.failure not in {
+                "collectible_no_resource_gain", "collectible_no_observed_gain"}
+                or not task.contact_seen or not task.consumed or task.gain_seq is not None
+                or task.gain_values or task.last_seq <= task.origin_seq or self.last_seq < task.last_seq
+                or self.last_context != task.context or self.last_scene_epoch != task.scene_epoch
+                or any(event not in task.load_events for event in self.last_load_events)
+                or not self.last_safe_ground or self.last_resources != task.initial_resources):
+            return
+        key = matches[0][0] if matches else (*task.context, *task.target)
+        old = self.no_gain_pickups.get(key, {})
+        failures = old.get("failures", 0) + 1 if old.get("signature") == self.last_pickup_signature else 1
+        self.bounded_put(self.no_gain_pickups, key, {"context": task.context,
+            "position": tuple(task.target), "actor_class": "En_Item00", "observed_uid": task.actor_uid,
+            "signature": self.last_pickup_signature, "progress_revision": self.progress_revision,
+            "failures": failures, "observed_seq": task.last_seq,
+            "retry_after": now + min(300, 120*failures)}, limit=512)
+
+    def pickup_deferred(self, game, task, *, now):
+        # Actor UIDs expire on a room revisit. Match only a currently drawn,
+        # authoritative target at the empirically contacted location instead.
+        if game.protocol == 3 and game.room_actors_truncated:
+            return False
+        actors = task.actors(game)
+        neighbors = [a for a in actors if a.drawn and task.is_collectible(a)
+            and a.room in {-1, game.room} and abs(a.position[1]-task.target[1]) <= 12
+            and math.hypot(a.position[0]-task.target[0], a.position[2]-task.target[2]) <= 16]
+        if len(neighbors) != 1:  # Coincident unknown pickups remain ambiguous.
+            return False
+        signature = self.pickup_signature(game)
+        return any(row["retry_after"] > now and row["signature"] == signature
+            and row["progress_revision"] == self.progress_revision
+            for _, row in self._matching_pickup_memories(task.context, task.target))
 
     def _departure_outcome(self, task, *, success, now):
         # A stationary first segment can fail under several different distant
@@ -154,13 +229,17 @@ class ObservedExplorationPlan:
              "retry_after": now + min(120, 20 * failures)}, limit=512)
 
     def departure_deferred(self, task, *, now):
+        return self.departure_retry_at(task) > now
+
+    def departure_retry_at(self, task):
         if task.kind != "observed_cell" or not task.corridor:
-            return False
+            return 0
         point = task.corridor[0]
-        return any(row["context"] == task.context and row["retry_after"] > now
+        return max((row["retry_after"] for row in self.failed_departures.values()
+            if row["context"] == task.context
             and math.dist(task.origin, row["origin"]) <= 18 and math.dist(point, row["point"]) <= 18
             and abs(task.origin[1] - row["origin"][1]) <= 4 and abs(point[1] - row["point"][1]) <= 4
-            for row in self.failed_departures.values())
+            ), default=0)
 
     def context_available(self, game, *, now=None):
         if not self.contextual_interactions or not eligible_context(game):
@@ -219,6 +298,8 @@ class ObservedExplorationPlan:
                           "container_recovery_candidates": 0,
                           "visibly_open_containers_skipped": 0,
                           "eligible_collectible_candidates": 0,
+                          "observed_no_gain_pickups_deferred": 0,
+                          "next_replan_at": None,
                           "eligible_upward_candidates": 0,
                           "read_context_deferred": self.read_context_deferred(game, now=now)}
         if not 1 <= budget_s <= 300:
@@ -244,11 +325,12 @@ class ObservedExplorationPlan:
             self.replans += 1
             return ObservedContextTask.create(game, now=now, budget_s=min(20, budget_s))
         context, position = physical_context(game), game.player.position
-        candidates = []
+        candidates, wake_times = [], []
 
         def offer(task, priority, distance, *, approach_distance=0):
             key = self.task_key(task)
             if self.retry_after.get(key, 0) > now:
+                wake_times.append(self.retry_after[key])
                 return False
             visits = self.visits.get(self.region(context, task.target), 0)
             # Horizontal frontiers seek expansion; vertical traversals first
@@ -264,6 +346,13 @@ class ObservedExplorationPlan:
                     try:
                         task = ObservedCollectibleApproachTask.create(game, actor, now=now, budget_s=min(20, budget_s))
                     except ValueError:
+                        continue
+                    if self.pickup_deferred(game, task, now=now):
+                        self.selection["observed_no_gain_pickups_deferred"] += 1
+                        self.no_gain_deferrals += 1
+                        wake_times.extend(row["retry_after"] for _, row in self._matching_pickup_memories(task.context, task.target)
+                            if row["retry_after"] > now and row["signature"] == self.last_pickup_signature
+                            and row["progress_revision"] == self.progress_revision)
                         continue
                     priority = 1 if self.failures.get(self.task_key(task), 0) >= 2 else -1
                     if offer(task, priority, math.dist(position, actor.position)):
@@ -288,14 +377,15 @@ class ObservedExplorationPlan:
                     self.selection["container_recovery_candidates"] += 1
 
         for row in game.scene_exits:
+            try:
+                task = ObservedPortalTask.create(game, row, now=now, budget_s=min(30, budget_s))
+            except ValueError:
+                continue
             # A new scene's entry doorway is held back briefly to avoid a
             # reflexive return. This does not infer its unseen destination.
             if (self.actual_transitions and now - self.entry_at < 15
                     and math.dist(row.position, self.entry_position) <= 130):
-                continue
-            try:
-                task = ObservedPortalTask.create(game, row, now=now, budget_s=min(30, budget_s))
-            except ValueError:
+                wake_times.append(self.entry_at + 15)
                 continue
             offer(task, 0, math.dist(position, row.position))
 
@@ -305,6 +395,8 @@ class ObservedExplorationPlan:
                 if task and not self.departure_deferred(task, now=now):
                     if offer(task, 1, math.dist(position, task.target), approach_distance=row.distance):
                         self.selection["eligible_upward_candidates"] += 1
+                elif task:
+                    wake_times.append(self.departure_retry_at(task))
                 continue
             if row.kind != "ledge_down" or self.region(context, row.target_position) in self.visits:
                 continue
@@ -331,9 +423,11 @@ class ObservedExplorationPlan:
             task = LocalTask.observed_cell(game, point, now=now, budget_s=min(12, budget_s))
             if self.retry_after.get(self.task_key(task), 0) > now:
                 self.selection["cooled_short_floor_candidates" if short else "cooled_floor_candidates"] += 1
+                wake_times.append(self.retry_after[self.task_key(task)])
             elif self.departure_deferred(task, now=now):
                 self.selection["cooled_departure_candidates"] += 1
                 self.departure_deferrals += 1
+                wake_times.append(self.departure_retry_at(task))
             else:
                 (short_candidates if short else floor_candidates).append((forward, task, distance))
         # A refined graph can expose only one short supported escape step.
@@ -351,6 +445,10 @@ class ObservedExplorationPlan:
             offer(task, 2, distance)
         self.selection["eligible_floor_candidates"] = len(floor_candidates)
         if not candidates:
+            if wake_times:
+                self.selection["next_replan_at"] = min(wake_times)
+                self.cooldown_replans += 1
+                raise CurrentTasksCooling(min(wake_times))
             raise ValueError("no_eligible_current_collision_task")
         self.replans += 1
         return min(candidates, key=lambda row: row[0])[1]
@@ -364,6 +462,9 @@ class ObservedExplorationPlan:
                 "max_outward_radius": max(self.max_radius.values(), default=0),
                 "observed_context_actions": dict(self.context_actions),
                 "verified_opened_containers": len(self.opened_containers),
+                "observed_no_gain_pickup_locations": len(self.no_gain_pickups),
+                "observed_no_gain_pickup_deferrals": self.no_gain_deferrals,
+                "cooldown_replans": self.cooldown_replans,
                 "verified_read_actor_contexts": len(self.read_actor_contexts),
                 "failed_departures": len(self.failed_departures),
                 "departure_deferrals": self.departure_deferrals,
@@ -382,4 +483,5 @@ class ObservedExplorationPlan:
                 failed_departure_attempts=[{"key": key, **value} for key, value in self.failed_departures.items()])
             result.update(occupied_floor_samples=[{"context": owner, "position": point}
                 for owner, point in self.occupied_floors.values()])
+            result.update(no_gain_pickup_attempts=list(self.no_gain_pickups.values()))
         return result

@@ -73,6 +73,62 @@ def test_continuous_tasks_share_one_locked_controller_and_local_success_is_not_g
     assert len(diagnostic["planning"]["visited_regions"]) == 3
 
 
+def test_temporary_cooldown_wait_releases_input_and_resumes_same_goal_without_counting_progress(state, monkeypatch, tmp_path):
+    from zelda_ai.autonomy.execution import ExecutionSupervisor
+    from zelda_ai.autonomy.local_tasks import LocalTask
+    from zelda_ai.models import InputReceipt
+
+    bridge, policy, counts = setup(state, monkeypatch)
+    create = module.ContinuousController
+
+    def controller(*args, **kwargs):
+        owned = create(*args, **kwargs)
+        owned.executor = ExecutionSupervisor()
+        return owned
+
+    monkeypatch.setattr(module,"ContinuousController",controller)
+    choose = module.ObservedExplorationPlan.choose
+    cooling = [True]
+
+    def first_cooldown(plan,game,**kwargs):
+        if cooling[0]:
+            cooling[0] = False
+            for target in [(70,0,0),(140,0,0),(210,0,0)]:
+                task = LocalTask.observed_cell(game,target)
+                plan.retry_after[plan.task_key(task)] = module.time.monotonic()+.03
+        return choose(plan,game,**kwargs)
+
+    monkeypatch.setattr(module.ObservedExplorationPlan,"choose",first_cooldown)
+    state.protocol = 3
+    bridge.connected, bridge.command_seq, bridge.receipts = True, 0, {}
+    neutral, releases = [], []
+    bridge.release = lambda: releases.append(True)
+
+    def send(**packet):
+        assert packet == {"buttons":0,"stick_x":0,"stick_y":0,"lease_ms":150}
+        neutral.append(packet)
+        bridge.command_seq += 1
+        seq = bridge.command_seq
+        bridge.receipts[seq] = InputReceipt(seq=seq,owner_epoch=1,status="completed",
+            first_tick=seq,last_tick=seq,pressed=0,released=0)
+        state.last_applied_command_seq = seq
+        return seq
+
+    async def next_state(seq,*,timeout):
+        await asyncio.sleep(min(.005,timeout))
+        state.seq += 1
+        return state
+
+    bridge.send, bridge.next_state = send,next_state
+    result = asyncio.run(module.exploration_episode(bridge,tmp_path/'frozen',policy,policy,
+        tmp_path/'motor',seconds=10))
+    assert counts["stages"] == 2 and counts["intents"] == 1, result["reason"]
+    assert neutral and releases and result["planning_waits"][0]["game_progress"] is False
+    assert result["planning_wait_consumed_actions"] > 0
+    assert result["objective_unchanged"] and not result["objective_completed"]
+    assert result["reason"] == "ValueError:no_more_observed_tasks"
+
+
 def test_mutating_the_original_intent_cannot_mutate_completion_lock(state, monkeypatch, tmp_path):
     bridge, policy, counts = setup(state, monkeypatch, mutate=True)
     result = asyncio.run(module.exploration_episode(bridge, tmp_path / "frozen", policy, policy,

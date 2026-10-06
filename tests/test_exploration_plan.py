@@ -58,6 +58,145 @@ def test_repeated_optional_collectible_failure_yields_to_current_exit_and_cools_
     assert plan.choose(state, budget_s=20, now=44).kind == "observed_portal"
 
 
+def no_gain_revisit(state):
+    ground(state)
+    actor = ActorObservation(actor_uid="before-revisit", actor_id=21, category=6, params=-1,
+        name="En_Item00", drawn=True,
+        position=(30, 1, 0), distance=30, room=state.room)
+    state.nearby_actors = state.room_actors = [actor]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    task = plan.choose(state, budget_s=20, now=0)
+    assert task.kind == "observed_collectible_approach"
+    state.player.position = (30, 0, 0)
+    state.seq += 1
+    task.observe(state, consumed=True, now=1)
+    state.nearby_actors = state.room_actors = []
+    for now in [1.1, 2.2]:
+        state.seq += 1
+        task.observe(state, consumed=True, now=now)
+    assert task.phase == "failed" and task.failure == "collectible_no_resource_gain"
+    plan.observe(state, now=2.2)
+    plan.outcome(task, success=False, now=2.2)
+    # Ordinary leave/revisit gives the same observed pickup a new actor lifetime.
+    state.scene += 1
+    state.seq += 1
+    plan.observe(state, now=3)
+    state.scene -= 1
+    state.scene_epoch += 2
+    state.seq += 1
+    state.player.position = (0, 0, 0)
+    state.nearby_actors = state.room_actors = [actor.model_copy(update={"actor_uid":"after-revisit"})]
+    return plan, state.nearby_actors[0], task
+
+
+@pytest.mark.parametrize("uid", ["before-revisit", "after-revisit"])
+def test_no_gain_contact_is_not_repeated_on_same_room_revisit_even_after_generic_cooldown(state, uid):
+    plan, actor, _ = no_gain_revisit(state)
+    actor.actor_uid = uid
+    assert plan.choose(state, budget_s=20, now=90).kind != "observed_collectible_approach"
+    assert plan.selection["observed_no_gain_pickups_deferred"] == 1
+    assert len(plan.no_gain_pickups) == 1
+
+
+@pytest.mark.parametrize("change", ["health", "rupees", "inventory", "expiry", "scene", "room",
+    "instance", "age", "mirror", "height", "position", "reload", "progress", "ambiguous", "truncated"])
+def test_observed_no_gain_attempt_never_blacklists_a_changed_or_unknown_pickup_context(state, change):
+    plan, actor, _ = no_gain_revisit(state)
+    now = 90
+    if change == "health":
+        state.player.health -= 1
+    elif change == "rupees":
+        state.player.rupees += 1
+    elif change == "inventory":
+        state.inventory = [1]
+    elif change == "expiry":
+        now = 125
+    elif change == "scene":
+        state.scene += 1
+    elif change == "room":
+        state.room += 1
+        actor.room = state.room
+    elif change == "instance":
+        state.instance_id = "new-native-instance"
+    elif change == "age":
+        state.player.age = "adult"
+    elif change == "mirror":
+        state.mirrored_world = True
+    elif change == "height":
+        actor.position = (30, 6, 0)
+        state.player.position, state.player.floor_height = (0, 6, 0), 6
+        state.navmesh.cells = [(x,z,6,flags) for x,z,y,flags in state.navmesh.cells]
+    elif change == "position":
+        actor.position = (50, 1, 0)
+    elif change == "reload":
+        state.events = [GameEvent(id="new-load",kind="save_loaded")]
+    elif change == "progress":
+        state.progress.owned_equipment = ["new observed item"]
+    elif change == "ambiguous":
+        state.room_actors = state.nearby_actors = [actor, actor.model_copy(update={"actor_uid":"unknown-overlap"})]
+    else:
+        state.protocol = 3
+        state.room_actors_truncated = True
+    state.seq += 1
+    assert plan.choose(state, budget_s=20, now=now).kind == "observed_collectible_approach"
+
+
+@pytest.mark.parametrize("missing", ["consumption", "contact", "fresh_task", "observed_final",
+    "same_epoch", "same_context", "same_resources", "safe_ground", "no_load", "no_gain", "failed_phase", "gain_failure"])
+def test_no_gain_memory_requires_observed_consumed_contact_and_unchanged_resources(state, missing):
+    plan, _, task = no_gain_revisit(state)
+    plan.no_gain_pickups.clear()
+    state.scene_epoch = task.scene_epoch
+    state.seq += 1
+    plan.observe(state, now=91)
+    if missing == "consumption":
+        task.consumed = False
+    elif missing == "contact":
+        task.contact_seen = False
+    elif missing == "fresh_task":
+        task.last_seq = task.origin_seq
+    elif missing == "observed_final":
+        plan.last_seq = task.last_seq-1
+    elif missing == "same_epoch":
+        plan.last_scene_epoch += 1
+    elif missing == "same_context":
+        plan.last_context = ("unrelated", *task.context[1:])
+    elif missing == "same_resources":
+        plan.last_resources = {**plan.last_resources, "health":47}
+    elif missing == "safe_ground":
+        plan.last_safe_ground = False
+    elif missing == "no_load":
+        plan.last_load_events = ("new-load",)
+    elif missing == "no_gain":
+        task.gain_seq, task.gain_values = task.last_seq, {"health":1}
+    elif missing == "failed_phase":
+        task.phase = "interrupted"
+    else:
+        task.failure = "collectible_gain_not_verified"
+    plan.outcome(task, success=False, now=91)
+    assert not plan.no_gain_pickups
+
+
+def test_verified_gain_at_remembered_location_heals_no_gain_memory(state):
+    plan, _, _ = no_gain_revisit(state)
+    state.player.health -= 1
+    state.seq += 1
+    task = plan.choose(state, budget_s=20, now=90)
+    assert task.kind == "observed_collectible_approach"
+    state.player.position = (30, 0, 0)
+    state.seq += 1
+    task.observe(state, consumed=True, now=90.1)
+    state.player.health += 1
+    state.nearby_actors = state.room_actors = []
+    for now in [90.2,90.3,90.4]:
+        state.seq += 1
+        task.observe(state, consumed=True, now=now)
+    assert task.phase == "succeeded" and task.gain_values == {"health":1}
+    plan.observe(state, now=90.4)
+    plan.outcome(task, success=True, now=90.4)
+    assert not plan.no_gain_pickups
+
+
 def test_current_visible_open_lid_is_skipped_without_fabricating_an_open_event(state):
     ground(state)
     state.nearby_actors = [chest(state).model_copy(update={"container_lid_pose": "open"})]
@@ -253,6 +392,19 @@ def test_native_portal_competes_without_a_destination_lookup(state):
         position=(0, 0, 70), direct_reachable=True, samples=1)]
     task = ObservedExplorationPlan().choose(state, budget_s=20, now=0)
     assert task.kind == "observed_portal" and task.exit_index == 1
+
+
+def test_current_reachable_tasks_in_cooldown_request_a_bounded_replan_instead_of_terminal_failure(state):
+    from zelda_ai.autonomy.local_tasks import LocalTask
+    ground(state)
+    plan = ObservedExplorationPlan()
+    for target in [(70,0,0),(140,0,0),(210,0,0)]:
+        task = LocalTask.observed_cell(state,target,now=0)
+        plan.retry_after[plan.task_key(task)] = 10
+    with pytest.raises(ValueError, match="current_tasks_cooling") as pending:
+        plan.choose(state,budget_s=20,now=1)
+    assert pending.value.retry_at == 10
+    assert plan.choose(state,budget_s=20,now=10.1).kind == "observed_cell"
 
 
 def test_new_room_holds_back_entry_exit_and_prefers_observed_unvisited_descent(state):

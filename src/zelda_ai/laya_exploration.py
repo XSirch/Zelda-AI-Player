@@ -9,7 +9,7 @@ import time
 from .autonomy.camera_task import ObservedCameraReturnTask
 from .autonomy.context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask
 from .autonomy.controller import ContinuousController
-from .autonomy.exploration_plan import ObservedExplorationPlan
+from .autonomy.exploration_plan import CurrentTasksCooling, ObservedExplorationPlan
 from .autonomy.ground_descent_task import GroundDescentApproachTask
 from .autonomy.ladder_task import LadderDescentTask
 from .autonomy.laya_ladder_policy import encode_ladder
@@ -19,6 +19,7 @@ from .autonomy.objectives import ObjectiveTracker
 from .g1 import ARTIFACTS, context, write_json
 from .laya_context import execute_context_task, execute_modal_wait
 from .laya_motor import execute_frozen_task
+from .laya_planning_wait import wait_for_replan
 from .laya_traversal import fresh_collision_snapshot
 
 
@@ -40,6 +41,7 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
     controller.executor.room_budget_s = 120  # Macro clock is never restarted by a new local task.
     started, deadline = time.monotonic(), time.monotonic() + seconds
     stages, reason, cancelled, first_task = [], None, False, None
+    planning_waits = []
     selection_state = initial
     landings = 0
     episode_valid = True
@@ -132,8 +134,24 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
                     reason = "objective_telemetry_completed"
                     break
                 selection_state = bridge.state.model_copy(deep=True)
-                task = planner.choose(selection_state, budget_s=min(300, deadline-time.monotonic()-.5),
-                    suppress_context=context_guard_active(selection_state))
+                try:
+                    task = planner.choose(selection_state, budget_s=min(300, deadline-time.monotonic()-.5),
+                        suppress_context=context_guard_active(selection_state))
+                except CurrentTasksCooling as cooling:
+                    if len(planning_waits) >= 64:
+                        reason = "planning_wait_count_budget"
+                        break
+                    walking.invalidate()
+                    ladder.invalidate()
+                    result = await wait_for_replan(controller,bridge,
+                        directory/f"wait-{len(planning_waits)+1:03d}",retry_at=cooling.retry_at,
+                        deadline=deadline,observe=observe)
+                    planning_waits.append({k:result[k] for k in ("reason","game_progress",
+                        "elapsed_seconds","consumed_actions","raw_button_actions")})
+                    if result["reason"] == "bridge_unavailable" or result["reason"].startswith("supervisor:"):
+                        reason = result["reason"]
+                        break
+                    continue
                 first_task = first_task or task
                 result = await execute(task, walking)
                 observe(bridge.state)
@@ -182,6 +200,7 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
     unchanged = controller.intent == locked_objective and all(row["objective_unchanged"] for row in stages)
     updates = controller.policy.updates - controller.starting_updates
     consumed = sum(row["consumed_actions"] for row in stages)
+    wait_consumed = sum(row["consumed_actions"] for row in planning_waits)
     buttons = sum(row["raw_button_actions"] for row in stages)
     causal_buttons = sum(row["causal_button_actions"] for row in stages)
     unowned_buttons = sum(row["unowned_button_actions"] for row in stages)
@@ -198,7 +217,9 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
         "landing_verified": landings > 0, "verified_landings": landings,
         "post_descent_walks_successful": sum(s["success"] for s in stages
             if s["task"]["kind"] == "observed_cell" and s["after_verified_landing"]),
-        "consumed_actions": consumed, "raw_button_actions": buttons, "objective_unchanged": unchanged,
+        "consumed_actions": consumed+wait_consumed, "raw_button_actions": buttons, "objective_unchanged": unchanged,
+        "movement_and_interaction_consumed_actions": consumed,
+        "planning_wait_consumed_actions": wait_consumed,"planning_waits":planning_waits,
         "causal_button_actions": causal_buttons, "unowned_button_actions": unowned_buttons,
         "contextual_interactions": contextual_interactions,
         "interaction_memory": controller.interaction_memory.snapshot() if contextual_interactions else None,
