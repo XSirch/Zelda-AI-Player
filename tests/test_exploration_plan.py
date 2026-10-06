@@ -394,6 +394,152 @@ def test_native_portal_competes_without_a_destination_lookup(state):
     assert task.kind == "observed_portal" and task.exit_index == 1
 
 
+def crossed_portal_revisit(state):
+    ground(state)
+    source_scene = state.scene
+    state.scene_exits = [SceneExitObservation(exit_index=1, entrance_index=123,
+        position=(0, 0, 70), direct_reachable=True, samples=1)]
+    plan = ObservedExplorationPlan()
+    portal = plan.choose(state, budget_s=20, now=0)
+    state.player.position = (0, 0, 65)
+    state.seq += 1
+    portal.observe(state, consumed=True, now=1)
+    plan.observe(state, now=1)
+    state.scene += 1
+    state.scene_epoch += 1
+    state.player.position = (0, 0, 0)
+    for now in [2, 3, 4]:
+        state.seq += 1
+        portal.observe(state, consumed=False, now=now)
+        plan.observe(state, now=now)
+    assert portal.phase == 'succeeded' and portal.verification_frames == 3
+    plan.outcome(portal, success=True, now=4)
+    state.scene = source_scene
+    state.scene_epoch += 1
+    state.seq += 1
+    plan.observe(state, now=5)
+    return plan, portal
+
+
+def test_actual_revisited_portal_yields_to_current_unvisited_floor_after_entry_guard(state):
+    plan, _ = crossed_portal_revisit(state)
+    task = plan.choose(state, budget_s=20, now=40)
+    assert task.kind == 'observed_cell' and task.target == (210, 0, 0)
+    assert plan.region(task.context, task.target) not in plan.visits
+
+
+def test_actual_revisited_portal_yields_to_current_unvisited_upward_floor(state):
+    plan, _ = crossed_portal_revisit(state)
+    upward_surface(state)
+    task = plan.choose(state, budget_s=20, now=40)
+    assert task.kind == 'observed_cell' and task.target == (0, 18, 70)
+
+
+def test_known_portal_remains_an_escape_when_current_local_floor_was_actually_occupied(state):
+    plan, portal = crossed_portal_revisit(state)
+    for index,x in enumerate([70,140,210,0]):
+        state.player.position = (x,0,0)
+        state.seq += 1
+        plan.observe(state,now=35+index)
+    state.scene_exits[0].position = (0,0,74)
+    task = plan.choose(state,budget_s=20,now=40)
+    assert task.kind == 'observed_portal' and task.target == (0,0,74)
+    assert task.target != portal.last_source_position
+    assert plan.selection['eligible_unvisited_floor_candidates'] == 0
+    assert plan.selection['revisited_portals_deprioritized'] == 1
+    row = next(iter(plan.traversed_portals.values()))
+    assert row['gateway_position'] == (0,0,65)
+    assert row['destination'] == portal.crossing_context
+
+
+@pytest.mark.parametrize('change',['exit_index','entrance_index','exit_position'])
+def test_unknown_current_exit_keeps_priority_over_local_frontiers(state,change):
+    plan,_ = crossed_portal_revisit(state)
+    if change == 'exit_position':
+        state.scene_exits[0].position = (0,0,170)
+    else:
+        setattr(state.scene_exits[0],change,getattr(state.scene_exits[0],change)+1)
+    assert plan.choose(state,budget_s=20,now=40).kind == 'observed_portal'
+    assert plan.selection['revisited_portals_deprioritized'] == 0
+
+
+def test_confirmed_crossing_does_not_synthesize_reverse_portal_utility(state):
+    plan,portal = crossed_portal_revisit(state)
+    state.scene = portal.crossing_context[1]
+    state.seq += 1
+    state.scene_epoch += 1
+    plan.observe(state,now=41)
+    assert plan.choose(state,budget_s=20,now=60).kind == 'observed_portal'
+    assert plan.selection['revisited_portals_deprioritized'] == 0
+    assert len(plan.traversed_portals) == 1
+
+
+def test_new_observed_inventory_progress_permits_known_room_reconsideration(state):
+    plan,_ = crossed_portal_revisit(state)
+    state.inventory = [5]
+    state.seq += 1
+    assert plan.choose(state,budget_s=20,now=40).kind == 'observed_portal'
+    assert plan.progress_revision == 1
+    assert plan.selection['revisited_portals_deprioritized'] == 0
+
+
+@pytest.mark.parametrize('change',['instance','save_loaded','player_died','game_over'])
+def test_portal_utility_memory_does_not_survive_new_native_lifetime(state,change):
+    plan,_ = crossed_portal_revisit(state)
+    state.seq += 1
+    if change == 'instance':
+        state.instance_id = 'another-native-instance'
+    else:
+        state.events = [GameEvent(id='new-episode-event',kind=change)]
+    plan.observe(state,now=40)
+    assert not plan.traversed_portals
+
+
+@pytest.mark.parametrize('change',['failed','phase','consumed','verification','no_destination',
+    'crossing_seq','stale_task','stale_plan','instance','age','mirror','same_room',
+    'final_context','epoch','unsafe','reload','gateway'])
+def test_portal_utility_needs_complete_native_crossing_evidence(state,change):
+    plan,portal = crossed_portal_revisit(state)
+    plan.traversed_portals.clear()
+    state.scene = portal.crossing_context[1]
+    state.seq += 1
+    state.scene_epoch += 1
+    plan.observe(state,now=41)
+    success = change != 'failed'
+    if change == 'phase':
+        portal.phase = 'interrupted'
+    elif change == 'consumed':
+        portal.consumed = False
+    elif change == 'verification':
+        portal.verification_frames = 2
+    elif change == 'no_destination':
+        portal.crossing_context = None
+    elif change == 'crossing_seq':
+        portal.crossing_seq = portal.origin_seq
+    elif change == 'stale_task':
+        portal.last_seq = portal.crossing_seq-1
+    elif change == 'stale_plan':
+        plan.last_seq = portal.last_seq-1
+    elif change in {'instance','age','mirror','same_room'}:
+        dest = list(portal.crossing_context)
+        index = {'instance':0,'age':4,'mirror':3,'same_room':1}[change]
+        dest[index] = {'instance':'different-instance','age':'adult','mirror':True,
+            'same_room':portal.context[1]}[change]
+        portal.crossing_context = plan.last_context = tuple(dest)
+    elif change == 'final_context':
+        plan.last_context = portal.context
+    elif change == 'epoch':
+        plan.last_scene_epoch = portal.scene_epoch
+    elif change == 'unsafe':
+        plan.last_safe_ground = False
+    elif change == 'reload':
+        plan.last_load_events = ('unknown-new-load',)
+    elif change == 'gateway':
+        portal.last_source_position = (0,0,300)
+    plan.outcome(portal,success=success,now=41)
+    assert not plan.traversed_portals
+
+
 def test_current_reachable_tasks_in_cooldown_request_a_bounded_replan_instead_of_terminal_failure(state):
     from zelda_ai.autonomy.local_tasks import LocalTask
     ground(state)

@@ -29,7 +29,7 @@ class CurrentTasksCooling(ValueError):
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v15"
+    VERSION = "current-collision-exploration-plan-v16"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
@@ -42,6 +42,7 @@ class ObservedExplorationPlan:
         self.origins, self.max_radius = {}, {}
         self.context_actions = Counter()
         self.opened_containers = {}
+        self.traversed_portals = {}
         self.no_gain_pickups = {}
         self.no_gain_deferrals, self.cooldown_replans = 0, 0
         self.last_resources, self.last_pickup_signature = {}, None
@@ -71,6 +72,7 @@ class ObservedExplorationPlan:
                 or any(e.id not in self.event_ids and e.kind in {"save_loaded", "player_died", "game_over"}
                     for e in game.events)):
             self.no_gain_pickups.clear()
+            self.traversed_portals.clear()
         self.last_seq = game.seq
         self.last_resources = resource_values(game)
         self.last_pickup_signature = self.pickup_signature(game)
@@ -130,6 +132,7 @@ class ObservedExplorationPlan:
         key = self.task_key(task)
         self._departure_outcome(task, success=success, now=now)
         self._pickup_outcome(task, success=success, now=now)
+        self._portal_outcome(task, success=success)
         if (success and isinstance(task, LinearDialogueTask) and task.phase == "succeeded"
                 and task.observed_effect == "dialogue_closed" and task.consumed
                 and task.verification_frames >= 3):
@@ -154,6 +157,35 @@ class ObservedExplorationPlan:
     def pickup_signature(game):
         # Only Link's observed resources/inventory: no drop params or contents.
         return (tuple(sorted(resource_values(game).items())), tuple(game.inventory))
+
+    def _portal_outcome(self, task, *, success):
+        # Utility memory only: current collision still owns every approach.
+        # Learn a direction only after consumed, settled native traversal;
+        # never infer the reverse direction or decode an entrance destination.
+        if (not isinstance(task, ObservedPortalTask) or not success or task.phase != 'succeeded'
+                or not task.consumed or task.verification_frames < 3 or task.crossing_context is None
+                or task.crossing_seq is None or task.crossing_seq <= task.origin_seq
+                or task.last_seq < task.crossing_seq or self.last_seq < task.last_seq
+                or tuple(task.crossing_context) != self.last_context
+                or task.crossing_context[0] != task.context[0]
+                or task.crossing_context[3:] != task.context[3:]
+                or task.crossing_context[1:3] == task.context[1:3]
+                or self.last_scene_epoch <= task.scene_epoch or not self.last_safe_ground
+                or any(event not in task.initial_events for event in self.last_load_events)
+                or task.last_source_position is None or math.dist(task.last_source_position,task.target)>80):
+            return
+        key = self.task_key(task)
+        old = self.traversed_portals.get(key, {})
+        self.bounded_put(self.traversed_portals,key,{'context':task.context,
+            'destination':tuple(task.crossing_context), 'exit_position':tuple(task.target),
+            'gateway_position':tuple(task.last_source_position), 'crossing_seq':task.crossing_seq,
+            'verified_seq':task.last_seq, 'crossings':old.get('crossings',0)+1,
+            'progress_revision':self.progress_revision},limit=512)
+
+    def revisited_portal(self, task):
+        row = self.traversed_portals.get(self.task_key(task))
+        return bool(row and row['progress_revision']==self.progress_revision
+            and math.dist(row['exit_position'],task.target)<=80)
 
     def _matching_pickup_memories(self, context, target):
         return [(key, row) for key, row in self.no_gain_pickups.items()
@@ -301,6 +333,8 @@ class ObservedExplorationPlan:
                           "observed_no_gain_pickups_deferred": 0,
                           "next_replan_at": None,
                           "eligible_upward_candidates": 0,
+                          "revisited_portals_deprioritized": 0,
+                          "eligible_unvisited_floor_candidates": 0,
                           "read_context_deferred": self.read_context_deferred(game, now=now)}
         if not 1 <= budget_s <= 300:
             raise ValueError("planning_budget_exhausted")
@@ -333,10 +367,14 @@ class ObservedExplorationPlan:
                 wake_times.append(self.retry_after[key])
                 return False
             visits = self.visits.get(self.region(context, task.target), 0)
+            frontier = priority == 2 and task.kind == 'observed_cell'
+            if frontier and visits:
+                priority = 4  # A known exit remains an escape from exhausted local ground.
+            crossings = self.traversed_portals.get(key, {}).get('crossings',0)
             # Horizontal frontiers seek expansion; vertical traversals first
             # prefer an observed nearby upper approach, then a shorter landing.
-            rank = (priority, self.failures.get(key, 0), visits, approach_distance,
-                    -distance if priority == 2 else distance, tuple(task.target))
+            rank = (priority, self.failures.get(key, 0), crossings, visits, approach_distance,
+                    -distance if frontier else distance, tuple(task.target))
             candidates.append((rank, task))
             return True
 
@@ -387,7 +425,9 @@ class ObservedExplorationPlan:
                     and math.dist(row.position, self.entry_position) <= 130):
                 wake_times.append(self.entry_at + 15)
                 continue
-            offer(task, 0, math.dist(position, row.position))
+            revisited = self.revisited_portal(task)
+            if offer(task, 3 if revisited else 0, math.dist(position, row.position)) and revisited:
+                self.selection['revisited_portals_deprioritized'] += 1
 
         for row in game.traversal_affordances:
             if row.kind == "stairs_or_slope_up":
@@ -442,7 +482,8 @@ class ObservedExplorationPlan:
         if any(row[0] for row in floor_candidates):
             floor_candidates = [row for row in floor_candidates if row[0]]
         for _, task, distance in floor_candidates:
-            offer(task, 2, distance)
+            if offer(task, 2, distance) and not self.visits.get(self.region(context,task.target),0):
+                self.selection['eligible_unvisited_floor_candidates'] += 1
         self.selection["eligible_floor_candidates"] = len(floor_candidates)
         if not candidates:
             if wake_times:
@@ -462,6 +503,7 @@ class ObservedExplorationPlan:
                 "max_outward_radius": max(self.max_radius.values(), default=0),
                 "observed_context_actions": dict(self.context_actions),
                 "verified_opened_containers": len(self.opened_containers),
+                "verified_portal_directions": len(self.traversed_portals),
                 "observed_no_gain_pickup_locations": len(self.no_gain_pickups),
                 "observed_no_gain_pickup_deferrals": self.no_gain_deferrals,
                 "cooldown_replans": self.cooldown_replans,
@@ -484,4 +526,6 @@ class ObservedExplorationPlan:
             result.update(occupied_floor_samples=[{"context": owner, "position": point}
                 for owner, point in self.occupied_floors.values()])
             result.update(no_gain_pickup_attempts=list(self.no_gain_pickups.values()))
+            result.update(traversed_portal_attempts=[{'key':key,**value}
+                for key,value in self.traversed_portals.items()])
         return result
