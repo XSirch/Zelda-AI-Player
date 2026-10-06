@@ -37,10 +37,11 @@ async def execute_frozen_task(controller, bridge, task, policy, directory, *, en
         if observe and game:
             observe(game)
         if (owned and game.player and owned.phase in {"prepare", "execute"}
-                and controller.last_setpoint.reason == "local_task"):
+                and bridge.command_seq > first_seq
+                and controller.last_setpoint.reason in {"local_task", "dialogue_disengage"}):
             requested[bridge.command_seq] = {"observation_seq": game.seq, "features": encoder(game, owned),
                 "stick": [controller.last_setpoint.stick_x, controller.last_setpoint.stick_y],
-                "buttons": controller.last_setpoint.buttons}
+                "buttons": controller.last_setpoint.buttons, "source": controller.last_setpoint.reason}
         if game and len(frames) < 660:
             frames.append({"state": game.model_dump(), "task": task.snapshot(),
                            "reason": controller.last_setpoint.reason})

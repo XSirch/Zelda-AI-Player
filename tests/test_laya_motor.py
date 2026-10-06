@@ -81,3 +81,15 @@ def test_actual_motor_observations_can_feed_ephemeral_planner_without_another_se
         assert result["success"] and observations == [state.seq]
         assert result["consumed_actions"] == 1 and bridge.releases == 1
     asyncio.run(scenario())
+
+
+def test_dialogue_guard_keeps_consumed_candidate_motion_in_audit(state, tmp_path):
+    async def scenario():
+        controller, bridge, task, policy, _ = harness(state)
+        controller.last_setpoint.reason = "dialogue_disengage"
+        result = await execute_frozen_task(controller, bridge, task, policy, tmp_path,
+            encoder=lambda g,t:[1]*9)
+        assert result["success"] and result["consumed_actions"] == 1
+        assert result["requested"][11]["source"] == "dialogue_disengage"
+        assert result["raw_button_actions"] == 0 and result["run_updates"] == 0
+    asyncio.run(scenario())

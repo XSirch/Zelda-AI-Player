@@ -394,7 +394,7 @@ class ContinuousController:
         """Refresh nonblocking local output or camera projection without replanning."""
         if (
             self.local_task is not None
-            and self.last_setpoint.reason == "local_task"
+            and self.last_setpoint.reason in {"local_task", "dialogue_disengage"}
             and getattr(self.local_stick_policy, "refresh_at_motor_cadence", False)
         ):
             task = self.local_task
@@ -408,7 +408,7 @@ class ContinuousController:
                     task.interrupt("invalid_local_policy_action")
                     stick = (0, 0)
             x, y = (max(-80, min(80, round(v))) for v in stick)
-            self.last_setpoint = Setpoint(stick_x=x, stick_y=y, reason="local_task")
+            self.last_setpoint = Setpoint(stick_x=x, stick_y=y, reason=self.last_setpoint.reason)
             self.last_stick = (x / 80, y / 80)
             if self.pending is not None:
                 self.pending["stick"] = list(self.last_stick)

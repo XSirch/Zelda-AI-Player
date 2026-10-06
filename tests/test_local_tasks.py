@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pytest
 
 from zelda_ai.autonomy.controller import ContinuousController
@@ -159,7 +161,8 @@ def test_external_stick_candidate_has_full_authority_and_no_reference_blend(stat
     assert controller.pending["trainable"] is False
 
 
-def test_nonblocking_local_policy_response_is_applied_between_ml_samples(state, tmp_path):
+@pytest.mark.parametrize("reason", ["local_task", "dialogue_disengage"])
+def test_nonblocking_local_policy_response_is_applied_between_ml_samples(state, tmp_path, reason):
     class Bridge:
         def command_consumed(self, seq):
             return True
@@ -175,10 +178,12 @@ def test_nonblocking_local_policy_response_is_applied_between_ml_samples(state, 
     controller.start_local_task(LocalTask.traversal(state, stair(state)), stick_policy=policy)
     controller._ml_step(state)
     assert controller.last_setpoint.stick_x == 0
+    controller.last_setpoint = replace(controller.last_setpoint, reason=reason)
     policy.response = (-40, 20)  # Worker completes between residual-policy samples.
     controller._refresh_camera_relative_setpoint(state)
     assert (controller.last_setpoint.stick_x, controller.last_setpoint.stick_y) == (-40, 20)
     assert controller.last_setpoint.buttons == 0
+    assert controller.last_setpoint.reason == reason
     assert controller.pending["trainable"] is False
     assert controller.pending["stick"] == [-.5, .25]
     controller.local_task.phase = "verify"
@@ -195,7 +200,8 @@ def test_observed_cell_uses_current_body_contact_when_thin_probes_miss_the_wall(
     state.player.bg_check_flags = 1 | 8
     state.navmesh = NavigationMeshSnapshot(
         origin=(0, 0, 0), step=70, half_extent=1,
-        cells=[(0, 0, 0.0, 16), (0, -1, 0.0, 0)],
+        cells=[(0, 0, 0.0, 16 | 4 | 64), (0, -1, 0.0, 0),
+               (1, 0, 0.0, 0), (-1, 0, 0.0, 0)],
     )
     state.navigation_probes = [
         NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)
@@ -206,6 +212,40 @@ def test_observed_cell_uses_current_body_contact_when_thin_probes_miss_the_wall(
     assert task.detour is not None
     assert abs(task.detour[0]) == pytest.approx(70)
     assert abs(task.detour[2]) < 1e-4  # A currently probed tangent, not into the wall.
+
+
+def test_ground_detour_cannot_turn_an_unsupported_raised_probe_into_a_walking_target(state):
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.navmesh = NavigationMeshSnapshot(origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 1), (0, 1, 0., 0)])
+    state.player.yaw = 0
+    state.navigation_probes = [
+        NavigationProbe(direction="forward", distance=70, floor_found=True, floor_y=0, delta_y=0, wall_hit=True),
+        NavigationProbe(direction="forward_left", distance=70, floor_found=True, floor_y=54, delta_y=54),
+    ]
+    task = LocalTask.observed_cell(state, (0, 0, 70), now=0)
+    state.seq += 1
+    task.observe(state, consumed=True, now=.1)
+    assert task.detour is None
+
+
+@pytest.mark.parametrize("linked", [False, True])
+def test_ground_detour_requires_directed_links_and_can_choose_a_supported_alternative(state, linked):
+    from zelda_ai.models import NavigationMeshSnapshot, NavigationProbe
+
+    state.navmesh = NavigationMeshSnapshot(origin=(0, 0, 0), step=70, half_extent=1,
+        cells=[(0, 0, 0., 1 | (4 if linked else 0)), (0, 1, 0., 0), (1, 0, 0., 0)])
+    state.player.yaw = 0
+    state.navigation_probes = [
+        NavigationProbe(direction="forward", distance=70, floor_found=True, floor_y=0, delta_y=0, wall_hit=True),
+        NavigationProbe(direction="forward_left", distance=70, floor_found=True, floor_y=54, delta_y=54),
+        NavigationProbe(direction="left", distance=70, floor_found=True, floor_y=0, delta_y=0),
+    ]
+    task = LocalTask.observed_cell(state, (0, 0, 70), now=0)
+    state.seq += 1
+    task.observe(state, consumed=True, now=.1)
+    assert task.detour == ((70., 0., 0.) if linked else None)
 
 
 @pytest.mark.parametrize("contact,target", ((1, (0, 0, -70)), (1 | 8, (0, 0, 70))))
@@ -331,7 +371,8 @@ def test_observed_probe_detour_is_not_released_before_rounding_its_endpoint(stat
     state.player.bg_check_flags = 1 | 8
     state.navmesh = NavigationMeshSnapshot(
         origin=(0, 0, 0), step=70, half_extent=1,
-        cells=[(0, 0, 0., 16), (0, -1, 0., 0)],
+        cells=[(0, 0, 0., 16 | 4 | 64), (0, -1, 0., 0),
+               (1, 0, 0., 0), (-1, 0, 0., 0)],
     )
     state.navigation_probes = [
         NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)
@@ -356,7 +397,8 @@ def test_observed_held_detour_reacts_to_new_body_contact_instead_of_pushing_into
     state.player.bg_check_flags = 1 | 8
     state.navmesh = NavigationMeshSnapshot(
         origin=(0, 0, 0), step=70, half_extent=1,
-        cells=[(0, 0, 0., 16), (0, -1, 0., 0)],
+        cells=[(0, 0, 0., 16 | 4 | 64), (0, -1, 0., 0),
+               (1, 0, 0., 0), (-1, 0, 0., 0)],
     )
     state.navigation_probes = [
         NavigationProbe(direction=name, distance=70, floor_found=True, floor_y=0, delta_y=0)

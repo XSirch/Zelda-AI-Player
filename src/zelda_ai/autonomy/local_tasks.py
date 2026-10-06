@@ -52,7 +52,7 @@ class LocalTask:
     waypoint_index: int = 0
     progress_point: tuple | None = None
     best_waypoint_distance: float | None = None
-    version: str = "observed-analog-task-v3"
+    version: str = "observed-analog-task-v4"
 
     @classmethod
     def traversal(cls, game, affordance, *, now=None, budget_s=8.0):
@@ -161,17 +161,23 @@ class LocalTask:
             if self.detour is None:
                 point = self._corridor_point()
                 dx, dz = point[0] - game.player.position[0], point[2] - game.player.position[2]
+                probe_points = {}
+
+                def supported_probe(probe):
+                    key = (probe.direction, probe.distance)
+                    if key not in probe_points:
+                        probe_points[key] = self._observed_probe_waypoint(game, probe)
+                    return probe_points[key] is not None
+
                 _, evidence = _collision_detour(
                     game, game.player, math.atan2(dx, dz), use_body_contact=True,
+                    probe_filter=supported_probe,
                 )
                 direction = evidence.get("detour")
                 if direction:
                     probe = min((p for p in game.navigation_probes if p.direction == direction),
                                 key=lambda p: abs(p.distance - 70))
-                    yaw = game.player.yaw * math.pi / 32768 + _PROBE_YAW_OFFSETS[direction]
-                    x, y, z = game.player.position
-                    self.detour = (x + math.sin(yaw) * probe.distance,
-                                   y + (probe.delta_y or 0), z + math.cos(yaw) * probe.distance)
+                    self.detour = probe_points[(probe.direction, probe.distance)]
             self._track_waypoint(game)
         position = game.player.position
         distance = math.dist(position, self.target)
@@ -220,6 +226,32 @@ class LocalTask:
         # probe endpoint against a wall may be unreachable by Link's body.
         return (math.hypot(position[0] - point[0], position[2] - point[2]) <= 18
                 and abs(position[1] - point[1]) <= 4)
+
+    def _observed_probe_waypoint(self, game, probe):
+        """A thin endpoint cannot authorize a new ground path through collision.
+
+        Grid quantization may move the endpoint to a nearby currently observed
+        floor cell. Its directed path owns the first steering waypoint; neither
+        that proposal nor the probe becomes an empirically traversed route.
+        """
+        mesh, player = game.navmesh, game.player
+        if not mesh.available or probe.floor_y is None:
+            return None
+        yaw = player.yaw * math.pi / 32768 + _PROBE_YAW_OFFSETS[probe.direction]
+        endpoint = (player.position[0] + math.sin(yaw) * probe.distance,
+                    probe.floor_y, player.position[2] + math.cos(yaw) * probe.distance)
+        candidates = []
+        for x, z, y, _ in mesh.cells:
+            point = (mesh.origin[0]+x*mesh.step, y, mesh.origin[2]+z*mesh.step)
+            if abs(y-endpoint[1]) > 4 or math.dist(point, endpoint) > mesh.step*.8:
+                continue
+            candidates.append((math.dist(point, endpoint), point))
+        for _, point in sorted(candidates):
+            path = observed_local_path(game, point, minimum_gain=0)
+            if (path and not path["partial"] and path["target_gap"] <= 4
+                    and not self._body_blocks_point(player, path["waypoint"])):
+                return path["waypoint"]
+        return None
 
     @staticmethod
     def _body_blocks_point(player, point):

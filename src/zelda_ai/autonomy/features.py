@@ -148,7 +148,7 @@ def _probe_is_walkable(probe) -> bool:
 
 
 def _collision_detour(
-    game: GameState, player, target_yaw: float, *, use_body_contact=False,
+    game: GameState, player, target_yaw: float, *, use_body_contact=False, probe_filter=None,
 ) -> tuple[tuple[float, float] | None, dict]:
     """Pick a locally collision-safe heading when the direct heading is blocked.
 
@@ -183,8 +183,11 @@ def _collision_detour(
         _PROBE_YAW_OFFSETS,
         key=lambda name: abs(_wrap_angle(relative_target - _PROBE_YAW_OFFSETS[name])),
     )
+    def walkable(probe):
+        return _probe_is_walkable(probe) and (probe_filter is None or probe_filter(probe))
+
     direct_probe = probes.get(direct_name)
-    if not body_blocked and (direct_probe is None or _probe_is_walkable(direct_probe)):
+    if not body_blocked and (direct_probe is None or walkable(direct_probe)):
         return None, {
             "blocked": False,
             "detour": None,
@@ -194,7 +197,7 @@ def _collision_detour(
     candidates = []
     for name, offset in _PROBE_YAW_OFFSETS.items():
         probe = probes.get(name)
-        if probe is None or not _probe_is_walkable(probe):
+        if probe is None or not walkable(probe):
             continue
         # A thin ray can miss the obstacle touching Link's collision body.
         # Select only a currently observed probe tangent to/out of that wall.
