@@ -20,7 +20,7 @@ from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v6"
+    VERSION = "current-collision-exploration-plan-v7"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
@@ -30,6 +30,8 @@ class ObservedExplorationPlan:
         self.origins, self.max_radius = {}, {}
         self.context_actions = Counter()
         self.opened_containers = {}
+        self.read_actor_contexts = {}
+        self.progress_tokens, self.progress_revision, self.progress_initialized = set(), 0, False
         self.event_ids = set()
         self.replans = self.actual_transitions = 0
         self.selection = {}
@@ -50,6 +52,15 @@ class ObservedExplorationPlan:
             return
         now = time.monotonic() if now is None else now
         self.last_seq = game.seq
+        tokens = ({("item", value) for value in game.inventory if 0 <= value < 255}
+            | {("equipment", name) for name in game.progress.owned_equipment}
+            | {("quest", name) for name in game.progress.quest_items}
+            | {("story", name) for name, value in game.progress.story_flags.items() if value})
+        novel = sorted(tokens - self.progress_tokens)[:max(0, 512-len(self.progress_tokens))]
+        if novel and self.progress_initialized:
+            self.progress_revision += 1
+        self.progress_tokens.update(novel)
+        self.progress_initialized = True
         context, position = physical_context(game), tuple(game.player.position)
         if self.last_context != context:
             same_lifetime = (self.last_context is not None and context[0] == self.last_context[0]
@@ -75,6 +86,8 @@ class ObservedExplorationPlan:
         if isinstance(task, ObservedPortalTask):
             return (*task.context, task.kind, task.exit_index, task.entrance_index)
         if isinstance(task, ObservedContextTask):
+            if task.context_actor_uid:
+                return (*task.context, task.kind, task.context_actor_uid, task.context_action_key)
             return (*self.region(task.context, task.origin), task.kind, task.context_action_key)
         if isinstance(task, ObservedContainerApproachTask):
             return (*task.context, task.kind, task.actor_uid)
@@ -83,6 +96,12 @@ class ObservedExplorationPlan:
     def outcome(self, task, *, success, now=None):
         now = time.monotonic() if now is None else now
         key = self.task_key(task)
+        if (success and isinstance(task, LinearDialogueTask) and task.phase == "succeeded"
+                and task.observed_effect == "dialogue_closed" and task.consumed
+                and task.verification_frames >= 3):
+            for speaker_context in task.read_speaker_contexts:
+                self.bounded_put(self.read_actor_contexts, speaker_context,
+                    {"progress_revision": self.progress_revision, "retry_after": now+120}, limit=512)
         if (success and isinstance(task, ObservedContextTask) and task.observed_effect == "chest_opened"
                 and task.context_actor_uid and task.effect_event_id):
             self.bounded_put(self.opened_containers, (*task.context, task.context_actor_uid),
@@ -100,8 +119,17 @@ class ObservedExplorationPlan:
         if not self.contextual_interactions or not eligible_context(game):
             return False
         now = time.monotonic() if now is None else now
+        if self.read_context_deferred(game, now=now):
+            return False
         task = ObservedContextTask.create(game, now=now)
         return self.retry_after.get(self.task_key(task), 0) <= now
+
+    def read_context_deferred(self, game, *, now):
+        actor = game.context_actor
+        if game.context_action.label.lower() not in {"check", "speak"} or not actor or not actor.actor_uid:
+            return False
+        read = self.read_actor_contexts.get((*physical_context(game), actor.actor_uid))
+        return bool(read and read["progress_revision"] == self.progress_revision and read["retry_after"] > now)
 
     def choose(self, game, *, budget_s, now=None, suppress_context=False):
         now = time.monotonic() if now is None else now
@@ -110,7 +138,8 @@ class ObservedExplorationPlan:
                           "mesh_cells": len(game.navmesh.cells), "reachable_floor_candidates": 0,
                           "cooled_floor_candidates": 0, "eligible_floor_candidates": 0,
                           "reachable_short_floor_candidates": 0, "cooled_short_floor_candidates": 0,
-                          "eligible_short_floor_candidates": 0}
+                          "eligible_short_floor_candidates": 0,
+                          "read_context_deferred": self.read_context_deferred(game, now=now)}
         if not 1 <= budget_s <= 300:
             raise ValueError("planning_budget_exhausted")
         if self.contextual_interactions and game.dialogue.active:
@@ -219,6 +248,8 @@ class ObservedExplorationPlan:
                 "max_outward_radius": max(self.max_radius.values(), default=0),
                 "observed_context_actions": dict(self.context_actions),
                 "verified_opened_containers": len(self.opened_containers),
+                "verified_read_actor_contexts": len(self.read_actor_contexts),
+                "durable_progress_revision": self.progress_revision,
                 "memory": "ephemeral_actual_positions_and_attempts_only", "last_selection": dict(self.selection)}
         if include_details:
             result.update(last_seq=self.last_seq, last_context=self.last_context, last_region=self.last_region,
@@ -227,4 +258,6 @@ class ObservedExplorationPlan:
                 attempted_targets=[{"key": key, "failures": value, "retry_after": self.retry_after.get(key, 0)}
                                    for key, value in self.failures.items()],
                 opened_containers=[{"key": key, "event_id": value} for key, value in self.opened_containers.items()])
+            result.update(read_actor_contexts=[{"key": key, **value} for key, value in self.read_actor_contexts.items()],
+                progress_tokens=sorted(self.progress_tokens), progress_initialized=self.progress_initialized)
         return result

@@ -177,6 +177,32 @@ def test_container_lid_pose_is_current_fast_geometry_and_missing_never_reuses_fu
     assert bridge.state.seq == 12 and bridge.rejected_packets == 1
 
 
+@pytest.mark.parametrize("mode", [1, 2, 3, 4, 5, 54, 55])
+def test_undisplayed_dialogue_buffer_does_not_become_observed_text_or_choice(state, mode):
+    bridge = ready(state)
+    dialogue = {**state.dialogue.model_dump(), "active": True, "text_id": 799,
+        "message_mode": mode, "text": "retained previous page", "choice_count": 2,
+        "choices": ["retained one", "retained two"], "can_advance": True}
+    feed(bridge, fast(state, dialogue=dialogue))
+    current = bridge.state.dialogue
+    assert current.active and current.text_id == 799 and current.message_mode == mode
+    assert current.text == "" and current.choices == [] and current.choice_count == 0
+    assert not current.can_advance
+
+
+def test_current_visible_dialogue_and_choices_replace_full_page_without_stale_enrichment(state):
+    bridge = ready(state)
+    current = {**state.dialogue.model_dump(), "active": True, "text_id": 42,
+        "message_mode": 53, "text_visible": True, "visible_bytes": 30,
+        "text": "current page", "choice_count": 2, "choices": ["one", "two"], "can_advance": True}
+    feed(bridge, fast(state, dialogue=current))
+    assert bridge.state.dialogue.text == "current page" and bridge.state.dialogue.choices == ["one", "two"]
+    feed(bridge, fast(state, seq=12, dialogue={**current, "text_id": 799, "message_mode": 2}))
+    assert bridge.state.dialogue.active and bridge.state.dialogue.text_id == 799
+    assert not bridge.state.dialogue.text and not bridge.state.dialogue.choices
+    assert bridge.state.dialogue.text_visible is False
+
+
 def test_event_bootstrap_does_not_replay_old_victories(state):
     bridge = Bridge(TOKEN); bridge.transport = Transport()
     feed(bridge, full(state, event_seq=3, events=[{'id': '3', 'kind': 'game_completed'}]))

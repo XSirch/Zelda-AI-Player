@@ -125,6 +125,59 @@ def test_contextual_mode_prioritizes_current_prompt_and_linear_text_without_grou
     assert plan.choose(state, budget_s=20, now=3).kind == "observed_linear_dialogue"
 
 
+def test_verified_visible_read_defers_same_actor_but_not_another_or_durable_progress(state):
+    from zelda_ai.autonomy.context_tasks import LinearDialogueTask
+    from zelda_ai.models import DialogueState
+    ground(state)
+    actor = ActorObservation(actor_uid="reader", actor_id=999, category=4, category_name="npc",
+        params=0, position=(100, 0, 0), distance=100, drawn=True)
+    state.context_actor = actor
+    state.context_action.code, state.context_action.label = 7, "speak"
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    plan.observe(state, now=0)
+    state.dialogue = DialogueState(active=True, text_id=42, text="observed page",
+        message_mode=53, text_visible=True, visible_bytes=13, can_advance=True, speaker=actor)
+    task = LinearDialogueTask.create(state, now=0)
+    state.dialogue = DialogueState()
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=True, now=.1+i/10)
+    assert task.phase == "succeeded"
+    plan.outcome(task, success=True, now=1)
+    assert plan.choose(state, budget_s=12, now=30).kind == "observed_cell"
+    assert plan.choose(state, budget_s=12, now=121).kind == "observed_context_interaction"
+    state.context_actor = actor.model_copy(update={"actor_uid": "other"})
+    assert plan.choose(state, budget_s=12, now=31).kind == "observed_context_interaction"
+    state.context_actor = actor
+    state.seq += 1
+    state.progress.owned_equipment = ["new observed equipment"]
+    assert plan.choose(state, budget_s=12, now=32).kind == "observed_context_interaction"
+
+
+@pytest.mark.parametrize("missing_proof", ["visibility", "speaker", "complete_page", "consumption"])
+def test_incomplete_dialogue_evidence_does_not_defer_actor(state, missing_proof):
+    from zelda_ai.autonomy.context_tasks import LinearDialogueTask
+    from zelda_ai.models import DialogueState
+    ground(state)
+    actor = ActorObservation(actor_uid="reader", actor_id=999, category=4, category_name="npc",
+        params=0, position=(100, 0, 0), distance=100, drawn=True)
+    state.context_actor = actor
+    state.context_action.code, state.context_action.label = 7, "speak"
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    plan.observe(state, now=0)
+    state.dialogue = DialogueState(active=True, text_id=42, text="observed page", message_mode=53,
+        text_visible=None if missing_proof == "visibility" else True, visible_bytes=13,
+        can_advance=missing_proof != "complete_page", speaker=None if missing_proof == "speaker" else actor)
+    task = LinearDialogueTask.create(state, now=0)
+    state.dialogue = DialogueState()
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=missing_proof != "consumption", now=.1+i/10)
+    plan.outcome(task, success=task.phase == "succeeded", now=1)
+    assert not plan.read_actor_contexts
+    assert plan.choose(state, budget_s=12, now=30).kind == "observed_context_interaction"
+
+
 def test_dialogue_escape_guard_can_suppress_context_while_preserving_walking(state):
     ground(state)
     state.context_action.code, state.context_action.label = 15, "speak"

@@ -779,10 +779,10 @@ class ContinuousController:
         if probe.get("kind") == "dialogue":
             text_changed = bool(
                 not game.dialogue.active
-                or game.dialogue.text_id != probe.get("dialogue_text_id")
-                or game.dialogue.text != probe.get("dialogue_text")
-                or game.dialogue.choice_count
-                != probe.get("dialogue_choice_count")
+                or game.dialogue.text_visible is not False and (
+                    game.dialogue.text_id != probe.get("dialogue_text_id")
+                    or game.dialogue.text != probe.get("dialogue_text")
+                    or game.dialogue.choice_count != probe.get("dialogue_choice_count"))
             )
             if text_changed:
                 self.interaction_memory.record_interaction_success(

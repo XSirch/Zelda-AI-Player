@@ -7,6 +7,7 @@
 #include "NavMeshQueries.hpp"
 #include "NavigationResolution.hpp"
 #include "ContainerPose.hpp"
+#include "DialogueObservation.hpp"
 #include <SDL2/SDL_net.h>
 #include <nlohmann/json.hpp>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -45,7 +46,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.12";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.13";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -1150,7 +1151,11 @@ Actor* ContextActor(Player* player, uint16_t doAction) {
             break;
         case DO_ACTION_SPEAK:
         case DO_ACTION_CHECK:
-            if (player->focusActor) return player->focusActor;
+            // The UI offers this actor, which can differ from the lock-on
+            // focus (or exist before a focus has been assigned).
+            if (const auto* actor = zelda_ai::OfferedTalkActor(
+                    player->stateFlags2 & PLAYER_STATE2_CAN_ACCEPT_TALK_OFFER ? player->talkActor : nullptr,
+                    player->focusActor, &player->actor)) return const_cast<Actor*>(actor);
             break;
         default:
             break;
@@ -1252,10 +1257,9 @@ json RoomActors(Player* player, bool metadata = true) {
     };
 }
 
-std::vector<std::string> DecodeChoices(MessageContext* msgCtx, int count) {
+std::vector<std::string> DecodeChoices(MessageContext* msgCtx, int count, uint16_t length) {
     std::vector<std::string> choices;
-    if (!msgCtx || count <= 0 || msgCtx->decodedTextLen == 0) return choices;
-    const uint16_t length = std::min<uint16_t>(msgCtx->decodedTextLen, sizeof(msgCtx->msgBufDecoded));
+    if (!msgCtx || count <= 0 || length == 0) return choices;
     uint16_t cursor = 0;
     while (cursor < length && msgCtx->msgBufDecoded[cursor] != MESSAGE_TWO_CHOICE &&
            msgCtx->msgBufDecoded[cursor] != MESSAGE_THREE_CHOICE) {
@@ -1280,17 +1284,18 @@ json DialogueJson(Player* player) {
     MessageContext* msgCtx = &gPlayState->msgCtx;
     const bool active = msgCtx->msgLength != 0;
     const uint8_t stateCode = Message_GetState(msgCtx);
+    const auto length = static_cast<uint16_t>(zelda_ai::DialogueVisibleBytes(active, msgCtx->msgMode,
+        msgCtx->decodedTextLen, msgCtx->textDrawPos, sizeof(msgCtx->msgBufDecoded)));
     std::string text;
-    if (active && msgCtx->decodedTextLen > 0) {
-        const uint16_t length = std::min<uint16_t>(msgCtx->decodedTextLen, sizeof(msgCtx->msgBufDecoded));
+    if (length > 0) {
         text = Message_TTS_Decode(msgCtx->msgBufDecoded, 0, length);
         if (text.size() > 4096) text.resize(4096);
     }
     int choiceCount = 0;
-    if (active && stateCode == TEXT_STATE_CHOICE) {
+    if (length > 0 && stateCode == TEXT_STATE_CHOICE) {
         choiceCount = std::clamp<int>(msgCtx->choiceNum, 0, 3);
     }
-    auto choices = DecodeChoices(msgCtx, choiceCount);
+    auto choices = DecodeChoices(msgCtx, choiceCount, length);
     json speaker = nullptr;
     if (active && msgCtx->talkActor) speaker = ActorJson(msgCtx->talkActor, player);
     return {
@@ -1300,7 +1305,9 @@ json DialogueJson(Player* player) {
         {"state", TextStateName(stateCode)},
         {"state_code", stateCode},
         {"message_mode", msgCtx->msgMode},
-        {"can_advance", active && TextCanAdvance(stateCode)},
+        {"text_visible", length > 0},
+        {"visible_bytes", length},
+        {"can_advance", length > 0 && TextCanAdvance(stateCode)},
         {"choice_count", choiceCount},
         {"choice_index", choiceCount > 0 ? std::min<int>(msgCtx->choiceIndex, choiceCount - 1) : 0},
         {"choices", choices},

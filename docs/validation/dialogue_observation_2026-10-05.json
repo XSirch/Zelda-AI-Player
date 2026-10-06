@@ -1,0 +1,583 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "scope": "current_visible_dialogue_span_and_bounded_empirical_read_memory",
+  "source": "soh",
+  "objective": "Obtain the Kokiri Sword",
+  "goal_unchanged": true,
+  "full_autonomy_goal_complete": false,
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "demonstration_labels_created": 0,
+  "reference_analog_blend": 0,
+  "operator_game_inputs": 0,
+  "native_adapter": {
+    "version": "3.13",
+    "upstream_revision": "d30fc192f2eb01ceea45bd1e12de61636cafbf86",
+    "build_exit_code": 0,
+    "build_elapsed_s": 125.94967329999781,
+    "executable_sha256": "3c8b359abaca16d9ad4e2a50c5ed47b9c9779aae45184f0d7a4e18b1abb1ef14",
+    "native_pin_matches_build": true
+  },
+  "dialogue_contract": {
+    "current_span": "min(decodedTextLen,textDrawPos,sizeof(msgBufDecoded))",
+    "native_buffer_capacity": 200,
+    "no_text_phases_tested": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      54,
+      55
+    ],
+    "renderer_draw_phase_whitelist": true,
+    "official_tts_decoder_reused": true,
+    "choices_and_advance_require_visible_span": true,
+    "active_modal_ownership_preserved": true,
+    "native_visible_byte_count_not_changed_by_client_guard": true,
+    "recorded_frames_are_client_canonicalized": true,
+    "check_speak_actor": "actual_offered_talk_actor_then_nonself_focus",
+    "semantic_button_mapping_added": false
+  },
+  "read_memory": {
+    "planner_version": "current-collision-exploration-plan-v7",
+    "task_version": "observed-linear-dialogue-task-v2",
+    "retry_seconds": 120,
+    "maximum_contexts": 512,
+    "maximum_task_speakers": 8,
+    "requires_complete_visible_nonchoice_page_and_actual_speaker_uid": true,
+    "requires_consumed_close_and_three_fresh_verification_frames": true,
+    "scope": "same_native_instance_scene_room_age_mirror_actor",
+    "suppresses": [
+      "check",
+      "speak"
+    ],
+    "novel_observed_inventory_equipment_quest_story_progress_releases_deferral": true,
+    "resource_quantities_movement_and_scene_churn_do_not_release_deferral": true,
+    "semantic_understanding_proven": false,
+    "evaluation_memory": "ephemeral",
+    "strategic_objective_completed_by_reading": false,
+    "native_reopening_suppression_independently_measured": false
+  },
+  "software_regressions": {
+    "recorded_native_source": "g1-ef9ff3dce566",
+    "software_replay_only": true,
+    "unique_retained_unsafe_states": 23,
+    "unsafe_states_exposed_before": 23,
+    "unsafe_states_exposed_after": 0,
+    "minimal_starting_state_exposed_before": true,
+    "minimal_starting_state_exposed_after": false,
+    "red_test_counts": {
+      "bridge": 7,
+      "causal_progress": 2,
+      "read_memory": 1
+    },
+    "all_red_cases_pass_after_fix": true,
+    "legacy_choice_fixture_corrected": {
+      "before_mode": 1,
+      "after_mode": 53,
+      "before_state": 2,
+      "after_state": 4
+    }
+  },
+  "native_batch": {
+    "suite_id": "g1-6461611dabc1",
+    "continuous_seconds": 240,
+    "planned_episodes": 2,
+    "attempted_episodes": 2,
+    "successful_objectives": 0,
+    "native_processes": 1,
+    "native_groups": 1,
+    "same_process_between_episodes": true,
+    "reset_planned": 1,
+    "reset_verified": 1,
+    "consumed_actions": 7183,
+    "walking_worker": {
+      "responses": 6883,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "retained_round_trip_samples": 4096,
+      "retained_output_age_samples": 4096,
+      "round_trip_window_covers_all_responses": false,
+      "round_trip_p95_ms": 6.2380999988818076,
+      "round_trip_max_ms": 45.41550000067218,
+      "sampled_output_age_max_ms": 96.92509999877075,
+      "camera_reprojected_outputs": 6489,
+      "camera_delta_max_deg": 11.887207031249991,
+      "physical_reaction_ms": null
+    },
+    "attached_worker": {
+      "responses": 142,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "retained_round_trip_samples": 142,
+      "retained_output_age_samples": 211,
+      "round_trip_window_covers_all_responses": true,
+      "round_trip_p95_ms": 6.687800003419397,
+      "round_trip_max_ms": 7.877000000007683,
+      "sampled_output_age_max_ms": 68.18360000033863,
+      "camera_reprojected_outputs": 0,
+      "camera_delta_max_deg": 0.0,
+      "physical_reaction_ms": null
+    },
+    "source_pins": {
+      "pins_verified": 86,
+      "matching_archives": []
+    },
+    "frozen_artifacts_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "walking_candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "attached_candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "post_shutdown_integrity": true,
+    "strict_utf8_finite_native_json_files": 87,
+    "seed": 4106400,
+    "save_slot": 2,
+    "experimental_budget_exceeds_120_second_g1_gate": true,
+    "performance_comparison_paired": false,
+    "reset": {
+      "reason": "observed_normal_title_reset",
+      "same_native_process": true,
+      "consumed": true,
+      "receipt_status": "completed",
+      "receipt_pressed_equals_released": true,
+      "fresh_title_context_observed": true
+    },
+    "raw_button_actions": 8,
+    "causal_button_actions": 8,
+    "unowned_button_actions": 0,
+    "ground_walks": {
+      "successful": 21,
+      "failed": 33,
+      "interrupted": 3
+    },
+    "portal_tasks_successful": 3,
+    "initial_house_exits_verified": 2,
+    "attached_descents_successful": 2,
+    "visible_lid_pose_extraction_physically_observed": true,
+    "lid_angle_does_not_establish_interactivity_or_open_status": true,
+    "episodes": [
+      {
+        "index": 1,
+        "attempted": true,
+        "objective_success": false,
+        "reason": "session_budget_exhausted",
+        "elapsed_seconds": 239.75341339999795,
+        "consumed_actions": 3604,
+        "objective_unchanged": true,
+        "fresh_normal_loads": 1,
+        "verified_landings": 1,
+        "post_descent_walks_successful": 11,
+        "kind_outcomes": [
+          {
+            "kind": "observed_portal",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "count": 1
+          },
+          {
+            "kind": "ladder_down",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "succeeded",
+            "count": 11
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "count": 2
+          },
+          {
+            "kind": "observed_context_interaction",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_linear_dialogue",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "count": 20
+          }
+        ],
+        "unique_recorded_states": 3801,
+        "native_dialogue_phases": {
+          "0": 3789,
+          "1": 2,
+          "2": 4,
+          "4": 1,
+          "6": 2,
+          "53": 1,
+          "54": 2
+        },
+        "unsafe_phase_count": 9,
+        "unsafe_text_or_bytes_exposed": 0,
+        "visible_dialogue_state_count": 3,
+        "complete_visible_page_count": 1,
+        "dialogue_native_fields_missing": 0,
+        "repeated_dpad_state_count": 0,
+        "read_tasks": [
+          {
+            "stage": "stage-009",
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 12,
+            "verification_frames": 3,
+            "effect": "dialogue_closed",
+            "speaker_contexts": [
+              [
+                "7023778-21533561",
+                85,
+                0,
+                false,
+                "child",
+                "138"
+              ]
+            ],
+            "text_changes_after_consumption": 0
+          }
+        ],
+        "context_interactions": [
+          {
+            "stage": "stage-008",
+            "phase": "succeeded",
+            "action_key": "1:check:prop:321",
+            "actor_uid": "138",
+            "effect": "dialogue_started",
+            "failure": null,
+            "consumed_actions": 64
+          }
+        ],
+        "drawn_container_pose_histogram": {},
+        "failures": [
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "reason": "unsupported_locomotor_mode",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "reason": "observed_context_interaction",
+            "count": 2
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "reason": "attempt_timeout",
+            "count": 9
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "reason": "no_geometric_progress",
+            "count": 11
+          }
+        ],
+        "container_attempts": [],
+        "short_step_invocations": 0,
+        "verified_read_actor_contexts": 1,
+        "durable_progress_revision": 0,
+        "actual_scene_room_transitions": 1,
+        "occupied_macro_regions": 26,
+        "max_outward_radius": 508.4567048993892
+      },
+      {
+        "index": 2,
+        "attempted": true,
+        "objective_success": false,
+        "reason": "session_budget_exhausted",
+        "elapsed_seconds": 239.7055204999997,
+        "consumed_actions": 3579,
+        "objective_unchanged": true,
+        "fresh_normal_loads": 1,
+        "verified_landings": 1,
+        "post_descent_walks_successful": 10,
+        "kind_outcomes": [
+          {
+            "kind": "observed_portal",
+            "phase": "succeeded",
+            "count": 2
+          },
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "count": 1
+          },
+          {
+            "kind": "ladder_down",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "succeeded",
+            "count": 10
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "count": 1
+          },
+          {
+            "kind": "observed_context_interaction",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_linear_dialogue",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "count": 13
+          },
+          {
+            "kind": "observed_container_approach",
+            "phase": "failed",
+            "count": 5
+          }
+        ],
+        "unique_recorded_states": 3821,
+        "native_dialogue_phases": {
+          "0": 3808,
+          "1": 2,
+          "2": 4,
+          "4": 1,
+          "6": 2,
+          "53": 2,
+          "54": 2
+        },
+        "unsafe_phase_count": 9,
+        "unsafe_text_or_bytes_exposed": 0,
+        "visible_dialogue_state_count": 4,
+        "complete_visible_page_count": 2,
+        "dialogue_native_fields_missing": 0,
+        "repeated_dpad_state_count": 0,
+        "read_tasks": [
+          {
+            "stage": "stage-009",
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 12,
+            "verification_frames": 3,
+            "effect": "dialogue_closed",
+            "speaker_contexts": [
+              [
+                "7023778-21533561",
+                85,
+                0,
+                false,
+                "child",
+                "362"
+              ]
+            ],
+            "text_changes_after_consumption": 0
+          }
+        ],
+        "context_interactions": [
+          {
+            "stage": "stage-008",
+            "phase": "succeeded",
+            "action_key": "1:check:prop:321",
+            "actor_uid": "362",
+            "effect": "dialogue_started",
+            "failure": null,
+            "consumed_actions": 66
+          }
+        ],
+        "drawn_container_pose_histogram": {
+          "13493": 2216
+        },
+        "failures": [
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "reason": "unsupported_locomotor_mode",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "reason": "observed_context_interaction",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "reason": "attempt_timeout",
+            "count": 6
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "reason": "no_geometric_progress",
+            "count": 7
+          },
+          {
+            "kind": "observed_container_approach",
+            "phase": "failed",
+            "reason": "container_no_observed_prompt",
+            "count": 4
+          },
+          {
+            "kind": "observed_container_approach",
+            "phase": "failed",
+            "reason": "container_approach_timeout",
+            "count": 1
+          }
+        ],
+        "container_attempts": [
+          {
+            "stage": "stage-031",
+            "actor_uid": "430",
+            "phase": "failed",
+            "failure": "container_no_observed_prompt",
+            "consumed_actions": 73,
+            "best_distance": 24.902535529994942,
+            "floor_phase": "succeeded",
+            "verification_frames": 0,
+            "initial_prompt": "none",
+            "final_prompt": "none"
+          },
+          {
+            "stage": "stage-032",
+            "actor_uid": "429",
+            "phase": "failed",
+            "failure": "container_no_observed_prompt",
+            "consumed_actions": 133,
+            "best_distance": 25.2368344902784,
+            "floor_phase": "succeeded",
+            "verification_frames": 0,
+            "initial_prompt": "none",
+            "final_prompt": "none"
+          },
+          {
+            "stage": "stage-033",
+            "actor_uid": "427",
+            "phase": "failed",
+            "failure": "container_no_observed_prompt",
+            "consumed_actions": 61,
+            "best_distance": 25.059677702165015,
+            "floor_phase": "succeeded",
+            "verification_frames": 0,
+            "initial_prompt": "none",
+            "final_prompt": "none"
+          },
+          {
+            "stage": "stage-034",
+            "actor_uid": "428",
+            "phase": "failed",
+            "failure": "container_no_observed_prompt",
+            "consumed_actions": 117,
+            "best_distance": 24.92882140172624,
+            "floor_phase": "succeeded",
+            "verification_frames": 0,
+            "initial_prompt": "none",
+            "final_prompt": "none"
+          },
+          {
+            "stage": "stage-035",
+            "actor_uid": "430",
+            "phase": "failed",
+            "failure": "container_approach_timeout",
+            "consumed_actions": 99,
+            "best_distance": 25.88117396711861,
+            "floor_phase": "succeeded",
+            "verification_frames": 0,
+            "initial_prompt": "none",
+            "final_prompt": "none"
+          }
+        ],
+        "short_step_invocations": 0,
+        "verified_read_actor_contexts": 1,
+        "durable_progress_revision": 0,
+        "actual_scene_room_transitions": 2,
+        "occupied_macro_regions": 38,
+        "max_outward_radius": 1687.0208197166237
+      }
+    ],
+    "owned_soh_and_workers_remaining": 0,
+    "native_child_exit_code": null,
+    "generic_base": {
+      "repo": "convaiinnovations/laya",
+      "revision": "7b928d828b7b0e022f929d9bd2e44165aa270148",
+      "training_domain": "generic_base",
+      "sha256": {
+        "model.safetensors": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+        "rl_agent_config.json": "ae287b56bbcf5f8c4f4541ae9dfd00c914c4c48b940b8398c3058af37ba92bbd",
+        "encoder/config.json": "bf3ab80598fdccf414855a2ce80f22859e4492d06ca8a62ddd1cfb63972f8979",
+        "tokenizer/tokenizer.json": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30",
+        "tokenizer/tokenizer_config.json": "50044de60daaa73df97d262e15a40d4faf0160e7d742df64b377877a1320dd12"
+      }
+    },
+    "generic_base_files_checked": 5
+  },
+  "validation": {
+    "pytest_passed": 570,
+    "pytest_skipped": 24,
+    "pytest_warning": "existing Starlette/httpx deprecation",
+    "web_build_exit_code": 0,
+    "skips_are_native_successes": false,
+    "separate_msvc_cases_passed": {
+      "scheduler": 19,
+      "walking_clearance": 10,
+      "navigation_resolution": 9,
+      "container_pose": 3,
+      "dialogue_observation": 5
+    },
+    "final_strict_utf8_text_files_checked": 123,
+    "task_text_paths": 18,
+    "suspicious_sequences_found": 0,
+    "lint": {
+      "new_findings": 0,
+      "baseline_findings": 15,
+      "current_findings": 15,
+      "existing_findings_by_file": {
+        "test_realtime_bridge.py": 15
+      }
+    },
+    "diff_check_exit_code": 0,
+    "prior_source_pins_reverified": {
+      "batch": "g1-ef9ff3dce566",
+      "pins_verified": 85,
+      "exact_archived_changed_files": 6
+    }
+  },
+  "unqualified": [
+    "reliable_general_navigation",
+    "container_open_close_classifier",
+    "short_step_physical_execution",
+    "container_opening",
+    "Kokiri_Sword",
+    "upward_crawl_water_fence_controllers",
+    "combat",
+    "G2_G5",
+    "INICIAR_promotion",
+    "full_campaign",
+    "full_observation_to_physical_reaction_latency"
+  ]
+}

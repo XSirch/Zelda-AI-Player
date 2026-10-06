@@ -166,7 +166,17 @@ class NativeModalWaitTask(LocalTask):
 class LinearDialogueTask(ObservedContextTask):
     observed_text_changes_after_consumption: int = 0
     last_text_signature: tuple | None = None
-    version: str = "observed-linear-dialogue-task-v1"
+    read_speaker_contexts: tuple = ()
+    version: str = "observed-linear-dialogue-task-v2"
+
+    def note_visible_page(self, game):
+        speaker = game.dialogue.speaker
+        if (game.dialogue.active and game.dialogue.text_visible is True and game.dialogue.text
+                and game.dialogue.can_advance and not game.dialogue.choice_count
+                and speaker and speaker.actor_uid):
+            key = (*physical_context(game), speaker.actor_uid)
+            if key not in self.read_speaker_contexts and len(self.read_speaker_contexts) < 8:
+                self.read_speaker_contexts += (key,)
 
     @classmethod
     def create(cls, game, *, now=None, budget_s=20):
@@ -179,6 +189,8 @@ class LinearDialogueTask(ObservedContextTask):
             physical_context(game), game.scene_epoch, game.seq, cls._loads(game), tuple(game.player.position),
             tuple(game.player.position), tuple(game.player.position), now, now+budget_s, now, 0., phase="execute")
         task.last_text_signature = (game.dialogue.text_id, game.dialogue.text, game.dialogue.choice_count)
+        task.context_actor_uid = game.dialogue.speaker.actor_uid if game.dialogue.speaker else None
+        task.note_visible_page(game)
         return task
 
     def allows_context_buttons(self, game):
@@ -204,7 +216,9 @@ class LinearDialogueTask(ObservedContextTask):
             self.interrupt("modal_owns_control")
             return
         signature = (game.dialogue.text_id, game.dialogue.text, game.dialogue.choice_count)
-        if game.dialogue.active and signature != self.last_text_signature and self.consumed:
+        self.note_visible_page(game)
+        if (game.dialogue.active and game.dialogue.text_visible is not False
+                and signature != self.last_text_signature and self.consumed):
             self.observed_text_changes_after_consumption += 1
             self.last_text_signature, self.progress_at = signature, now
         if not game.dialogue.active and self.consumed:

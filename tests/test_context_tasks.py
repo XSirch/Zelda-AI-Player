@@ -170,6 +170,40 @@ def test_causal_chest_binding_requires_a_new_effect_and_matching_consumed_physic
     assert memory == [("opaque", "R")] and controller.pending_interaction_probe is None
 
 
+def test_hidden_page_transition_does_not_teach_a_dialogue_button(state):
+    from zelda_ai.models import DialogueState
+    state.protocol = 3
+    memory = []
+    controller = SimpleNamespace(
+        bridge=SimpleNamespace(command_consumed=lambda seq: True),
+        pending_interaction_probe={"kind": "dialogue", "instance_id": state.instance_id,
+            "at": time.monotonic(), "command_seqs": [8], "key": "dialogue:advance",
+            "button": "R", "known": False, "dialogue_text_id": 42,
+            "dialogue_text": "previous page", "dialogue_choice_count": 0, "event_ids": ()},
+        interaction_memory=SimpleNamespace(record_interaction_success=lambda *args: memory.append(args)),
+        interaction_probe_successes=0, last_interaction_source="none")
+    state.dialogue = DialogueState(active=True, text_id=799, message_mode=2, text="stale buffer")
+    ContinuousController._observe_interaction_outcome(controller, state, None)
+    assert not memory and controller.pending_interaction_probe is not None
+    state.dialogue = DialogueState(active=True, text_id=799, message_mode=6, text="current page")
+    ContinuousController._observe_interaction_outcome(controller, state, None)
+    assert memory == [("dialogue:advance", "R")] and controller.pending_interaction_probe is None
+
+
+def test_hidden_page_transition_does_not_count_as_consumed_linear_text_progress(state):
+    from zelda_ai.models import DialogueState
+    state.dialogue = DialogueState(active=True, text_id=42, message_mode=53, text="previous page")
+    task = LinearDialogueTask.create(state, now=0)
+    state.seq += 1
+    state.dialogue = DialogueState(active=True, text_id=799, message_mode=2, text="stale buffer")
+    task.observe(state, consumed=True, now=.1)
+    assert task.observed_text_changes_after_consumption == 0 and task.progress_at == 0
+    state.seq += 1
+    state.dialogue = DialogueState(active=True, text_id=799, message_mode=6, text="current page")
+    task.observe(state, consumed=True, now=.2)
+    assert task.observed_text_changes_after_consumption == 1 and task.progress_at == .2
+
+
 def test_cutscene_arbiter_observes_owned_container_effect_with_neutral_input(state, tmp_path):
     import asyncio
 

@@ -46,8 +46,8 @@ def test_game_state_keeps_structured_dialogue_actor_and_progress(state):
             "text_id": 123,
             "text": "Hello Link",
             "state": "choice",
-            "state_code": 2,
-            "message_mode": 1,
+            "state_code": 4,  # TEXT_STATE_CHOICE
+            "message_mode": 53,  # MSGMODE_TEXT_DONE; start/growth has no visible page.
             "can_advance": True,
             "choice_count": 2,
             "choice_index": 0,

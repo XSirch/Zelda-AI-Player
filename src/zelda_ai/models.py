@@ -182,11 +182,27 @@ class DialogueState(StrictModel):
     state: str = Field(default="none", max_length=40)
     state_code: int = Field(default=0, ge=0, le=255)
     message_mode: int = Field(default=0, ge=0, le=255)
+    text_visible: bool | None = None
+    visible_bytes: int | None = Field(default=None, ge=0, le=4096)
     can_advance: bool = False
     choice_count: int = Field(default=0, ge=0, le=3)
     choice_index: int = Field(default=0, ge=0, le=2)
     choices: list[str] = Field(default_factory=list, max_length=3)
     speaker: ActorObservation | None = None
+
+    @model_validator(mode="after")
+    def undisplayed_buffer_is_not_observation(self):
+        # These pinned native phases do not display a decoded current page.
+        # Older adapters can retain a previous buffer here. Preserve modal
+        # ownership/ID, but never present those bytes as text or a choice.
+        if self.message_mode in {1, 2, 3, 4, 5, 54, 55}:
+            self.text_visible = False
+        if self.text_visible is False:
+            self.text = ""
+            self.choices = []
+            self.choice_count = 0
+            self.can_advance = False
+        return self
 
 
 class PauseMenuState(StrictModel):
