@@ -20,7 +20,7 @@ from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v5"
+    VERSION = "current-collision-exploration-plan-v6"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
@@ -108,7 +108,9 @@ class ObservedExplorationPlan:
         self.observe(game, now=now)
         self.selection = {"observation_seq": game.seq, "full_seq": game.full_seq, "monotonic_s": now,
                           "mesh_cells": len(game.navmesh.cells), "reachable_floor_candidates": 0,
-                          "cooled_floor_candidates": 0, "eligible_floor_candidates": 0}
+                          "cooled_floor_candidates": 0, "eligible_floor_candidates": 0,
+                          "reachable_short_floor_candidates": 0, "cooled_short_floor_candidates": 0,
+                          "eligible_short_floor_candidates": 0}
         if not 1 <= budget_s <= 300:
             raise ValueError("planning_budget_exhausted")
         if self.contextual_interactions and game.dialogue.active:
@@ -171,23 +173,32 @@ class ObservedExplorationPlan:
                 continue
             offer(task, 1, math.dist(position, row.target_position), approach_distance=row.distance)
 
-        mesh, floor_candidates = game.navmesh, []
+        mesh, floor_candidates, short_candidates = game.navmesh, [], []
         for x, z, y, _ in mesh.cells:
             point = (mesh.origin[0] + x * mesh.step, y, mesh.origin[2] + z * mesh.step)
             distance = math.dist(position, point)
-            if not 55 <= distance <= 280 or abs(y - game.player.floor_height) > 24:
+            short = 20 <= distance < 55 and mesh.step < 55
+            if (not (short or 55 <= distance <= 280)
+                    or abs(y - game.player.floor_height) > 24):
                 continue
             path = observed_local_path(game, point, minimum_gain=0)
             if not path or path["partial"] or path["target_gap"] > 4:
                 continue
-            self.selection["reachable_floor_candidates"] += 1
+            self.selection["reachable_short_floor_candidates" if short else "reachable_floor_candidates"] += 1
             heading = math.atan2(point[0] - position[0], point[2] - position[2])
             forward = math.cos(heading - game.player.yaw * math.pi / 32768) >= -.25
             task = LocalTask.observed_cell(game, point, now=now, budget_s=min(12, budget_s))
             if self.retry_after.get(self.task_key(task), 0) <= now:
-                floor_candidates.append((forward, task, distance))
+                (short_candidates if short else floor_candidates).append((forward, task, distance))
             else:
-                self.selection["cooled_floor_candidates"] += 1
+                self.selection["cooled_short_floor_candidates" if short else "cooled_floor_candidates"] += 1
+        # A refined graph can expose only one short supported escape step.
+        # Reuse the same directed-path, cooldown and task completion contracts;
+        # never let this fallback replace an eligible longer frontier or reset
+        # the macro dwell clock. No route edge is created by selecting a step.
+        if not floor_candidates:
+            floor_candidates = short_candidates
+            self.selection["eligible_short_floor_candidates"] = len(short_candidates)
         # A rearward frontier is eligible only without a current forward/side
         # path. Every candidate still needs actual directed collision links.
         if any(row[0] for row in floor_candidates):

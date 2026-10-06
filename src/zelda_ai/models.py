@@ -164,6 +164,7 @@ class ActorObservation(StrictModel):
     distance: float = Field(ge=0)
     targeted: bool = False
     drawn: bool = False
+    container_lid_rotation_z: int | None = Field(default=None, ge=-32768, le=32767)
     text_id: int | None = Field(default=None, ge=0, le=65535)
 
     @field_validator("position", "focus_position", "velocity")

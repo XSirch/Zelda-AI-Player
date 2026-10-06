@@ -175,6 +175,66 @@ def test_unlinked_cells_and_rearward_paths_do_not_replace_observed_forward_front
     assert task.target == (0, 0, 140)
 
 
+def test_only_linked_short_fine_step_can_escape_without_new_macro_progress(state):
+    ground(state)
+    state.player.position = (-83, 0, -53)
+    state.navmesh = NavigationMeshSnapshot(origin=state.player.position, step=35, half_extent=8,
+        cells=[(-1, 0, 0., 4), (0, 0, 0., 64), (2, 0, 0., 4), (3, 0, 0., 64)])
+    plan = ObservedExplorationPlan()
+    task = plan.choose(state, budget_s=12, now=0)
+    assert task.kind == "observed_cell" and task.target == (-118, 0, -53)
+    assert task.corridor == ((-118, 0, -53),)
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=True, now=.1+i/10)
+    assert task.phase != "verify" and not task.terminal
+    # Move within the same macro-region: this is an escape step, not expansion.
+    state.seq += 1
+    state.player.position = (-84, 0, -53)
+    plan.observe(state, now=1)
+    assert len(plan.visits) == 1
+    state.seq += 1
+    state.player.position = (-118, 0, -53)
+    plan.observe(state, now=2)
+    assert len(plan.visits) == 1
+    task.phase, task.failure = "failed", "no_geometric_progress"
+    plan.outcome(task, success=False, now=2)
+    with pytest.raises(ValueError, match="no_eligible_current_collision_task"):
+        plan.choose(state, budget_s=12, now=3)
+
+
+def test_short_step_completes_only_after_consumed_geometric_gain_and_stopped_frames(state):
+    ground(state)
+    state.navmesh = NavigationMeshSnapshot(step=35, half_extent=8,
+        cells=[(0, 0, 0., 4), (1, 0, 0., 64)])
+    task = ObservedExplorationPlan().choose(state, budget_s=12, now=0)
+    state.player.position = (26, 0, 0)
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=False, now=.1+i/10)
+    assert not task.terminal and task.verification_frames == 0
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=True, now=.4+i/10)
+    assert task.phase == "succeeded" and task.verification_frames == 3
+
+
+def test_short_step_does_not_replace_available_longer_frontier(state):
+    ground(state)
+    state.navmesh = NavigationMeshSnapshot(step=35, half_extent=8,
+        cells=[(0, 0, 0., 68), (-1, 0, 0., 4), (1, 0, 0., 68), (2, 0, 0., 64)])
+    task = ObservedExplorationPlan().choose(state, budget_s=12, now=0)
+    assert task.target == (70, 0, 0)
+
+
+def test_unlinked_short_cell_cannot_supply_an_escape(state):
+    ground(state)
+    state.navmesh = NavigationMeshSnapshot(step=35, half_extent=8,
+        cells=[(0, 0, 0., 0), (-1, 0, 0., 4)])
+    with pytest.raises(ValueError, match="no_eligible_current_collision_task"):
+        ObservedExplorationPlan().choose(state, budget_s=12, now=0)
+
+
 def test_fine_movement_and_camera_churn_do_not_create_new_macro_footprints(state):
     ground(state)
     plan = ObservedExplorationPlan()

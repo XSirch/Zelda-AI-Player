@@ -6,6 +6,7 @@
 #include "StartupGuard.hpp"
 #include "NavMeshQueries.hpp"
 #include "NavigationResolution.hpp"
+#include "ContainerPose.hpp"
 #include <SDL2/SDL_net.h>
 #include <nlohmann/json.hpp>
 #include <libultraship/bridge/consolevariablebridge.h>
@@ -31,6 +32,7 @@ extern "C" {
 #include "global.h"
 #include "functions.h"
 #include "message_data_fmt.h"
+#include "src/overlays/actors/ovl_En_Box/z_en_box.h"
 extern PlayState* gPlayState;
 extern SaveContext gSaveContext;
 }
@@ -43,7 +45,7 @@ namespace {
 using json = nlohmann::json;
 constexpr const char* REVISION = "d30fc192f2eb01ceea45bd1e12de61636cafbf86";
 constexpr size_t MAX_EVENTS = 64;
-constexpr const char* BRIDGE_BUILD = "rt-input-v3.11";
+constexpr const char* BRIDGE_BUILD = "rt-input-v3.12";
 constexpr size_t MAX_NEARBY_ACTORS = 24;
 constexpr size_t MAX_ROOM_ACTORS = 64;
 constexpr float MAX_NEARBY_ACTOR_DISTANCE = 1400.0f;
@@ -1112,8 +1114,15 @@ json ActorJson(Actor* actor, Player* player, bool metadata = true) {
         {"distance", distance},
         {"targeted", actor->isTargeted != 0},
         {"drawn", actor->isDrawn != 0},
+        {"container_lid_rotation_z", nullptr},
         {"text_id", actor->textId},
     };
+    if (actor->id == ACTOR_EN_BOX) {
+        const auto* box = reinterpret_cast<const EnBox*>(actor);
+        const auto pose = zelda_ai::VisibleContainerLidRotation(actor->isDrawn != 0, box->alpha,
+            box->skelanime.jointTable, box->skelanime.limbCount);
+        if (pose) result["container_lid_rotation_z"] = *pose;
+    }
     if (actor->category == ACTORCAT_ENEMY || actor->category == ACTORCAT_BOSS) {
         result["velocity"] = {actor->velocity.x, actor->velocity.y, actor->velocity.z};
         result["speed_xz"] = actor->speedXZ;

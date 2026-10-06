@@ -52,7 +52,7 @@ class LocalTask:
     waypoint_index: int = 0
     progress_point: tuple | None = None
     best_waypoint_distance: float | None = None
-    version: str = "observed-analog-task-v4"
+    version: str = "observed-analog-task-v5"
 
     @classmethod
     def traversal(cls, game, affordance, *, now=None, budget_s=8.0):
@@ -186,7 +186,13 @@ class LocalTask:
             if self.kind != "observed_cell":
                 self.progress_at = now
         horizontal = math.hypot(position[0] - self.target[0], position[2] - self.target[2])
-        reached = horizontal <= 35 and abs(position[1] - self.target[1]) <= 4
+        # A fine escape step can be only 35 units long. The usual 35-unit
+        # arrival tolerance would accept consumed neutral input at its origin.
+        # Require real geometric gain before entering stopped verification.
+        origin_distance = math.hypot(self.target[0] - self.origin[0], self.target[2] - self.origin[2])
+        arrival_radius = (min(18, max(8, origin_distance * .35))
+                          if self.kind == "observed_cell" and origin_distance < 55 else 35)
+        reached = horizontal <= arrival_radius and abs(position[1] - self.target[1]) <= 4
         # Actual gain is necessary: approaching the base of a raised surface
         # must not count as a climb. Verify stopped, fresh frames, not a jump apex.
         delta = self.target[1] - self.origin[1]
@@ -200,7 +206,7 @@ class LocalTask:
             self.phase, self.failure = "failed", "attempt_timeout"
         elif now - self.progress_at >= 2.5:
             self.phase, self.failure = "failed", "no_geometric_progress"
-        elif (horizontal <= 35 and abs(position[1] - self.target[1]) <= 4 and grounded(game.player)
+        elif (horizontal <= arrival_radius and abs(position[1] - self.target[1]) <= 4 and grounded(game.player)
               or self.phase == "verify" and game.player.speed_xz >= .1):
             self.phase = "verify"
         elif math.dist(position, self.approach) > 35 and self.phase == "prepare":

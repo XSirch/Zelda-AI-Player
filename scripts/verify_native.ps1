@@ -11,7 +11,8 @@ $nativeInclude = Join-Path $taskRoot 'native'
 $harnesses = @(
     @{ Name = 'scheduler'; Source = 'native_input_scheduler.cpp' },
     @{ Name = 'walking-clearance'; Source = 'native_walking_clearance.cpp' },
-    @{ Name = 'navigation-resolution'; Source = 'native_navigation_resolution.cpp' }
+    @{ Name = 'navigation-resolution'; Source = 'native_navigation_resolution.cpp' },
+    @{ Name = 'container-pose'; Source = 'native_container_pose.cpp' }
 )
 foreach ($harness in $harnesses) {
     $binary = Join-Path $taskOut ($harness.Name + '.exe')

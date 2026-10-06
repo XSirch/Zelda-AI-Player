@@ -15,8 +15,8 @@ INCLUDE = '#include "soh/Enhancements/zelda-ai/ZeldaAiBridge.h"\n'
 LEGACY_CALL = "        ZeldaAiBridge_OverrideInput(i, &input->cur.button, &input->cur.stick_x, &input->cur.stick_y);\n"
 CALL = "        ZeldaAiBridge_ConsumeInput(i, newInput, mode);\n"
 ANCHOR = "        ogInput++;"
-NATIVE_FILES = ("ZeldaAiBridge.cpp", "ZeldaAiBridge.h", "InputScheduler.hpp", "ActorRegistry.hpp", "StartupGuard.hpp", "NavMeshQueries.hpp", "NavigationResolution.hpp")
-ADAPTER_VERSION = "3.11"
+NATIVE_FILES = ("ZeldaAiBridge.cpp", "ZeldaAiBridge.h", "InputScheduler.hpp", "ActorRegistry.hpp", "StartupGuard.hpp", "NavMeshQueries.hpp", "NavigationResolution.hpp", "ContainerPose.hpp")
+ADAPTER_VERSION = "3.12"
 WIRE_PROTOCOL = 3
 BRIDGE_BUILD = f"rt-input-v{ADAPTER_VERSION}"
 

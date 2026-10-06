@@ -1,0 +1,742 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "scope": "visible_container_joint_telemetry_and_short_collision_steps",
+  "source": "soh",
+  "objective": "Obtain the Kokiri Sword",
+  "goal_unchanged": true,
+  "full_autonomy_goal_complete": false,
+  "provider_calls": 0,
+  "screenshots": 0,
+  "training_updates": 0,
+  "reference_analog_blend": 0,
+  "native_adapter": {
+    "version": "3.12",
+    "upstream_revision": "d30fc192f2eb01ceea45bd1e12de61636cafbf86",
+    "build_exit_code": 0,
+    "build_elapsed_s": 479.7495004000011,
+    "executable_sha256": "eed682b0af6480d97ac12122995503a12e3ed9f4b38dc2a300b7918eff2696fc",
+    "post_link_asset_copy_overlapped_native_start": true,
+    "native_pin_matches_build": true
+  },
+  "pose_contract": {
+    "field": "container_lid_rotation_z",
+    "units": "signed_native_lid_joint_rotation",
+    "source": "drawn_EnBox_skelanime_jointTable_3_z_nonzero_alpha_valid_skeleton",
+    "unknown": "null",
+    "hidden_contents_or_treasure_flags_read_for_pose": false,
+    "open_closed_classification_added": false,
+    "observations_are_current_fast_geometry": true
+  },
+  "short_step_contract": {
+    "planner_version": "current-collision-exploration-plan-v6",
+    "local_task_version": "observed-analog-task-v5",
+    "eligible_distance_units": [
+      20,
+      55
+    ],
+    "requires_refined_mesh": true,
+    "requires_actual_directed_collision_path": true,
+    "only_without_eligible_longer_frontier": true,
+    "honors_cooldown": true,
+    "arrival_radius": "min(18,max(8,origin_horizontal_distance*0.35))",
+    "preserves_macro_dwell_supervisor": true,
+    "does_not_persist_proposed_route_edges": true
+  },
+  "software_regressions": {
+    "selection_red_replay": {
+      "source_state": ".local/qualification/g1-de88e9ceab32/episode-1/motor/planning-state.json",
+      "seq": 4247,
+      "software_replay_only": true,
+      "version": "current-collision-exploration-plan-v5",
+      "position": [
+        -83.0,
+        0.0,
+        -53.9105110168457
+      ],
+      "error": "no_eligible_current_collision_task",
+      "selection": {
+        "observation_seq": 4247,
+        "full_seq": 4247,
+        "monotonic_s": 18134.8962829,
+        "mesh_cells": 58,
+        "reachable_floor_candidates": 0,
+        "cooled_floor_candidates": 0,
+        "eligible_floor_candidates": 0
+      }
+    },
+    "selection_green_replay": {
+      "source_state": ".local/qualification/g1-de88e9ceab32/episode-1/motor/planning-state.json",
+      "seq": 4247,
+      "software_replay_only": true,
+      "version": "current-collision-exploration-plan-v6",
+      "position": [
+        -83.0,
+        0.0,
+        -53.9105110168457
+      ],
+      "kind": "observed_cell",
+      "target": [
+        -118.0,
+        0.0,
+        -53.9105110168457
+      ],
+      "corridor": [
+        [
+          -118.0,
+          0.0,
+          -53.9105110168457
+        ]
+      ],
+      "selection": {
+        "observation_seq": 4247,
+        "full_seq": 4247,
+        "monotonic_s": 18134.8962829,
+        "mesh_cells": 58,
+        "reachable_floor_candidates": 0,
+        "cooled_floor_candidates": 0,
+        "eligible_floor_candidates": 1,
+        "reachable_short_floor_candidates": 1,
+        "cooled_short_floor_candidates": 0,
+        "eligible_short_floor_candidates": 1
+      }
+    },
+    "minimized_selection_before": "1 failed, 2 passed",
+    "stationary_arrival_before": "1 failed",
+    "stationary_arrival_after": "requires actual geometric gain, consumed input and three fresh stopped frames",
+    "scope": "decision/task contract replays only, no physical trajectory replay"
+  },
+  "generic_base": {
+    "repo": "convaiinnovations/laya",
+    "revision": "7b928d828b7b0e022f929d9bd2e44165aa270148",
+    "training_domain": "generic_base",
+    "sha256": {
+      "model.safetensors": "891102d372688fc2a094dac56a384bc537b87c63f21f9f3dac0be2b7cbc8d86c",
+      "rl_agent_config.json": "ae287b56bbcf5f8c4f4541ae9dfd00c914c4c48b940b8398c3058af37ba92bbd",
+      "encoder/config.json": "bf3ab80598fdccf414855a2ce80f22859e4492d06ca8a62ddd1cfb63972f8979",
+      "tokenizer/tokenizer.json": "6c8aaa9a542084f2457eab775d4eeb51f92a70c0fd9de28d5edb0ddec3c08d30",
+      "tokenizer/tokenizer_config.json": "50044de60daaa73df97d262e15a40d4faf0160e7d742df64b377877a1320dd12"
+    },
+    "all_five_files_verified": true
+  },
+  "native_batch": {
+    "suite_id": "g1-ef9ff3dce566",
+    "planning_version": "current-collision-exploration-plan-v6",
+    "planned_episodes": 2,
+    "attempted_episodes": 2,
+    "successful_objectives": 0,
+    "native_processes": 1,
+    "reset_verified": 1,
+    "consumed_actions": 4951,
+    "walking_worker": {
+      "responses": 4528,
+      "expired_responses": 0,
+      "context_rejections": 1,
+      "retained_round_trip_samples": 4096,
+      "retained_output_age_samples": 4096,
+      "round_trip_window_covers_all_responses": false,
+      "round_trip_p95_ms": 6.915099998877849,
+      "round_trip_max_ms": 76.1026000000129,
+      "sampled_output_age_max_ms": 149.90540000144392,
+      "camera_reprojected_outputs": 4228,
+      "camera_delta_max_deg": 21.176147460937496,
+      "physical_reaction_ms": null
+    },
+    "attached_worker": {
+      "responses": 104,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "retained_round_trip_samples": 104,
+      "retained_output_age_samples": 116,
+      "round_trip_window_covers_all_responses": true,
+      "round_trip_p95_ms": 11.379400002624607,
+      "round_trip_max_ms": 14.708599999721628,
+      "sampled_output_age_max_ms": 147.26590000282158,
+      "camera_reprojected_outputs": 0,
+      "camera_delta_max_deg": 0.0,
+      "physical_reaction_ms": null
+    },
+    "episodes": [
+      {
+        "index": 1,
+        "attempted": true,
+        "objective_success": false,
+        "reason": "supervisor:no_durable_or_macro_progress",
+        "native_instance": "2609681325-19805262",
+        "pid": 24276,
+        "reset": null,
+        "fresh_normal_loads": 1,
+        "elapsed_seconds": 212.94799480000074,
+        "consumed_actions": 3098,
+        "raw_button_actions": 6,
+        "objective_unchanged": true,
+        "objective_acquired_in_run": false,
+        "verified_landings": 1,
+        "post_descent_walks_successful": 14,
+        "planning": {
+          "version": "current-collision-exploration-plan-v6",
+          "replans": 39,
+          "actual_scene_room_transitions": 1,
+          "occupied_macro_regions": 24,
+          "failed_target_regions": 13,
+          "max_outward_radius": 505.08392318992964,
+          "observed_context_actions": {
+            "attack": 92,
+            "down": 73,
+            "speak": 102,
+            "putaway": 316,
+            "check": 54,
+            "next": 170,
+            "return": 15
+          },
+          "verified_opened_containers": 0,
+          "memory": "ephemeral_actual_positions_and_attempts_only",
+          "last_selection": {
+            "observation_seq": 4343,
+            "full_seq": 4343,
+            "monotonic_s": 20031.5790997,
+            "mesh_cells": 52,
+            "reachable_floor_candidates": 0,
+            "cooled_floor_candidates": 0,
+            "eligible_floor_candidates": 0,
+            "reachable_short_floor_candidates": 0,
+            "cooled_short_floor_candidates": 0,
+            "eligible_short_floor_candidates": 0
+          }
+        },
+        "exact_planning_diagnostic": {
+          "path": ".local/qualification/g1-ef9ff3dce566/episode-1/motor/planning-state.json",
+          "observation_seq": 4343,
+          "full_seq": 4343,
+          "snapshot_is_selection_observation": true,
+          "memory_last_seq": 4346,
+          "selection": {
+            "observation_seq": 4343,
+            "full_seq": 4343,
+            "monotonic_s": 20031.5790997,
+            "mesh_cells": 52,
+            "reachable_floor_candidates": 0,
+            "cooled_floor_candidates": 0,
+            "eligible_floor_candidates": 0,
+            "reachable_short_floor_candidates": 0,
+            "cooled_short_floor_candidates": 0,
+            "eligible_short_floor_candidates": 0
+          }
+        },
+        "kind_outcomes": [
+          {
+            "kind": "observed_portal",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "count": 1
+          },
+          {
+            "kind": "ladder_down",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "count": 5
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "succeeded",
+            "count": 14
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "count": 11
+          },
+          {
+            "kind": "observed_context_interaction",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_linear_dialogue",
+            "phase": "succeeded",
+            "count": 3
+          },
+          {
+            "kind": "observed_context_interaction",
+            "phase": "interrupted",
+            "count": 3
+          }
+        ],
+        "native_builds": {
+          "rt-input-v3.12": 3317
+        },
+        "drawn_container_pose_histogram": {},
+        "unique_recorded_states": 3317,
+        "observed_containers": [],
+        "short_steps": [],
+        "native_chest_open_events": [],
+        "failed_stages": [
+          {
+            "name": "stage-002",
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "failure": "unsupported_locomotor_mode"
+          },
+          {
+            "name": "stage-004",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-006",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout"
+          },
+          {
+            "name": "stage-007",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout"
+          },
+          {
+            "name": "stage-009",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-010",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-011",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-012",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-013",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-020",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout"
+          },
+          {
+            "name": "stage-023",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-024",
+            "kind": "observed_context_interaction",
+            "phase": "interrupted",
+            "failure": "unsupported_context_mode"
+          },
+          {
+            "name": "stage-027",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-032",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-033",
+            "kind": "observed_context_interaction",
+            "phase": "interrupted",
+            "failure": "unsupported_context_mode"
+          },
+          {
+            "name": "stage-036",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-037",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-038",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout"
+          },
+          {
+            "name": "stage-039",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-040",
+            "kind": "observed_context_interaction",
+            "phase": "interrupted",
+            "failure": "motor_stopped"
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "attempted": true,
+        "objective_success": false,
+        "reason": "supervisor:no_durable_or_macro_progress",
+        "native_instance": "2609681325-19805262",
+        "pid": 24276,
+        "reset": {
+          "source": "soh",
+          "success": true,
+          "reason": "observed_normal_title_reset",
+          "same_native_process": true,
+          "consumed": true,
+          "receipt": {
+            "seq": 3401,
+            "owner_epoch": 1,
+            "status": "completed",
+            "first_tick": 4886,
+            "last_tick": 4887,
+            "pressed": 12304,
+            "released": 12304,
+            "apply_latency_ms": 0.005,
+            "client_to_consume_ms": 47.469,
+            "reason": ""
+          },
+          "initial_seq": 4355,
+          "initial_scene_epoch": 5,
+          "initial_context_epoch": 23,
+          "provider_calls": 0,
+          "command_base_seq": 4356,
+          "final_seq": 4377,
+          "final_scene_epoch": 5,
+          "final_context_epoch": 25
+        },
+        "fresh_normal_loads": 1,
+        "elapsed_seconds": 137.11237090000213,
+        "consumed_actions": 1853,
+        "raw_button_actions": 4,
+        "objective_unchanged": true,
+        "objective_acquired_in_run": false,
+        "verified_landings": 0,
+        "post_descent_walks_successful": 0,
+        "planning": {
+          "version": "current-collision-exploration-plan-v6",
+          "replans": 28,
+          "actual_scene_room_transitions": 1,
+          "occupied_macro_regions": 22,
+          "failed_target_regions": 10,
+          "max_outward_radius": 372.6642741996117,
+          "observed_context_actions": {
+            "attack": 58,
+            "down": 66,
+            "putaway": 298,
+            "check": 40,
+            "next": 6,
+            "return": 10,
+            "speak": 34
+          },
+          "verified_opened_containers": 0,
+          "memory": "ephemeral_actual_positions_and_attempts_only",
+          "last_selection": {
+            "observation_seq": 7092,
+            "full_seq": 7092,
+            "monotonic_s": 20177.6433482,
+            "mesh_cells": 44,
+            "reachable_floor_candidates": 26,
+            "cooled_floor_candidates": 14,
+            "eligible_floor_candidates": 7,
+            "reachable_short_floor_candidates": 0,
+            "cooled_short_floor_candidates": 0,
+            "eligible_short_floor_candidates": 0
+          }
+        },
+        "exact_planning_diagnostic": {
+          "path": ".local/qualification/g1-ef9ff3dce566/episode-2/motor/planning-state.json",
+          "observation_seq": 7092,
+          "full_seq": 7092,
+          "snapshot_is_selection_observation": true,
+          "memory_last_seq": 7186,
+          "selection": {
+            "observation_seq": 7092,
+            "full_seq": 7092,
+            "monotonic_s": 20177.6433482,
+            "mesh_cells": 44,
+            "reachable_floor_candidates": 26,
+            "cooled_floor_candidates": 14,
+            "eligible_floor_candidates": 7,
+            "reachable_short_floor_candidates": 0,
+            "cooled_short_floor_candidates": 0,
+            "eligible_short_floor_candidates": 0
+          }
+        },
+        "kind_outcomes": [
+          {
+            "kind": "observed_portal",
+            "phase": "succeeded",
+            "count": 1
+          },
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "count": 1
+          },
+          {
+            "kind": "ladder_down",
+            "phase": "failed",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "succeeded",
+            "count": 10
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "count": 9
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "count": 3
+          },
+          {
+            "kind": "observed_context_interaction",
+            "phase": "succeeded",
+            "count": 2
+          },
+          {
+            "kind": "observed_linear_dialogue",
+            "phase": "succeeded",
+            "count": 2
+          }
+        ],
+        "native_builds": {
+          "rt-input-v3.12": 2008
+        },
+        "drawn_container_pose_histogram": {},
+        "unique_recorded_states": 2008,
+        "observed_containers": [],
+        "short_steps": [],
+        "native_chest_open_events": [],
+        "failed_stages": [
+          {
+            "name": "stage-002",
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "failure": "unsupported_locomotor_mode"
+          },
+          {
+            "name": "stage-003",
+            "kind": "ladder_down",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-007",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-008",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-011",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-013",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout"
+          },
+          {
+            "name": "stage-014",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-016",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction"
+          },
+          {
+            "name": "stage-020",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-021",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-022",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-023",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-024",
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "no_geometric_progress"
+          },
+          {
+            "name": "stage-029",
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "motor_stopped"
+          }
+        ]
+      }
+    ]
+  },
+  "integrity": {
+    "pins_per_batch": 85,
+    "pins_verified_after_shutdown": true,
+    "frozen_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "attached_candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "fixture_verified": true,
+    "previous_batch_exact_archive": ".local/pre-container-pose-20261005/sha256.json"
+  },
+  "native_feature_coverage": {
+    "drawn_container_observations": 0,
+    "short_step_invocations": 0,
+    "pose_extraction_physical_qualification": false,
+    "short_step_physical_qualification": false
+  },
+  "checks": {
+    "python_and_web": [
+      {
+        "name": "pytest",
+        "exit_code": 0,
+        "elapsed_s": 15.587251400000241
+      },
+      {
+        "name": "web",
+        "exit_code": 0,
+        "elapsed_s": 1.1641813999995065
+      }
+    ],
+    "msvc_harnesses": {
+      "scheduler": 19,
+      "walking_clearance": 10,
+      "navigation_resolution": 9,
+      "container_pose": 3
+    },
+    "gxx_clang_absence_is_not_native_success": true,
+    "lint": {
+      "focused_paths": [
+        "src/zelda_ai/models.py",
+        "src/zelda_ai/autonomy/local_tasks.py",
+        "src/zelda_ai/autonomy/exploration_plan.py",
+        "scripts/integrate_soh.py",
+        "tests/test_exploration_plan.py",
+        "tests/test_integration_v3.py",
+        "tests/test_native_container_pose.py"
+      ],
+      "focused_exit_code": 0,
+      "legacy_file": "tests/test_realtime_bridge.py",
+      "baseline_findings": 15,
+      "current_findings": 15,
+      "introduced_findings": 0,
+      "baseline_commit": "3b02759ff1cd8f6db63a986dfc6b90338c8012f5"
+    },
+    "encoding": {
+      "strict_utf8_written_text_files": 114,
+      "suspicious_encoding_findings": 0,
+      "finite_native_json_files": 85,
+      "previous_batches_exact_pins_reverified": 4,
+      "git_diff_check_exit_code": 0
+    },
+    "staged": {
+      "staged_utf8_files": 15,
+      "paths": [
+        "README.md",
+        "docs/STATUS.md",
+        "docs/validation/container_pose_2026-10-05.json",
+        "native/ContainerPose.hpp",
+        "native/ZeldaAiBridge.cpp",
+        "scripts/integrate_soh.py",
+        "scripts/verify_native.ps1",
+        "src/zelda_ai/autonomy/exploration_plan.py",
+        "src/zelda_ai/autonomy/local_tasks.py",
+        "src/zelda_ai/models.py",
+        "tests/native_container_pose.cpp",
+        "tests/test_exploration_plan.py",
+        "tests/test_integration_v3.py",
+        "tests/test_native_container_pose.py",
+        "tests/test_realtime_bridge.py"
+      ],
+      "staged_diff_check": 0,
+      "preexisting_untracked_excluded": [
+        "docs/PLANO_MESTRE.md",
+        "package-lock.json",
+        "uv.lock",
+        "web/package-lock.json"
+      ]
+    }
+  },
+  "limits": [
+    "Sword not acquired; native route reliability and the full campaign remain unqualified.",
+    "Same-process reset episodes reload the working QA save; they are not independent native groups or pristine restorations.",
+    "Full observation-to-physical-reaction latency is unknown; the 100 ms budget retains 50 ms actuation grace.",
+    "Walking and attachment candidates were frozen; trajectories cannot support a paired learning/reliability claim."
+  ],
+  "cleanup": {
+    "matching_native_or_worker_processes": 0,
+    "native_child_exit_code": null
+  }
+}

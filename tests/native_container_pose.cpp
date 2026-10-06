@@ -1,0 +1,47 @@
+#include "ContainerPose.hpp"
+#include <cstdlib>
+#include <iostream>
+#include <string>
+
+#define REQUIRE(condition) do { if (!(condition)) { \
+    std::cerr << "Check failed at line " << __LINE__ << ": " << #condition << '\n'; \
+    std::exit(1); } } while (false)
+struct Joint { int16_t x{}, y{}, z{}; };
+#define CASE(n) void n()
+CASE(visible_pose_is_the_live_lid_joint) {
+    Joint joints[5]{};
+    joints[3].z = 32000;
+    REQUIRE(zelda_ai::VisibleContainerLidRotation(true, 255, joints, 5) == 32000);
+    joints[3].z = -32768;
+    REQUIRE(zelda_ai::VisibleContainerLidRotation(true, 12, joints, 4) == -32768);
+    joints[3].z = 0;
+    REQUIRE(zelda_ai::VisibleContainerLidRotation(true, 255, joints, 5) == 0);
+}
+CASE(hidden_or_missing_pose_stays_unknown) {
+    Joint joints[5]{};
+    REQUIRE(!zelda_ai::VisibleContainerLidRotation(false, 255, joints, 5));
+    REQUIRE(!zelda_ai::VisibleContainerLidRotation(true, 0, joints, 5));
+    REQUIRE(!zelda_ai::VisibleContainerLidRotation<Joint>(true, 255, nullptr, 5));
+}
+CASE(incompatible_skeleton_stays_unknown) {
+    Joint joints[5]{};
+    REQUIRE(!zelda_ai::VisibleContainerLidRotation(true, 255, joints, 3));
+    REQUIRE(!zelda_ai::VisibleContainerLidRotation(true, 255, joints, 6));
+}
+int main(int argc, char** argv) {
+    struct Test { const char* name; void (*run)(); };
+    const Test tests[]{
+        {"visible_pose_is_the_live_lid_joint", visible_pose_is_the_live_lid_joint},
+        {"hidden_or_missing_pose_stays_unknown", hidden_or_missing_pose_stays_unknown},
+        {"incompatible_skeleton_stays_unknown", incompatible_skeleton_stays_unknown},
+    };
+    bool found = argc == 1;
+    for (const auto& test : tests) {
+        if (argc == 1 || test.name == std::string(argv[1])) {
+            found = true;
+            test.run();
+            std::cout << test.name << " passed\n";
+        }
+    }
+    return found ? 0 : 2;
+}

@@ -163,6 +163,20 @@ def test_metadata_only_follows_same_lifetime(state):
     assert "missing" not in actors
 
 
+def test_container_lid_pose_is_current_fast_geometry_and_missing_never_reuses_full_pose(state):
+    bridge = Bridge(TOKEN)
+    bridge.transport = Transport()
+    chest = {**actor("box", 40), "category": 10, "category_name": "chest", "drawn": True}
+    feed(bridge, full(state, room_actors=[{**chest, "name": "box", "container_lid_rotation_z": 32000}]))
+    feed(bridge, fast(state, room_actors=[{**chest, "container_lid_rotation_z": 12000}]))
+    assert bridge.state.room_actors[0].container_lid_rotation_z == 12000
+    assert bridge.state.room_actors[0].name == "box"
+    feed(bridge, fast(state, seq=12, room_actors=[chest]))
+    assert bridge.state.room_actors[0].container_lid_rotation_z is None
+    feed(bridge, fast(state, seq=13, room_actors=[{**chest, "container_lid_rotation_z": 32768}]))
+    assert bridge.state.seq == 12 and bridge.rejected_packets == 1
+
+
 def test_event_bootstrap_does_not_replay_old_victories(state):
     bridge = Bridge(TOKEN); bridge.transport = Transport()
     feed(bridge, full(state, event_seq=3, events=[{'id': '3', 'kind': 'game_completed'}]))
