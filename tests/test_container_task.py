@@ -19,6 +19,31 @@ def setup(state):
     return actor
 
 
+def test_visible_open_container_cannot_start_or_continue_an_approach(state):
+    actor = setup(state)
+    opened = actor.model_copy(update={"container_lid_pose": "open"})
+    state.nearby_actors = [opened]
+    with pytest.raises(ValueError, match="visibly open"):
+        ObservedContainerApproachTask.create(state, opened, now=0)
+    state.nearby_actors = [actor]
+    task = ObservedContainerApproachTask.create(state, actor, now=0)
+    state.seq += 1
+    state.nearby_actors = [opened]
+    task.observe(state, consumed=True, now=.1)
+    assert task.phase == "interrupted" and task.failure == "container_visibly_open"
+
+
+def test_matching_current_open_prompt_retains_interaction_authority(state):
+    actor = setup(state).model_copy(update={"container_lid_pose": "open"})
+    state.nearby_actors = [actor]
+    state.context_action.label, state.context_actor = "open", actor
+    task = ObservedContainerApproachTask.create(state, actor, now=0)
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=True, now=.1 + i/10)
+    assert task.phase == "succeeded"
+
+
 def test_floor_arrival_is_not_container_success_and_final_contact_is_bounded(state):
     actor = setup(state)
     task = ObservedContainerApproachTask.create(state, actor, now=0)

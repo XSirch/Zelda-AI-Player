@@ -13,13 +13,15 @@ from .navigation import observed_local_path
 
 @dataclass
 class ObservedContainerApproachTask(LocalTask):
-    VERSION = "observed-container-approach-v2"
+    VERSION = "observed-container-approach-v3"
     actor_uid: str = ""
     floor_task: LocalTask | None = None
     version: str = VERSION
 
     @classmethod
     def create(cls, game, actor, *, now=None, budget_s=15):
+        if actor.container_lid_pose == "open" and not cls.matching_prompt(game, actor.actor_uid):
+            raise ValueError("Container is currently visibly open")
         if (actor not in game.nearby_actors or not actor.drawn or not actor.actor_uid
                 or actor.category_name.lower() != "chest" or actor.room not in {-1, game.room}
                 or not grounded(game.player) or not game.navmesh.available
@@ -49,8 +51,12 @@ class ObservedContainerApproachTask(LocalTask):
             and math.dist(a.position, self.target) <= 8), None)
 
     def actionable(self, game):
+        return self.matching_prompt(game, self.actor_uid)
+
+    @staticmethod
+    def matching_prompt(game, actor_uid):
         actor = game.context_actor
-        return bool(actor and actor.actor_uid == self.actor_uid
+        return bool(actor_uid and actor and actor.actor_uid == actor_uid
             and game.context_action.label.lower() == "open")
 
     def steering_point(self, game):
@@ -75,12 +81,16 @@ class ObservedContainerApproachTask(LocalTask):
         if not grounded(game.player):
             self.interrupt("unsupported_locomotor_mode")
             return
-        if not self.current_actor(game):
+        actor = self.current_actor(game)
+        if not actor:
             self.interrupt("container_target_lost")
             return
         if game.seq <= self.origin_seq or game.seq <= self.last_seq:
             return
         self.last_seq, self.consumed = game.seq, self.consumed or consumed
+        if actor.container_lid_pose == "open" and not self.actionable(game):
+            self.interrupt("container_visibly_open")
+            return
         if self.actionable(game):
             self.phase = "verify"
             self.verification_frames = (self.verification_frames + 1

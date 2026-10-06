@@ -103,6 +103,8 @@ def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
     autosave = {
         "pending": False, "target_scene": -1, "last_scene": 85,
         "count": 2, "last_saved_at_ms": 1234,
+        "requested_count": 2, "in_flight": False,
+        "pending_reasons": [], "last_reasons": ["resource_gain"], "last_rupees": 44,
     }
     feed(bridge, full(state, navmesh=mesh, scene_exits=exits,
         traversal_affordances=affordances, progress=progress, autosave=autosave,
@@ -121,6 +123,9 @@ def test_fast_keeps_navmesh_from_matching_full_snapshot(state):
     assert bridge.state.traversal_affordances[0].approach_position == (0.0, 0.0, 70.0)
     assert bridge.state.progress.story_flags["greeted_by_saria"] is True
     assert bridge.state.autosave.last_scene == 85
+    assert bridge.state.autosave.last_rupees == 44
+    assert bridge.state.autosave.last_reasons == ["resource_gain"]
+    assert bridge.state.autosave.requested_count == 2
 
 
 def test_fast_updates_pose_without_slow_callback(state):

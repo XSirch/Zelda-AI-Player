@@ -165,6 +165,9 @@ class ActorObservation(StrictModel):
     targeted: bool = False
     drawn: bool = False
     container_lid_rotation_z: int | None = Field(default=None, ge=-32768, le=32767)
+    container_lid_pose: Literal["open", "closed", "unknown"] = "unknown"
+    container_lid_closed_rotation_z: int | None = Field(default=None, ge=-32768, le=32767)
+    container_lid_open_rotation_z: int | None = Field(default=None, ge=-32768, le=32767)
     text_id: int | None = Field(default=None, ge=0, le=65535)
 
     @field_validator("position", "focus_position", "velocity")
@@ -249,6 +252,11 @@ class AutosaveState(StrictModel):
     last_scene: int = Field(default=-1, ge=-1, le=65535)
     count: int = Field(default=0, ge=0)
     last_saved_at_ms: int = Field(default=0, ge=0)
+    in_flight: bool = False
+    requested_count: int = Field(default=0, ge=0)
+    pending_reasons: list[Literal["scene", "resource_gain", "item_gain", "chest_opened"]] = Field(default_factory=list, max_length=4)
+    last_reasons: list[Literal["scene", "resource_gain", "item_gain", "chest_opened"]] = Field(default_factory=list, max_length=4)
+    last_rupees: int | None = Field(default=None, ge=0, le=9999)
 
 
 class ContextAction(StrictModel):
@@ -287,7 +295,7 @@ class StartupState(StrictModel):
 class GameState(StrictModel):
     protocol: Literal[1, 3] = 1
     kind: Literal["full"] = "full"
-    capabilities: list[str] = Field(default_factory=list, max_length=16)
+    capabilities: list[str] = Field(default_factory=list, max_length=32)
     bridge_build: str = Field(default="legacy", max_length=80)
     full_seq: int = Field(default=0, ge=0)
     capture_tick: int = Field(default=0, ge=0)

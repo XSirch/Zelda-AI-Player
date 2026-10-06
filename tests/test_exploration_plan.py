@@ -28,6 +28,55 @@ def test_current_drawn_container_precedes_frontier_and_failure_cools_actor_ident
     assert plan.choose(state, budget_s=12, now=2).kind == "observed_cell"
 
 
+def test_current_visible_open_lid_is_skipped_without_fabricating_an_open_event(state):
+    ground(state)
+    state.nearby_actors = [chest(state).model_copy(update={"container_lid_pose": "open"})]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    assert plan.choose(state, budget_s=20, now=0).kind == "observed_cell"
+    assert not plan.opened_containers and not plan.failures
+    assert plan.selection["visibly_open_containers_skipped"] == 1
+
+
+@pytest.mark.parametrize("pose", ["closed", "unknown"])
+def test_unknown_or_closed_lid_retains_observed_container_attempt(state, pose):
+    ground(state)
+    state.nearby_actors = [chest(state).model_copy(update={"container_lid_pose": pose})]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    assert plan.choose(state, budget_s=20, now=0).kind == "observed_container_approach"
+
+
+def test_repeated_container_failures_yield_to_an_observed_native_exit(state):
+    ground(state)
+    state.nearby_actors = [chest(state)]
+    state.scene_exits = [SceneExitObservation(exit_index=1, entrance_index=123,
+        position=(70, 0, 0), direct_reachable=True, samples=1)]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    for start, end in [(0, 1), (22, 23)]:
+        task = plan.choose(state, budget_s=20, now=start)
+        assert task.kind == 'observed_container_approach'
+        task.phase, task.failure, task.consumed = 'failed', 'container_no_observed_prompt', True
+        plan.outcome(task, success=False, now=end)
+    assert plan.choose(state, budget_s=20, now=44).kind == 'observed_portal'
+
+
+@pytest.mark.parametrize('alternative', ['no_exit', 'new_actor'])
+def test_container_failures_preserve_unknown_interactions_and_other_actor_identity(state, alternative):
+    ground(state)
+    state.nearby_actors = [chest(state)]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    for start, end in [(0, 1), (22, 23)]:
+        task = plan.choose(state, budget_s=20, now=start)
+        task.phase, task.failure, task.consumed = 'failed', 'container_no_observed_prompt', True
+        plan.outcome(task, success=False, now=end)
+    if alternative == 'new_actor':
+        state.nearby_actors.append(chest(state, uid='newly_observed'))
+        state.scene_exits = [SceneExitObservation(exit_index=1, entrance_index=123,
+            position=(70, 0, 0), direct_reachable=True, samples=1)]
+    chosen = plan.choose(state, budget_s=20, now=44)
+    assert chosen.kind == 'observed_container_approach'
+    assert chosen.actor_uid == ('newly_observed' if alternative == 'new_actor' else 'observed-container')
+
+
 @pytest.mark.parametrize("reason", ["not_drawn", "room_only", "unlinked", "raised"])
 def test_container_selection_requires_current_drawn_and_reachable_floor(state, reason):
     ground(state)
@@ -55,6 +104,103 @@ def ground(state):
     state.camera_input_yaw = 0
     state.navmesh = NavigationMeshSnapshot(step=70, half_extent=4,
         cells=[(0, 0, 0., 4), (1, 0, 0., 68), (2, 0, 0., 68), (3, 0, 0., 64)])
+
+
+def stationary_departure(state):
+    from zelda_ai.autonomy.local_tasks import LocalTask
+    ground(state)
+    state.navmesh.cells = [(0, 0, 0., 65), (0, 1, 0., 1), (0, 2, 0., 1),
+                          (0, 3, 0., 0), (-1, 0, 0., 0)]
+    task = LocalTask.observed_cell(state, (0, 0, 210), now=0)
+    plan = ObservedExplorationPlan()
+    plan.observe(state, now=0)
+    plan.visits[plan.region(task.context, (-70, 0, 0))] = 1
+    state.seq += 1
+    task.observe(state, consumed=True, now=3)
+    assert task.failure == 'no_geometric_progress'
+    plan.observe(state, now=3)
+    return plan, task
+
+
+def test_stationary_failed_departure_is_not_retried_under_another_target(state):
+    plan, task = stationary_departure(state)
+    plan.outcome(task, success=False, now=3)
+    next_task = plan.choose(state, budget_s=12, now=4)
+    assert next_task.steering_point(state) != (0, 0, 70)
+    assert next_task.target == (-70, 0, 0)
+    assert plan.selection['cooled_departure_candidates'] > 0
+
+
+@pytest.mark.parametrize('missing', ['consumption', 'fresh_state', 'stationary_origin',
+                                   'held_first_point', 'first_segment', 'physical_failure'])
+def test_departure_memory_requires_a_consumed_stationary_first_attempt(state, missing):
+    plan, task = stationary_departure(state)
+    if missing == 'consumption':
+        task.consumed = False
+    elif missing == 'fresh_state':
+        plan.last_seq = task.origin_seq
+    elif missing == 'stationary_origin':
+        plan.last_position = (0, 0, 40)
+    elif missing == 'held_first_point':
+        task.progress_point = (0, 0, 140)
+    elif missing == 'first_segment':
+        task.waypoint_index = 1
+    else:
+        task.phase, task.failure = 'interrupted', 'modal_owns_control'
+    plan.outcome(task, success=False, now=3)
+    assert not plan.failed_departures
+    assert plan.choose(state, budget_s=12, now=4).steering_point(state) == (0, 0, 70)
+
+
+def test_departure_cooldown_expires_without_creating_traversed_routes(state):
+    plan, task = stationary_departure(state)
+    plan.outcome(task, success=False, now=3)
+    assert plan.choose(state, budget_s=12, now=4).target == (-70, 0, 0)
+    assert plan.choose(state, budget_s=12, now=24).steering_point(state) == (0, 0, 70)
+    assert len(plan.visits) == 2  # Only the observed origin and seeded earlier west visit.
+    assert plan.departure_deferrals > 0
+
+
+@pytest.mark.parametrize('changed', ['instance', 'scene', 'room', 'age', 'mirror', 'floor', 'origin'])
+def test_failed_departure_is_local_to_the_observed_physical_context(state, changed):
+    from dataclasses import replace
+    plan, task = stationary_departure(state)
+    plan.outcome(task, success=False, now=3)
+    context = list(task.context)
+    if changed in {'instance', 'scene', 'room', 'age', 'mirror'}:
+        index = {'instance': 0, 'scene': 1, 'room': 2, 'mirror': 3, 'age': 4}[changed]
+        context[index] = 'other' if index in {0, 4} else not context[index] if index == 3 else context[index]+1
+        candidate = replace(task, context=tuple(context))
+    elif changed == 'floor':
+        candidate = replace(task, origin=(0, 10, 0), corridor=((0, 10, 70),))
+    else:
+        candidate = replace(task, origin=(40, 0, 0), corridor=((0, 0, 70),))
+    assert not plan.departure_deferred(candidate, now=4)
+
+
+def test_observed_portal_is_not_suppressed_by_failed_horizontal_departure(state):
+    plan, task = stationary_departure(state)
+    plan.outcome(task, success=False, now=3)
+    state.scene_exits = [SceneExitObservation(exit_index=1, entrance_index=123,
+        position=(0, 0, 70), direct_reachable=True, samples=1)]
+    next_task = plan.choose(state, budget_s=20, now=4)
+    assert next_task.kind == 'observed_portal'
+    assert not plan.departure_deferred(next_task, now=4)
+
+
+def test_verified_physical_reach_heals_a_failed_departure(state):
+    from zelda_ai.autonomy.local_tasks import LocalTask
+    plan, task = stationary_departure(state)
+    plan.outcome(task, success=False, now=3)
+    successful = LocalTask.observed_cell(state, (0, 0, 70), now=4)
+    state.player.position = (0, 0, 70)
+    for now in [5, 5.05, 5.1]:
+        state.seq += 1
+        successful.observe(state, consumed=True, now=now)
+        plan.observe(state, now=now)
+    assert successful.phase == 'succeeded'
+    plan.outcome(successful, success=True, now=5.1)
+    assert not plan.failed_departures
 
 
 def test_frontier_prefers_unoccupied_current_region_and_never_marks_proposed_target_visited(state):

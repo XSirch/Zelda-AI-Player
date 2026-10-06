@@ -13,7 +13,8 @@ $harnesses = @(
     @{ Name = 'walking-clearance'; Source = 'native_walking_clearance.cpp' },
     @{ Name = 'navigation-resolution'; Source = 'native_navigation_resolution.cpp' },
     @{ Name = 'container-pose'; Source = 'native_container_pose.cpp' },
-    @{ Name = 'dialogue-observation'; Source = 'native_dialogue_observation.cpp' }
+    @{ Name = 'dialogue-observation'; Source = 'native_dialogue_observation.cpp' },
+    @{ Name = 'progress-autosave'; Source = 'native_progress_autosave.cpp' }
 )
 foreach ($harness in $harnesses) {
     $binary = Join-Path $taskOut ($harness.Name + '.exe')

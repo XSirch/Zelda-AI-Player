@@ -1,7 +1,7 @@
 """Bounded goal-local planning from current collision, with actual footprints.
 
-Working memory stores occupied regions and attempted targets, never proposed
-route edges. It is ephemeral in frozen evaluation and isolated by context.
+Working memory stores occupied regions and failed local attempts, never proposed
+traversed route edges. It is ephemeral in frozen evaluation and isolated by context.
 """
 from __future__ import annotations
 
@@ -20,12 +20,14 @@ from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v7"
+    VERSION = "current-collision-exploration-plan-v10"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
         self.visits, self.failures, self.retry_after = {}, {}, {}
         self.last_seq, self.last_context, self.last_region = -1, None, None
+        self.last_position = None
+        self.failed_departures, self.departure_deferrals = {}, 0
         self.entry_position, self.entry_at = None, 0
         self.origins, self.max_radius = {}, {}
         self.context_actions = Counter()
@@ -62,6 +64,7 @@ class ObservedExplorationPlan:
         self.progress_tokens.update(novel)
         self.progress_initialized = True
         context, position = physical_context(game), tuple(game.player.position)
+        self.last_position = position
         if self.last_context != context:
             same_lifetime = (self.last_context is not None and context[0] == self.last_context[0]
                 and context[3:] == self.last_context[3:] and not any(e.id not in self.event_ids
@@ -96,6 +99,7 @@ class ObservedExplorationPlan:
     def outcome(self, task, *, success, now=None):
         now = time.monotonic() if now is None else now
         key = self.task_key(task)
+        self._departure_outcome(task, success=success, now=now)
         if (success and isinstance(task, LinearDialogueTask) and task.phase == "succeeded"
                 and task.observed_effect == "dialogue_closed" and task.consumed
                 and task.verification_frames >= 3):
@@ -114,6 +118,41 @@ class ObservedExplorationPlan:
             failures = self.failures.get(key, 0)
         self.bounded_put(self.failures, key, failures, limit=512)
         self.bounded_put(self.retry_after, key, now + (30 if isinstance(task, ObservedPortalTask) else 20), limit=512)
+
+    def _departure_outcome(self, task, *, success, now):
+        # A stationary first segment can fail under several different distant
+        # targets. Remember only that actual consumed attempt, not a blocked
+        # collision edge or a traversed route. Explicit interactions/traversals
+        # retain their own contracts and are never filtered by this memory.
+        if (task.kind != "observed_cell" or self.last_position is None
+                or self.last_context != task.context or self.last_seq <= task.origin_seq):
+            return
+        if success and task.phase == "succeeded" and task.consumed and task.verification_frames >= 3:
+            for key, row in list(self.failed_departures.items()):
+                if (row["context"] == task.context and math.dist(task.origin, row["origin"]) <= 18
+                        and math.dist(self.last_position, row["point"]) <= 18):
+                    del self.failed_departures[key]
+            return
+        if (success or task.phase != "failed" or task.failure != "no_geometric_progress"
+                or not task.consumed or not task.corridor or task.waypoint_index != 0 or task.detour
+                or task.progress_point != task.corridor[0]
+                or math.dist(self.last_position, task.origin) > 18):
+            return
+        point, origin = tuple(task.progress_point), tuple(task.origin)
+        key = (*task.context, *(round(v, 1) for v in origin), *(round(v, 1) for v in point))
+        failures = self.failed_departures.get(key, {}).get("failures", 0) + 1
+        self.bounded_put(self.failed_departures, key,
+            {"context": task.context, "origin": origin, "point": point, "failures": failures,
+             "retry_after": now + min(120, 20 * failures)}, limit=512)
+
+    def departure_deferred(self, task, *, now):
+        if task.kind != "observed_cell" or not task.corridor:
+            return False
+        point = task.corridor[0]
+        return any(row["context"] == task.context and row["retry_after"] > now
+            and math.dist(task.origin, row["origin"]) <= 18 and math.dist(point, row["point"]) <= 18
+            and abs(task.origin[1] - row["origin"][1]) <= 4 and abs(point[1] - row["point"][1]) <= 4
+            for row in self.failed_departures.values())
 
     def context_available(self, game, *, now=None):
         if not self.contextual_interactions or not eligible_context(game):
@@ -139,6 +178,9 @@ class ObservedExplorationPlan:
                           "cooled_floor_candidates": 0, "eligible_floor_candidates": 0,
                           "reachable_short_floor_candidates": 0, "cooled_short_floor_candidates": 0,
                           "eligible_short_floor_candidates": 0,
+                          "cooled_departure_candidates": 0,
+                          "container_recovery_candidates": 0,
+                          "visibly_open_containers_skipped": 0,
                           "read_context_deferred": self.read_context_deferred(game, now=now)}
         if not 1 <= budget_s <= 300:
             raise ValueError("planning_budget_exhausted")
@@ -163,23 +205,34 @@ class ObservedExplorationPlan:
         def offer(task, priority, distance, *, approach_distance=0):
             key = self.task_key(task)
             if self.retry_after.get(key, 0) > now:
-                return
+                return False
             visits = self.visits.get(self.region(context, task.target), 0)
             # Horizontal frontiers seek expansion; vertical traversals first
             # prefer an observed nearby upper approach, then a shorter landing.
             rank = (priority, self.failures.get(key, 0), visits, approach_distance,
                     -distance if priority == 2 else distance, tuple(task.target))
             candidates.append((rank, task))
+            return True
 
         if self.contextual_interactions and not suppress_context:
             for actor in game.nearby_actors:
                 if (*context, actor.actor_uid) in self.opened_containers:
                     continue
+                if (actor.drawn and actor.category_name.lower() == "chest"
+                        and actor.container_lid_pose == "open"
+                        and not ObservedContainerApproachTask.matching_prompt(game, actor.actor_uid)):
+                    self.selection["visibly_open_containers_skipped"] += 1
+                    continue
                 try:
                     task = ObservedContainerApproachTask.create(game, actor, now=now, budget_s=min(15, budget_s))
                 except ValueError:
                     continue
-                offer(task, -1, math.dist(position, actor.position))
+                # Repeated local failure can make a CURRENT native exit the
+                # next recovery attempt. This does not classify the container
+                # as open/inert or infer a destination beyond the observed exit.
+                priority = 1 if self.failures.get(self.task_key(task), 0) >= 2 else -1
+                if offer(task, priority, math.dist(position, actor.position)) and priority == 1:
+                    self.selection["container_recovery_candidates"] += 1
 
         for row in game.scene_exits:
             # A new scene's entry doorway is held back briefly to avoid a
@@ -217,10 +270,13 @@ class ObservedExplorationPlan:
             heading = math.atan2(point[0] - position[0], point[2] - position[2])
             forward = math.cos(heading - game.player.yaw * math.pi / 32768) >= -.25
             task = LocalTask.observed_cell(game, point, now=now, budget_s=min(12, budget_s))
-            if self.retry_after.get(self.task_key(task), 0) <= now:
-                (short_candidates if short else floor_candidates).append((forward, task, distance))
-            else:
+            if self.retry_after.get(self.task_key(task), 0) > now:
                 self.selection["cooled_short_floor_candidates" if short else "cooled_floor_candidates"] += 1
+            elif self.departure_deferred(task, now=now):
+                self.selection["cooled_departure_candidates"] += 1
+                self.departure_deferrals += 1
+            else:
+                (short_candidates if short else floor_candidates).append((forward, task, distance))
         # A refined graph can expose only one short supported escape step.
         # Reuse the same directed-path, cooldown and task completion contracts;
         # never let this fallback replace an eligible longer frontier or reset
@@ -249,6 +305,8 @@ class ObservedExplorationPlan:
                 "observed_context_actions": dict(self.context_actions),
                 "verified_opened_containers": len(self.opened_containers),
                 "verified_read_actor_contexts": len(self.read_actor_contexts),
+                "failed_departures": len(self.failed_departures),
+                "departure_deferrals": self.departure_deferrals,
                 "durable_progress_revision": self.progress_revision,
                 "memory": "ephemeral_actual_positions_and_attempts_only", "last_selection": dict(self.selection)}
         if include_details:
@@ -260,4 +318,6 @@ class ObservedExplorationPlan:
                 opened_containers=[{"key": key, "event_id": value} for key, value in self.opened_containers.items()])
             result.update(read_actor_contexts=[{"key": key, **value} for key, value in self.read_actor_contexts.items()],
                 progress_tokens=sorted(self.progress_tokens), progress_initialized=self.progress_initialized)
+            result.update(last_position=self.last_position,
+                failed_departure_attempts=[{"key": key, **value} for key, value in self.failed_departures.items()])
         return result
