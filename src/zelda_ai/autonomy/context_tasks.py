@@ -26,7 +26,11 @@ class ObservedContextTask(LocalTask):
     stopped_frames: int = 0
     observed_effect: str | None = None
     effect_seq: int | None = None
-    version: str = "observed-context-control-task-v1"
+    effect_event_id: str | None = None
+    prior_events: tuple = ()
+    container_context: bool = False
+    context_actor_uid: str | None = None
+    version: str = "observed-context-control-task-v2"
 
     @classmethod
     def create(cls, game, *, now=None, budget_s=20):
@@ -35,6 +39,11 @@ class ObservedContextTask(LocalTask):
         task = cls._create(game, "observed_context_interaction", game.player.position,
             game.player.position, now=now, budget_s=budget_s)
         task.context_action_key, task.phase = context_key(game), "prepare"
+        task.prior_events = tuple(e.id for e in game.events)
+        task.container_context = bool(game.context_actor
+            and game.context_actor.category_name.lower() == "chest"
+            and game.context_action.label.lower() == "open")
+        task.context_actor_uid = game.context_actor.actor_uid if game.context_actor else None
         return task
 
     def register_button(self, seq, mask):
@@ -74,7 +83,15 @@ class ObservedContextTask(LocalTask):
         if game.pause_menu.active or game.paused:
             self.interrupt("modal_owns_control")
             return
-        effect = ("dialogue_started" if game.dialogue.active else
+        chest = next((e for e in game.events if e.kind == "chest_opened"
+            and e.id not in self.prior_events and e.detail.startswith(f"{self.context[1]}:")
+            and (e.actor_uid is None or e.actor_uid == self.context_actor_uid)
+            and physical_context(game)[1:3] == self.context[1:3]), None)
+        if not self.consumed:
+            self.prior_events = tuple(dict.fromkeys((*self.prior_events, *(e.id for e in game.events))))[-256:]
+        if self.container_context and chest and self.consumed:
+            self.effect_event_id = chest.id
+        effect = ("chest_opened" if self.effect_event_id else "dialogue_started" if game.dialogue.active else
                   "observed_scene_room_transition" if physical_context(game)[1:3] != self.context[1:3] else None)
         if effect and self.consumed:
             if effect != self.observed_effect:
@@ -87,6 +104,10 @@ class ObservedContextTask(LocalTask):
             return
         if now >= self.deadline:
             self.phase, self.failure = "failed", "context_no_observed_effect"
+        elif game.cutscene_active and self.container_context and self.consumed:
+            # Opening animation can precede the actual native treasure flag.
+            # Remain neutral and bounded; animation alone earns no success.
+            self.phase = "transition"
         elif game.cutscene_active or water_active(game.player):
             self.interrupt("unsupported_context_mode")
         elif context_key(game) != self.context_action_key:
@@ -97,6 +118,48 @@ class ObservedContextTask(LocalTask):
                 self.phase = "execute"
         elif math.dist(game.player.position, self.origin) > 35:
             self.interrupt("context_anchor_moved")
+
+
+@dataclass
+class NativeModalWaitTask(LocalTask):
+    observed_effect: str | None = None
+    version: str = "observed-native-modal-wait-v1"
+
+    @classmethod
+    def create(cls, game, *, now=None, budget_s=20):
+        if (game.source != "soh" or not game.in_game or not game.player or game.player.health <= 0
+                or game.game_over_state or not game.cutscene_active or game.dialogue.active
+                or game.paused or game.pause_menu.active or not 0 < budget_s <= 30):
+            raise ValueError("Modal wait requires an actual current native animation")
+        now = time.monotonic() if now is None else now
+        point = tuple(game.player.position)
+        return cls(f"native_modal_wait:{game.seq}", "observed_native_modal_wait",
+            physical_context(game), game.scene_epoch, game.seq, cls._loads(game), point, point, point,
+            now, now+budget_s, now, 0., phase="execute")
+
+    def observe(self, game, *, consumed=False, now=None):
+        if self.terminal:
+            return
+        now = time.monotonic() if now is None else now
+        if (game.instance_id != self.context[0] or physical_context(game)[3:] != self.context[3:]
+                or not game.player or game.player.health <= 0 or game.game_over_state
+                or not game.in_game or any(e not in self.load_events for e in self._loads(game))):
+            self.interrupt("context_episode_changed")
+            return
+        if game.paused or game.pause_menu.active:
+            self.interrupt("modal_owns_control")
+            return
+        if game.seq <= self.origin_seq or game.seq <= self.last_seq:
+            return
+        self.last_seq = game.seq
+        effect = "dialogue_handoff" if game.dialogue.active else (
+            "playable_handoff" if not game.cutscene_active else None)
+        self.verification_frames = self.verification_frames + 1 if effect == self.observed_effect and effect else int(bool(effect))
+        self.observed_effect = effect
+        if self.verification_frames >= 3:
+            self.phase = "succeeded"
+        elif now >= self.deadline:
+            self.phase, self.failure = "failed", "native_modal_wait_timeout"
 
 
 @dataclass

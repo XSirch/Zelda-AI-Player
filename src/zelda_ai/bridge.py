@@ -314,7 +314,12 @@ class Bridge(asyncio.DatagramProtocol):
         last_seq = state.seq
         try:
             while time.monotonic() < deadline:
-                current = await self.next_state(last_seq, timeout=min(.35, max(.001, deadline-time.monotonic())))
+                # The title emits slower observations than playable motion.
+                # Honor the caller's startup receipt budget without resending
+                # input or extending the native controller lease.
+                remaining = max(.001, deadline-time.monotonic())
+                feedback_wait = remaining if startup_slot is not None else min(.35, remaining)
+                current = await self.next_state(last_seq, timeout=feedback_wait)
                 last_seq = current.seq
                 row = self.receipts.get(seq)
                 if (current.instance_id, current.scene_epoch, current.context_epoch) != context:

@@ -2,11 +2,50 @@ import pytest
 
 from zelda_ai.autonomy.exploration_plan import ObservedExplorationPlan
 from zelda_ai.models import (
+    ActorObservation,
     GameEvent,
     NavigationMeshSnapshot,
     SceneExitObservation,
     TraversalAffordanceObservation,
 )
+
+
+def chest(state, *, drawn=True, uid="observed-container"):
+    return ActorObservation(actor_uid=uid, actor_id=999, category=10, category_name="chest",
+        params=0, position=(180, 0, 0), distance=180, drawn=drawn)
+
+
+def test_current_drawn_container_precedes_frontier_and_failure_cools_actor_identity(state):
+    ground(state)
+    state.nearby_actors = [chest(state)]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    task = plan.choose(state, budget_s=20, now=0)
+    assert task.kind == "observed_container_approach"
+    assert task.actor_uid == "observed-container" and task.target == (180, 0, 0)
+    assert plan.region(task.context, task.target) not in plan.visits
+    task.phase, task.failure = "failed", "container_no_observed_prompt"
+    plan.outcome(task, success=False, now=1)
+    assert plan.choose(state, budget_s=12, now=2).kind == "observed_cell"
+
+
+@pytest.mark.parametrize("reason", ["not_drawn", "room_only", "unlinked", "raised"])
+def test_container_selection_requires_current_drawn_and_reachable_floor(state, reason):
+    ground(state)
+    actor = chest(state, drawn=reason != "not_drawn")
+    if reason == "room_only":
+        state.room_actors = [actor]
+    else:
+        state.nearby_actors = [actor]
+    if reason == "unlinked":
+        state.navmesh.cells = [(0, 0, 0., 0), (3, 0, 0., 0)]
+    if reason == "raised":
+        actor.position = (180, 60, 0)
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    try:
+        task = plan.choose(state, budget_s=12, now=0)
+    except ValueError:
+        return
+    assert task.kind != "observed_container_approach"
 
 
 def ground(state):

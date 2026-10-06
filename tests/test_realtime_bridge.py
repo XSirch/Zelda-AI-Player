@@ -45,6 +45,31 @@ def ready(state):
     return bridge
 
 
+def test_startup_sequence_waits_within_requested_budget_without_replaying_consumed_input(state):
+    bridge = ready(state)
+    waits = []
+
+    async def feedback(after_seq, *, timeout):
+        waits.append(timeout)
+        # Replay the native title cadence (388 ms), without sleeping or
+        # pretending this software receipt is physical gameplay evidence.
+        if timeout < .388:
+            raise RuntimeError("state_feedback_timeout")
+        bridge.receipts[1] = InputReceipt(seq=1, owner_epoch=1, status="completed",
+            first_tick=251, last_tick=252, pressed=0x4000, released=0x4000)
+        bridge.state.seq += 1
+        return bridge.state
+
+    bridge.next_state = feedback
+    row = asyncio.run(bridge.sequence_receipt([
+        {"buttons": 0x4000, "stick_x": 0, "stick_y": 0, "ticks": 1},
+        {"buttons": 0, "stick_x": 0, "stick_y": 0, "ticks": 1}],
+        edge_buttons=0x4000, startup_slot=1, timeout=.8))
+    assert row.first_tick == 251 and .388 <= waits[0] <= .8
+    assert sum(p["kind"] == "sequence" for p in bridge.transport.sent) == 1
+    assert not any(p["kind"] == "renew" for p in bridge.transport.sent)
+
+
 def receipt(seq, **changes):
     value = dict(seq=seq, owner_epoch=1, status='accepted', first_tick=0, last_tick=0,
                  pressed=0, released=0, apply_latency_ms=None, client_to_consume_ms=None, reason='')

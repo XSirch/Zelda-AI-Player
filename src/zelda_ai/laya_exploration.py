@@ -6,7 +6,7 @@ import json
 import math
 import time
 
-from .autonomy.context_tasks import LinearDialogueTask, ObservedContextTask
+from .autonomy.context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask
 from .autonomy.controller import ContinuousController
 from .autonomy.exploration_plan import ObservedExplorationPlan
 from .autonomy.ground_descent_task import GroundDescentApproachTask
@@ -15,7 +15,7 @@ from .autonomy.laya_ladder_policy import encode_ladder
 from .autonomy.models import AgentIntent, ObjectiveCompletion
 from .autonomy.objectives import ObjectiveTracker
 from .g1 import ARTIFACTS, context, write_json
-from .laya_context import execute_context_task
+from .laya_context import execute_context_task, execute_modal_wait
 from .laya_motor import execute_frozen_task
 from .laya_traversal import fresh_collision_snapshot
 
@@ -85,7 +85,12 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
         options = {"encoder": encoder} if encoder else {}
         was_cancelled = False
         try:
-            if isinstance(task, ObservedContextTask):
+            if isinstance(task, NativeModalWaitTask):
+                walking.invalidate()
+                ladder.invalidate()
+                result = await execute_modal_wait(controller, bridge, task, path,
+                    on_started=on_started, observe=observe)
+            elif isinstance(task, ObservedContextTask):
                 walking.invalidate()
                 ladder.invalidate()
                 result = await execute_context_task(controller, bridge, task, path,
@@ -150,6 +155,9 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
                     break
                 if isinstance(task, LinearDialogueTask) and not result["success"]:
                     reason = task.failure or "linear_dialogue_incomplete"
+                    break
+                if isinstance(task, NativeModalWaitTask) and not result["success"]:
+                    reason = task.failure or "native_modal_handoff_incomplete"
                     break
             reason = reason or ("task_count_budget" if len(stages) >= 64 else "session_budget_exhausted")
     except (ValueError, RuntimeError, OSError, TimeoutError) as exc:

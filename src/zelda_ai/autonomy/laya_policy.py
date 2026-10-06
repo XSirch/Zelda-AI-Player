@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..laya_data import PROFILE, bounded_state, digest
+from .container_task import ObservedContainerApproachTask
 from .features import camera_world_yaw
 from .ground_descent_task import GroundDescentApproachTask
 from .imitation import encode_surface
@@ -143,12 +144,16 @@ class LayaWalkingPolicy:
             or task.terminal
             or task.phase in {"verify", "transition"}
             or task.kind not in {"observed_cell", "observed_portal", "stairs_or_slope_up", "stairs_or_slope_down",
-                                 "observed_descent_approach"}
+                                 "observed_descent_approach", "observed_container_approach"}
             or game.source != "soh"
             or not game.in_game
             or not game.player
             or task.kind == "observed_descent_approach" and (
                 not isinstance(task, GroundDescentApproachTask) or task.version != task.VERSION
+                or not grounded(game.player))
+            or task.kind == "observed_container_approach" and (
+                not isinstance(task, ObservedContainerApproachTask)
+                or task.version != task.VERSION or not task.current_actor(game)
                 or not grounded(game.player))
             or game.player.health <= 0
             or game.game_over_state

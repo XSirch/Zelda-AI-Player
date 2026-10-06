@@ -763,10 +763,17 @@ class ContinuousController:
         now = time.monotonic()
         commands = probe.get("command_seqs", ())
         if game.protocol == 3 and not any(self.bridge.command_consumed(seq) for seq in commands):
+            probe["pre_consumption_chest_ids"] = tuple(dict.fromkeys((
+                *probe.get("pre_consumption_chest_ids", ()),
+                *(e.id for e in game.events if e.kind == "chest_opened"))))[-256:]
             if now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
                 self.pending_interaction_probe = None
             return
         if probe.get("instance_id", game.instance_id) != game.instance_id or game.game_over_state:
+            self.pending_interaction_probe = None
+            return
+        if any(e.id not in probe.get("event_ids", ()) and e.kind in {"save_loaded", "player_died", "game_over"}
+               for e in game.events):
             self.pending_interaction_probe = None
             return
         if probe.get("kind") == "dialogue":
@@ -822,6 +829,14 @@ class ContinuousController:
             scene_changed
             or dialogue_started
             or traversal_started
+            or (probe.get("container_context") and not scene_changed
+                and any(e.kind == "chest_opened" and e.id not in probe.get("event_ids", ())
+                    and e.id not in probe.get("pre_consumption_chest_ids", ())
+                    and (e.actor_uid is None or e.actor_uid == probe.get("context_actor_uid"))
+                    and e.detail.startswith(f"{probe['scene']}:") for e in game.events)
+                and (game.protocol != 3 or any(self.bridge.command_consumed(seq)
+                    and seq in self.bridge.receipts and self.bridge.receipts[seq].pressed == BUTTON_MASKS[probe["button"]]
+                    for seq in commands)))
         )
 
         if success:
@@ -936,6 +951,10 @@ class ContinuousController:
         self.pending_interaction_probe = {
             "kind": "context",
             "instance_id": game.instance_id,
+            "event_ids": tuple(e.id for e in game.events),
+            "container_context": bool(actor and actor.category_name.lower() == "chest"
+                and game.context_action.label.lower() == "open"),
+            "context_actor_uid": actor.actor_uid if actor else None,
             "key": key,
             "button": button,
             "at": now,
@@ -1878,6 +1897,11 @@ class ContinuousController:
                 # During a non-interactive cutscene there is no useful control
                 # transition to learn; neutral input avoids polluting the rollout.
                 if game.cutscene_active and not game.dialogue.active:
+                    # Native chest effects may arrive during an opening
+                    # animation. Observe causality without sampling movement.
+                    self._observe_interaction_outcome(game, None)
+                    if isinstance(self.local_task, ObservedContextTask):
+                        self._observe_local_task(game)
                     self.executor.observe(game, {})
                     if self.pending is not None:
                         self.pending["trainable"] = False

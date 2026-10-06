@@ -9,7 +9,8 @@ import math
 import time
 from collections import Counter
 
-from .context_tasks import LinearDialogueTask, ObservedContextTask, eligible_context
+from .container_task import ObservedContainerApproachTask
+from .context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask, eligible_context
 from .execution import physical_context
 from .ground_descent_task import GroundDescentApproachTask
 from .local_tasks import LocalTask
@@ -19,7 +20,7 @@ from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v4"
+    VERSION = "current-collision-exploration-plan-v5"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
@@ -28,6 +29,7 @@ class ObservedExplorationPlan:
         self.entry_position, self.entry_at = None, 0
         self.origins, self.max_radius = {}, {}
         self.context_actions = Counter()
+        self.opened_containers = {}
         self.event_ids = set()
         self.replans = self.actual_transitions = 0
         self.selection = {}
@@ -74,11 +76,17 @@ class ObservedExplorationPlan:
             return (*task.context, task.kind, task.exit_index, task.entrance_index)
         if isinstance(task, ObservedContextTask):
             return (*self.region(task.context, task.origin), task.kind, task.context_action_key)
+        if isinstance(task, ObservedContainerApproachTask):
+            return (*task.context, task.kind, task.actor_uid)
         return (*self.region(task.context, task.target), task.kind)
 
     def outcome(self, task, *, success, now=None):
         now = time.monotonic() if now is None else now
         key = self.task_key(task)
+        if (success and isinstance(task, ObservedContextTask) and task.observed_effect == "chest_opened"
+                and task.context_actor_uid and task.effect_event_id):
+            self.bounded_put(self.opened_containers, (*task.context, task.context_actor_uid),
+                task.effect_event_id, limit=512)
         failures = max(0, self.failures.get(key, 0) - 1) if success else self.failures.get(key, 0) + 1
         # Modal/context interrupts are not physical geometry failures.
         if (not success and task.phase == "interrupted" and task.failure in {
@@ -106,6 +114,9 @@ class ObservedExplorationPlan:
         if self.contextual_interactions and game.dialogue.active:
             self.replans += 1
             return LinearDialogueTask.create(game, now=now, budget_s=min(20, budget_s))
+        if self.contextual_interactions and game.cutscene_active and not game.dialogue.active:
+            self.replans += 1
+            return NativeModalWaitTask.create(game, now=now, budget_s=min(20, budget_s))
         if (game.dialogue.active or game.pause_menu.active or game.paused or game.cutscene_active):
             raise ValueError("modal_requires_separate_controller")
         if not grounded(game.player):
@@ -128,6 +139,16 @@ class ObservedExplorationPlan:
             rank = (priority, self.failures.get(key, 0), visits, approach_distance,
                     -distance if priority == 2 else distance, tuple(task.target))
             candidates.append((rank, task))
+
+        if self.contextual_interactions and not suppress_context:
+            for actor in game.nearby_actors:
+                if (*context, actor.actor_uid) in self.opened_containers:
+                    continue
+                try:
+                    task = ObservedContainerApproachTask.create(game, actor, now=now, budget_s=min(15, budget_s))
+                except ValueError:
+                    continue
+                offer(task, -1, math.dist(position, actor.position))
 
         for row in game.scene_exits:
             # A new scene's entry doorway is held back briefly to avoid a
@@ -186,11 +207,13 @@ class ObservedExplorationPlan:
                 "failed_target_regions": sum(value > 0 for value in self.failures.values()),
                 "max_outward_radius": max(self.max_radius.values(), default=0),
                 "observed_context_actions": dict(self.context_actions),
+                "verified_opened_containers": len(self.opened_containers),
                 "memory": "ephemeral_actual_positions_and_attempts_only", "last_selection": dict(self.selection)}
         if include_details:
             result.update(last_seq=self.last_seq, last_context=self.last_context, last_region=self.last_region,
                 entry_position=self.entry_position, entry_at=self.entry_at,
                 visited_regions=[{"key": key, "visits": value} for key, value in self.visits.items()],
                 attempted_targets=[{"key": key, "failures": value, "retry_after": self.retry_after.get(key, 0)}
-                                   for key, value in self.failures.items()])
+                                   for key, value in self.failures.items()],
+                opened_containers=[{"key": key, "event_id": value} for key, value in self.opened_containers.items()])
         return result

@@ -6,12 +6,41 @@ from dataclasses import replace
 
 import pytest
 
+from zelda_ai.autonomy.container_task import ObservedContainerApproachTask
 from zelda_ai.autonomy.controller import ContinuousController
 from zelda_ai.autonomy.ground_descent_task import GroundDescentApproachTask
 from zelda_ai.autonomy.imitation import encode_surface
 from zelda_ai.autonomy.laya_policy import DecisionLease, LayaWalkingPolicy
 from zelda_ai.autonomy.local_tasks import LocalTask
-from zelda_ai.models import NavigationMeshSnapshot, TraversalAffordanceObservation
+from zelda_ai.models import ActorObservation, NavigationMeshSnapshot, TraversalAffordanceObservation
+
+
+def test_container_approach_uses_dry_walking_contract_and_lost_actor_revokes_reply(state):
+    async def scenario():
+        state.player.bg_check_flags = 1
+        state.camera_input_yaw = 0
+        state.navmesh = NavigationMeshSnapshot(step=70, half_extent=4,
+            cells=[(0, 0, 0., 4), (1, 0, 0., 68), (2, 0, 0., 64)])
+        actor = ActorObservation(actor_uid="container", actor_id=999, category=10, category_name="chest",
+            params=0, position=(180, 0, 0), distance=180, drawn=True)
+        state.nearby_actors = [actor]
+        task = ObservedContainerApproachTask.create(state, actor)
+        process = FakeWorker()
+        policy = LayaWalkingPolicy(process)
+        try:
+            policy(state, task)
+            await asyncio.sleep(0)
+            request = process.sent[0]
+            assert encode_surface(state, task)[-1] == 1
+            state.nearby_actors = []
+            assert policy(state, task) == (0, 0)
+            await process.replies.put({"id": request["id"], "stick": [20, 60], "inference_ms": 5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert policy.metrics["context_rejections"] == 1 and policy.lease.owner is None
+        finally:
+            await policy.close()
+    asyncio.run(scenario())
 
 
 def test_decision_lease_expires_and_rejects_old_context_or_direction():

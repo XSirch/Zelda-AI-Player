@@ -6,6 +6,34 @@ from zelda_ai.autonomy.portal_task import ObservedPortalTask
 from zelda_ai.models import GameEvent, NavigationMeshSnapshot, SceneExitObservation
 
 
+def test_cutscene_arbiter_holds_portal_without_running_its_ground_observer(state, tmp_path):
+    import asyncio
+    import time
+
+    from zelda_ai.autonomy.controller import ContinuousController
+    from zelda_ai.bridge import Bridge
+
+    row = observed(state, direct=True)
+    task = ObservedPortalTask.create(state, row)
+    bridge = Bridge("x" * 32)
+    bridge.state, bridge.last_seen = state, time.monotonic()
+    sent, snapshots = [], []
+
+    def send(**packet):
+        sent.append(packet)
+        bridge.command_seq += 1
+        return bridge.command_seq
+
+    bridge.send, bridge.release = send, lambda: None
+    controller = ContinuousController(bridge, tmp_path / "policy.pt", training_enabled=False)
+    controller.start_local_task(task, stick_policy=lambda game, owned: (0, 60))
+    state.cutscene_active = True
+    state.seq += 1
+    asyncio.run(controller.run(lambda: not snapshots, lambda: snapshots.append(task.snapshot())))
+    assert snapshots[0]["failure"] is None and snapshots[0]["phase"] == "execute"
+    assert sent == [{"buttons": 0, "stick_x": 0, "stick_y": 0, "lease_ms": 150}]
+
+
 def observed(state, *, direct=False):
     state.player.position = (0, 0, 0)
     state.player.floor_height = 0

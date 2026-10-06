@@ -88,3 +88,63 @@ async def execute_context_task(controller, bridge, task, directory, *, on_starte
     if cancelled:
         raise asyncio.CancelledError
     return report
+
+
+async def execute_modal_wait(controller, bridge, task, directory, *, on_started=None, observe=None):
+    """Observe a native handoff with input revoked; this is no neural action."""
+    if controller.training_enabled:
+        raise ValueError("Frozen modal QA cannot train the policy")
+    directory.mkdir(parents=True, exist_ok=True)
+    initial, objective = bridge.state.model_copy(deep=True), controller.intent.model_copy(deep=True)
+    starting_updates, first_seq = controller.policy.updates, bridge.command_seq
+    controller.pending = controller.pending_interaction_probe = None
+    controller.local_task = controller.local_stick_policy = None
+    bridge.release()
+    if on_started:
+        on_started()
+    failure, cancelled, frames = None, False, []
+    try:
+        while not task.terminal and bridge.connected:
+            game = bridge.state
+            if observe:
+                observe(game)
+            task.observe(game)
+            controller.executor.observe(game, {})
+            if len(frames) < 660:
+                frames.append({"state": game.model_dump(), "task": task.snapshot(), "reason": "native_modal_wait"})
+            if controller.executor.state == "blocked":
+                task.interrupt(f"supervisor:{controller.executor.reason}")
+            if task.terminal:
+                break
+            if time.monotonic() >= task.deadline:
+                task.phase, task.failure = "failed", "native_modal_wait_timeout"
+                break
+            try:
+                await bridge.next_state(game.seq, timeout=min(.5, max(.01, task.deadline-time.monotonic())))
+            except TimeoutError:
+                continue  # Poll the same process; silence never triggers a relaunch.
+        if not task.terminal:
+            task.interrupt("bridge_unavailable")
+    except (RuntimeError, ValueError, OSError) as exc:
+        failure = f"{type(exc).__name__}:{str(exc)[:180]}"
+    except asyncio.CancelledError:
+        failure, cancelled = "stage_cancelled", True
+    finally:
+        bridge.release()
+    receipts = {seq: row.model_dump() for seq, row in bridge.receipts.items()
+                if seq > first_seq and row.first_tick > 0}
+    buttons = sum(bool(row["pressed"]) for row in receipts.values())
+    unchanged, updates = controller.intent == objective, controller.policy.updates-starting_updates
+    report = {"source": "soh", "success": bool(not failure and task.phase == "succeeded"
+        and not buttons and unchanged and updates == 0), "task": task.snapshot(),
+        "initial": initial.model_dump(), "final": bridge.state.model_dump(), "frames": frames,
+        "requested": {}, "receipts": receipts, "consumed_actions": 0,
+        "raw_button_actions": buttons, "causal_button_actions": 0, "unowned_button_actions": buttons,
+        "input_source": "neutral_native_modal_wait", "candidate_button_actions": 0,
+        "objective": objective.model_dump(), "final_objective": controller.intent.model_dump(),
+        "objective_unchanged": unchanged, "run_updates": updates, "provider_calls": 0,
+        "reference_blend": 0, "demonstration_labels": 0, "motor_failure": failure}
+    await asyncio.to_thread(write_json, directory / "motor.json", report)
+    if cancelled:
+        raise asyncio.CancelledError
+    return report

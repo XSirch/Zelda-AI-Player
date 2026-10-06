@@ -28,7 +28,8 @@ def encode_surface(game, task):
             float(task.kind == "stairs_or_slope_up"), float(task.kind == "stairs_or_slope_down"),
             # Dry approach points share this steering contract. Their physical
             # transition/landing postcondition belongs to the local task.
-            float(task.kind in {"observed_cell", "observed_portal", "observed_descent_approach"})]
+            float(task.kind in {"observed_cell", "observed_portal", "observed_descent_approach",
+                               "observed_container_approach"})]
 
 
 class SurfacePolicy:

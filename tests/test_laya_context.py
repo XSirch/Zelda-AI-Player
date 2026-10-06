@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from zelda_ai.autonomy.context_tasks import ObservedContextTask
+from zelda_ai.autonomy.context_tasks import NativeModalWaitTask, ObservedContextTask
 from zelda_ai.autonomy.controller import Setpoint
 from zelda_ai.autonomy.models import AgentIntent
-from zelda_ai.laya_context import execute_context_task
+from zelda_ai.laya_context import execute_context_task, execute_modal_wait
 from zelda_ai.models import InputReceipt
 
 
@@ -47,3 +47,33 @@ def test_causal_stage_requires_owned_single_button_receipt_even_if_task_reports_
     assert result["unowned_button_actions"] == int(not expected)
     assert result["run_updates"] == 0 and result["candidate_button_actions"] == 0
     assert json.loads((tmp_path / "motor/motor.json").read_text(encoding="utf-8"))["input_source"] == "causal_context_controller"
+
+
+def test_modal_wait_polls_same_bridge_releases_ownership_and_does_not_claim_neural_actions(state, tmp_path):
+    state.cutscene_active = True
+    task = NativeModalWaitTask.create(state)
+    releases, observations = [], []
+    bridge = SimpleNamespace(state=state, connected=True, command_seq=1, receipts={},
+        release=lambda: releases.append("release"))
+    controller = SimpleNamespace(training_enabled=False, policy=SimpleNamespace(updates=0),
+        intent=AgentIntent.bootstrap(), pending={"old": True}, pending_interaction_probe={"old": True},
+        local_task=object(), local_stick_policy=object(),
+        executor=SimpleNamespace(state="executing", observe=lambda game, evidence: observations.append(game.seq)))
+    calls = 0
+
+    async def next_state(seq, *, timeout):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise TimeoutError("temporary silence")
+        state.seq += 1
+        state.cutscene_active = False
+        return state
+
+    bridge.next_state = next_state
+    result = asyncio.run(execute_modal_wait(controller, bridge, task, tmp_path / "wait"))
+    assert result["success"] and calls == 4 and len(releases) == 2
+    assert result["consumed_actions"] == result["raw_button_actions"] == 0
+    assert result["input_source"] == "neutral_native_modal_wait" and result["run_updates"] == 0
+    assert result["objective_unchanged"] and observations[-1] == state.seq
+    assert controller.pending is controller.pending_interaction_probe is controller.local_task is None
