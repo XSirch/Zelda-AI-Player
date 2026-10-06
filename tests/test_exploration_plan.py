@@ -28,6 +28,36 @@ def test_current_drawn_container_precedes_frontier_and_failure_cools_actor_ident
     assert plan.choose(state, budget_s=12, now=2).kind == "observed_cell"
 
 
+def test_drawn_collectible_with_current_floor_approach_is_attempted_before_random_frontier(state):
+    ground(state)
+    actor = ActorObservation(actor_uid="current-collectible", actor_id=21, category=6,
+        category_name="misc", name="En_Item00", description="Collectibles", params=-1,
+        position=(180, 1, 0), distance=180, drawn=True)
+    state.nearby_actors = [actor]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    task = plan.choose(state, budget_s=20, now=0)
+    assert task.kind == "observed_collectible_approach"
+    assert task.actor_uid == actor.actor_uid
+
+
+def test_repeated_optional_collectible_failure_yields_to_current_exit_and_cools_uid(state):
+    ground(state)
+    actor = ActorObservation(actor_uid="current-collectible", actor_id=21, category=6,
+        category_name="misc", name="En_Item00", params=-1,
+        position=(180, 1, 0), distance=180, drawn=True)
+    state.nearby_actors = [actor]
+    state.scene_exits = [SceneExitObservation(exit_index=1, entrance_index=123,
+        position=(70, 0, 0), direct_reachable=True, samples=1)]
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    for start in [0, 22]:
+        task = plan.choose(state, budget_s=20, now=start)
+        assert task.actor_uid == actor.actor_uid
+        task.phase, task.failure = "failed", "collectible_no_observed_gain"
+        plan.outcome(task, success=False, now=start+1)
+        assert plan.choose(state, budget_s=20, now=start+2).kind == "observed_portal"
+    assert plan.choose(state, budget_s=20, now=44).kind == "observed_portal"
+
+
 def test_current_visible_open_lid_is_skipped_without_fabricating_an_open_event(state):
     ground(state)
     state.nearby_actors = [chest(state).model_copy(update={"container_lid_pose": "open"})]
@@ -253,6 +283,92 @@ def test_vertical_choice_prefers_current_upper_approach_before_a_farther_frontie
     state.traversal_affordances = [farther, near]
     task = ObservedExplorationPlan().choose(state, budget_s=20, now=0)
     assert task.target == near.target_position
+
+
+def upward_surface(state, *, height=18, linked=True):
+    ground(state)
+    state.navmesh.cells = [(0, 0, 0., 5 if linked else 4), (0, 1, float(height), 0),
+                           (1, 0, 0., 4), (2, 0, 0., 4), (3, 0, 0., 0)]
+    state.traversal_affordances = [TraversalAffordanceObservation(
+        kind="stairs_or_slope_up", direction="up", distance=0,
+        approach_position=(0, 0, 0), target_position=(0, height, 70), height_delta=height)]
+
+
+@pytest.mark.parametrize("height", [18, 38])
+def test_current_linked_upward_floor_precedes_horizontal_frontier_with_real_height_postcondition(state, height):
+    upward_surface(state, height=height)
+    plan = ObservedExplorationPlan()
+    task = plan.choose(state, budget_s=20, now=0)
+    assert task.target == (0, height, 70)
+    assert task.kind == "observed_cell" and task.corridor == ((0, height, 70),)
+    assert plan.selection["eligible_upward_candidates"] == 1
+    # A small rise may share the macro-region with its base. That must not
+    # erase the observed traversal or reset the macro dwell clock.
+    if height == 18:
+        assert plan.region(task.context, task.target) in plan.visits
+    state.player.position = (0, 0, 70)
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=True, now=.1+i/10)
+    assert not task.terminal
+    state.player.position, state.player.floor_height = (0, height, 70), height
+    for i in range(3):
+        state.seq += 1
+        task.observe(state, consumed=True, now=.4+i/10)
+    assert task.phase == "succeeded" and task.verification_frames == 3
+
+
+@pytest.mark.parametrize("missing", ["directed_link", "matching_floor", "affordance"])
+def test_upward_priority_needs_current_floor_and_directed_path_not_just_a_surface_label(state, missing):
+    upward_surface(state, height=38, linked=missing != "directed_link")
+    if missing == "matching_floor":
+        state.navmesh.cells[1] = (0, 1, 0., 0)
+    elif missing == "affordance":
+        state.traversal_affordances = []
+    plan = ObservedExplorationPlan()
+    assert plan.choose(state, budget_s=20, now=0).target == (210, 0, 0)
+    assert plan.selection["eligible_upward_candidates"] == 0
+
+
+def test_actually_occupied_upper_floor_loses_vertical_priority_without_new_macro_expansion(state):
+    upward_surface(state)
+    plan = ObservedExplorationPlan()
+    plan.observe(state, now=0)
+    state.seq += 1
+    state.player.position, state.player.floor_height = (0, 18, 70), 18
+    plan.observe(state, now=1)
+    state.seq += 1
+    state.player.position, state.player.floor_height = (0, 0, 0), 0
+    assert plan.choose(state, budget_s=20, now=2).target == (210, 0, 0)
+    assert plan.selection["eligible_upward_candidates"] == 0
+    assert len(plan.visits) == 1 and plan.actual_transitions == 0
+
+
+def test_upward_proposal_or_airborne_pass_does_not_mark_the_landing_occupied(state):
+    upward_surface(state)
+    plan = ObservedExplorationPlan()
+    first = plan.choose(state, budget_s=20, now=0)
+    assert not plan.upward_floor_visited(first.context, first.target)
+    state.seq += 1
+    state.player.position, state.player.floor_height = (0, 18, 70), 18
+    state.player.bg_check_flags = 0
+    plan.observe(state, now=1)
+    assert not plan.upward_floor_visited(first.context, first.target)
+    state.seq += 1
+    state.player.position, state.player.floor_height, state.player.bg_check_flags = (0, 0, 0), 0, 1
+    assert plan.choose(state, budget_s=20, now=2).target == first.target
+
+
+def test_failed_supported_upward_attempt_cools_down_before_horizontal_recovery(state):
+    upward_surface(state)
+    plan = ObservedExplorationPlan()
+    first = plan.choose(state, budget_s=20, now=0)
+    first.phase, first.failure = "failed", "no_geometric_progress"
+    plan.outcome(first, success=False, now=1)
+    next_task = plan.choose(state, budget_s=20, now=2)
+    assert next_task.target == (210, 0, 0)
+    assert plan.selection["eligible_upward_candidates"] == 0
+    assert not plan.upward_floor_visited(first.context, first.target)
 
 
 def test_contextual_mode_prioritizes_current_prompt_and_linear_text_without_ground_frontier(state):

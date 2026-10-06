@@ -9,6 +9,7 @@ import math
 import time
 from collections import Counter
 
+from .collectible_task import ObservedCollectibleApproachTask
 from .container_task import ObservedContainerApproachTask
 from .context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask, eligible_context
 from .execution import physical_context
@@ -20,11 +21,12 @@ from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v10"
+    VERSION = "current-collision-exploration-plan-v12"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
         self.visits, self.failures, self.retry_after = {}, {}, {}
+        self.occupied_floors = {}
         self.last_seq, self.last_context, self.last_region = -1, None, None
         self.last_position = None
         self.failed_departures, self.departure_deferrals = {}, 0
@@ -80,6 +82,10 @@ class ObservedExplorationPlan:
         if region != self.last_region:
             self.bounded_put(self.visits, region, self.visits.get(region, 0) + 1)
             self.last_region = region
+        if grounded(game.player) and abs(position[1] - game.player.floor_height) <= 4:
+            point = (position[0], game.player.floor_height, position[2])
+            key = (*context, math.floor(point[0] / 20), math.floor(point[1] / 8), math.floor(point[2] / 20))
+            self.bounded_put(self.occupied_floors, key, (context, point))
         label = game.context_action.label
         if label != "none" and (label in self.context_actions or len(self.context_actions) < 32):
             self.context_actions[label] += 1
@@ -92,7 +98,7 @@ class ObservedExplorationPlan:
             if task.context_actor_uid:
                 return (*task.context, task.kind, task.context_actor_uid, task.context_action_key)
             return (*self.region(task.context, task.origin), task.kind, task.context_action_key)
-        if isinstance(task, ObservedContainerApproachTask):
+        if isinstance(task, (ObservedContainerApproachTask, ObservedCollectibleApproachTask)):
             return (*task.context, task.kind, task.actor_uid)
         return (*self.region(task.context, task.target), task.kind)
 
@@ -170,6 +176,35 @@ class ObservedExplorationPlan:
         read = self.read_actor_contexts.get((*physical_context(game), actor.actor_uid))
         return bool(read and read["progress_revision"] == self.progress_revision and read["retry_after"] > now)
 
+    def upward_floor_visited(self, context, target):
+        # Actual grounded occupation is finer than macro dwell accounting.
+        # A small rise in an already occupied macro-region is still new floor.
+        return any(owner == context and abs(point[1] - target[1]) <= 4
+            and math.hypot(point[0] - target[0], point[2] - target[2]) <= 35
+            for owner, point in self.occupied_floors.values())
+
+    def upward_floor_task(self, game, affordance, *, now, budget_s):
+        # The affordance nominates a currently observed upper surface. Only a
+        # matching CURRENT cell reached by directed collision links supplies
+        # the held walking target and its corridor; no thin probe or floor
+        # sample alone creates a climb route. The usual stopped/height/consumed
+        # postcondition of observed_cell proves actual arrival upstairs.
+        mesh, target, context = game.navmesh, affordance.target_position, physical_context(game)
+        cells = []
+        for x, z, y, _ in mesh.cells:
+            point = (mesh.origin[0] + x * mesh.step, y, mesh.origin[2] + z * mesh.step)
+            gap = math.dist(point, target)
+            if (y - game.player.floor_height <= 8 or abs(y - target[1]) > 4
+                    or gap > mesh.step * .8 or self.upward_floor_visited(context, point)):
+                continue
+            cells.append((gap, point))
+        for _, point in sorted(cells):
+            try:
+                return LocalTask.observed_cell(game, point, now=now, budget_s=min(20, budget_s))
+            except ValueError:
+                continue
+        return None
+
     def choose(self, game, *, budget_s, now=None, suppress_context=False):
         now = time.monotonic() if now is None else now
         self.observe(game, now=now)
@@ -181,6 +216,8 @@ class ObservedExplorationPlan:
                           "cooled_departure_candidates": 0,
                           "container_recovery_candidates": 0,
                           "visibly_open_containers_skipped": 0,
+                          "eligible_collectible_candidates": 0,
+                          "eligible_upward_candidates": 0,
                           "read_context_deferred": self.read_context_deferred(game, now=now)}
         if not 1 <= budget_s <= 300:
             raise ValueError("planning_budget_exhausted")
@@ -216,6 +253,15 @@ class ObservedExplorationPlan:
 
         if self.contextual_interactions and not suppress_context:
             for actor in game.nearby_actors:
+                if ObservedCollectibleApproachTask.is_collectible(actor):
+                    try:
+                        task = ObservedCollectibleApproachTask.create(game, actor, now=now, budget_s=min(20, budget_s))
+                    except ValueError:
+                        continue
+                    priority = 1 if self.failures.get(self.task_key(task), 0) >= 2 else -1
+                    if offer(task, priority, math.dist(position, actor.position)):
+                        self.selection["eligible_collectible_candidates"] += 1
+                    continue
                 if (*context, actor.actor_uid) in self.opened_containers:
                     continue
                 if (actor.drawn and actor.category_name.lower() == "chest"
@@ -247,6 +293,12 @@ class ObservedExplorationPlan:
             offer(task, 0, math.dist(position, row.position))
 
         for row in game.traversal_affordances:
+            if row.kind == "stairs_or_slope_up":
+                task = self.upward_floor_task(game, row, now=now, budget_s=budget_s)
+                if task and not self.departure_deferred(task, now=now):
+                    if offer(task, 1, math.dist(position, task.target), approach_distance=row.distance):
+                        self.selection["eligible_upward_candidates"] += 1
+                continue
             if row.kind != "ledge_down" or self.region(context, row.target_position) in self.visits:
                 continue
             try:
@@ -300,6 +352,7 @@ class ObservedExplorationPlan:
         result = {"version": self.VERSION, "replans": self.replans,
                 "actual_scene_room_transitions": self.actual_transitions,
                 "occupied_macro_regions": len(self.visits),
+                "occupied_ground_floor_samples": len(self.occupied_floors),
                 "failed_target_regions": sum(value > 0 for value in self.failures.values()),
                 "max_outward_radius": max(self.max_radius.values(), default=0),
                 "observed_context_actions": dict(self.context_actions),
@@ -320,4 +373,6 @@ class ObservedExplorationPlan:
                 progress_tokens=sorted(self.progress_tokens), progress_initialized=self.progress_initialized)
             result.update(last_position=self.last_position,
                 failed_departure_attempts=[{"key": key, **value} for key, value in self.failed_departures.items()])
+            result.update(occupied_floor_samples=[{"context": owner, "position": point}
+                for owner, point in self.occupied_floors.values()])
         return result

@@ -6,6 +6,7 @@ from dataclasses import replace
 
 import pytest
 
+from zelda_ai.autonomy.collectible_task import ObservedCollectibleApproachTask
 from zelda_ai.autonomy.container_task import ObservedContainerApproachTask
 from zelda_ai.autonomy.controller import ContinuousController
 from zelda_ai.autonomy.ground_descent_task import GroundDescentApproachTask
@@ -32,6 +33,34 @@ def test_container_approach_uses_dry_walking_contract_and_lost_actor_revokes_rep
             await asyncio.sleep(0)
             request = process.sent[0]
             assert encode_surface(state, task)[-1] == 1
+            state.nearby_actors = []
+            assert policy(state, task) == (0, 0)
+            await process.replies.put({"id": request["id"], "stick": [20, 60], "inference_ms": 5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert policy.metrics["context_rejections"] == 1 and policy.lease.owner is None
+        finally:
+            await policy.close()
+    asyncio.run(scenario())
+
+
+def test_collectible_approach_uses_frozen_walking_and_neutralizes_when_target_is_lost(state):
+    async def scenario():
+        state.player.bg_check_flags, state.camera_input_yaw = 1, 0
+        state.navmesh = NavigationMeshSnapshot(step=70, half_extent=4,
+            cells=[(0, 0, 0., 4), (1, 0, 0., 68), (2, 0, 0., 64)])
+        actor = ActorObservation(actor_uid="current-collectible", actor_id=21, category=6,
+            category_name="misc", name="En_Item00", params=-32768,
+            position=(180, 1, 0), distance=180, drawn=True)
+        state.nearby_actors = [actor]
+        task = ObservedCollectibleApproachTask.create(state, actor)
+        process, policy = FakeWorker(), None
+        policy = LayaWalkingPolicy(process)
+        try:
+            policy(state, task)
+            await asyncio.sleep(0)
+            request = process.sent[0]
+            assert request["state"]["history_oldest_first"][-1][-1] == 1
             state.nearby_actors = []
             assert policy(state, task) == (0, 0)
             await process.replies.put({"id": request["id"], "stick": [20, 60], "inference_ms": 5})
