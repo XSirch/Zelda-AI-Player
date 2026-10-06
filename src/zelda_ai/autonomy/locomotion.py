@@ -8,9 +8,15 @@ from __future__ import annotations
 GROUND = 1
 JUMPING = 1 << 18
 FREEFALL = 1 << 19
+FIRST_PERSON = 1 << 20
 IN_WATER = 1 << 27
 UNDERWATER = 1 << 10
 DIVING = 1 << 11
+
+
+def camera_modal_active(player):
+    """The pinned native first-person flag owns the analog as camera input."""
+    return bool(player and player.state_flags_1 & FIRST_PERSON)
 
 
 def water_active(player):
@@ -46,6 +52,8 @@ def locomotor_mode(game):
         return "swimming"
     if player.state_flags_1 & (JUMPING | FREEFALL):
         return "airborne"
+    if camera_modal_active(player):
+        return "first_person"
     if grounded(player):
         return "ground"
     return "unknown"

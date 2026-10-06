@@ -9,19 +9,20 @@ import math
 import time
 from collections import Counter
 
+from .camera_task import ObservedCameraReturnTask, eligible_camera_return
 from .collectible_task import ObservedCollectibleApproachTask
 from .container_task import ObservedContainerApproachTask
 from .context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask, eligible_context
 from .execution import physical_context
 from .ground_descent_task import GroundDescentApproachTask
 from .local_tasks import LocalTask
-from .locomotion import grounded, locomotor_mode
+from .locomotion import camera_modal_active, grounded, locomotor_mode
 from .navigation import observed_local_path
 from .portal_task import ObservedPortalTask
 
 
 class ObservedExplorationPlan:
-    VERSION = "current-collision-exploration-plan-v12"
+    VERSION = "current-collision-exploration-plan-v13"
 
     def __init__(self, *, contextual_interactions=False):
         self.contextual_interactions = contextual_interactions
@@ -120,7 +121,8 @@ class ObservedExplorationPlan:
         # Modal/context interrupts are not physical geometry failures.
         if (not success and task.phase == "interrupted" and task.failure in {
                 "context_changed", "modal_owns_control", "game_not_playable",
-                "portal_episode_changed", "portal_player_context_changed", "observed_context_interaction"}):
+                "portal_episode_changed", "portal_player_context_changed", "observed_context_interaction",
+                "camera_modal_owns_control"}):
             failures = self.failures.get(key, 0)
         self.bounded_put(self.failures, key, failures, limit=512)
         self.bounded_put(self.retry_after, key, now + (30 if isinstance(task, ObservedPortalTask) else 20), limit=512)
@@ -229,6 +231,11 @@ class ObservedExplorationPlan:
             return NativeModalWaitTask.create(game, now=now, budget_s=min(20, budget_s))
         if (game.dialogue.active or game.pause_menu.active or game.paused or game.cutscene_active):
             raise ValueError("modal_requires_separate_controller")
+        if camera_modal_active(game.player):
+            if self.contextual_interactions and eligible_camera_return(game):
+                self.replans += 1
+                return ObservedCameraReturnTask.create(game, now=now, budget_s=min(20, budget_s))
+            raise ValueError("first_person_requires_separate_controller")
         if not grounded(game.player):
             raise ValueError(f"unsupported_planning_mode:{locomotor_mode(game)}")
         if not game.navmesh.available or game.camera_input_yaw is None:

@@ -8,12 +8,12 @@ from dataclasses import dataclass, field
 from .execution import physical_context
 from .interaction_memory import context_key
 from .local_tasks import LocalTask
-from .locomotion import grounded, water_active
+from .locomotion import camera_modal_active, grounded, water_active
 
 
 def eligible_context(game):
     return bool(game.source == "soh" and game.in_game and game.player and game.player.health > 0
-        and grounded(game.player) and not game.game_over_state and not game.paused
+        and grounded(game.player) and not camera_modal_active(game.player) and not game.game_over_state and not game.paused
         and not game.dialogue.active and not game.pause_menu.active and not game.cutscene_active
         and game.context_action.label.lower() in {"check", "speak", "open", "enter"}
         and context_key(game) is not None)
@@ -82,6 +82,9 @@ class ObservedContextTask(LocalTask):
         self.consumed = self.consumed or consumed
         if game.pause_menu.active or game.paused:
             self.interrupt("modal_owns_control")
+            return
+        if camera_modal_active(game.player):
+            self.interrupt("camera_modal_owns_control")
             return
         chest = next((e for e in game.events if e.kind == "chest_opened"
             and e.id not in self.prior_events and e.detail.startswith(f"{self.context[1]}:")

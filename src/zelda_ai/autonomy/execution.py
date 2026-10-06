@@ -15,7 +15,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from .lifetime import ObservationLifetime
-from .locomotion import locomotor_mode
+from .locomotion import camera_modal_active, locomotor_mode
 
 
 @dataclass
@@ -96,12 +96,13 @@ class ExecutionSupervisor:
             self.last_input_seq, self.input_at = consumed, now
         if self.state == "blocked":
             return
-        modal = game.dialogue.active or game.pause_menu.active or game.cutscene_active or game.paused
+        modal = (game.dialogue.active or game.pause_menu.active or game.cutscene_active or game.paused
+                 or camera_modal_active(game.player))
         if modal:
             signature = (game.dialogue.active, game.dialogue.text_id, game.dialogue.text,
                          game.dialogue.choice_index, game.pause_menu.active,
                          game.pause_menu.page_index, game.pause_menu.cursor_point,
-                         game.cutscene_active, game.paused)
+                         game.cutscene_active, game.paused, camera_modal_active(game.player))
             if signature != self.modal_signature:
                 self.modal_signature, self.modal_effect_at = signature, now
             if now - self.modal_effect_at >= self.modal_budget_s:

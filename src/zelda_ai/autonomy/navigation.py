@@ -10,13 +10,15 @@ import heapq
 import math
 
 from ..models import GameState
+from .locomotion import camera_modal_active
 
 OFFSETS = ((0, 1), (1, 1), (1, 0), (1, -1), (0, -1), (-1, -1), (-1, 0), (-1, 1))
 
 
 def observed_local_path(game: GameState, target, *, minimum_gain=None) -> dict | None:
     mesh = game.navmesh
-    if not game.player or not mesh.available or game.dialogue.active or game.pause_menu.active:
+    if (not game.player or not mesh.available or game.dialogue.active or game.pause_menu.active
+            or camera_modal_active(game.player)):
         return None
     cells = {(x, z): (y, links) for x, z, y, links in mesh.cells}
     ox, _, oz = mesh.origin

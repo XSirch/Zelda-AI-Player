@@ -17,7 +17,7 @@ from .container_task import ObservedContainerApproachTask
 from .features import camera_world_yaw
 from .ground_descent_task import GroundDescentApproachTask
 from .imitation import encode_surface
-from .locomotion import FREEFALL, JUMPING, grounded, water_active
+from .locomotion import FREEFALL, JUMPING, camera_modal_active, grounded, water_active
 
 
 @dataclass(frozen=True)
@@ -166,6 +166,7 @@ class LayaWalkingPolicy:
             or game.cutscene_active
             or game.dialogue.active
             or game.pause_menu.active
+            or camera_modal_active(game.player)
             or game.player.climbing_ladder
             or game.player.hanging_ledge
             or game.player.climbing_ledge

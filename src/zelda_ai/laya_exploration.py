@@ -6,12 +6,14 @@ import json
 import math
 import time
 
+from .autonomy.camera_task import ObservedCameraReturnTask
 from .autonomy.context_tasks import LinearDialogueTask, NativeModalWaitTask, ObservedContextTask
 from .autonomy.controller import ContinuousController
 from .autonomy.exploration_plan import ObservedExplorationPlan
 from .autonomy.ground_descent_task import GroundDescentApproachTask
 from .autonomy.ladder_task import LadderDescentTask
 from .autonomy.laya_ladder_policy import encode_ladder
+from .autonomy.locomotion import camera_modal_active
 from .autonomy.models import AgentIntent, ObjectiveCompletion
 from .autonomy.objectives import ObjectiveTracker
 from .g1 import ARTIFACTS, context, write_json
@@ -73,6 +75,8 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
                 previous_observer(game, old)
         finally:
             observe(game)
+            if old and camera_modal_active(old.player) and not camera_modal_active(game.player):
+                controller.note_camera_return_closed(old, game)
             if old and old.dialogue.active and not game.dialogue.active:
                 controller.note_dialogue_closed(old, game)
                 bridge.release()  # Closing input is revoked before a repeated motor tick.
@@ -158,6 +162,9 @@ async def exploration_episode(bridge, frozen, walking, ladder, directory, *, sec
                     break
                 if isinstance(task, NativeModalWaitTask) and not result["success"]:
                     reason = task.failure or "native_modal_handoff_incomplete"
+                    break
+                if isinstance(task, ObservedCameraReturnTask) and not result["success"]:
+                    reason = task.failure or "camera_return_incomplete"
                     break
             reason = reason or ("task_count_budget" if len(stages) >= 64 else "session_budget_exhausted")
     except (ValueError, RuntimeError, OSError, TimeoutError) as exc:

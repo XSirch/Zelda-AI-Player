@@ -12,7 +12,7 @@ from dataclasses import asdict, dataclass
 
 from .execution import physical_context
 from .features import _PROBE_YAW_OFFSETS, _collision_detour, camera_relative_stick
-from .locomotion import grounded, water_active
+from .locomotion import camera_modal_active, grounded, water_active
 from .navigation import observed_local_path
 
 
@@ -79,7 +79,7 @@ class LocalTask:
         return task
 
     @classmethod
-    def _create(cls, game, kind, target, approach, *, now, budget_s):
+    def _create(cls, game, kind, target, approach, *, now, budget_s, allow_camera_modal=False):
         if (game.source != "soh" or not game.in_game or not game.player
                 or game.player.health <= 0 or game.game_over_state
                 or game.cutscene_active or game.paused
@@ -89,6 +89,8 @@ class LocalTask:
             raise ValueError("Task budget must be in (0, 30] seconds")
         if water_active(game.player):
             raise ValueError("A water locomotor needs its own task and controller")
+        if camera_modal_active(game.player) and not allow_camera_modal:
+            raise ValueError("A first-person camera modal needs its own task and controller")
         now = time.monotonic() if now is None else now
         origin, target, approach = tuple(game.player.position), tuple(target), tuple(approach)
         return cls(f"{kind}:{game.seq}:{target}", kind, physical_context(game),
@@ -111,6 +113,9 @@ class LocalTask:
     def accepts_attached_mode(self, game):
         return False
 
+    def accepts_camera_modal(self, game):
+        return False
+
     def allows_context_buttons(self, game):
         return False
 
@@ -128,6 +133,9 @@ class LocalTask:
             return
         if game.dialogue.active or game.pause_menu.active or game.paused or game.cutscene_active:
             self.interrupt("modal_owns_control")
+            return
+        if camera_modal_active(game.player) and not self.accepts_camera_modal(game):
+            self.interrupt("camera_modal_owns_control")
             return
         if water_active(game.player):
             self.interrupt("unsupported_locomotor_mode")

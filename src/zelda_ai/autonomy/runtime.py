@@ -18,6 +18,7 @@ from ..providers.openrouter import reserve_cost
 from .champions import ChampionStore
 from .controller import ContinuousController
 from .features import target_point
+from .locomotion import camera_modal_active
 from .models import AgentIntent
 from .objectives import ObjectiveTracker
 from .prompt import AUTONOMY_SYSTEM_PROMPT, build_cognition_observation
@@ -536,6 +537,8 @@ class AutonomyRuntime:
                         ),
                     )
 
+            if camera_modal_active(old.player) and not camera_modal_active(state.player) and self.controller:
+                self.controller.note_camera_return_closed(old, state)
             if old.dialogue.active and not state.dialogue.active:
                 if self.controller:
                     self.controller.note_dialogue_closed(old, state)

@@ -371,6 +371,30 @@ def test_failed_supported_upward_attempt_cools_down_before_horizontal_recovery(s
     assert not plan.upward_floor_visited(first.context, first.target)
 
 
+def test_native_first_person_flag_selects_bounded_camera_return_instead_of_ground_frontier(state):
+    ground(state)
+    state.player.state_flags_1 = 1 << 20
+    state.context_action.code, state.context_action.label = 4, "return"
+    plan = ObservedExplorationPlan(contextual_interactions=True)
+    task = plan.choose(state, budget_s=20, now=0)
+    assert task.kind == "observed_camera_return"
+    assert task.reference_stick(state) == (0, 0)
+    assert plan.selection["eligible_floor_candidates"] == 0
+
+
+def test_first_person_interrupt_is_not_a_failed_ground_departure(state):
+    ground(state)
+    plan = ObservedExplorationPlan()
+    task = plan.choose(state, budget_s=12, now=0)
+    state.seq += 1
+    state.player.state_flags_1 = 1 << 20
+    task.observe(state, consumed=True, now=3)
+    assert task.phase == "interrupted" and task.failure == "camera_modal_owns_control"
+    plan.observe(state, now=3)
+    plan.outcome(task, success=False, now=3)
+    assert not plan.failed_departures and not any(plan.failures.values())
+
+
 def test_contextual_mode_prioritizes_current_prompt_and_linear_text_without_ground_frontier(state):
     ground(state)
     state.context_action.code, state.context_action.label = 1, "check"

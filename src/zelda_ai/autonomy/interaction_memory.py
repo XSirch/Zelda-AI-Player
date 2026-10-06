@@ -1,6 +1,8 @@
 """Observed physical-button bindings, with read-only evaluation working memory."""
 from __future__ import annotations
 
+from .locomotion import camera_modal_active
+
 
 def context_key(game):
     action = game.context_action
@@ -10,7 +12,8 @@ def context_key(game):
     actor = game.context_actor
     category = (actor.category_name or "").strip().lower() if actor else "none"
     actor_id = actor.actor_id if actor else -1
-    return f"{action.code}:{label}:{category}:{actor_id}"[:200]
+    mode = "first_person:" if camera_modal_active(game.player) else ""
+    return f"{mode}{action.code}:{label}:{category}:{actor_id}"[:200]
 
 
 class ObservedInteractionMemory:

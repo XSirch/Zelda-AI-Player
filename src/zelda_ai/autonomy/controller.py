@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..bridge import Bridge
+from .camera_task import ObservedCameraReturnTask, eligible_camera_return
 from .context_tasks import LinearDialogueTask, ObservedContextTask
 from .execution import ExecutionSupervisor
 from .features import (
@@ -27,6 +28,7 @@ from .interaction_memory import ObservedInteractionMemory, context_key
 from .ledge_task import ObservedLedgeAscentTask
 from .lifetime import ObservationLifetime
 from .local_tasks import LocalTask
+from .locomotion import camera_modal_active, grounded
 from .ml_policy import OnlinePPO
 from .models import AgentIntent
 from .navigation import observed_local_path
@@ -234,6 +236,7 @@ class ContinuousController:
         self.pending_interaction_probe = None
         self.last_interaction_source = "none"
         self.dialogue_reentry_guard = None
+        self.camera_return_retry_after = 0.0
         self.dialogue_reentry_suppressed = 0
         self.active_escape_attempt = None
         self.escape_retry_after.clear()
@@ -310,6 +313,8 @@ class ContinuousController:
                        for seq in (self.pending or {}).get("command_seqs", ()))
         if hasattr(task, "button_consumed"):
             consumed = task.button_consumed(self.bridge)
+        if camera_modal_active(game.player) and not task.accepts_camera_modal(game):
+            task.interrupt("camera_modal_owns_control")
         task.observe(game, consumed=consumed)
         return task.guidance(game)
 
@@ -392,6 +397,13 @@ class ContinuousController:
 
     def _refresh_camera_relative_setpoint(self, game):
         """Refresh nonblocking local output or camera projection without replanning."""
+        if camera_modal_active(game.player) and not isinstance(self.local_task, ObservedCameraReturnTask):
+            self.last_setpoint = Setpoint(reason="camera_modal_wait")
+            self.last_stick = (0.0, 0.0)
+            self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+            if self.pending is not None:
+                self.pending["trainable"] = False
+            return
         if (
             self.local_task is not None
             and self.last_setpoint.reason in {"local_task", "dialogue_disengage"}
@@ -539,6 +551,31 @@ class ContinuousController:
                 f"{key}|{name}".encode("utf-8")
             ).digest(),
         )
+
+    def note_camera_return_closed(self, old_game, game):
+        """Revoke the closing lease while later fresh frames verify causality."""
+        if (not camera_modal_active(old_game.player) or camera_modal_active(game.player)
+                or not game.player or not game.in_game or game.player.health <= 0 or game.game_over_state
+                or (old_game.instance_id, old_game.scene, old_game.room) != (game.instance_id, game.scene, game.room)
+                or any(e.kind == "save_loaded" and e.id not in {v.id for v in old_game.events} for e in game.events)):
+            return
+        if self.dialogue_reentry_guard and self.dialogue_reentry_guard.get("closed_seq") == game.seq:
+            return
+        now = time.monotonic()
+        self.dialogue_reentry_guard = {"kind": "camera_return", "closed_seq": game.seq,
+            "scene": game.scene, "room": game.room, "anchor": tuple(game.player.position),
+            "speaker_uid": None, "speaker_id": None, "text_id": None,
+            "closing_button": (self.pending_interaction_probe or {}).get("button"),
+            "started_at": now, "until": now + DIALOGUE_REENTRY_GUARD_S}
+        # Keep a consumed camera probe until its three-frame verification;
+        # recording a binding merely on this first flag transition is unsafe.
+        self.last_setpoint = Setpoint(reason="camera_return_disengage")
+        self.last_buttons = tuple(0.0 for _ in BUTTON_NAMES)
+        self.last_stick = (0.0, 0.0)
+        self.last_interaction_source = "camera_return_disengage"
+        if self.pending is not None:
+            self.pending["trainable"] = False
+        self.bridge.release()
 
     def note_dialogue_closed(self, old_game, game):
         """Release the closing button and prevent immediate dialogue re-entry."""
@@ -763,6 +800,9 @@ class ContinuousController:
         now = time.monotonic()
         commands = probe.get("command_seqs", ())
         if game.protocol == 3 and not any(self.bridge.command_consumed(seq) for seq in commands):
+            if probe.get("camera_return_active") and not camera_modal_active(game.player):
+                self.pending_interaction_probe = None
+                return
             probe["pre_consumption_chest_ids"] = tuple(dict.fromkeys((
                 *probe.get("pre_consumption_chest_ids", ()),
                 *(e.id for e in game.events if e.kind == "chest_opened"))))[-256:]
@@ -775,6 +815,27 @@ class ContinuousController:
         if any(e.id not in probe.get("event_ids", ()) and e.kind in {"save_loaded", "player_died", "game_over"}
                for e in game.events):
             self.pending_interaction_probe = None
+            return
+        if probe.get("camera_return_active"):
+            same_context = (game.scene, game.room) == (probe["scene"], probe["room"])
+            delivered = any(self.bridge.command_consumed(seq) and seq in self.bridge.receipts
+                and self.bridge.receipts[seq].pressed == BUTTON_MASKS[probe["button"]] for seq in commands)
+            settled = bool(same_context and delivered and grounded(game.player)
+                and not camera_modal_active(game.player) and not game.dialogue.active
+                and not game.pause_menu.active and not game.paused and not game.cutscene_active
+                and game.player.speed_xz < .1)
+            if game.seq > probe.get("verification_seq", -1):
+                probe["verification_seq"] = game.seq
+                probe["verification_frames"] = probe.get("verification_frames", 0) + 1 if settled else 0
+            if probe.get("verification_frames", 0) >= 3:
+                self.interaction_memory.record_interaction_success(probe["key"], probe["button"])
+                self.interaction_probe_successes += 1
+                self.last_interaction_source = f"learned:{probe['key']}->{probe['button']}"
+                self.pending_interaction_probe = None
+            elif now - probe["at"] >= INTERACTION_OUTCOME_WINDOW_S:
+                if probe.get("known"):
+                    self.interaction_memory.record_interaction_failure(probe["key"], probe["button"])
+                self.pending_interaction_probe = None
             return
         if probe.get("kind") == "dialogue":
             text_changed = bool(
@@ -885,6 +946,7 @@ class ContinuousController:
             guidance.get("exit_active")
             or guidance.get("traversal_route_active")
             or guidance.get("context_interaction_active")
+            or guidance.get("camera_return_active")
             or actor_is_door
             or self.intent.mode == "interact"
         )
@@ -954,6 +1016,7 @@ class ContinuousController:
             "event_ids": tuple(e.id for e in game.events),
             "container_context": bool(actor and actor.category_name.lower() == "chest"
                 and game.context_action.label.lower() == "open"),
+            "camera_return_active": bool(guidance.get("camera_return_active") and camera_modal_active(game.player)),
             "context_actor_uid": actor.actor_uid if actor else None,
             "key": key,
             "button": button,
@@ -1546,13 +1609,16 @@ class ContinuousController:
         ):
             self._enqueue_rollout(observation, done=reward.done)
 
+        if (self.local_task is None and eligible_camera_return(game)
+                and time.monotonic() >= getattr(self, "camera_return_retry_after", 0)):
+            self.start_local_task(ObservedCameraReturnTask.create(game))
         local_owned = self.local_task is not None
         if local_owned:
             self.route_graph.clear_frontier()
             guidance = self._observe_local_task(game)
         else:
             final_target = target_point(game, self.intent)
-            if game.dialogue.active or game.pause_menu.active:
+            if game.dialogue.active or game.pause_menu.active or camera_modal_active(game.player):
                 # Modal UI owns physical control. Drop the ephemeral frontier
                 # commitment without treating the modal pause as a navigation fail.
                 self.route_graph.clear_frontier()
@@ -1606,7 +1672,8 @@ class ContinuousController:
             else:
                 route_hint = None
             local_target = (route_hint or {}).get("exit_position") or final_target
-            if self.intent.mode in {"navigate", "explore", "observe"} and not (game.dialogue.active or game.pause_menu.active):
+            if self.intent.mode in {"navigate", "explore", "observe"} and not (
+                    game.dialogue.active or game.pause_menu.active or camera_modal_active(game.player)):
                 route_hint = self._local_path_hint(game, route_hint, local_target)
             guidance = goal_guidance(
                 game,
@@ -1682,6 +1749,10 @@ class ContinuousController:
             )
         if dialogue_override:
             interaction_override = True
+        elif camera_modal_active(game.player) and not isinstance(self.local_task, ObservedCameraReturnTask):
+            setpoint = Setpoint(reason="camera_modal_wait")
+            sample = {**sample, "stick": [0.0, 0.0], "buttons": [0.0 for _ in BUTTON_NAMES]}
+            interaction_override = True
         else:
             (
                 setpoint,
@@ -1749,6 +1820,8 @@ class ContinuousController:
         self.actions_sampled += 1
         if local_owned and self.local_task.terminal:
             task = self.local_task
+            if isinstance(task, ObservedCameraReturnTask):
+                self.camera_return_retry_after = time.monotonic() + (0 if task.phase == "succeeded" else 20)
             if (task.kind.startswith("stairs_or_slope") and task.context == self.executor.context
                     and task.phase in {"succeeded", "failed"}):
                 self.route_graph.record_surface_outcome(game, task.target, success=task.phase == "succeeded")

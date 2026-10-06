@@ -72,6 +72,30 @@ def test_collectible_approach_uses_frozen_walking_and_neutralizes_when_target_is
     asyncio.run(scenario())
 
 
+def test_native_first_person_invalidates_pending_walking_reply(state):
+    async def scenario():
+        state.player.bg_check_flags, state.camera_input_yaw = 1, 0
+        state.navmesh = NavigationMeshSnapshot(step=70, half_extent=4,
+            cells=[(0,0,0.,4),(1,0,0.,68),(2,0,0.,64)])
+        task = LocalTask.observed_cell(state,(140,0,0))
+        process = FakeWorker()
+        policy = LayaWalkingPolicy(process)
+        try:
+            policy(state,task)
+            await asyncio.sleep(0)
+            request = process.sent[0]
+            state.player.state_flags_1 = 1 << 20
+            state.seq += 1
+            assert policy(state,task)==(0,0) and policy.owner is None
+            await process.replies.put({"id":request["id"],"stick":[20,60],"inference_ms":5})
+            for _ in range(5):
+                await asyncio.sleep(0)
+            assert policy.metrics["context_rejections"]==1 and policy.lease.owner is None
+        finally:
+            await policy.close()
+    asyncio.run(scenario())
+
+
 def test_decision_lease_expires_and_rejects_old_context_or_direction():
     features = (0.0, 1.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 1.0)
     lease = DecisionLease(("instance", 2, "task"), 10.0, features, (0, 60))

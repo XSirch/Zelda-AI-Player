@@ -1,0 +1,2134 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-06",
+  "scope": "observed_camera_ownership_and_causal_return",
+  "native_adapter_version": "3.14",
+  "native_adapter_rebuilt_this_change": false,
+  "native_mode_primary_source": "Shipwright-AI/soh/include/z64player.h:690",
+  "native_first_person_state1_mask": 1048576,
+  "diagnosis": {
+    "suite": "g1-e6ab03d3b008",
+    "stationary_ground_failures": 18,
+    "all_had_first_person_flag": true,
+    "all_had_zero_displacement": true,
+    "all_consumed_ground_actions": true,
+    "failure_was_camera_ownership_not_proof_of_collision": true
+  },
+  "software_replay": {
+    "software_replay_only": true,
+    "source": "soh",
+    "suite": "g1-e6ab03d3b008",
+    "recorded_stage": "episode-1/stage-020",
+    "native_first_person_flag": true,
+    "prior_actual_attempt": {
+      "failure": "no_geometric_progress",
+      "consumed_actions": 41,
+      "no_physical_displacement": true
+    },
+    "results": [
+      {
+        "planner": "current-collision-exploration-plan-v12",
+        "selected_task": "observed_cell",
+        "old_task_accepts_current_observed_cell_during_first_person": true,
+        "initial_phase": "execute",
+        "task_target": [
+          434.18658447265625,
+          -0.0,
+          221.9678955078125
+        ],
+        "collision_cells": 71
+      },
+      {
+        "planner": "current-collision-exploration-plan-v13",
+        "selected_task": "observed_camera_return",
+        "initial_phase": "prepare",
+        "collision_cells": 71,
+        "task_target": [
+          714.1865844726562,
+          -0.0,
+          501.9678955078125
+        ],
+        "selected_ground_candidates": 0
+      }
+    ],
+    "not_gameplay_success_or_training_labels": true
+  },
+  "controlled_native_qa": {
+    "suite_id": "g1-ebc7ea64e95d",
+    "scope": "controlled_first_person_return_qa",
+    "planned_episodes": 2,
+    "successful_episodes": 2,
+    "native_processes": 1,
+    "native_groups": 1,
+    "normal_resets_verified": 1,
+    "return_tasks_successful": 4,
+    "return_tasks_planned": 4,
+    "scripted_camera_setup_is_campaign_success": false,
+    "known_setup_button_packets": 4,
+    "consumed_return_button_packets": 4,
+    "return_button_source": "causal_context_controller",
+    "context_binding_discoveries": 2,
+    "context_binding_replays": 2,
+    "training_updates": 0,
+    "provider_calls": 0,
+    "screenshots": 0,
+    "demonstration_labels": 0,
+    "reference_analog_blend": 0,
+    "source_pins": {
+      "pins_verified": 89,
+      "matching_archives": []
+    },
+    "frozen_artifacts_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "walking_candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "attached_candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "strict_utf8_finite_native_json_files": 26,
+    "post_shutdown_integrity": true,
+    "owned_processes_remaining": 0,
+    "episodes": [
+      {
+        "index": 1,
+        "success": true,
+        "normal_reset": false,
+        "fresh_normal_save_loads": 1,
+        "house_exit_and_attached_descent_verified": true,
+        "cycles": [
+          {
+            "index": 1,
+            "success": true,
+            "task_kind": "observed_camera_return",
+            "task_version": "observed-camera-return-v1",
+            "effect": "first_person_closed",
+            "verification_frames": 3,
+            "distinct_stopped_closed_frame_samples": 5,
+            "consumed_return_actions": 13,
+            "consumed_return_button_packets": 1,
+            "unowned_return_button_packets": 0,
+            "known_physical_setup_button": "C_UP",
+            "setup_pressed_equals_released": true,
+            "learned_key": "first_person:3:return:none:-1",
+            "empirically_learned_button": "A",
+            "binding_successes_in_episode": 1,
+            "binding_persistence": "ephemeral_observed_control_attempts",
+            "return_sources": {
+              "local_task": 6,
+              "interaction_probe": 2,
+              "dialogue_disengage": 5
+            },
+            "postclose_requested_packets": 5,
+            "postclose_buttons_all_zero": true,
+            "requested_stick_all_zero": true,
+            "objective_unchanged": true,
+            "training_updates": 0,
+            "release_guard_kind": "camera_return"
+          },
+          {
+            "index": 2,
+            "success": true,
+            "task_kind": "observed_camera_return",
+            "task_version": "observed-camera-return-v1",
+            "effect": "first_person_closed",
+            "verification_frames": 3,
+            "distinct_stopped_closed_frame_samples": 5,
+            "consumed_return_actions": 12,
+            "consumed_return_button_packets": 1,
+            "unowned_return_button_packets": 0,
+            "known_physical_setup_button": "C_UP",
+            "setup_pressed_equals_released": true,
+            "learned_key": "first_person:3:return:none:-1",
+            "empirically_learned_button": "A",
+            "binding_successes_in_episode": 2,
+            "binding_persistence": "ephemeral_observed_control_attempts",
+            "return_sources": {
+              "local_task": 6,
+              "interaction_memory": 2,
+              "camera_return_disengage": 1,
+              "dialogue_disengage": 3
+            },
+            "postclose_requested_packets": 5,
+            "postclose_buttons_all_zero": true,
+            "requested_stick_all_zero": true,
+            "objective_unchanged": true,
+            "training_updates": 0,
+            "release_guard_kind": "camera_return"
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "success": true,
+        "normal_reset": true,
+        "fresh_normal_save_loads": 1,
+        "house_exit_and_attached_descent_verified": true,
+        "cycles": [
+          {
+            "index": 1,
+            "success": true,
+            "task_kind": "observed_camera_return",
+            "task_version": "observed-camera-return-v1",
+            "effect": "first_person_closed",
+            "verification_frames": 3,
+            "distinct_stopped_closed_frame_samples": 5,
+            "consumed_return_actions": 13,
+            "consumed_return_button_packets": 1,
+            "unowned_return_button_packets": 0,
+            "known_physical_setup_button": "C_UP",
+            "setup_pressed_equals_released": true,
+            "learned_key": "first_person:3:return:none:-1",
+            "empirically_learned_button": "A",
+            "binding_successes_in_episode": 1,
+            "binding_persistence": "ephemeral_observed_control_attempts",
+            "return_sources": {
+              "local_task": 7,
+              "interaction_probe": 2,
+              "camera_return_disengage": 1,
+              "dialogue_disengage": 3
+            },
+            "postclose_requested_packets": 5,
+            "postclose_buttons_all_zero": true,
+            "requested_stick_all_zero": true,
+            "objective_unchanged": true,
+            "training_updates": 0,
+            "release_guard_kind": "camera_return"
+          },
+          {
+            "index": 2,
+            "success": true,
+            "task_kind": "observed_camera_return",
+            "task_version": "observed-camera-return-v1",
+            "effect": "first_person_closed",
+            "verification_frames": 3,
+            "distinct_stopped_closed_frame_samples": 5,
+            "consumed_return_actions": 12,
+            "consumed_return_button_packets": 1,
+            "unowned_return_button_packets": 0,
+            "known_physical_setup_button": "C_UP",
+            "setup_pressed_equals_released": true,
+            "learned_key": "first_person:3:return:none:-1",
+            "empirically_learned_button": "A",
+            "binding_successes_in_episode": 2,
+            "binding_persistence": "ephemeral_observed_control_attempts",
+            "return_sources": {
+              "local_task": 5,
+              "interaction_memory": 2,
+              "dialogue_disengage": 5
+            },
+            "postclose_requested_packets": 5,
+            "postclose_buttons_all_zero": true,
+            "requested_stick_all_zero": true,
+            "objective_unchanged": true,
+            "training_updates": 0,
+            "release_guard_kind": "camera_return"
+          }
+        ]
+      }
+    ]
+  },
+  "continuous_native_pilot": {
+    "suite_id": "g1-a00595d4c41f",
+    "planning_version": "current-collision-exploration-plan-v13",
+    "continuous_seconds": 300,
+    "planned_episodes": 2,
+    "attempted_episodes": 2,
+    "successful_objectives": 0,
+    "native_processes": 1,
+    "native_groups": 1,
+    "same_process_between_episodes": true,
+    "reset_planned": 1,
+    "reset_verified": 1,
+    "consumed_actions": 8453,
+    "walking_worker": {
+      "responses": 7937,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "retained_round_trip_samples": 4096,
+      "retained_output_age_samples": 4096,
+      "round_trip_window_covers_all_responses": false,
+      "round_trip_p95_ms": 6.6144000011263415,
+      "round_trip_max_ms": 36.745900000823895,
+      "sampled_output_age_max_ms": 93.14380000068923,
+      "camera_reprojected_outputs": 8622,
+      "camera_delta_max_deg": 13.463745117187488,
+      "physical_reaction_ms": null
+    },
+    "attached_worker": {
+      "responses": 144,
+      "expired_responses": 0,
+      "context_rejections": 0,
+      "retained_round_trip_samples": 144,
+      "retained_output_age_samples": 214,
+      "round_trip_window_covers_all_responses": true,
+      "round_trip_p95_ms": 7.0291000010911375,
+      "round_trip_max_ms": 7.751199998892844,
+      "sampled_output_age_max_ms": 68.947499999922,
+      "camera_reprojected_outputs": 0,
+      "camera_delta_max_deg": 0.0,
+      "physical_reaction_ms": null
+    },
+    "source_pins": {
+      "pins_verified": 89,
+      "matching_archives": []
+    },
+    "frozen_artifacts_sha256": {
+      "raw-controller-ppo-rnd-v3.pt": "389a3d830de6d29203f0919ae9d5f0c8c4cee9ccb28693b9cb168e1c4d16e262",
+      "route-graph-v1.json": "6c009664672280e2c187cba7ff46595e6ffdcf5cc5041065685489d866c199e4",
+      "room-map-v1.json": "97dcb41a41f7844750c58ff65e6aa8080c63643f8c149f14087246d558a1fa3f"
+    },
+    "walking_candidate_sha256": {
+      "candidate.json": "3225a7f39496bb519824ac7cfe8d48f966c6ad588661b8c5034e6a8ef16b87c1",
+      "heads.safetensors": "e01a5a6470b260671722c7b1d1ee53079f84fc4546252ee94d04f484a441e720"
+    },
+    "attached_candidate_sha256": {
+      "candidate.json": "ec380f5fcc273deff0e65770fdd112f273c57d1c924947c25648e3b0305e49dc",
+      "heads.safetensors": "78684b23e4a72a7ace28ed89d2bfc573b77fa433dcc968cc9d2e50d5c4e415f6"
+    },
+    "native_executable_sha256": "afe987ba59145defcef89d1378fcc8b2bc281a00d81fd536ebcec7ee6e61fe96",
+    "post_shutdown_integrity": true,
+    "strict_utf8_finite_native_json_files": 96,
+    "episodes": [
+      {
+        "index": 1,
+        "attempted": true,
+        "objective_success": false,
+        "reason": "session_budget_exhausted",
+        "reset": null,
+        "fresh_normal_loads": 1,
+        "elapsed_seconds": 299.82922450000115,
+        "consumed_actions": 4238,
+        "raw_button_actions": 0,
+        "objective_unchanged": true,
+        "objective_acquired_in_run": false,
+        "verified_landings": 1,
+        "post_descent_walks_successful": 4,
+        "planning": {
+          "version": "current-collision-exploration-plan-v13",
+          "replans": 33,
+          "actual_scene_room_transitions": 7,
+          "occupied_macro_regions": 29,
+          "occupied_ground_floor_samples": 322,
+          "failed_target_regions": 17,
+          "max_outward_radius": 894.2230555678522,
+          "observed_context_actions": {
+            "attack": 169,
+            "down": 82,
+            "speak": 2,
+            "grab": 317,
+            "check": 150,
+            "putaway": 66
+          },
+          "verified_opened_containers": 0,
+          "verified_read_actor_contexts": 0,
+          "failed_departures": 0,
+          "departure_deferrals": 0,
+          "durable_progress_revision": 0,
+          "memory": "ephemeral_actual_positions_and_attempts_only",
+          "last_selection": {
+            "observation_seq": 5826,
+            "full_seq": 5826,
+            "monotonic_s": 29454.295356,
+            "mesh_cells": 76,
+            "reachable_floor_candidates": 35,
+            "cooled_floor_candidates": 0,
+            "eligible_floor_candidates": 28,
+            "reachable_short_floor_candidates": 0,
+            "cooled_short_floor_candidates": 0,
+            "eligible_short_floor_candidates": 0,
+            "cooled_departure_candidates": 0,
+            "container_recovery_candidates": 0,
+            "visibly_open_containers_skipped": 0,
+            "eligible_collectible_candidates": 0,
+            "eligible_upward_candidates": 1,
+            "read_context_deferred": false
+          }
+        },
+        "stages": [
+          {
+            "name": "stage-001",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 102,
+            "verification_frames": 3,
+            "after_verified_landing": false
+          },
+          {
+            "name": "stage-002",
+            "kind": "observed_descent_approach",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "unsupported_locomotor_mode",
+            "consumed_actions": 11,
+            "verification_frames": 0,
+            "after_verified_landing": false
+          },
+          {
+            "name": "stage-003",
+            "kind": "ladder_down",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 73,
+            "verification_frames": 3,
+            "after_verified_landing": false
+          },
+          {
+            "name": "stage-004",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "consumed_actions": 16,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-005",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 63,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-006",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 329,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-007",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 193,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-008",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 271,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-009",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 15,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-010",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 29,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-011",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 17,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-012",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 23,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-013",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 117,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-014",
+            "kind": "observed_portal",
+            "success": false,
+            "phase": "failed",
+            "failure": "observed_approach_exhausted",
+            "consumed_actions": 229,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-015",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 197,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-016",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 55,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-017",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 53,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-018",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 193,
+            "verification_frames": 1,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-019",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 306,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-020",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 331,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-021",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 122,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-022",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 43,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-023",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 41,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-024",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 21,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-025",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 9,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-026",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 163,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-027",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 327,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-028",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 291,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-029",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 45,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-030",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 41,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-031",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 19,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-032",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 9,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-033",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 279,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-034",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 205,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          }
+        ],
+        "actual_resource_gains": [],
+        "disk_confirmed_save_observations": [
+          {
+            "count": 1,
+            "last_scene": 85,
+            "last_saved_at_ms": 29174976,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 2,
+            "last_scene": 41,
+            "last_saved_at_ms": 29237804,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 3,
+            "last_scene": 85,
+            "last_saved_at_ms": 29325022,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 4,
+            "last_scene": 41,
+            "last_saved_at_ms": 29354924,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 5,
+            "last_scene": 85,
+            "last_saved_at_ms": 29380528,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 6,
+            "last_scene": 41,
+            "last_saved_at_ms": 29420789,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 7,
+            "last_scene": 85,
+            "last_saved_at_ms": 29453640,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          }
+        ],
+        "progress_disk_callbacks": [],
+        "visible_lid_observation_counts": {},
+        "visible_lid_reference_samples": [],
+        "phases": [
+          {
+            "kind": "observed_portal",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 7
+          },
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "failure": "unsupported_locomotor_mode",
+            "count": 1
+          },
+          {
+            "kind": "ladder_down",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 4
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "count": 7
+          },
+          {
+            "kind": "observed_collectible_approach",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "count": 12
+          },
+          {
+            "kind": "observed_portal",
+            "phase": "failed",
+            "failure": "observed_approach_exhausted",
+            "count": 1
+          }
+        ],
+        "recorded_fresh_states": 4819,
+        "initial_rupees": 39,
+        "final_rupees": 39,
+        "upward_floor_attempts": [
+          {
+            "stage": "stage-004",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "target_rise": 17.168323516845703,
+            "actual_rise": 0.0,
+            "verification_frames": 0,
+            "consumed_actions": 16
+          },
+          {
+            "stage": "stage-005",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 17.25271224975586,
+            "actual_rise": 17.120525360107422,
+            "verification_frames": 3,
+            "consumed_actions": 63
+          },
+          {
+            "stage": "stage-006",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "target_rise": 62.87947463989258,
+            "actual_rise": 62.87947463989258,
+            "verification_frames": 0,
+            "consumed_actions": 329
+          },
+          {
+            "stage": "stage-020",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "target_rise": 10.26835823059082,
+            "actual_rise": 0.0,
+            "verification_frames": 0,
+            "consumed_actions": 331
+          },
+          {
+            "stage": "stage-027",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "target_rise": 10.26835823059082,
+            "actual_rise": 3.8261008262634277,
+            "verification_frames": 0,
+            "consumed_actions": 327
+          },
+          {
+            "stage": "stage-034",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "target_rise": 10.26835823059082,
+            "actual_rise": 0.0,
+            "verification_frames": 0,
+            "consumed_actions": 205
+          }
+        ],
+        "collectible_attempts": [
+          {
+            "stage": "stage-009",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "164",
+            "consumed_actions": 15,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "66",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-010",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "165",
+            "consumed_actions": 29,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "69",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-011",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "166",
+            "consumed_actions": 17,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "72",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-012",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "167",
+            "consumed_actions": 23,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "75",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-022",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "286",
+            "consumed_actions": 43,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "136",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-023",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "285",
+            "consumed_actions": 41,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "139",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-024",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "284",
+            "consumed_actions": 21,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "142",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-025",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "287",
+            "consumed_actions": 9,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "145",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-029",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "414",
+            "consumed_actions": 45,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "217",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-030",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "413",
+            "consumed_actions": 41,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "220",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-031",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "412",
+            "consumed_actions": 19,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "223",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-032",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "415",
+            "consumed_actions": 9,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "226",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "attempted": true,
+        "objective_success": false,
+        "reason": "session_budget_exhausted",
+        "reset": {
+          "success": true,
+          "same_native_process": true,
+          "consumed": true,
+          "reason": "observed_normal_title_reset",
+          "pressed_equals_released": true
+        },
+        "fresh_normal_loads": 1,
+        "elapsed_seconds": 299.62509130000035,
+        "consumed_actions": 4215,
+        "raw_button_actions": 15,
+        "objective_unchanged": true,
+        "objective_acquired_in_run": false,
+        "verified_landings": 1,
+        "post_descent_walks_successful": 18,
+        "planning": {
+          "version": "current-collision-exploration-plan-v13",
+          "replans": 47,
+          "actual_scene_room_transitions": 5,
+          "occupied_macro_regions": 45,
+          "occupied_ground_floor_samples": 436,
+          "failed_target_regions": 12,
+          "max_outward_radius": 1371.9472919984453,
+          "observed_context_actions": {
+            "attack": 142,
+            "down": 77,
+            "speak": 62,
+            "grab": 249,
+            "check": 414,
+            "next": 63,
+            "return": 17,
+            "putaway": 259
+          },
+          "verified_opened_containers": 0,
+          "verified_read_actor_contexts": 3,
+          "failed_departures": 0,
+          "departure_deferrals": 0,
+          "durable_progress_revision": 0,
+          "memory": "ephemeral_actual_positions_and_attempts_only",
+          "last_selection": {
+            "observation_seq": 12139,
+            "full_seq": 12139,
+            "monotonic_s": 29780.933333,
+            "mesh_cells": 50,
+            "reachable_floor_candidates": 30,
+            "cooled_floor_candidates": 10,
+            "eligible_floor_candidates": 12,
+            "reachable_short_floor_candidates": 0,
+            "cooled_short_floor_candidates": 0,
+            "eligible_short_floor_candidates": 0,
+            "cooled_departure_candidates": 0,
+            "container_recovery_candidates": 0,
+            "visibly_open_containers_skipped": 0,
+            "eligible_collectible_candidates": 0,
+            "eligible_upward_candidates": 0,
+            "read_context_deferred": false
+          }
+        },
+        "stages": [
+          {
+            "name": "stage-001",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 103,
+            "verification_frames": 3,
+            "after_verified_landing": false
+          },
+          {
+            "name": "stage-002",
+            "kind": "observed_descent_approach",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "unsupported_locomotor_mode",
+            "consumed_actions": 11,
+            "verification_frames": 0,
+            "after_verified_landing": false
+          },
+          {
+            "name": "stage-003",
+            "kind": "ladder_down",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 73,
+            "verification_frames": 3,
+            "after_verified_landing": false
+          },
+          {
+            "name": "stage-004",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "consumed_actions": 17,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-005",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 67,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-006",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 77,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-007",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 107,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-008",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 159,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-009",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "consumed_actions": 107,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-010",
+            "kind": "observed_context_interaction",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 220,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-011",
+            "kind": "observed_linear_dialogue",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 12,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-012",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 109,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-013",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 15,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-014",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 29,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-015",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 17,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-016",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 21,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-017",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 33,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-018",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 118,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-019",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 327,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-020",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 45,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-021",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 43,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-022",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 41,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-023",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 21,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-024",
+            "kind": "observed_collectible_approach",
+            "success": false,
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "consumed_actions": 9,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-025",
+            "kind": "observed_portal",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 171,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-026",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 327,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-027",
+            "kind": "observed_portal",
+            "success": false,
+            "phase": "failed",
+            "failure": "observed_approach_exhausted",
+            "consumed_actions": 257,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-028",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "consumed_actions": 25,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-029",
+            "kind": "observed_context_interaction",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 12,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-030",
+            "kind": "observed_linear_dialogue",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 16,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-031",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 139,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-032",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 115,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-033",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 127,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-034",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 109,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-035",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 103,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-036",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 111,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-037",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 131,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-038",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "consumed_actions": 33,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-039",
+            "kind": "observed_context_interaction",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 38,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-040",
+            "kind": "observed_linear_dialogue",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 62,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-041",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 25,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-042",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 199,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-043",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 115,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-044",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 117,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-045",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 75,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-046",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 17,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-047",
+            "kind": "observed_cell",
+            "success": true,
+            "phase": "succeeded",
+            "failure": null,
+            "consumed_actions": 73,
+            "verification_frames": 3,
+            "after_verified_landing": true
+          },
+          {
+            "name": "stage-048",
+            "kind": "observed_cell",
+            "success": false,
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "consumed_actions": 37,
+            "verification_frames": 0,
+            "after_verified_landing": true
+          }
+        ],
+        "actual_resource_gains": [],
+        "disk_confirmed_save_observations": [
+          {
+            "count": 7,
+            "last_scene": 85,
+            "last_saved_at_ms": 29453640,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 8,
+            "last_scene": 85,
+            "last_saved_at_ms": 29491612,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 9,
+            "last_scene": 41,
+            "last_saved_at_ms": 29556614,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 10,
+            "last_scene": 85,
+            "last_saved_at_ms": 29579368,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 11,
+            "last_scene": 41,
+            "last_saved_at_ms": 29604717,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          },
+          {
+            "count": 12,
+            "last_scene": 85,
+            "last_saved_at_ms": 29630627,
+            "last_reasons": [
+              "scene"
+            ],
+            "last_rupees": 39
+          }
+        ],
+        "progress_disk_callbacks": [],
+        "visible_lid_observation_counts": {},
+        "visible_lid_reference_samples": [],
+        "phases": [
+          {
+            "kind": "observed_portal",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 5
+          },
+          {
+            "kind": "observed_descent_approach",
+            "phase": "interrupted",
+            "failure": "unsupported_locomotor_mode",
+            "count": 1
+          },
+          {
+            "kind": "ladder_down",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 1
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "count": 4
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 18
+          },
+          {
+            "kind": "observed_context_interaction",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 3
+          },
+          {
+            "kind": "observed_linear_dialogue",
+            "phase": "succeeded",
+            "failure": null,
+            "count": 3
+          },
+          {
+            "kind": "observed_collectible_approach",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "count": 8
+          },
+          {
+            "kind": "observed_cell",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "count": 4
+          },
+          {
+            "kind": "observed_portal",
+            "phase": "failed",
+            "failure": "observed_approach_exhausted",
+            "count": 1
+          }
+        ],
+        "recorded_fresh_states": 4769,
+        "initial_rupees": 39,
+        "final_rupees": 39,
+        "upward_floor_attempts": [
+          {
+            "stage": "stage-004",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "target_rise": 17.168323516845703,
+            "actual_rise": 0.0,
+            "verification_frames": 0,
+            "consumed_actions": 17
+          },
+          {
+            "stage": "stage-005",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 18.053760528564453,
+            "actual_rise": 19.31954574584961,
+            "verification_frames": 3,
+            "consumed_actions": 67
+          },
+          {
+            "stage": "stage-006",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 21.491504669189453,
+            "actual_rise": 18.797286987304688,
+            "verification_frames": 3,
+            "consumed_actions": 77
+          },
+          {
+            "stage": "stage-007",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 21.53777313232422,
+            "actual_rise": 18.832366943359375,
+            "verification_frames": 3,
+            "consumed_actions": 107
+          },
+          {
+            "stage": "stage-008",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 23.050800323486328,
+            "actual_rise": 23.050800323486328,
+            "verification_frames": 3,
+            "consumed_actions": 159
+          },
+          {
+            "stage": "stage-019",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "target_rise": 10.26835823059082,
+            "actual_rise": 1.7765785455703735,
+            "verification_frames": 0,
+            "consumed_actions": 327
+          },
+          {
+            "stage": "stage-026",
+            "phase": "failed",
+            "failure": "attempt_timeout",
+            "target_rise": 10.26835823059082,
+            "actual_rise": 5.137321472167969,
+            "verification_frames": 0,
+            "consumed_actions": 327
+          },
+          {
+            "stage": "stage-037",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 15.351629257202148,
+            "actual_rise": 14.928939819335938,
+            "verification_frames": 3,
+            "consumed_actions": 131
+          },
+          {
+            "stage": "stage-038",
+            "phase": "interrupted",
+            "failure": "observed_context_interaction",
+            "target_rise": 20.634071350097656,
+            "actual_rise": -14.928939819335938,
+            "verification_frames": 0,
+            "consumed_actions": 33
+          },
+          {
+            "stage": "stage-041",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 19.051912307739258,
+            "actual_rise": 16.69724464416504,
+            "verification_frames": 3,
+            "consumed_actions": 25
+          },
+          {
+            "stage": "stage-046",
+            "phase": "succeeded",
+            "failure": null,
+            "target_rise": 8.261466979980469,
+            "actual_rise": 8.261466979980469,
+            "verification_frames": 3,
+            "consumed_actions": 17
+          }
+        ],
+        "collectible_attempts": [
+          {
+            "stage": "stage-013",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "692",
+            "consumed_actions": 15,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "305",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-014",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "693",
+            "consumed_actions": 29,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "308",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-015",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "694",
+            "consumed_actions": 17,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "311",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-016",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "695",
+            "consumed_actions": 21,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "314",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-021",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "814",
+            "consumed_actions": 43,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "367",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-022",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "813",
+            "consumed_actions": 41,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "370",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-023",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "812",
+            "consumed_actions": 21,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "373",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          },
+          {
+            "stage": "stage-024",
+            "phase": "failed",
+            "failure": "collectible_no_resource_gain",
+            "actor_uid": "815",
+            "consumed_actions": 9,
+            "contact_seen": true,
+            "actual_positive_deltas": {},
+            "verification_frames": 0,
+            "initial_room_scope_had_target": true,
+            "initial_room_scope_truncated": false,
+            "health_before": 48,
+            "health_after": 48,
+            "max_health_before": 48,
+            "actual_item_events": [
+              {
+                "id": "376",
+                "detail": "131:Recovery Heart"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "seed": 4106400,
+    "save_slot": 2,
+    "provider_calls": 0,
+    "screenshots": 0,
+    "training_updates": 0,
+    "reference_analog_blend": 0,
+    "operator_game_inputs": 0,
+    "unowned_buttons": 0,
+    "goal_complete": false,
+    "owned_processes_remaining": 0,
+    "upward_floor_phases": {
+      "interrupted": 3,
+      "succeeded": 8,
+      "failed": 6
+    },
+    "collectible_phases": {
+      "failed": 20
+    },
+    "camera_return_stages": 0,
+    "native_gain_save_and_reload_qualified": false,
+    "full_campaign_qualified": false
+  },
+  "validation": {
+    "pytest": "658 passed, 25 skipped",
+    "web_build_exit_code": 0,
+    "native_cpp_checks": "not rerun; no native source change",
+    "focused_ruff": "changed sources/tests passed; runtime E731 excluded after exact baseline verification",
+    "preexisting_runtime_ruff": "E731 reserve lambda exists in pre-camera source",
+    "checks": [
+      {
+        "check": "pytest",
+        "exit_code": 0,
+        "seconds": 20.985436099999788,
+        "last_lines": [
+          "  C:\\Projetos\\Zelda-AI-Player\\.venv\\Lib\\site-packages\\fastapi\\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.",
+          "    from starlette.testclient import TestClient as TestClient  # noqa",
+          "",
+          "-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html",
+          "658 passed, 25 skipped, 1 warning in 19.03s"
+        ]
+      },
+      {
+        "check": "web",
+        "exit_code": 0,
+        "seconds": 1.495764399998734,
+        "last_lines": [
+          "dist/index.html                   0.42 kB │ gzip:  0.31 kB",
+          "dist/assets/index-CnY9zsst.css   11.96 kB │ gzip:  3.09 kB",
+          "dist/assets/index-CaOZbqcv.js   241.90 kB │ gzip: 75.69 kB",
+          "",
+          "✓ built in 91ms"
+        ]
+      }
+    ]
+  },
+  "qualification": {
+    "first_person_return_in_controlled_native_qa": true,
+    "reliable_general_navigation": false,
+    "new_resource_gain_saved_and_reloaded": false,
+    "kokiri_sword": false,
+    "full_campaign": false,
+    "goal_status": "active"
+  }
+}
